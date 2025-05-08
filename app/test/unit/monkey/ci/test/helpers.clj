@@ -212,8 +212,10 @@
 (defn gen-entity [t]
   (gen/generate (spec/gen t)))
 
-(defn gen-cust []
-  (gen-entity :entity/customer))
+(defn gen-org []
+  (gen-entity :entity/org))
+
+(def ^:deprecated gen-cust gen-org)
 
 (defn gen-repo []
   (gen-entity :entity/repo))
@@ -224,8 +226,10 @@
 (defn gen-ssh-key []
   (gen-entity :entity/ssh-key))
 
-(defn gen-customer-params []
-  (gen-entity :entity/customer-params))
+(defn gen-org-params []
+  (gen-entity :entity/org-params))
+
+(def ^:deprecated gen-customer-params gen-org-params)
 
 (defn gen-user []
   (gen-entity :entity/user))
@@ -250,9 +254,11 @@
 (defn- update-amount [x]
   (update x :amount bigdec))
 
-(defn gen-cust-credit []
-  (-> (gen-entity :entity/customer-credit)
+(defn gen-org-credit []
+  (-> (gen-entity :entity/org-credit)
       (update-amount)))
+
+(def ^:deprecated gen-cust-credit gen-org-credit)
 
 (defn gen-credit-subs []
   (-> (gen-entity :entity/credit-subscription)

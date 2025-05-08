@@ -1,5 +1,5 @@
-(ns monkey.ci.web.api.customer
-  "Specific customer api routes"
+(ns monkey.ci.web.api.org
+  "Specific org api routes"
   (:require [clojure.tools.logging :as log]
             [java-time.api :as jt]
             [medley.core :as mc]
@@ -14,7 +14,7 @@
 (def query-params (comp :query :parameters))
 
 (defn- repo->out [r]
-  (dissoc r :customer-id))
+  (dissoc r :org-id))
 
 (defn- repos->out
   "Converts the project repos into output format"
@@ -22,46 +22,46 @@
   (some-> p
           (mc/update-existing :repos (comp (partial map repo->out) vals))))
 
-(defn- save-customer [st cust]
+(defn- save-org [st cust]
   ;; Since the getter converts repos to a list, convert it back here before saving
   (letfn [(repos->map [{:keys [repos] :as cust}]
             (cond-> cust
               (sequential? repos) (update :repos (partial zipmap (map :id repos)))))]
-    (st/save-customer st (repos->map cust))))
+    (st/save-org st (repos->map cust))))
 
-(c/make-entity-endpoints "customer"
-                         {:get-id (c/id-getter :customer-id)
-                          :getter (comp repos->out st/find-customer)
-                          :saver save-customer})
+(c/make-entity-endpoints "org"
+                         {:get-id (c/id-getter :org-id)
+                          :getter (comp repos->out st/find-org)
+                          :saver save-org})
 
 (defn- maybe-link-user [req st cust-id]
   (let [user (:identity req)
         user? (every-pred :type)]
-    ;; When a user is creating the customer, link them up
+    ;; When a user is creating the org, link them up
     (if (user? user)
-      (st/save-user st (update user :customers conj cust-id))
-      (log/warn "No user in request, so creating customer that is not linked to a user."))))
+      (st/save-user st (update user :orgs conj cust-id))
+      (log/warn "No user in request, so creating org that is not linked to a user."))))
 
 (defn- create-subscription [st cust-id]
   (let [ts (t/now)
         cs {:id (cuid/random-cuid)
-            :customer-id cust-id
+            :org-id cust-id
             :amount config/free-credits
             :valid-from ts}]
     (when (st/save-credit-subscription st cs)
-      (st/save-customer-credit st {:id (cuid/random-cuid)
-                                   :customer-id cust-id
-                                   :subscription-id (:id cs)
-                                   :type :subscription
-                                   :amount (:amount cs)
-                                   :from-time ts}))))
+      (st/save-org-credit st {:id (cuid/random-cuid)
+                              :org-id cust-id
+                              :subscription-id (:id cs)
+                              :type :subscription
+                              :amount (:amount cs)
+                              :from-time ts}))))
 
-(defn create-customer [req]
+(defn create-org [req]
   ;; Remove the transaction when it's configured on all endpoints
   (st/with-transaction (c/req->storage req) st
     (let [creator (c/entity-creator (fn [_ cust]
                                       ;; Use trx storage
-                                      (st/save-customer st cust))
+                                      (st/save-org st cust))
                                     c/default-id)]
       (when-let [reply (creator req)]
         (let [cust-id (get-in reply [:body :id])]
@@ -69,12 +69,12 @@
           (create-subscription st cust-id)
           reply)))))
 
-(defn search-customers [req]
+(defn search-orgs [req]
   (let [f (query-params req)]
     (if (empty? f)
       (-> (rur/response {:message "Query must be specified"})
           (rur/status 400))
-      (rur/response (st/search-customers (c/req->storage req) f)))))
+      (rur/response (st/search-orgs (c/req->storage req) f)))))
 
 (def query->since (comp :since query-params))
 
@@ -84,29 +84,29 @@
   (- (t/now) (t/hours->millis h)))
 
 (defn recent-builds
-  "Fetches all builds for the customer that were executed in the past 24 hours, or since
+  "Fetches all builds for the org that were executed in the past 24 hours, or since
    a given query parameter.  Or the last x builds.  If both query parameters are provided,
    it will do a logical `and` (meaning: the builds from the recent period, and the last 
    number of builds)."
   [req]
   (let [st (c/req->storage req)
-        cid (c/customer-id req)
+        cid (c/org-id req)
         n (:n (query-params req))]
-    (if (st/find-customer st cid)
+    (if (st/find-org st cid)
       (let [rb (st/list-builds-since st cid (or (query->since req)
                                                 (hours-ago 24)))
             nb (when (number? n) (st/find-latest-n-builds st cid n))]
         (->> (concat rb nb)
              (distinct)
              (rur/response)))
-      (rur/not-found {:message "Customer not found"}))))
+      (rur/not-found {:message "Org not found"}))))
 
 (defn latest-builds
-  "Fetches the latest build for each repo for the customer.  This is used in the customer
+  "Fetches the latest build for each repo for the org.  This is used in the org
    overview screen."
   [req]
   (-> (st/find-latest-builds (c/req->storage req)
-                             (c/customer-id req))
+                             (c/org-id req))
       (rur/response)))
 
 (def default-tz "Z")
@@ -153,7 +153,7 @@
          (sort-by :date))))
 
 (defn stats
-  "Retrieves customer statistics, since given time and grouped by specified zone
+  "Retrieves org statistics, since given time and grouped by specified zone
    offset (or UTC if none given)"
   [req]
   (try
@@ -166,9 +166,9 @@
                        (t/now))
           dates    (->> (t/date-seq (jt/offset-date-time since zone))
                         (take-while (partial jt/after? (jt/offset-date-time until zone))))
-          cid      (c/customer-id req)
+          cid      (c/org-id req)
           builds   (st/list-builds-since st cid since)
-          ccos     (st/list-customer-credit-consumptions-since st cid since)
+          ccos     (st/list-org-credit-consumptions-since st cid since)
           elapsed  (-> (group-by-date dates zone builds :start-time)
                        (elapsed-seconds))
           consumed (-> (group-by-date dates zone ccos :consumed-at)
@@ -183,9 +183,9 @@
       (c/error-response (ex-message ex) 400))))
 
 (defn credits
-  "Returns details of customer credits"
+  "Returns details of org credits"
   [req]
   (let [s (c/req->storage req)
-        cust-id (c/customer-id req)
+        cust-id (c/org-id req)
         avail (st/calc-available-credits s cust-id)]
     (rur/response {:available avail})))

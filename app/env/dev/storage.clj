@@ -17,15 +17,15 @@
   ([]
    (make-storage (storage-config))))
 
-(defn get-customer
-  "Retrieves customer info for the current config"
+(defn get-org
+  "Retrieves org info for the current config"
   []
-  (s/find-customer (make-storage)
-                   (get-in @c/global-config [:account :customer-id])))
+  (s/find-org (make-storage)
+              (get-in @c/global-config [:account :org-id])))
 
-(defn update-customer
+(defn update-org
   [upd]
-  (s/save-customer (make-storage) upd))
+  (s/save-org (make-storage) upd))
 
 (defn list-builds
   "Lists builds according to current account settings"

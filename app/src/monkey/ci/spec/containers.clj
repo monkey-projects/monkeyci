@@ -12,7 +12,7 @@
   (s/keys :req-un [::b/build ::log-maker]
           :opt-un [::dev-mode? ::c/artifacts ::c/cache]))
 
-(s/def ::customer-id c/id?)
+(s/def ::org-id c/id?)
 (s/def ::repo-id c/id?)
 (s/def ::build-id c/id?)
 (s/def ::job-id c/id?)
@@ -23,5 +23,5 @@
 (s/def ::image-tag string?)
 
 (s/def ::promtail-config
-  (s/keys :req-un [::customer-id ::repo-id ::build-id ::job-id ::loki-url]
+  (s/keys :req-un [::org-id ::repo-id ::build-id ::job-id ::loki-url]
           :opt-un [::token ::image-url ::image-tag]))

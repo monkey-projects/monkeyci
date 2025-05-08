@@ -21,7 +21,7 @@
              [http :as wh]
              [middleware :as wm]]
             [monkey.ci.web.api
-             [customer :as cust-api]
+             [org :as org-api]
              [invoice :as inv-api]
              [join-request :as jr-api]
              [params :as param-api]
@@ -54,25 +54,25 @@
   {:name Name
    :value c/not-empty-str})
 
-(s/defschema NewCustomer
+(s/defschema NewOrg
   {:name Name})
 
-(s/defschema UpdateCustomer
-  (assoc-id NewCustomer))
+(s/defschema UpdateOrg
+  (assoc-id NewOrg))
 
-(s/defschema SearchCustomer
+(s/defschema SearchOrg
   {(s/optional-key :name) s/Str
    (s/optional-key :id) s/Str})
 
 (s/defschema NewWebhook
-  {:customer-id Id
+  {:org-id Id
    :repo-id Id})
 
 (s/defschema UpdateWebhook
   (assoc-id NewWebhook))
 
 (s/defschema NewRepo
-  {:customer-id Id
+  {:org-id Id
    :name Name
    :url s/Str
    (s/optional-key :main-branch) Id
@@ -108,14 +108,14 @@
 
 (s/defschema Parameters
   {(s/optional-key :id) Id
-   (s/optional-key :customer-id) Id
+   (s/optional-key :org-id) Id
    :parameters [ParameterValue]
    (s/optional-key :description) s/Str
    :label-filters [LabelFilter]})
 
 (s/defschema SshKeys
   {(s/optional-key :id) Id
-   (s/optional-key :customer-id) Id
+   (s/optional-key :org-id) Id
    :private-key s/Str
    :public-key s/Str ; TODO It may be possible to extract public key from private
    (s/optional-key :description) s/Str
@@ -126,7 +126,7 @@
    :type-id s/Any
    (s/optional-key :id) Id ; Internal id
    (s/optional-key :email) s/Str
-   (s/optional-key :customers) [Id]})
+   (s/optional-key :orgs) [Id]})
 
 (s/defschema EmailRegistration
   {:email s/Str})
@@ -175,9 +175,9 @@
                                      :body s/Any}}
                  :middleware [:bitbucket-security]}]))]))
 
-(def customer-parameter-routes
+(def org-parameter-routes
   ["/param"
-   [["" {:get  {:handler param-api/get-customer-params}
+   [["" {:get  {:handler param-api/get-org-params}
          :put  {:handler param-api/update-params
                 :parameters {:body [Parameters]}}
          :post {:handler param-api/create-param
@@ -192,8 +192,8 @@
 (def repo-parameter-routes
   ["/param" {:get {:handler param-api/get-repo-params}}])
 
-(def customer-ssh-keys-routes
-  ["/ssh-keys" {:get {:handler ssh-api/get-customer-ssh-keys}
+(def org-ssh-keys-routes
+  ["/ssh-keys" {:get {:handler ssh-api/get-org-ssh-keys}
                 :put {:handler ssh-api/update-ssh-keys
                       :parameters {:body [SshKeys]}}}])
 
@@ -274,15 +274,15 @@
        (conj watch-routes))])
 
 (s/defschema JoinRequestSchema
-  {:customer-id Id
+  {:org-id Id
    (s/optional-key :message) s/Str})
 
 (s/defschema JoinRequestResponse
   {(s/optional-key :message) s/Str})
 
-(def customer-join-request-routes
+(def org-join-request-routes
   ["/join-request"
-   [["" {:get {:handler jr-api/list-customer-join-requests}}]
+   [["" {:get {:handler jr-api/list-org-join-requests}}]
     ["/:request-id"
      {:parameters {:path {:request-id Id}}}
      [["/approve"
@@ -296,24 +296,24 @@
   ["/events" {:get {:handler api/event-stream
                     :parameters {:query {(s/optional-key :authorization) s/Str}}}}])
 
-(def customer-build-routes
+(def org-build-routes
   ["/builds"
    [["/recent"
-     {:get {:handler cust-api/recent-builds
+     {:get {:handler org-api/recent-builds
             :parameters (assoc-in since-params
                                   [:query (s/optional-key :n)] s/Int)}}]
     ["/latest"
-     {:get {:handler cust-api/latest-builds}}]]])
+     {:get {:handler org-api/latest-builds}}]]])
 
 (def stats-routes
-  ["/stats" {:get {:handler cust-api/stats
+  ["/stats" {:get {:handler org-api/stats
                    :parameters (assoc-in since-params
                                          [:query (s/optional-key :zone-offset)] s/Str)}}])
 
 (def credit-routes
-  ["/credits" {:get {:handler cust-api/credits}}])
+  ["/credits" {:get {:handler org-api/credits}}])
 
-(def cust-webhook-routes
+(def org-webhook-routes
   ["/webhook"
    [["/bitbucket" {:get {:handler bitbucket/list-webhooks
                          :parameters
@@ -338,27 +338,27 @@
             :parameters
             {:path {:invoice-id Id}}}}]]])
 
-(def customer-routes
-  ["/customer"
-   {:middleware [:customer-check]}
+(def org-routes
+  ["/org"
+   {:middleware [:org-check]}
    (c/generic-routes
-    {:creator cust-api/create-customer
-     :updater cust-api/update-customer
-     :getter  cust-api/get-customer
-     :searcher cust-api/search-customers
-     :new-schema NewCustomer
-     :update-schema UpdateCustomer
-     :search-schema SearchCustomer
-     :id-key :customer-id
+    {:creator org-api/create-org
+     :updater org-api/update-org
+     :getter  org-api/get-org
+     :searcher org-api/search-orgs
+     :new-schema NewOrg
+     :update-schema UpdateOrg
+     :search-schema SearchOrg
+     :id-key :org-id
      :child-routes [repo-routes
-                    customer-parameter-routes
-                    customer-ssh-keys-routes
-                    customer-join-request-routes
+                    org-parameter-routes
+                    org-ssh-keys-routes
+                    org-join-request-routes
                     event-stream-routes
-                    customer-build-routes
+                    org-build-routes
                     stats-routes
                     credit-routes
-                    cust-webhook-routes
+                    org-webhook-routes
                     invoice-routes]})])
 
 (def github-routes
@@ -415,9 +415,9 @@
     ["/:user-id"
      {:parameters
       {:path {:user-id s/Str}}}
-     [["/customers"
+     [["/orgs"
        {:get
-        {:handler api/get-user-customers}}]
+        {:handler api/get-user-orgs}}]
       user-join-request-routes]]
     ["/:user-type/:type-id"
      {:parameters
@@ -442,7 +442,7 @@
    ["/version" {:get version}]
    ["/metrics" {:get metrics}]
    webhook-routes
-   customer-routes
+   org-routes
    github-routes
    bitbucket-routes
    auth-routes
@@ -484,8 +484,8 @@
            [github/validate-security (constantly (get-in (rt/config rt) [:github :webhook-secret]))]
            :bitbucket-security
            [bitbucket/validate-security]
-           :customer-check
-           [auth/customer-authorization]
+           :org-check
+           [auth/org-authorization]
            :sysadmin-check
            [auth/sysadmin-authorization]}
           (mc/map-vals (partial non-dev rt)))}))

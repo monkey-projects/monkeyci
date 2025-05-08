@@ -94,67 +94,67 @@
   ([type]
    [global (name type)]))
 
-(def customer-sid (partial global-sid :customers))
+(def org-sid (partial global-sid :orgs))
 
-(defn save-customer [s cust]
-  (p/write-obj s (customer-sid (:id cust)) cust))
+(defn save-org [s cust]
+  (p/write-obj s (org-sid (:id cust)) cust))
 
-(defn find-customer [s id]
-  (p/read-obj s (customer-sid id)))
+(defn find-org [s id]
+  (p/read-obj s (org-sid id)))
 
-(def find-customers
-  "Fetches multiple customers, without repos"
+(def find-orgs
+  "Fetches multiple orgs, without repos"
   (override-or
-   [:customer :find-multiple]
+   [:org :find-multiple]
    (fn [s ids]
      (->> ids
           (distinct)
-          (map (partial find-customer s))))))
+          (map (partial find-org s))))))
 
-(def search-customers
-  "Searches customers using given filter"
+(def search-orgs
+  "Searches orgs using given filter"
   (override-or
-   [:customer :search]
+   [:org :search]
    (fn [s {:keys [id name]}]
      (cond
        id
-       (->> [(find-customer s id)]
+       (->> [(find-org s id)]
             (remove nil?))
        
        name
        ;; Naive approach, should be overridden by implementations
-       (->> (p/list-obj s (global-sid :customers))
-            (map (partial find-customer s))
+       (->> (p/list-obj s (global-sid :orgs))
+            (map (partial find-org s))
             (filter (comp #(cs/includes? % name) :name)))
        
        :else
        []))))
 
 (def save-repo
-  "Saves the repository by updating the customer it belongs to"
+  "Saves the repository by updating the org it belongs to"
   (override-or
    [:repo :save]
-   (fn [s {:keys [customer-id id] :as r}]
-     (-> (update-obj s (customer-sid customer-id) assoc-in [:repos id] r)
+   (fn [s {:keys [org-id id] :as r}]
+     (-> (update-obj s (org-sid org-id) assoc-in [:repos id] r)
          ;; Return repo sid
          (conj id)))))
 
 (def find-repo
-  "Reads the repo, as part of the customer object's projects"
+  "Reads the repo, as part of the org object's projects"
   (override-or
    [:repo :find]
    (fn 
      [s [cust-id id]]
-     (some-> (find-customer s cust-id)
+     (some-> (find-org s cust-id)
              (get-in [:repos id])
-             (assoc :customer-id cust-id)))))
+             (assoc :org-id cust-id)))))
 
 (def update-repo
   "Applies `f` to the repo with given sid"
   (override-or
    [:repo :update]
    (fn [s [cust-id repo-id] f & args]
-     (apply update-obj s (customer-sid cust-id) update-in [:repos repo-id] f args))))
+     (apply update-obj s (org-sid cust-id) update-in [:repos repo-id] f args))))
 
 (declare list-build-ids)
 (declare builds)
@@ -166,7 +166,7 @@
   (override-or
    [:repo :delete]
    (fn [s [cust-id repo-id :as sid]]
-     (when (some? (update-obj s (customer-sid cust-id) update :repos dissoc repo-id))
+     (when (some? (update-obj s (org-sid cust-id) update :repos dissoc repo-id))
        ;; Delete all builds
        (->> (list-build-ids s sid)
             (map (comp sid/->sid (partial concat [builds] sid) vector))
@@ -175,17 +175,17 @@
        ;; Delete webhooks
        (->> (p/list-obj s (webhook-sid))
             (map (partial find-webhook s))
-            (filter (comp (partial = sid) (juxt :customer-id :repo-id)))
+            (filter (comp (partial = sid) (juxt :org-id :repo-id)))
             (map (comp (partial p/delete-obj s) webhook-sid :id))
             (doall))
        true))))
 
 (def list-repo-display-ids
-  "Lists all display ids for the repos for given customer"
+  "Lists all display ids for the repos for given org"
   (override-or
    [:repo :list-display-ids]
    (fn [s cust-id]
-     (->> (find-customer s cust-id)
+     (->> (find-org s cust-id)
           :repos
           keys))))
 
@@ -205,7 +205,7 @@
    repo entity and returns it."
   (override-or
    [:watched-github-repos :watch]
-   (fn [s {:keys [customer-id id github-id] :as r}]
+   (fn [s {:keys [org-id id github-id] :as r}]
      (let [repo-sid (save-repo s r)]
        ;; Add the repo sid to the list of watched repos for the github id
        (update-obj s (watched-sid github-id) (fnil conj []) (ext-repo-sid repo-sid))
@@ -247,7 +247,7 @@
    (fn [s sid]
      (->> (p/list-obj s (webhook-sid))
           (map (partial find-webhook s))
-          (filter (comp (partial = sid) (juxt :customer-id :repo-id)))
+          (filter (comp (partial = sid) (juxt :org-id :repo-id)))
           (map (comp (partial find-webhook s) :id))
           (doall)))))
 
@@ -265,14 +265,14 @@
   (p/read-obj s (bb-webhook-sid id)))
 
 (def search-bb-webhooks
-  "Retrieves bitbucket webhook that match given filter, and adds customer and repo ids."
-  (let [wh-props #{:customer-id :repo-id}]
+  "Retrieves bitbucket webhook that match given filter, and adds org and repo ids."
+  (let [wh-props #{:org-id :repo-id}]
     (override-or
      [:bitbucket :search-webhooks]
      (fn [s f]
        (letfn [(add-webhook [bb-wh]
                  (merge bb-wh (-> (find-webhook s (:webhook-id bb-wh))
-                                  (select-keys [:customer-id :repo-id]))))
+                                  (select-keys [:org-id :repo-id]))))
                (matches-filter? [bb-wh]
                  (= f (select-keys bb-wh (keys f))))]
          (->> (p/list-obj s (bb-webhook-sid))
@@ -287,10 +287,10 @@
    (fn [s wh-id]
      (some-> (search-bb-webhooks s {:webhook-id wh-id})
              (first)
-             (dissoc :customer-id :repo-id)))))
+             (dissoc :org-id :repo-id)))))
 
 (def builds "builds")
-(def build-sid-keys [:customer-id :repo-id :build-id])
+(def build-sid-keys [:org-id :repo-id :build-id])
 ;; Build sid, for external representation
 (def ext-build-sid (apply juxt build-sid-keys))
 (def build-sid (comp (partial into [builds])
@@ -405,11 +405,11 @@
           (find-build s)))))
 
 (def find-latest-builds
-  "Retrieves all latest builds for all repos for the customer"
+  "Retrieves all latest builds for all repos for the org"
   (override-or
-   [:customer :find-latest-builds]
+   [:org :find-latest-builds]
    (fn [s cust-id]
-     (let [cust (find-customer s cust-id)]
+     (let [cust (find-org s cust-id)]
        (->> cust
             :repos
             vals
@@ -417,11 +417,11 @@
             (map (partial find-latest-build s)))))))
 
 (def find-latest-n-builds
-  "Retrieves the latest `n` builds, over all repos for the customer."
+  "Retrieves the latest `n` builds, over all repos for the org."
   (override-or
-   [:customer :find-latest-n-builds]
+   [:org :find-latest-n-builds]
    (fn [s cust-id n]
-     (let [cust (find-customer s cust-id)]
+     (let [cust (find-org s cust-id)]
        (->> cust
             :repos
             vals
@@ -432,13 +432,13 @@
             (take n))))))
 
 (def list-builds-since
-  "Retrieves all builds for customer since the given timestamp"
+  "Retrieves all builds for org since the given timestamp"
   (override-or
    [:build :list-since]
    (fn [s cust-id ts]
      (letfn [(since? [b]
                (>= (:start-time b) ts))]
-       (->> (find-customer s cust-id)
+       (->> (find-org s cust-id)
             :repos
             keys
             (mapcat #(list-builds s [cust-id %]))
@@ -459,16 +459,16 @@
      (some-> (find-build s (sid/->sid (take 3 job-sid)))
              (get-in [:script :jobs (nth job-sid 3)])))))
 
-(defn params-sid [customer-id & [param-id]]
-  ;; All parameters for a customer are stored together
-  (cond-> ["build-params" customer-id]
+(defn params-sid [org-id & [param-id]]
+  ;; All parameters for a org are stored together
+  (cond-> ["build-params" org-id]
     param-id (conj param-id)))
 
 (defn find-params [s cust-id]
   (p/read-obj s (params-sid cust-id)))
 
 (defn save-params
-  "Saves all customer parameters at once"
+  "Saves all org parameters at once"
   [s cust-id p]
   (p/write-obj s (params-sid cust-id) p))
 
@@ -482,34 +482,34 @@
           (first)))))
 
 (def save-param
-  "Saves a single customer parameter"
+  "Saves a single org parameter"
   (override-or
    [:param :save]
-   (fn [s {:keys [customer-id] :as p}]
-     (let [all (find-params s customer-id)
+   (fn [s {:keys [org-id] :as p}]
+     (let [all (find-params s org-id)
            match (->> all
                       (filter (cp/prop-pred :id (:id p)))
                       (first))]
        (when (save-params
               s
-              customer-id
+              org-id
               (if match
                 (replace {match p} all)
                 (conj (vec all) p)))
-         (params-sid customer-id (:id p)))))))
+         (params-sid org-id (:id p)))))))
 
 (def delete-param
   "Deletes a single parameter set by sid"
   (override-or
    [:param :delete]
-   (fn [s [_ customer-id param-id]]
-     (let [all (find-params s customer-id)
+   (fn [s [_ org-id param-id]]
+     (let [all (find-params s org-id)
            matcher (cp/prop-pred :id param-id)
            exists? (some matcher all)]
        (when exists?
          (save-params
           s
-          customer-id
+          org-id
           (remove matcher all))
          true)))))
 
@@ -555,14 +555,14 @@
               (filter (comp (partial = id) :id))
               (first)))))))
 
-(def list-user-customers
+(def list-user-orgs
   (override-or
-   [:user :customers]
+   [:user :orgs]
    (fn [s id]
      (some->> id
               (find-user s)
-              :customers
-              (map (partial find-customer s))))))
+              :orgs
+              (map (partial find-org s))))))
 
 (def join-requests "join-requests")
 (def join-request-sid (partial global-sid (keyword join-requests)))
@@ -585,16 +585,16 @@
        (filter f)))
 
 (def list-user-join-requests
-  "Retrieves all customer join requests for that user"
+  "Retrieves all org join requests for that user"
   (override-or
    [:join-request :list-user]
    #(list-join-requests %1 (comp (partial = %2) :user-id))))
 
-(def list-customer-join-requests
-  "Retrieves all customer join requests for that customer"
+(def list-org-join-requests
+  "Retrieves all org join requests for that org"
   (override-or
-   [:join-request :list-customer]
-   #(list-join-requests %1 (comp (partial = %2) :customer-id))))
+   [:join-request :list-org]
+   #(list-join-requests %1 (comp (partial = %2) :org-id))))
 
 (def delete-join-request
   (override-or
@@ -642,31 +642,31 @@
 (defn delete-email-registration [s id]
   (p/delete-obj s (email-registration-sid id)))
 
-(def customer-credits :customer-credits)
-(def customer-credit-sid (partial global-sid customer-credits))
+(def org-credits :org-credits)
+(def org-credit-sid (partial global-sid org-credits))
 
-(defn save-customer-credit [s cred]
-  (p/write-obj s (customer-credit-sid (:id cred)) cred))
+(defn save-org-credit [s cred]
+  (p/write-obj s (org-credit-sid (:id cred)) cred))
 
-(defn find-customer-credit [s id]
-  (p/read-obj s (customer-credit-sid id)))
+(defn find-org-credit [s id]
+  (p/read-obj s (org-credit-sid id)))
 
-(def list-customer-credits
+(def list-org-credits
   (override-or
-   [:customer :list-credits]
+   [:org :list-credits]
    (fn [s cust-id]
-     (->> (p/list-obj s (customer-credit-sid))
-          (map (partial find-customer-credit s))
-          (filter (cp/prop-pred :customer-id cust-id))))))
+     (->> (p/list-obj s (org-credit-sid))
+          (map (partial find-org-credit s))
+          (filter (cp/prop-pred :org-id cust-id))))))
 
-(def list-customer-credits-since
-  "Lists all customer credits for the customer since given timestamp.  
+(def list-org-credits-since
+  "Lists all org credits for the org since given timestamp.  
    This includes those without a `from-time`."
   (override-or
-   [:customer :list-credits-since]
+   [:org :list-credits-since]
    (fn [s cust-id ts]
-     (->> (list-customer-credits s cust-id)
-          (filter (every-pred (cp/prop-pred :customer-id cust-id)
+     (->> (list-org-credits s cust-id)
+          (filter (every-pred (cp/prop-pred :org-id cust-id)
                               (comp (some-fn nil? (partial <= ts)) :from-time)))))))
 
 (def credit-subscriptions :credit-subscriptions)
@@ -674,7 +674,7 @@
   (into [global (name credit-subscriptions)] parts))
 
 (defn save-credit-subscription [s cs]
-  (p/write-obj s (credit-sub-sid (:customer-id cs) (:id cs)) cs))
+  (p/write-obj s (credit-sub-sid (:org-id cs) (:id cs)) cs))
 
 (defn find-credit-subscription [s sid]
   (p/read-obj s (apply credit-sub-sid sid)))
@@ -682,9 +682,9 @@
 (defn delete-credit-subscription [s sid]
   (p/delete-obj s (apply credit-sub-sid sid)))
 
-(def list-customer-credit-subscriptions
+(def list-org-credit-subscriptions
   (override-or
-   [:customer :list-credit-subscriptions]
+   [:org :list-credit-subscriptions]
    (fn [st cust-id]
      (let [sid (credit-sub-sid cust-id)]
        (->> (p/list-obj st sid)
@@ -701,7 +701,7 @@
                 (<= valid-from at)
                 (or (nil? valid-until) (< at valid-until))))]
        (->> (p/list-obj s (credit-sub-sid))
-            (mapcat (partial list-customer-credit-subscriptions s))
+            (mapcat (partial list-org-credit-subscriptions s))
             (filter active?))))))
 
 (def credit-consumptions :credit-consumptions)
@@ -709,25 +709,25 @@
   (into [global (name credit-consumptions)] parts))
 
 (defn save-credit-consumption [s cs]
-  (p/write-obj s (credit-cons-sid (:customer-id cs) (:id cs)) cs))
+  (p/write-obj s (credit-cons-sid (:org-id cs) (:id cs)) cs))
 
 (defn find-credit-consumption [s sid]
   (p/read-obj s sid))
 
-(def list-customer-credit-consumptions
+(def list-org-credit-consumptions
   (override-or
-   [:customer :list-credit-consumptions]
+   [:org :list-credit-consumptions]
    (fn [st cust-id]
      (let [sid (credit-cons-sid cust-id)]
        (->> (p/list-obj st sid)
             (map (partial conj sid))
             (map (partial find-credit-consumption st)))))))
 
-(def list-customer-credit-consumptions-since
+(def list-org-credit-consumptions-since
   (override-or
-   [:customer :list-credit-consumptions-since]
+   [:org :list-credit-consumptions-since]
    (fn [st cust-id since]
-     (->> (list-customer-credit-consumptions st cust-id)
+     (->> (list-org-credit-consumptions st cust-id)
           (filter (comp (partial <= since) :consumed-at))))))
 
 (defn- sum-amount [e]
@@ -736,33 +736,33 @@
        (reduce + 0M)))
 
 (def list-available-credits
-  "Lists all available customer credits.  These are the credits that have not been fully
+  "Lists all available org credits.  These are the credits that have not been fully
    consumed, i.e. the difference between the amount and the sum of all consumptions linked
    to the credit is positive."
   (override-or
-   [:customer :list-available-credits]
+   [:org :list-available-credits]
    (fn [s cust-id]
-     (let [consm (->> (list-customer-credit-consumptions s cust-id)
+     (let [consm (->> (list-org-credit-consumptions s cust-id)
                       (group-by :credit-id))
            avail? (fn [{:keys [id amount]}]
                     (->> (get consm id)
                          (sum-amount)
                          (- amount)
                          pos?))]
-       (->> (list-customer-credits s cust-id)
+       (->> (list-org-credits s cust-id)
             (filter avail?))))))
 
 (def calc-available-credits
-  "Calculates the available credits for the customer.  Basically this is the
+  "Calculates the available credits for the org.  Basically this is the
    amount of provisioned credits, substracted by the consumed credits."
   (override-or
-   [:customer :get-available-credits]
+   [:org :get-available-credits]
    (fn [s cust-id]
      ;; Naive implementation: sum up all provisioned credits and all
      ;; credits from all builds
-     (let [avail (->> (list-customer-credits s cust-id)
+     (let [avail (->> (list-org-credits s cust-id)
                       (sum-amount))
-           used  (->> (list-customer-credit-consumptions s cust-id)
+           used  (->> (list-org-credit-consumptions s cust-id)
                       (sum-amount))]
        (- avail used)))))
 
@@ -771,7 +771,7 @@
   (into [global (name crypto)] parts))
 
 (defn save-crypto [st crypto]
-  (p/write-obj st (crypto-sid (:customer-id crypto)) crypto))
+  (p/write-obj st (crypto-sid (:org-id crypto)) crypto))
 
 (defn find-crypto [st cust-id]
   (p/read-obj st (crypto-sid cust-id)))
@@ -791,14 +791,14 @@
   (into [global (name invoice)] parts))
 
 (defn save-invoice [st invoice]
-  (p/write-obj st (invoice-sid (:customer-id invoice) (:id invoice)) invoice))
+  (p/write-obj st (invoice-sid (:org-id invoice) (:id invoice)) invoice))
 
 (defn find-invoice [st sid]
   (p/read-obj st (apply invoice-sid sid)))
 
-(def list-invoices-for-customer
+(def list-invoices-for-org
   (override-or
-   [:invoice :list-for-customer]
+   [:invoice :list-for-org]
    (fn [st cust-id]
      (->> (p/list-obj st (invoice-sid cust-id))
           (map (partial vector cust-id))

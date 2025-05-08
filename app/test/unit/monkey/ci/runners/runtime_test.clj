@@ -16,7 +16,7 @@
 (def runner-config
   (assoc tc/base-config
          :checkout-base-dir "/base/dir"
-         :build {:customer-id "test-cust"
+         :build {:org-id "test-cust"
                  :repo-id "test-repo"
                  :build-id "test-build"
                  :sid ["test" "build"]}

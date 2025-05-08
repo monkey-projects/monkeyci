@@ -26,7 +26,7 @@
 (s/def :entity/timed
   (s/keys :opt-un [:entity/start-time :entity/end-time]))
 
-(s/def :entity/customer
+(s/def :entity/org
   (-> (s/keys :req-un [:entity/name])
       (s/merge :entity/common)))
 
@@ -38,11 +38,11 @@
 
 (s/def :entity/labels (s/coll-of :entity/label))
 
-(s/def :entity/customer-id ::c/cuid)
+(s/def :entity/org-id ::c/cuid)
 (s/def :entity/github-id int?)
 
 (s/def :entity/repo
-  (s/keys :req-un [:entity/customer-id :entity/name :display/id]
+  (s/keys :req-un [:entity/org-id :entity/name :display/id]
           :opt-un [:git/url :git/main-branch :entity/github-id :entity/labels]))
 
 (s/def :entity/repo-id string?)
@@ -52,7 +52,7 @@
 (s/def :entity/message string?)
 
 (s/def :entity/build
-  (-> (s/keys :req-un [:entity/build-id :entity/customer-id :entity/repo-id :entity/idx :build/source]
+  (-> (s/keys :req-un [:entity/build-id :entity/org-id :entity/repo-id :entity/idx :build/source]
               :opt-un [:build/status :entity/script :build/git :entity/credits :entity/message])
       (s/merge :entity/timed)))
 
@@ -72,7 +72,7 @@
 (s/def :entity/secret-key string?)
 
 (s/def :entity/webhook
-  (-> (s/keys :req-un [:entity/customer-id :entity/repo-id :entity/secret-key])
+  (-> (s/keys :req-un [:entity/org-id :entity/repo-id :entity/secret-key])
       (s/merge :entity/common)))
 
 (s/def :label-filter/label string?)
@@ -87,13 +87,13 @@
 (s/def :ssh/public-key string?)
 
 (s/def :entity/ssh-key
-  (-> (s/keys :req-un [:entity/customer-id :ssh/private-key :ssh/public-key
+  (-> (s/keys :req-un [:entity/org-id :ssh/private-key :ssh/public-key
                        :entity/description]
               :opt-un [:entity/label-filters])
       (s/merge :entity/common)))
 
-(s/def :entity/customer-params
-  (-> (s/keys :req-un [:entity/customer-id :entity/parameters]
+(s/def :entity/org-params
+  (-> (s/keys :req-un [:entity/org-id :entity/parameters]
               :opt-un [:entity/description :entity/label-filters])
       (s/merge :entity/common)))
 
@@ -105,11 +105,11 @@
 (s/def :user/type #{:github :bitbucket})
 (s/def :user/type-id string?)
 (s/def :entity/email string?)
-(s/def :user/customers (s/coll-of :entity/id))
+(s/def :user/orgs (s/coll-of :entity/id))
 
 (s/def :entity/user
   (-> (s/keys :req-un [:user/type :user/type-id]
-              :opt-un [:entity/email :user/customers])
+              :opt-un [:entity/email :user/orgs])
       (s/merge :entity/common)))
 
 (s/def :entity/user-id ::c/cuid)
@@ -118,7 +118,7 @@
 (s/def :join-request/response-msg string?)
 
 (s/def :entity/join-request
-  (-> (s/keys :req-un [:entity/user-id :entity/customer-id :join-request/status]
+  (-> (s/keys :req-un [:entity/user-id :entity/org-id :join-request/status]
               :opt-un [:join-request/request-msg :join-request/response-msg])
       (s/merge :entity/common)))
 
@@ -133,7 +133,7 @@
 (s/def :entity/valid-until ts?)
 
 (s/def :entity/credit-subscription
-  (-> (s/keys :req-un [:entity/customer-id :entity/amount :entity/valid-from]
+  (-> (s/keys :req-un [:entity/org-id :entity/amount :entity/valid-from]
               :opt-un [:entity/valid-until])
       (s/merge :entity/common)))
 
@@ -141,8 +141,8 @@
 (s/def :entity/reason string?)
 (s/def :entity/subscription-id ::c/cuid)
 
-(s/def :entity/customer-credit
-  (-> (s/keys :req-un [:entity/customer-id :entity/amount :credit/type]
+(s/def :entity/org-credit
+  (-> (s/keys :req-un [:entity/org-id :entity/amount :credit/type]
               :opt-un [:entity/from-time :entity/user-id :entity/subscription-id :entity/reason])
       (s/merge :entity/common)))
 
@@ -150,7 +150,7 @@
 (s/def :entity/consumed-at ts?)
 
 (s/def :entity/credit-consumption
-  (-> (s/keys :req-un [:entity/credit-id :entity/customer-id :entity/repo-id :entity/build-id
+  (-> (s/keys :req-un [:entity/credit-id :entity/org-id :entity/repo-id :entity/build-id
                        :entity/amount :entity/consumed-at])
       (s/merge :entity/common)))
 
@@ -167,7 +167,7 @@
                     #(sg/fixed-byte-array 16)))
 
 (s/def :entity/crypto
-  (s/keys :req-un [:entity/customer-id :entity/iv]))
+  (s/keys :req-un [:entity/org-id :entity/iv]))
 
 (s/def :entity/password string?)
 
@@ -175,7 +175,7 @@
   (s/keys :req-un [:entity/user-id :entity/password]))
 
 (s/def :entity/invoice
-  (-> (s/keys :req-un [:entity/customer-id :invoice/kind :invoice/invoice-nr :invoice/date
+  (-> (s/keys :req-un [:entity/org-id :invoice/kind :invoice/invoice-nr :invoice/date
                        :invoice/net-amount :invoice/vat-perc :invoice/currency
                        :invoice/details])
       (s/merge :entity/common)))

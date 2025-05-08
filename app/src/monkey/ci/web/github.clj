@@ -18,7 +18,7 @@
             [aleph.http :as http]
             [ring.util.response :as rur]))
 
-(def req->repo-sid (comp (juxt :customer-id :repo-id) :path :parameters))
+(def req->repo-sid (comp (juxt :org-id :repo-id) :path :parameters))
 
 (defn validate-security
   "Middleware that validates the github security header using a fn that retrieves
@@ -34,8 +34,8 @@
    send other types of requests."
   (comp (partial = "push") github-event))
 
-(defn- find-ssh-keys [{st :storage} customer-id repo-id]
-  (let [repo (s/find-repo st [customer-id repo-id])]
+(defn- find-ssh-keys [{st :storage} org-id repo-id]
+  (let [repo (s/find-repo st [org-id repo-id])]
     (c/find-ssh-keys st repo)))
 
 (defn- file-changes
@@ -53,10 +53,10 @@
    configuration, a build structure is returned, which will be sent in a `build/triggered`
    event and eventually passed on to a runner.  Creating the entity in the database is
    up to the event handler, to ensure uniqueness of assigned ids."
-  [{st :storage :as rt} {:keys [customer-id repo-id] :as init-build} payload]
+  [{st :storage :as rt} {:keys [org-id repo-id] :as init-build} payload]
   (let [{:keys [master-branch clone-url ssh-url private]} (:repository payload)
         commit-id (get-in payload [:head-commit :id])
-        ssh-keys (find-ssh-keys rt customer-id repo-id)]
+        ssh-keys (find-ssh-keys rt org-id repo-id)]
     (-> init-build
         (assoc :id (s/new-id)
                :git (-> payload
@@ -78,7 +78,7 @@
     (create-build
      rt
      (-> details
-         (select-keys [:customer-id :repo-id])
+         (select-keys [:org-id :repo-id])
          (assoc :webhook-id id
                 :source :github-webhook))
      payload)
@@ -87,9 +87,9 @@
 (defn create-app-build
   "Creates a build as triggered from an app call.  This does not originate from a
    webhook, but rather from a watched repo."
-  [rt {:keys [customer-id id]} payload]
+  [rt {:keys [org-id id]} payload]
   (create-build rt
-                {:customer-id customer-id
+                {:org-id org-id
                  :repo-id id
                  :source :github-app}
                 payload))
@@ -141,7 +141,7 @@
   (let [st (c/req->storage req)
         repo (get-in req [:parameters :body])
         existing (when-let [id (:id repo)]
-                   (s/find-repo st [(:customer-id repo) id]))
+                   (s/find-repo st [(:org-id repo) id]))
         with-id (if existing
                   (merge existing repo)
                   (assoc repo :id (c/gen-repo-display-id st repo)))]

@@ -49,33 +49,33 @@
                      (sut/login)
                      :status))))))
 
-(deftest list-customer-credits
+(deftest list-org-credits
   (let [{st :storage :as rt} (trt/test-runtime)
-        cust (h/gen-cust)
-        cred (-> (h/gen-cust-credit)
-                 (assoc :customer-id (:id cust)))]
-    (is (sid/sid? (st/save-customer st cust)))
-    (is (sid/sid? (st/save-customer-credit st cred)))
+        org (h/gen-org)
+        cred (-> (h/gen-org-credit)
+                 (assoc :org-id (:id org)))]
+    (is (sid/sid? (st/save-org st org)))
+    (is (sid/sid? (st/save-org-credit st cred)))
     
-    (testing "returns list of issued credits for customer"
+    (testing "returns list of issued credits for org"
       (let [resp (-> rt
                      (h/->req)
-                     (assoc-in [:parameters :path :customer-id] (:id cust))
-                     (sut/list-customer-credits))]
+                     (assoc-in [:parameters :path :org-id] (:id org))
+                     (sut/list-org-credits))]
         (is (= 200 (:status resp)))
         (is (not-empty (:body resp)))))))
 
 (deftest issue-credits
   (h/with-memory-store st
-    (let [cust (h/gen-cust)]
-      (testing "creates new customer credits in db"
+    (let [org (h/gen-org)]
+      (testing "creates new org credits in db"
         (let [user (h/gen-user)
               resp (-> {:storage st}
                        (h/->req)
                        (h/with-identity user)
                        (assoc :parameters
                               {:path
-                               {:customer-id (:id cust)}
+                               {:org-id (:id org)}
                                :body
                                {:amount 1000M}})
                        (sut/issue-credits))]
@@ -100,14 +100,14 @@
             today (ts->date-str now)
             from  (- now 1000)
             until (+ now (t/hours->millis (* 24 40)))
-            cust  (h/gen-cust)
+            org  (h/gen-org)
             sub   (-> (h/gen-credit-subs)
-                      (assoc :customer-id (:id cust)
+                      (assoc :org-id (:id org)
                              :amount 200M
                              :valid-from from
                              :valid-until until))]
         
-        (is (st/save-customer st cust))
+        (is (st/save-org st org))
         (is (st/save-credit-subscription st sub))
         (is (not-empty (st/list-active-credit-subscriptions st now)))
 
@@ -117,7 +117,7 @@
               "expected credits to have been issued"))
         
         (testing "creates credit for each subscription"
-          (let [cc (st/list-customer-credits-since st (:id cust) 0)]
+          (let [cc (st/list-org-credits-since st (:id org) 0)]
             (is (= 1 (count cc)))
             (is (= [200M] (map :amount cc)))))
 
@@ -139,44 +139,44 @@
                              :credits))))
 
         (testing "when month has fewer days, also creates credits for missing days"
-          (let [cust (h/gen-cust)
+          (let [org (h/gen-org)
                 date (-> (jt/offset-date-time 2024 1 30)
                          (jt/with-offset 0) ; force UTC
                          (jt/to-millis-from-epoch))
                 cs {:id (cuid/random-cuid)
                     :valid-from date
                     :valid-until (+ date (t/hours->millis (* 24 100)))
-                    :customer-id (:id cust)
+                    :org-id (:id org)
                     :amount 100}]
-            (is (some? (st/save-customer st cust)))
+            (is (some? (st/save-org st org)))
             (is (some? (st/save-credit-subscription st cs)))
             (is (not-empty (->> (issue-at "2024-02-29")
                                 :body
                                 :credits)))))
 
         (testing "does not process when month has max days"
-          (let [cust (h/gen-cust)
+          (let [org (h/gen-org)
                 date (-> (jt/offset-date-time 2025 3 31)
                          (jt/with-offset 0) ; force UTC
                          (jt/to-millis-from-epoch))
                 cs {:id (cuid/random-cuid)
                     :valid-from date
                     :valid-until (+ date (t/hours->millis (* 24 100)))
-                    :customer-id (:id cust)
+                    :org-id (:id org)
                     :amount 150}]
-            (is (some? (st/save-customer st cust)))
+            (is (some? (st/save-org st org)))
             (is (some? (st/save-credit-subscription st cs)))
             (is (empty? (->> (issue-at "2024-04-01")
                              :body
                              :credits)))))
         
         (testing "ignores ad-hoc credit issuances"
-          (is (st/save-customer-credit st {:customer-id (:id cust)
-                                           :type :user
-                                           :amount 1000M
-                                           :valid-from (+ now 2000)}))
+          (is (st/save-org-credit st {:org-id (:id org)
+                                      :type :user
+                                      :amount 1000M
+                                      :valid-from (+ now 2000)}))
           (is (st/save-credit-subscription st (-> (h/gen-credit-subs)
-                                                  (assoc :customer-id (:id cust)
+                                                  (assoc :org-id (:id org)
                                                          :amount 300M
                                                          :valid-from from
                                                          :valid-until until))))
@@ -207,7 +207,7 @@
     (let [sid (repeatedly 3 cuid/random-cuid)
           rt (-> (trt/test-runtime)
                  (trt/set-process-reaper
-                  (constantly [(zipmap [:customer-id :repo-id :build-id] sid)])))
+                  (constantly [(zipmap [:org-id :repo-id :build-id] sid)])))
           resp (-> rt
                    (h/->req)
                    (sut/cancel-dangling-builds))]
@@ -221,18 +221,18 @@
 (deftest cancel-credit-subscription
   (testing "deletes when `valid-from` time is in the future"
     (let [{st :storage :as rt} (trt/test-runtime)
-          cust (h/gen-cust)
+          org (h/gen-org)
           cs {:id (cuid/random-cuid)
-              :customer-id (:id cust)
+              :org-id (:id org)
               :valid-from (+ (t/now) 1000)
               :amount 1000}]
-      (is (sid/sid? (st/save-customer st cust)))
+      (is (sid/sid? (st/save-org st org)))
       (is (sid/sid? (st/save-credit-subscription st cs)))
       (is (= 204 (-> (h/->req rt)
                      (assoc :parameters
                             {:path
-                             {:customer-id (:id cust)
+                             {:org-id (:id org)
                               :subscription-id (:id cs)}})
                      (sut/cancel-credit-subscription)
                      :status)))
-      (is (nil? (st/find-credit-subscription st [(:id cust) (:id cs)]))))))
+      (is (nil? (st/find-credit-subscription st [(:id org) (:id cs)]))))))

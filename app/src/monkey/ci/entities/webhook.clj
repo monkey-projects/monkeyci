@@ -4,13 +4,13 @@
             [monkey.ci.entities.core :as ec]))
 
 (def base-query
-  {:select [[:c.cuid :customer-id]
+  {:select [[:c.cuid :org-id]
             [:r.display-id :repo-id]
             [:w.cuid :id]
             [:w.secret :secret-key]]
    :from [[:webhooks :w]]
    :join [[:repos :r] [:= :r.id :w.repo-id]
-          [:customers :c] [:= :c.id :r.customer-id]]})
+          [:orgs :c] [:= :c.id :r.org-id]]})
 
 (defn select-webhooks-as-entity
   "Select the necessary properties for a webhook to return it as an entity."
@@ -22,7 +22,7 @@
 (defn by-cuid [cuid]
   [:= :w.cuid cuid])
 
-(defn by-repo [cust-id repo-id]
+(defn by-repo [org-id repo-id]
   [:and
-   [:= :c.cuid cust-id]
+   [:= :c.cuid org-id]
    [:= :r.display-id repo-id]])

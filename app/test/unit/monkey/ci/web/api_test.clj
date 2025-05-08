@@ -28,7 +28,7 @@
 
 (deftest create-repo
   (let [repo {:name "Test repo"
-              :customer-id (st/new-id)}
+              :org-id (st/new-id)}
         {st :storage :as rt} (trt/test-runtime)]
     
     (testing "generates id from repo name"
@@ -41,7 +41,7 @@
 
     (testing "on id collision, appends index"
       (let [new-repo {:name "Test repo"
-                      :customer-id (:customer-id repo)}
+                      :org-id (:org-id repo)}
             r (-> rt
                   (h/->req)
                   (h/with-body new-repo)
@@ -54,7 +54,7 @@
     (let [{st :storage :as rt} (trt/test-runtime)
           r (-> rt
                 (h/->req)
-                (h/with-body {:customer-id "test-customer"})
+                (h/with-body {:org-id "test-org"})
                 (sut/create-webhook))]
       (is (= 201 (:status r)))
       (is (string? (get-in r [:body :secret-key]))))))
@@ -75,7 +75,7 @@
 (deftest get-latest-build
   (testing "returns latest build"
     (let [{st :storage :as rt} (trt/test-runtime)
-          md {:customer-id "test-cust"
+          md {:org-id "test-cust"
               :repo-id "test-repo"}
           create-build (fn [ts]
                          (let [id (str "build-" ts)
@@ -95,7 +95,7 @@
   (testing "retrieves build by id"
     (let [{st :storage :as rt} (trt/test-runtime)
           id (st/new-id)
-          build {:customer-id "test-cust"
+          build {:org-id "test-cust"
                  :repo-id "test-repo"
                  :build-id id
                  :status :success}
@@ -124,7 +124,7 @@
                  :id))))
 
     (testing "contains other properties"
-      (let [build {:customer-id "test-cust"
+      (let [build {:org-id "test-cust"
                    :status :success}]
         (is (= build (sut/build->out build))))))
 
@@ -208,22 +208,22 @@
                                           :ping)
                               1000)))))
 
-  (testing "only sends events for customer specified in path"
+  (testing "only sends events for org specified in path"
     (let [sent (atom [])
-          cid "test-customer"
+          cid "test-org"
           bus (mb/event-bus)
           f (-> (h/->req {:update-bus bus})
-                (assoc-in [:parameters :path :customer-id] cid)
+                (assoc-in [:parameters :path :org-id] cid)
                 (sut/event-stream))
           _ (ms/consume (fn [evt]
                           (swap! sent conj (parse-event evt)))
                         (:body f))]
       (is (true? (publish bus {:type :build/updated
-                               :sid ["other-customer" "test-repo" "test-build"]})))
+                               :sid ["other-org" "test-repo" "test-build"]})))
       (is (true? (publish bus {:type :build/updated
                                :sid [cid "test-repo" "test-build"]})))
       (is (not= :timeout
-                (h/wait-until #(some (comp (partial = "test-customer")
+                (h/wait-until #(some (comp (partial = "test-org")
                                            first
                                            :sid)
                                      @sent)
@@ -266,15 +266,15 @@
     (let [{st :storage :as rt} (trt/test-runtime)
           [cid rid] (repeatedly st/new-id)
           repo {:id rid
-                :customer-id cid}
+                :org-id cid}
           ssh-key {:private-key "enc-private-key"
                    :public-key "public-key"}]
-      (is (st/sid? (st/save-customer st {:id cid
+      (is (st/sid? (st/save-org st {:id cid
                                          :repos {rid repo}})))
       (is (st/sid? (st/save-ssh-keys st cid [ssh-key])))
       (is (= [ssh-key]
              (-> (h/->req rt)
-                 (assoc-in [:parameters :path] {:customer-id cid
+                 (assoc-in [:parameters :path] {:org-id cid
                                                 :repo-id rid})
                  (sut/make-build-ctx repo)
                  :git
@@ -329,12 +329,12 @@
     (letfn [(with-repo [f]
               (let [cust-id (st/new-id)
                     repo (-> (h/gen-repo)
-                             (assoc :customer-id cust-id))
+                             (assoc :org-id cust-id))
                     cust (-> (h/gen-cust)
                              (assoc :id cust-id
                                     :repos {(:id repo) repo}))]
-                (st/save-customer st cust)
-                (st/save-customer-credit st {:customer-id cust-id
+                (st/save-org st cust)
+                (st/save-org-credit st {:org-id cust-id
                                              :amount 1000})
                 (f cust repo)))
 
@@ -354,7 +354,7 @@
                         res (-> rt
                                 (h/->req)
                                 (assoc :parameters p)
-                                (assoc-in [:parameters :path] {:customer-id (:id cust)
+                                (assoc-in [:parameters :path] {:org-id (:id cust)
                                                                :repo-id (:id repo)})
                                 (sut/trigger-build))]
                     (is (= 202 (:status res)))
@@ -383,14 +383,14 @@
       
       (testing "looks up url in repo config"
         (with-repo
-          (fn [{customer-id :id} {repo-id :id}]
-            (is (some? (st/save-customer st {:id customer-id
+          (fn [{org-id :id} {repo-id :id}]
+            (is (some? (st/save-org st {:id org-id
                                              :repos
                                              {repo-id
                                               {:id repo-id
                                                :url "http://test-url"}}})))
             (is (= "http://test-url"
-                   (-> (make-req {:path {:customer-id customer-id
+                   (-> (make-req {:path {:org-id org-id
                                          :repo-id repo-id}})
                        (sut/trigger-build)
                        (r/get-events)
@@ -426,7 +426,7 @@
         (verify-response
          {}
          (fn [{:keys [sid response]}]
-           (is (= 2 (count sid)) "expected sid to contain customer and repo id"))))
+           (is (= 2 (count sid)) "expected sid to contain org and repo id"))))
       
       (testing "does not create build in storage"
         (verify-trigger
@@ -445,14 +445,14 @@
       (testing "returns id"
         (with-repo
           (fn [cust repo]
-            (is (cuid/cuid? (-> (make-req {:path {:customer-id (:id cust)
+            (is (cuid/cuid? (-> (make-req {:path {:org-id (:id cust)
                                                   :repo-id (:id repo)}})
                                 (sut/trigger-build)
                                 :body
                                 :id))))))
 
       (testing "returns 404 (not found) when repo does not exist"
-        (is (= 404 (-> (make-req {:path {:customer-id "nonexisting"
+        (is (= 404 (-> (make-req {:path {:org-id "nonexisting"
                                          :repo-id "also-nonexisting"}})
                        (sut/trigger-build)
                        :status)))))))
@@ -463,7 +463,7 @@
           build (-> (h/gen-build)
                     (assoc :start-time 100
                            :end-time 200
-                           :customer-id (:customer-id repo)
+                           :org-id (:org-id repo)
                            :repo-id (:id repo)))
           make-req (fn [runner params]
                      (-> {:storage st
@@ -474,7 +474,7 @@
       (is (some? (st/save-repo st repo)))
 
       (let [r (-> (make-req (constantly "ok")
-                            {:path (select-keys build [:customer-id :repo-id :build-id])})
+                            {:path (select-keys build [:org-id :repo-id :build-id])})
                   (sut/retry-build))
             bid (-> r :body :id)]
         (testing "returns newly created build id"
@@ -494,9 +494,9 @@
       (testing "adds ssh keys"
         (let [ssh-keys [{:private-key "test-priv"
                          :public-key "test-pub"}]]
-          (is (some? (st/save-ssh-keys st (:customer-id build) ssh-keys)))
+          (is (some? (st/save-ssh-keys st (:org-id build) ssh-keys)))
           (let [r (-> (make-req (constantly "ok")
-                                {:path (select-keys build [:customer-id :repo-id :build-id])})
+                                {:path (select-keys build [:org-id :repo-id :build-id])})
                       (sut/retry-build))
                 b (-> r r/get-events first :build)]
             (is (some? b))
@@ -505,7 +505,7 @@
       (testing "returns 404 if build not found"
         (is (= 404 (-> (make-req (constantly "ok")
                                  {:path (-> build
-                                            (select-keys [:customer-id :repo-id])
+                                            (select-keys [:org-id :repo-id])
                                             (assoc :build-id "non-existing"))})
                        (sut/retry-build)
                        :status)))))))

@@ -23,7 +23,7 @@
   (assoc-in conf [:api :token] (gen-token conf)))
 
 (defn make-build [sid git-url branch]
-  (-> (zipmap [:customer-id :repo-id :build-id] sid)
+  (-> (zipmap [:org-id :repo-id :build-id] sid)
       (assoc :sid sid
              :git {:url git-url
                    :branch branch})))

@@ -1,20 +1,19 @@
 (ns monkey.ci.web.bitbucket-test
-  (:require
-   [buddy.sign.jwt :as jwt]
-   [clojure.spec.alpha :as spec]
-   [clojure.test :refer [deftest is testing]]
-   [monkey.ci.cuid :as cuid]
-   [monkey.ci.protocols :as p]
-   [monkey.ci.spec.build :as sb]
-   [monkey.ci.storage :as st]
-   [monkey.ci.test.aleph-test :as at]
-   [monkey.ci.test.helpers :as h]
-   [monkey.ci.test.mailman :as tmm]
-   [monkey.ci.test.runtime :as trt]
-   [monkey.ci.vault :as v]
-   [monkey.ci.web.auth :as auth]
-   [monkey.ci.web.bitbucket :as sut]
-   [monkey.ci.web.response :as r]))
+  (:require [buddy.sign.jwt :as jwt]
+            [clojure.test :refer [deftest is testing]]
+            [monkey.ci
+             [cuid :as cuid]
+             [protocols :as p]
+             [storage :as st]
+             [vault :as v]]
+            [monkey.ci.test
+             [aleph-test :as at]
+             [helpers :as h]
+             [runtime :as trt]]
+            [monkey.ci.web
+             [auth :as auth]
+             [bitbucket :as sut]
+             [response :as r]]))
 
 (deftest login
   (testing "when token request fails, returns 400 status"
@@ -86,7 +85,7 @@
 
 (deftest watch-repo
   (h/with-memory-store st
-    (let [cust (h/gen-cust)
+    (let [org (h/gen-org)
           ws "test-workspace"
           slug "test-bb-repo"
           bb-uuid (str (random-uuid))
@@ -102,20 +101,20 @@
                                  :headers {"Content-Type" "application/json"}
                                  :body (h/to-json {:uuid bb-uuid})})
                               {:status 401}))]
-        (is (some? (st/save-customer st cust)))
+        (is (some? (st/save-org st org)))
         (let [r (-> {:storage st
                      :config
                      {:api
                       {:ext-url "http://api.monkeyci.test"}}}
                     (h/->req)
-                    (assoc :uri "/customer/test-cust"
+                    (assoc :uri "/org/test-org"
                            :scheme :http
                            :headers {"host" "localhost"}
                            :parameters
                            {:path
-                            {:customer-id (:id cust)}
+                            {:org-id (:id org)}
                             :body
-                            {:customer-id (:id cust)
+                            {:org-id (:id org)
                              :workspace ws
                              :repo-slug slug
                              :url "http://bitbucket.org/test-repo"
@@ -125,7 +124,7 @@
           (is (= 201 (:status r)))
           
           (testing "creates repo in db"
-            (is (some? (st/find-repo st [(:id cust) (get-in r [:body :id])]))))
+            (is (some? (st/find-repo st [(:id org) (get-in r [:body :id])]))))
 
           (let [whs (->> (p/list-obj st (st/webhook-sid))
                          (map (partial st/find-webhook st)))
@@ -152,13 +151,13 @@
                 (is (= slug (:repo-slug bb-wh)))
                 (is (= ws (:workspace bb-wh)))))))))
 
-    (testing "404 if customer not found"
+    (testing "404 if org not found"
       (is (= 404 (-> {:storage st}
                      (h/->req)
-                     (assoc-in [:parameters :path :customer-id] "invalid-customer")
+                     (assoc-in [:parameters :path :org-id] "invalid-org")
                      (assoc :scheme :http
                             :headers {"host" "localhost"}
-                            :uri "/customer")
+                            :uri "/org")
                      (sut/watch-repo)
                      :status))))))
 
@@ -168,9 +167,9 @@
           repo-slug "test-repo"
           wh-uuid (str (random-uuid))
           repo (h/gen-repo)
-          cust (-> (h/gen-cust)
-                   (assoc :repos {(:id repo) repo}))
-          wh {:customer-id (:id cust)
+          org (-> (h/gen-org)
+                  (assoc :repos {(:id repo) repo}))
+          wh {:org-id (:id org)
               :repo-id (:id repo)
               :id (cuid/random-cuid)}
           bb-wh {:id (cuid/random-cuid)
@@ -180,7 +179,7 @@
                  :repo-slug repo-slug}
           inv (atom [])]
       
-      (is (some? (st/save-customer st cust)))
+      (is (some? (st/save-org st org)))
       (is (some? (st/save-webhook st wh)))
       (is (some? (st/save-bb-webhook st bb-wh)))
 
@@ -195,7 +194,7 @@
                        (h/->req)
                        (assoc :parameters
                               {:path
-                               {:customer-id (:id cust)
+                               {:org-id (:id org)
                                 :repo-id (:id repo)}})
                        (sut/unwatch-repo)
                        :status)))
@@ -221,15 +220,15 @@
                (trt/set-vault vault))
         repo (-> (h/gen-repo)
                  (assoc :url "http://test-url"))
-        cust (-> (h/gen-cust)
-                 (assoc :repos {(:id repo) repo}))
-        _ (st/save-customer s cust)
+        org (-> (h/gen-org)
+                (assoc :repos {(:id repo) repo}))
+        _ (st/save-org s org)
         wh {:id (cuid/random-cuid)
             :repo-id (:id repo)
-            :customer-id (:id cust)}
+            :org-id (:id org)}
         _ (st/save-webhook s wh)
-        _ (st/save-customer-credit s {:customer-id (:id cust)
-                                      :amount 1000})
+        _ (st/save-org-credit s {:org-id (:id org)
+                                 :amount 1000})
         req (-> rt
                 (h/->req)
                 (assoc :headers {"x-event-key" "repo:push"}
@@ -262,7 +261,7 @@
           (is (= "refs/heads/main" (:ref git)))))
 
       (testing "does not create build in storage"
-        (is (nil? (st/find-build s [(:id cust) (:id repo) (get-in resp [:body :build-id])])))))
+        (is (nil? (st/find-build s [(:id org) (:id repo) (get-in resp [:body :build-id])])))))
 
     (testing "adds configured encrypted ssh key matching repo labels"
       (let [iv (v/generate-iv)
@@ -270,8 +269,8 @@
                      :private-key "encrypted-key"}]
         (is (st/sid? (st/save-repo s (assoc repo :labels [{:name "ssh-lbl"
                                                            :value "lbl-val"}]))))
-        (is (st/sid? (st/save-ssh-keys s (:id cust) [ssh-key])))
-        (is (st/sid? (st/save-crypto s {:customer-id (:id cust)
+        (is (st/sid? (st/save-ssh-keys s (:id org) [ssh-key])))
+        (is (st/sid? (st/save-crypto s {:org-id (:id org)
                                         :iv iv})))
         (let [evts (-> (sut/webhook req)
                        (r/get-events))]
@@ -279,7 +278,7 @@
           (is (= [{:id (:id ssh-key)
                    :private-key "encrypted-key"}]
                  (-> evts first :build (get-in [:git :ssh-keys])))))))
-  
+    
     (testing "404 if webhook does not exist"
       (is (= 404 (-> rt
                      (h/->req)

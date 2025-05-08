@@ -47,7 +47,7 @@
                                                   (fs/canonicalize)
                                                   str)
                                          cwd)
-                       :customer-id "local-cust"
+                       :org-id "local-cust"
                        :repo-id "local-repo"
                        :build-id (b/local-build-id)}
                 dir (b/set-script-dir dir))
@@ -83,7 +83,7 @@
 
 (defn ^:deprecated list-builds [rt]
   (->> (http/get (apply format "%s/customer/%s/repo/%s/builds"
-                        ((juxt :url :customer-id :repo-id) (rt/account rt)))
+                        ((juxt :url :org-id :repo-id) (rt/account rt)))
                  {:headers {"accept" "application/edn"}})
        (deref)
        :body

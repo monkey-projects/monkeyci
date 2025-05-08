@@ -20,9 +20,9 @@
   (let [cid (cuid/random-cuid)
         {st :storage :as rt} (trt/test-runtime)
         _ (st/save-webhook st {:id "test-hook"
-                               :customer-id cid})
-        _ (st/save-customer-credit st {:customer-id cid
-                                       :amount 1000})
+                               :org-id cid})
+        _ (st/save-org-credit st {:org-id cid
+                                  :amount 1000})
         req (-> rt
                 (h/->req)
                 (assoc :headers {"x-github-event" "push"}
@@ -68,11 +68,11 @@
   (testing "triggers build on push for watched repo"
     (let [[gid cid] (repeatedly cuid/random-cuid)
           {s :storage :as rt} (trt/test-runtime)
-          sid (st/watch-github-repo s {:customer-id cid
+          sid (st/watch-github-repo s {:org-id cid
                                        :id "test-repo"
                                        :github-id gid})
-          _ (st/save-customer-credit s {:customer-id cid
-                                        :amount 1000})
+          _ (st/save-org-credit s {:org-id cid
+                                   :amount 1000})
           req (-> rt
                   (h/->req)
                   (assoc :headers {"x-github-event" "push"}
@@ -91,7 +91,7 @@
   (testing "ignores non-push events"
     (let [gid (cuid/random-cuid)
           {s :storage :as rt} (trt/test-runtime)
-          sid (st/watch-github-repo s {:customer-id "test-cust"
+          sid (st/watch-github-repo s {:org-id "test-org"
                                        :id "test-repo"
                                        :github-id gid})
           req (-> rt
@@ -117,7 +117,7 @@
       (is (empty? (r/get-events resp))))))
 
 (defn- test-webhook []
-  (zipmap [:id :customer-id :repo-id] (repeatedly st/new-id)))
+  (zipmap [:id :org-id :repo-id] (repeatedly st/new-id)))
 
 (deftest create-build
   (testing "file changes"
@@ -137,7 +137,7 @@
                  (:changes b))))))))
 
 (deftest create-webhook-build
-  (testing "does not create build record for customer/repo"
+  (testing "does not create build record for org/repo"
     (h/with-memory-store s
       (let [wh (test-webhook)]
         (is (st/sid? (st/save-webhook s wh)))
@@ -146,7 +146,7 @@
                                           {})]
           (is (some? r))
           (is (not (p/obj-exists? s (-> wh
-                                        (select-keys [:customer-id :repo-id])
+                                        (select-keys [:org-id :repo-id])
                                         (assoc :build-id (:build-id r))
                                         (st/build-sid)))))))))
 
@@ -240,12 +240,12 @@
   (testing "adds configured encrypted ssh key matching repo labels"
     (h/with-memory-store s
       (let [wh (test-webhook)
-            cid (:customer-id wh)
+            cid (:org-id wh)
             rid (:repo-id wh)
             ssh-key {:id "test-key"
                      :private-key "encrypted-key"}]
         (is (st/sid? (st/save-webhook s wh)))
-        (is (st/sid? (st/save-repo s {:customer-id cid
+        (is (st/sid? (st/save-repo s {:org-id cid
                                       :id rid
                                       :labels [{:name "ssh-lbl"
                                                 :value "lbl-val"}]})))
@@ -260,9 +260,9 @@
 
   (testing "assigns id"
     (h/with-memory-store s
-      (let [{cid :customer-id rid :repo-id :as wh} (test-webhook)]
+      (let [{cid :org-id rid :repo-id :as wh} (test-webhook)]
         (is (st/sid? (st/save-webhook s wh)))
-        (is (st/sid? (st/save-repo s {:customer cid
+        (is (st/sid? (st/save-repo s {:org cid
                                       :id rid})))
         (let [r (sut/create-webhook-build {:storage s}
                                           (:id wh)
@@ -326,17 +326,17 @@
         (let [{st :storage :as rt} (trt/test-runtime)
               _ (st/save-user st {:type "github"
                                   :type-id (:id u)
-                                  :customers ["test-cust"]})
+                                  :orgs ["test-org"]})
               req (-> rt
                       (h/->req)
                       (assoc :parameters
                              {:query
                               {:code "test-code"}}))]
-          (is (= ["test-cust"]
+          (is (= ["test-org"]
                  (-> req
                      (sut/login)
                      :body
-                     :customers)))))))
+                     :orgs)))))))
 
   (testing "creates user when none found in storage"
     (with-github-user
@@ -396,11 +396,11 @@
           (is (string? (:github-token resp))))))))
 
 (deftest watch-repo
-  (let [cust-id (st/new-id)
+  (let [org-id (st/new-id)
         {st :storage :as rt} (trt/test-runtime)
-        _ (st/save-customer st {:id cust-id :name "test customer"})
+        _ (st/save-org st {:id org-id :name "test org"})
         repo {:name "test repo"
-              :customer-id cust-id
+              :org-id org-id
               :github-id 1234245}
         r (-> rt
               (h/->req)
@@ -415,7 +415,7 @@
 
     (testing "creates new repo"
       (is (= (:body r)
-             (st/find-repo st [cust-id (get-in r [:body :id])]))))
+             (st/find-repo st [org-id (get-in r [:body :id])]))))
 
     (testing "generates display id based on github repo name"
       (is (= "test-repo" (get-in r [:body :id]))))))
@@ -424,22 +424,22 @@
   (testing "404 when repo not found"
     (is (= 404 (-> (trt/test-runtime)
                    (h/->req)
-                   (assoc :parameters {:path {:customer-id "test-cust"
+                   (assoc :parameters {:path {:org-id "test-org"
                                               :repo-id "test-repo"}})
                    (sut/unwatch-repo)
                    :status))))
 
   (testing "unwatches in db"
     (let [{st :storage :as rt} (trt/test-runtime)
-          [cust-id repo-id github-id :as sid] (repeatedly 3 st/new-id)
-          _ (st/watch-github-repo st (zipmap [:customer-id :id :github-id] sid))
+          [org-id repo-id github-id :as sid] (repeatedly 3 st/new-id)
+          _ (st/watch-github-repo st (zipmap [:org-id :id :github-id] sid))
           req (-> rt
                   (h/->req)
-                  (assoc :parameters {:path {:customer-id cust-id
+                  (assoc :parameters {:path {:org-id org-id
                                              :repo-id repo-id}}))
           resp (sut/unwatch-repo req)]
       (is (= 200 (:status resp)))
-      (is (= {:customer-id cust-id
+      (is (= {:org-id org-id
               :id repo-id}
              (:body resp)))
       (is (empty? (st/find-watched-github-repos st github-id))))))

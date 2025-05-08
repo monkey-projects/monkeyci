@@ -163,8 +163,10 @@
 (defn by-cuid [cuid]
   [:= :cuid cuid])
 
-(defn by-customer [id]
-  [:= :customer-id id])
+(defn by-org [id]
+  [:= :org-id id])
+
+(def ^:deprecated by-customer by-org)
 
 (defn by-repo [id]
   [:= :repo-id id])
@@ -186,7 +188,13 @@
 
 ;;; Basic entities
 
-(defentity customer)
+(defentity org)
+;; Provided for compatibility purposes
+(def ^:deprecated insert-customer insert-org)
+(def ^:deprecated update-customer update-org)
+(def ^:deprecated delete-customers delete-orgs)
+(def ^:deprecated select-customers select-orgs)
+
 (defentity repo)
 (defentity webhook)
 (defentity user)
@@ -277,7 +285,7 @@
    :after-update  convert-job
    :after-select  convert-job-select})
 
-;; For customer params and ssh keys we don't store the labels in a separate table.
+;; For org params and ssh keys we don't store the labels in a separate table.
 ;; This to avoid lots of work on mapping to and from sql statements, and because
 ;; there is no real added value: it's not possible to do a query that will retrieve
 ;; all matching params or ssh keys, so we may just as well do it in code.
@@ -293,7 +301,7 @@
    :after-update  convert-label-filters
    :after-select  convert-label-filters-select})
 
-(defentity customer-param label-filter-conversions)
+(defentity org-param label-filter-conversions)
 (defentity ssh-key label-filter-conversions)
 
 ;;; Aggregate entities
@@ -307,24 +315,24 @@
        (map (juxt :repo-id :name :value))
        (insert-entities conn :repo-labels [:repo-id :name :value])))
 
-(defaggregate user-customer)
+(defaggregate user-org)
 
-(defn insert-user-customers
-  "Batch inserts user/customer links"
+(defn insert-user-orgs
+  "Batch inserts user/org links"
   [conn user-id cust-ids]
   (when-not (empty? cust-ids)
-    (insert-entities conn :user-customers
-                     [:user-id :customer-id]
+    (insert-entities conn :user-orgs
+                     [:user-id :org-id]
                      (map (partial conj [user-id]) cust-ids))))
 
-(defaggregate customer-param-value)
+(defaggregate org-param-value)
 
-(defn insert-customer-param-values
+(defn insert-org-param-values
   "Batch inserts multiple parameter values at once"
   [conn values]
   (->> values
        (map (juxt :params-id :name :value))
-       (insert-entities conn :customer-param-values [:params-id :name :value])))
+       (insert-entities conn :org-param-values [:params-id :name :value])))
 
 (defentity join-request)
 (defentity email-registration)
@@ -369,7 +377,7 @@
    :after-update  convert-credit
    :after-select  convert-credit-select})
 
-(defentity customer-credit cust-credit-conversions)
+(defentity org-credit cust-credit-conversions)
 
 (def prepare-credit-cons (partial int->time :consumed-at))
 (def convert-credit-cons (partial copy-prop :consumed-at))
@@ -390,7 +398,7 @@
 (defn update-crypto [conn crypto]
   (execute-update conn {:update :cryptos
                         :set crypto
-                        :where [:= :customer-id (:customer-id crypto)]}))
+                        :where [:= :org-id (:org-id crypto)]}))
 
 (defaggregate sysadmin)
 

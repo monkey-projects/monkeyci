@@ -19,16 +19,16 @@
        (map db->entity)))
 
 (defn select-bb-webhooks-with-repos
-  "Selects bitbucket webhook including customers and repos"
+  "Selects bitbucket webhook including orgs and repos"
   [conn f]
   (->> (-> base-query
            (assoc :select [:bb.*
                            [:wh.cuid :wh-cuid]
-                           [:c.cuid :customer-id]
+                           [:c.cuid :org-id]
                            [:r.display-id :repo-id]]
                   :where f)
            (update :join concat [[:repos :r] [:= :r.id :wh.repo-id]
-                                 [:customers :c] [:= :c.id :r.customer-id]]))
+                                 [:orgs :c] [:= :c.id :r.org-id]]))
        (ec/select conn)
        (map db->entity)))
 
@@ -55,11 +55,11 @@
 (defn by-filter
   "Constructs where clause given a generic webhook filter"
   [f]
-  (let [wh-props #{:customer-id :repo-id :webhook-id}
+  (let [wh-props #{:org-id :repo-id :webhook-id}
         bb-f (apply dissoc f wh-props)]
     (cond-> []
       (not-empty bb-f) (concat (->where bb-f :bb))
       (some? (:webhook-id f)) (conj [:= :wh.cuid (:webhook-id f)])
-      (some? (:customer-id f)) (conj [:= :c.cuid (:customer-id f)])
+      (some? (:org-id f)) (conj [:= :c.cuid (:org-id f)])
       (some? (:repo-id f)) (conj [:= :r.display-id (:repo-id f)])
       true (prefix-and))))

@@ -2,22 +2,22 @@
   (:require [monkey.ci.entities.core :as ec]))
 
 (defn select-credit-subs [conn f]
-  (->> {:select [:cs.* [:c.cuid :cust-cuid]]
+  (->> {:select [:cs.* [:c.cuid :org-cuid]]
         :from [[:credit-subscriptions :cs]]
-        :join [[:customers :c] [:= :c.id :cs.customer-id]]
+        :join [[:orgs :c] [:= :c.id :cs.org-id]]
         :where f}
        (ec/select conn)
        (map ec/convert-credit-sub-select)
        (map (fn [r]
               (-> r
-                  (dissoc :cuid :cust-cuid)
+                  (dissoc :cuid :org-cuid)
                   (assoc :id (:cuid r)
-                         :customer-id (:cust-cuid r)))))))
+                         :org-id (:org-cuid r)))))))
 
 (defn by-cuid [id]
   [:= :cs.cuid id])
 
-(defn by-cust [id]
+(defn by-org [id]
   [:= :c.cuid id])
 
 (defn active-at [at]

@@ -180,6 +180,6 @@
 
   (testing "when no `sid`, returns customer, repo and build id"
     (is (= [::test-cust ::test-repo ::test-build]
-           (sut/sid {:customer-id ::test-cust
+           (sut/sid {:org-id ::test-cust
                      :repo-id ::test-repo
                      :build-id ::test-build})))))

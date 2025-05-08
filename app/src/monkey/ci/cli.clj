@@ -74,7 +74,7 @@
    ;;         :as "Server URL"
    ;;         :type :string}
    ;;        {:as "Customer id"
-   ;;         :option "customer-id"
+   ;;         :option "org-id"
    ;;         :short "c"
    ;;         :type :string}
    ;;        {:as "Repository id"

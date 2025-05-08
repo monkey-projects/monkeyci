@@ -79,7 +79,7 @@
           (work-dir [x]
             (update x :work-dir (comp u/abs-path #(or (:workdir args) % (u/cwd)))))
           (account [x]
-            (let [acc (-> (select-keys args [:customer-id :repo-id])
+            (let [acc (-> (select-keys args [:org-id :repo-id])
                           (mc/assoc-some :url (:server args)))]
               (cond-> x
                 (not-empty acc) (assoc :account acc))))

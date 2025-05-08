@@ -153,12 +153,12 @@
                           {:items
                            [{:id "test-instance"
                              :display-name "build-1"
-                             :freeform-tags {:customer-id "test-cust"
+                             :freeform-tags {:org-id "test-cust"
                                              :repo-id "test-repo"}
                              :time-created (str (jt/instant time))}
                             {:id "other-instance"
                              :display-name "build-2"
-                             :freeform-tags {:customer-id "test-cust"
+                             :freeform-tags {:org-id "test-cust"
                                              :repo-id "test-repo"}
                              :time-created (str (jt/instant (t/now)))}
                             {:id "non-build-instance"
@@ -174,7 +174,7 @@
                         (md/error-deferred
                          (ex-info "Wrong instance" opts))))]
         
-        (is (= [{:customer-id "test-cust"
+        (is (= [{:org-id "test-cust"
                  :repo-id "test-repo"
                  :build-id "build-1"
                  :instance-id "test-instance"}]

@@ -4,12 +4,12 @@
 
 (s/def ::config map?) ; TODO Specify
 
-(s/def ::customer-id (s/and string? not-empty))
+(s/def ::org-id (s/and string? not-empty))
 (s/def ::repo-id (s/and string? not-empty))
 (s/def ::sid (s/coll-of string?))
 
 (s/def ::build
-  (s/keys :req-un [::customer-id ::repo-id]
+  (s/keys :req-un [::org-id ::repo-id]
           :opt-un [::sid]))
 
 (s/def ::workspace ::sc/blob-store)
