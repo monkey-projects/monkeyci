@@ -224,3 +224,7 @@
   "Given a relative path `p`, returns it as a subpath to the job working directory.
    Fails if an absolute path is given."
   bs/in-work)
+
+(def git-ref
+  "The git ref that triggered the build"
+  bc/git-ref)

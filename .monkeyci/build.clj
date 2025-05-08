@@ -62,7 +62,7 @@
 (defn tag-version
   "Extracts the version from the tag"
   [ctx]
-  (some->> (m/git-ref ctx)
+  (some->> (core/git-ref ctx)
            (re-matches tag-regex)
            (second)))
 
@@ -249,10 +249,11 @@
                                          (gen-idx ctx :admin)]))
         (assoc :save-artifacts [gui-release-artifact]))))
 
-(defn prepare-scw-gui-config [ctx]
+(defn prepare-scw-gui-config
   "Creates config files to be included in the Scaleway gui image.  This is necessary
    because Scaleway containers don't support mounting files, and using env vars is
    not easy with nginx."
+  [ctx]
   (when (publish-gui? ctx)
     (m/action-job
      "prepare-scw-gui-config"
