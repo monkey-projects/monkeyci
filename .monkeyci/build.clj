@@ -258,9 +258,10 @@
     (m/action-job
      "prepare-scw-gui-config"
      (fn [ctx]
-       (let [p (api/build-params ctx)]
-         (spit "gui/dev-resources/config.js" (get p "scw-gui-config"))
-         (spit "gui/dev-resources/admin-config.js" (get p "scw-gui-admin-config")))))))
+       (let [p (api/build-params ctx)
+             dir "gui/resources/public/conf/"]
+         (spit (str dir "config.js") (get p "scw-gui-config"))
+         (spit (str dir "admin-config.js") (get p "scw-gui-admin-config")))))))
 
 (defn deploy
   "Job that auto-deploys the image to staging by pushing the new image tag to infra repo."
