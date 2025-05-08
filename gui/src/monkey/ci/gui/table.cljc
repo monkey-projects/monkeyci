@@ -15,7 +15,7 @@
     :columns [{:label "Id"
                :value :id}
               {:label "Name"
-               :value (comp :name :customer)}]}])
+               :value (comp :name :org)}]}])
 
 (defn nav-link [item-opts link-opts content]
   [:li.page-item item-opts

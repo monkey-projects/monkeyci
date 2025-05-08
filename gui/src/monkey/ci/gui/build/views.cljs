@@ -60,9 +60,9 @@
 
 (defn- build-path [route]
   (let [p (r/path-params route)
-        get-p (juxt :customer-id :repo-id :build-id)]
+        get-p (juxt :org-id :repo-id :build-id)]
     (->> (get-p p)
-         (interleave ["customer" "repo" "builds"])
+         (interleave ["org" "repo" "builds"])
          (into [m/url])
          (cs/join "/"))))
 

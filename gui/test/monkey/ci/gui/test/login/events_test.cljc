@@ -127,29 +127,29 @@
     (rf/dispatch-sync [:github/load-user--success ::github-user])
     (is (= ::github-user (db/github-user @app-db))))
   
-  (testing "redirects to root page if multiple customers"
+  (testing "redirects to root page if multiple orgs"
     (rf-test/run-test-sync
      (let [c (h/catch-fx :route/goto)]
-       (reset! app-db (db/set-user {} {:customers ["cust-1" "cust-2"]}))
+       (reset! app-db (db/set-user {} {:orgs ["org-1" "org-2"]}))
        (rf/dispatch [:github/load-user--success {}])
        (is (= "/" (first @c))))))
 
-  (testing "redirects to customer page if only one customer"
+  (testing "redirects to org page if only one org"
     (rf-test/run-test-sync
      (let [c (h/catch-fx :route/goto)]
-       (reset! app-db (db/set-user {} {:customers ["test-cust"]}))
+       (reset! app-db (db/set-user {} {:orgs ["test-org"]}))
        (rf/dispatch [:github/load-user--success {}])
-       (is (= "/o/test-cust" (first @c))))))
+       (is (= "/o/test-org" (first @c))))))
 
   (testing "redirects to redirect page if set"
     (rf-test/run-test-sync
      (rf/reg-cofx
       :local-storage
       (fn [cofx]
-        (assoc cofx :local-storage {:redirect-to "/o/test-cust"})))
+        (assoc cofx :local-storage {:redirect-to "/o/test-org"})))
      (let [c (h/catch-fx :route/goto)]
        (rf/dispatch [:github/load-user--success {}])
-       (is (= "/o/test-cust" (first @c))))))
+       (is (= "/o/test-org" (first @c))))))
 
   (testing "ignores redirect page if `/`"
     (rf-test/run-test-sync
@@ -158,9 +158,9 @@
       (fn [cofx]
         (assoc cofx :local-storage {:redirect-to "/"})))
      (let [c (h/catch-fx :route/goto)]
-       (reset! app-db (db/set-user {} {:customers ["test-cust"]}))
+       (reset! app-db (db/set-user {} {:orgs ["test-org"]}))
        (rf/dispatch [:github/load-user--success {}])
-       (is (= "/o/test-cust" (first @c)))))))
+       (is (= "/o/test-org" (first @c)))))))
 
 (deftest github-load-user--failed
   (testing "sets error alert"
@@ -269,29 +269,29 @@
     (rf/dispatch-sync [:bitbucket/load-user--success ::bitbucket-user])
     (is (= ::bitbucket-user (db/bitbucket-user @app-db))))
   
-  (testing "redirects to root page if multiple customers"
+  (testing "redirects to root page if multiple orgs"
     (rf-test/run-test-sync
      (let [c (h/catch-fx :route/goto)]
-       (reset! app-db (db/set-user {} {:customers ["cust-1" "cust-2"]}))
+       (reset! app-db (db/set-user {} {:orgs ["org-1" "org-2"]}))
        (rf/dispatch [:bitbucket/load-user--success {}])
        (is (= "/" (first @c))))))
 
-  (testing "redirects to customer page if only one customer"
+  (testing "redirects to org page if only one org"
     (rf-test/run-test-sync
      (let [c (h/catch-fx :route/goto)]
-       (reset! app-db (db/set-user {} {:customers ["test-cust"]}))
+       (reset! app-db (db/set-user {} {:orgs ["test-org"]}))
        (rf/dispatch [:bitbucket/load-user--success {}])
-       (is (= "/o/test-cust" (first @c))))))
+       (is (= "/o/test-org" (first @c))))))
 
   (testing "redirects to redirect page if set"
     (rf-test/run-test-sync
      (rf/reg-cofx
       :local-storage
       (fn [cofx]
-        (assoc cofx :local-storage {:redirect-to "/o/test-cust"})))
+        (assoc cofx :local-storage {:redirect-to "/o/test-org"})))
      (let [c (h/catch-fx :route/goto)]
        (rf/dispatch [:bitbucket/load-user--success {}])
-       (is (= "/o/test-cust" (first @c))))))
+       (is (= "/o/test-org" (first @c))))))
 
   (testing "ignores redirect page if `/`"
     (rf-test/run-test-sync
@@ -300,9 +300,9 @@
       (fn [cofx]
         (assoc cofx :local-storage {:redirect-to "/"})))
      (let [c (h/catch-fx :route/goto)]
-       (reset! app-db (db/set-user {} {:customers ["test-cust"]}))
+       (reset! app-db (db/set-user {} {:orgs ["test-org"]}))
        (rf/dispatch [:bitbucket/load-user--success {}])
-       (is (= "/o/test-cust" (first @c)))))))
+       (is (= "/o/test-org" (first @c)))))))
 
 (deftest bitbucket-load-user--failed
   (testing "sets error alert"

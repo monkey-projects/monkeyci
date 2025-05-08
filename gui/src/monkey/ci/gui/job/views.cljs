@@ -152,7 +152,7 @@
 (defn- artifacts [job]
   (let [route (rf/subscribe [:route/current])
         token (rf/subscribe [:login/token])
-        {:keys [customer-id repo-id build-id]} (r/path-params @route)]
+        {:keys [org-id repo-id build-id]} (r/path-params @route)]
     (letfn [(artifact-row [art]
               [:tr
                [:td [download-artifact-btn art]]
@@ -202,7 +202,7 @@
      [:a {:href (r/path-for :page/build (r/path-params @route))}
       [:span.me-1 [co/icon :chevron-left]] "Back to build"]]))
 
-(def route->id (comp (juxt :customer-id :repo-id :build-id :job-id)
+(def route->id (comp (juxt :org-id :repo-id :build-id :job-id)
                      r/path-params))
 
 (defn page [route]

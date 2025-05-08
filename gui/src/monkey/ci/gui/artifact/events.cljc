@@ -15,11 +15,11 @@
 (rf/reg-event-fx
  :artifact/download
  (fn [{:keys [db]} [_ art-id]]
-   (let [{:keys [customer-id repo-id build-id]} (-> (r/current db)
+   (let [{:keys [org-id repo-id build-id]} (-> (r/current db)
                                                     (r/path-params))
          token (ldb/token db)]
      {:http-xhrio {:method :get
-                   :uri (m/api-url (str "/customer/" customer-id
+                   :uri (m/api-url (str "/org/" org-id
                                         "/repo/" repo-id
                                         "/builds/" build-id
                                         "/artifact/" art-id

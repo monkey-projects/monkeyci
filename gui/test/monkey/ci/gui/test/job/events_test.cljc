@@ -18,17 +18,17 @@
 (deftest job-init
   (letfn [(mock-handlers []
             (rf/reg-event-db
-             :customer/maybe-load
-             (fn [db _] (assoc db ::customer ::loaded)))
+             :org/maybe-load
+             (fn [db _] (assoc db ::org ::loaded)))
             (rf/reg-event-db
              :build/maybe-load
              (fn [db _] (assoc db ::build ::loaded))))]
     
-    (testing "loads customer if not loaded"
+    (testing "loads org if not loaded"
       (rft/run-test-sync
        (mock-handlers)
        (rf/dispatch [:job/init])
-       (is (= ::loaded (::customer @app-db)))))
+       (is (= ::loaded (::org @app-db)))))
     
     (testing "loads build details if not present in db"
       (rft/run-test-sync
@@ -42,7 +42,7 @@
       (is (some? (reset! app-db (-> {}
                                     (r/set-current
                                      {:parameters
-                                      {:path (zipmap [:customer-id :repo-id :build-id :job-id]
+                                      {:path (zipmap [:org-id :repo-id :build-id :job-id]
                                                      uid)}})
                                     (db/set-alerts [{:type :info :message "test alert"}])))))
       (rf/dispatch-sync [:job/leave uid])
@@ -57,7 +57,7 @@
   (is (some? (reset! app-db (r/set-current {}
                                            {:parameters
                                             {:path
-                                             {:customer-id "test-cust"
+                                             {:org-id "test-org"
                                               :repo-id "test-repo"
                                               :build-id "test-build"
                                               :job-id "test-job"}}}))))
@@ -101,7 +101,7 @@
   (is (some? (reset! app-db (r/set-current {}
                                            {:parameters
                                             {:path
-                                             {:customer-id "test-cust"
+                                             {:org-id "test-org"
                                               :repo-id "test-repo"
                                               :build-id "test-build"
                                               :job-id "test-job"}}}))))
@@ -123,8 +123,8 @@
        (is (cs/includes? (-> @e first (nth 3) :query)
                          "filename=\"test/path\"")))
 
-     (testing "sets customer id in request"
-       (is (= "test-cust" (-> @e first (nth 3) :customer-id))))
+     (testing "sets org id in request"
+       (is (= "test-org" (-> @e first (nth 3) :org-id))))
 
      (testing "marks loading"
        (is (db/logs-loading? @app-db "test/path"))))))

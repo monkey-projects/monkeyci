@@ -2,7 +2,7 @@
   (:require [monkey.ci.gui.loader :as lo]
             [monkey.ci.gui.routing :as r]))
 
-(def route->id (comp (juxt :customer-id :repo-id :build-id :job-id)
+(def route->id (comp (juxt :org-id :repo-id :build-id :job-id)
                      r/path-params))
 (def db->job-id (comp route->id r/current))
 

@@ -20,7 +20,7 @@
                                     (r/set-current
                                      {:parameters
                                       {:path
-                                       {:customer-id "test-cust"
+                                       {:org-id "test-org"
                                         :repo-id "test-repo"
                                         :build-id "test-build"}}})
                                     (ldb/set-token "test-token")))))
@@ -28,7 +28,7 @@
       (is (= 1 (count @e)))
       (let [inv (first @e)]
         (is (= :get (:method inv)))
-        (is (= "http://test:3000/customer/test-cust/repo/test-repo/builds/test-build/artifact/test-art/download"
+        (is (= "http://test:3000/org/test-org/repo/test-repo/builds/test-build/artifact/test-art/download"
                (:uri inv)))
         (is (= "Bearer test-token" (get-in inv [:headers "Authorization"]))))))
 

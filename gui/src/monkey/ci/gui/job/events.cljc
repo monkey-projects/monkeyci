@@ -16,7 +16,7 @@
  :job/init
  (fn [{:keys [db]} [_ uid]]
    (lo/on-initialize db uid {:init-events
-                             [[:customer/maybe-load]
+                             [[:org/maybe-load]
                               [:build/maybe-load]
                               [:tab/tab-changed details-tabs-id nil]]
                              :leave-event
@@ -31,19 +31,19 @@
 
 (def route->id db/route->id)
 
-(def params->build-sid (juxt :customer-id :repo-id :build-id))
+(def params->build-sid (juxt :org-id :repo-id :build-id))
 
 (rf/reg-event-fx
  :job/load-log-files
  (fn [{:keys [db] :as ctx} [_ job :as evt]]
-   (let [[cust-id :as id] (db/db->job-id db)
+   (let [[org-id :as id] (db/db->job-id db)
          loader (lo/loader-evt-handler
                  id
                  (fn [& _]
                    [:secure-request
                     :get-log-label-values
                     (-> (loki/request-params id job)
-                        (assoc :customer-id cust-id
+                        (assoc :org-id org-id
                                :label "filename"))
                     [:job/load-log-files--success]
                     [:job/load-log-files--failed]]))]
@@ -66,7 +66,7 @@
 (rf/reg-event-fx
  :job/load-logs
  (fn [{:keys [db] :as ctx} [_ job path :as evt]]
-   (let [[cust-id :as id] (db/get-path-id db path)
+   (let [[org-id :as id] (db/get-path-id db path)
          loader (lo/loader-evt-handler
                  id
                  (fn [& _]
@@ -76,7 +76,7 @@
                    [:secure-request
                     :download-log
                     (-> (loki/request-params id job)
-                        (assoc :customer-id cust-id
+                        (assoc :org-id org-id
                                :limit 1000
                                :query (-> (loki/job-query id (:id job))
                                           (assoc "filename" path)

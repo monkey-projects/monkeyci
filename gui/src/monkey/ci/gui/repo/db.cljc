@@ -18,7 +18,7 @@
 (defn set-builds [db b]
   (lo/set-value db id b))
 
-(def build-uid (juxt :customer-id :repo-id :build-id))
+(def build-uid (juxt :org-id :repo-id :build-id))
 
 (defn find-build [db b]
   (->> (get-builds db)
