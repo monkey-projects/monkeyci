@@ -1,7 +1,11 @@
 (ns monkey.ci.test
   "This is the basic namespace to use in unit tests.  It provides various functions that
    can be used to simulate a MonkeyCI build environment."
-  (:require [monkey.ci.build.api :as ba]
+  (:require [babashka.fs :as fs]
+            [monkey.ci
+             [build :as b]
+             [jobs :as j]]
+            [monkey.ci.build.api :as ba]
             [monkey.ci.protocols :as p]))
 
 (defn with-build-params* [params f]
@@ -60,3 +64,36 @@
    a specific context."
   [jobs ctx]
   (p/resolve-jobs jobs ctx))
+
+(defn with-checkout-dir
+  "Sets the given directory as the build checkout dir in the context"
+  [ctx dir]
+  (update ctx :build b/set-checkout-dir dir))
+
+(def checkout-dir
+  "Retrieves configured checkout dir in the context"
+  (comp b/checkout-dir :build))
+
+(defn with-tmp-checkout-dir
+  "Configures a temporary checkout directory in the context"
+  [ctx]
+  (with-checkout-dir ctx (str (fs/create-temp-dir))))
+
+(defn execute-job
+  "Executes given job with specified context. Look out for side effects!"
+  [job ctx]
+  (j/execute! job ctx))
+
+(defn with-tmp-dir*
+  "Creates a temp dir, then invokes `f` on it"
+  [f]
+  (let [dir (fs/create-temp-dir)]
+    (try
+      (f (str dir))
+      (finally
+        (fs/delete-tree dir)))))
+
+(defmacro with-tmp-dir [dir & body]
+  `(with-tmp-dir*
+     (fn [~dir]
+       ~@body)))

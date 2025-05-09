@@ -325,8 +325,8 @@
    build-app-image
    build-gui-image
 
-   prepare-scw-gui-config
-   build-scw-image
+   ;;prepare-scw-gui-config
+   ;;build-scw-image
    
    deploy
    notify])

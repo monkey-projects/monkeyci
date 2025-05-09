@@ -100,6 +100,21 @@
           (testing "creates manifest job"
             (is (contains? job-ids "gui-img-manifest"))))))))
 
+(deftest prepare-scw-gui-config
+  (testing "nothing if no gui changes"
+    (is (nil? (sut/prepare-scw-gui-config mt/test-ctx))))
+
+  (testing "with gui changes"
+    (let [ctx (-> mt/test-ctx
+                  (mt/with-git-ref "refs/heads/main")
+                  (mt/with-changes (mt/modified ["gui/deps.edn"])))
+          job (sut/prepare-scw-gui-config ctx)]
+      (testing "creates action job"
+        (is (b/action-job? job)))
+
+      (testing "provides artifacts"
+        (is (not-empty (:save-artifacts job)))))))
+
 (deftest jobs
   (mt/with-build-params {}
     (testing "with release tag"
