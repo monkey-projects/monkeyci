@@ -258,7 +258,7 @@
    because Scaleway containers don't support mounting files, and using env vars is
    not easy with nginx."
   [ctx]
-  (when (publish-gui? ctx)
+  (when true #_(publish-gui? ctx)
     (-> (m/action-job
          "prepare-scw-gui-config"
          (fn [ctx]
@@ -325,7 +325,7 @@
    build-app-image
    build-gui-image
 
-   ;;prepare-scw-gui-config
+   prepare-scw-gui-config
    ;;build-scw-image
    
    deploy
