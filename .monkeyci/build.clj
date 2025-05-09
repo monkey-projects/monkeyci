@@ -263,7 +263,7 @@
          "prepare-scw-gui-config"
          (fn [ctx]
            (let [p (api/build-params ctx)
-                 dir "gui/resources/public/conf/"]
+                 dir (m/in-work "gui/resources/public/conf/")]
              (fs/create-dirs dir)
              (spit (str dir "config.js") (get p "scw-gui-config"))
              (spit (str dir "admin-config.js") (get p "scw-gui-admin-config"))
