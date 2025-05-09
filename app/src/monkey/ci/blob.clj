@@ -39,8 +39,6 @@
 (def compression-type "gz")
 (def archive-type "tar")
 
-(def extract-archive a/extract)
-
 (defn- drop-prefix-resolver
   "The default entry name resolver includes the full path to the file.  
    We only want the file name without the base directory, so that's what
