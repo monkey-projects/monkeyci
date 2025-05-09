@@ -67,6 +67,8 @@
   "Archives the `src` directory or file into `dest`, which should be something
    that can be converted into an `OutputStream`."
   [src dest]
+  (when-not (fs/exists? src)
+    (throw (ex-info (str "Unable to make archive, path not found:" src) {:src src :dest dest})))
   ;; The prefix to drop is the directory where the files are in.  If the source is
   ;; a single file, we mean its containing directory, otherwise the entire directory
   ;; should be dropped.
