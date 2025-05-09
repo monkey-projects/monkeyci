@@ -1,5 +1,6 @@
 (ns build-test
   (:require [clojure.test :refer [deftest testing is]]
+            [babashka.fs :as fs]
             [build :as sut]
             [monkey.ci.build
              [core :as bc]
@@ -121,7 +122,8 @@
         (mt/with-tmp-dir dir
           (mt/with-build-params {"scw-gui-config" "test-gui-config"
                                  "scw-gui-admin-config" "test-admin-config"}
-            (is (bc/success? @(mt/execute-job job (mt/with-checkout-dir ctx dir)))))))
+            (is (bc/success? @(mt/execute-job job (mt/with-checkout-dir ctx dir))))
+            (is (fs/exists? (fs/path dir "gui/resources/public/conf/config.js"))))))
 
       (testing "fails when no config found"
         (mt/with-tmp-dir dir

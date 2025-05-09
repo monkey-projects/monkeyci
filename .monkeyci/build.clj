@@ -266,7 +266,7 @@
                  dir (m/in-work ctx "gui/resources/public/conf/")
                  write-conf (fn [f k]
                               (let [c (get p k)
-                                    dest (str dir f)]
+                                    dest (str (fs/path dir f))]
                                 (println "Writing config to file" dest ":" c)
                                 (spit dest c)
                                 c))]
