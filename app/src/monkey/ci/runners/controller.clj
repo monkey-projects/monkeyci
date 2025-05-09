@@ -8,8 +8,8 @@
             [monkey.ci
              [blob :as blob]
              [build :as b]
+             [config :as c]
              [errors :as err]
-             [jobs :as j]
              [protocols :as p]
              [utils :as u]
              [workspace :as ws]]
@@ -159,7 +159,7 @@
          (fn [{:keys [status message]}]
            (make-result (if (= :success status) 0 err/error-script-failure)
                         message))))
-       (md/timeout! j/max-job-timeout)
+       (md/timeout! c/max-script-timeout)
        (deref))))
 
 (defn- post-end-evt [{:keys [build] :as rt}]
