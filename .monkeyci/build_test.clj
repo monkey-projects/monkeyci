@@ -113,7 +113,13 @@
         (is (b/action-job? job)))
 
       (testing "provides artifacts"
-        (is (not-empty (:save-artifacts job)))))))
+        (is (not-empty (:save-artifacts job))))
+
+      (testing "creates config files from params"
+        (mt/with-tmp-dir dir
+          (mt/with-build-params {"scw-gui-config" "test-gui-config"
+                                 "swc-gui-admin-config" "test-admin-config"}
+            (is (b/success? (mt/execute-job job (mt/with-checkout-dir ctx dir))))))))))
 
 (deftest jobs
   (mt/with-build-params {}

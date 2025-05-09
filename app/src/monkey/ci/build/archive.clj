@@ -67,12 +67,6 @@
 (defn- archive-stream [is]
   (.createArchiveInputStream stream-factory ArchiveStreamFactory/TAR is))
 
-(defn- copy-to-tmp [is]
-  (let [tmp (java.io.File/createTempFile "archive-" ".tgz")]
-    (log/debug "Storing downloaded archive in" tmp)
-    (io/copy is tmp)
-    (io/input-stream tmp)))
-
 (defn- decompress
   "Decompresses a source file.  Returns an input stream that will contain the
    decompressed archive."
@@ -83,11 +77,7 @@
     (doto (Thread. (fn []
                      (log/debug "Decompressing source:" src)
                      (try 
-                       (cc/decompress
-                        ;; TODO Delete when no longer needed
-                        (copy-to-tmp src)
-                        os
-                        compression-type)
+                       (cc/decompress src os compression-type)
                        (catch Exception ex
                          (log/error "Unable to decompress archive" ex))
                        (finally
@@ -130,9 +120,11 @@
 (defn extract
   "Allows extracting an archive input stream (like a downloaded artifact) 
    into a destination location.  If a regular expression is given as third
-   argument, only the files that match the regex are extracted."
-  [is dest & [re]]
-  (with-open [ds (decompress is)]
+   argument, only the files that match the regex are extracted.  Closes the
+   input stream."
+  [src dest & [re]]
+  (with-open [in (io/input-stream src)
+              ds (decompress in)]
     (unarchive ds
                (io/file dest)
                (if re
@@ -157,7 +149,8 @@
    that match predicate `pred` as a sequence.  Since the stream needs to be
    closed afterwards, we can't be lazy about it."
   [src pred]
-  (with-open [dc (decompress src)
+  (with-open [in (io/input-stream src)
+              dc (decompress in)
               ai (archive-stream dc)]
     (let [p (bc/->pred pred)]
       (letfn [(matches? [e]
@@ -178,7 +171,8 @@
   "Extracts the given source archive, and returns the contents of the first
    file that matches predicate `pred`, or `nil` if there were no matches."
   [src pred]
-  (with-open [dc (decompress src)
+  (with-open [in (io/input-stream src)
+              dc (decompress in)
               ai (archive-stream dc)]
     (let [p (bc/->pred pred)]
       (loop [e (next-entry ai)]
