@@ -263,11 +263,17 @@
          "prepare-scw-gui-config"
          (fn [ctx]
            (let [p (api/build-params ctx)
-                 dir (m/in-work ctx "gui/resources/public/conf/")]
+                 dir (m/in-work ctx "gui/resources/public/conf/")
+                 write-conf (fn [f k]
+                              (let [c (get p k)]
+                                (println "Writing config to file" f ":" c)
+                                (spit (str dir f) c)
+                                c))]
              (fs/create-dirs dir)
-             (spit (str dir "config.js") (get p "scw-gui-config"))
-             (spit (str dir "admin-config.js") (get p "scw-gui-admin-config"))
-             (println "Created config files in" dir))))
+             (when (and (write-conf "config.js" "scw-gui-config")
+                        (write-conf "admin-config.js" "scw-gui-admin-config"))
+               (println "Created config files in" dir)
+               (m/with-message m/failure "No config written")))))
         (m/save-artifacts [scw-gui-config-artifact]))))
 
 (defn deploy

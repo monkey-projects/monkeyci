@@ -186,8 +186,8 @@
                   (is (fs/exists? p))
                   (is (= v (slurp p))))))
 
-            #_(testing "deletes tmp files"
-              (is (empty? (fs/list-dir tmp-dir))))))
+            (testing "deletes tmp files"
+              (is (not (fs/exists? tmp-dir))))))
 
         (with-redefs [sut/head-object (constantly false)
                       sut/get-object (fn [& args]

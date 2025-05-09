@@ -1,7 +1,9 @@
 (ns build-test
   (:require [clojure.test :refer [deftest testing is]]
             [build :as sut]
-            [monkey.ci.build.v2 :as b]
+            [monkey.ci.build
+             [core :as bc]
+             [v2 :as b]]
             [monkey.ci.test :as mt]))
 
 (deftest tag-version
@@ -119,7 +121,7 @@
         (mt/with-tmp-dir dir
           (mt/with-build-params {"scw-gui-config" "test-gui-config"
                                  "swc-gui-admin-config" "test-admin-config"}
-            (is (b/success? (mt/execute-job job (mt/with-checkout-dir ctx dir))))))))))
+            (is (bc/success? (mt/execute-job job (mt/with-checkout-dir ctx dir))))))))))
 
 (deftest jobs
   (mt/with-build-params {}
