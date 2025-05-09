@@ -120,8 +120,13 @@
       (testing "creates config files from params"
         (mt/with-tmp-dir dir
           (mt/with-build-params {"scw-gui-config" "test-gui-config"
-                                 "swc-gui-admin-config" "test-admin-config"}
-            (is (bc/success? (mt/execute-job job (mt/with-checkout-dir ctx dir))))))))))
+                                 "scw-gui-admin-config" "test-admin-config"}
+            (is (bc/success? @(mt/execute-job job (mt/with-checkout-dir ctx dir)))))))
+
+      (testing "fails when no config found"
+        (mt/with-tmp-dir dir
+          (mt/with-build-params {}
+            (is (bc/failed? @(mt/execute-job job (mt/with-checkout-dir ctx dir))))))))))
 
 (deftest jobs
   (mt/with-build-params {}

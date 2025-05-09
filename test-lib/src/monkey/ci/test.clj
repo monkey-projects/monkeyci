@@ -82,7 +82,7 @@
 (defn execute-job
   "Executes given job with specified context. Look out for side effects!"
   [job ctx]
-  (j/execute! job ctx))
+  @(j/execute! job ctx))
 
 (defn with-tmp-dir*
   "Creates a temp dir, then invokes `f` on it"
