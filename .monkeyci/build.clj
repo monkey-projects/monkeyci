@@ -265,9 +265,10 @@
            (let [p (api/build-params ctx)
                  dir (m/in-work ctx "gui/resources/public/conf/")
                  write-conf (fn [f k]
-                              (let [c (get p k)]
-                                (println "Writing config to file" f ":" c)
-                                (spit (str dir f) c)
+                              (let [c (get p k)
+                                    dest (str dir f)]
+                                (println "Writing config to file" dest ":" c)
+                                (spit dest c)
                                 c))]
              (fs/create-dirs dir)
              (if (and (write-conf "config.js" "scw-gui-config")
