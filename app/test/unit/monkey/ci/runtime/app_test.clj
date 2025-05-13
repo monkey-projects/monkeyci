@@ -96,10 +96,20 @@
                   (sut/new-queue-options)
                   :destinations))))
 
-  (testing "`nats` configures queue"
-    (is (= "test-queue"
-           (-> {:mailman
-                {:type :nats
-                 :queue "test-queue"}}
-               (sut/new-queue-options)
-               :queue)))))
+  (testing "`nats`"
+    (testing "configures queue"
+      (is (= "test-queue"
+             (-> {:mailman
+                  {:type :nats
+                   :queue "test-queue"}}
+                 (sut/new-queue-options)
+                 :queue))))
+
+    (testing "configures stream and consumer"
+      (is (= {:stream "test-stream"
+              :consumer "test-consumer"}
+             (-> {:mailman
+                  {:type :nats
+                   :stream "test-stream"
+                   :consumer "test-consumer"}}
+                 (sut/new-queue-options)))))))

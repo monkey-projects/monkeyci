@@ -119,8 +119,8 @@
   {:destinations (emj/queue-destinations conf)})
 
 (defmethod make-queue-options :nats [conf]
-  ;; Use a queue name, if so configured
-  (select-keys conf [:queue]))
+  ;; Use a queue or stream, if so configured
+  (select-keys conf [:queue :stream :consumer]))
 
 (defmethod make-queue-options :default [_]
   {})
