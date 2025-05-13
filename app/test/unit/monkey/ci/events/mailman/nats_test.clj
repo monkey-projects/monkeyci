@@ -44,13 +44,21 @@
 (deftest nats-component
   (with-redefs [nats/make-connection (constantly ::nats)]
     (testing "`start`"
-      (let [s (co/start (sut/map->NatsComponent {:config {:prefix "test"}}))]
+      (let [s (co/start (sut/map->NatsComponent {:config {:prefix "test"
+                                                          :stream "test-stream"
+                                                          :consumer "test-consumer"}}))]
         (testing "creates connection"
           (is (= ::nats (get-in s [:broker :nats])))
           (is (= ::nats (:conn s))))
 
         (testing "adds subjects according to prefix"
-          (is (map? (:subjects s))))))
+          (is (map? (:subjects s))))
+
+        (testing "configures stream"
+          (is (= "test-stream" (get-in s [:broker :config :stream]))))
+
+        (testing "configures consumer"
+          (is (= "test-consumer" (get-in s [:broker :config :consumer]))))))
 
     (testing "`stop`"
       (let [stopped? (atom false)

@@ -34,7 +34,9 @@
           subjects (types-to-subjects (:prefix conf))]
       (-> this
           (assoc :conn conn
-                 :broker (mnc/make-broker conn {:subject-mapper (comp subjects :type)})
+                 :broker (mnc/make-broker conn (-> (:config this)
+                                                   (select-keys [:stream :consumer])
+                                                   (merge {:subject-mapper (comp subjects :type)})))
                  :subjects subjects)
           (dissoc :config))))
   
