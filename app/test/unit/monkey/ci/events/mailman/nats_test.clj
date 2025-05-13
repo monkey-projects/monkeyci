@@ -1,5 +1,5 @@
 (ns monkey.ci.events.mailman.nats-test
-  (:require [clj-nats-async.core :as nats]
+  (:require [monkey.nats.core :as nats]
             [clojure.test :refer [deftest testing is]]
             [com.stuartsierra.component :as co]
             [monkey.ci.events.mailman :as em]
@@ -42,7 +42,7 @@
                        :container/job-queued])))))
 
 (deftest nats-component
-  (with-redefs [nats/create-nats (constantly ::nats)]
+  (with-redefs [nats/make-connection (constantly ::nats)]
     (testing "`start`"
       (let [s (co/start (sut/map->NatsComponent {:config {:prefix "test"}}))]
         (testing "creates connection"
@@ -75,7 +75,7 @@
           (is (nil? (:conn c))))))
 
     (testing "`add-router`"
-      (with-redefs [nats/create-nats-subscription (constantly ::test-sub)]
+      (with-redefs [nats/subscribe (constantly ::test-sub)]
         (testing "registers listener per subject"
           (let [c (-> (sut/map->NatsComponent {:config {:prefix "test"}})
                       (co/start))
