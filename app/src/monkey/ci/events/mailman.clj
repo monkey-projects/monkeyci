@@ -75,7 +75,7 @@
       (assoc this
              :routes routes
              :listeners (add-router mailman routes (-> {:interceptors global-interceptors}
-                                                       (merge (:options this)))))))
+                                                       (merge options))))))
 
   (stop [{:keys [listeners] :as this}]
     (when listeners

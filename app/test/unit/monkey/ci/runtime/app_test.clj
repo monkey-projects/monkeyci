@@ -110,6 +110,6 @@
               :consumer "test-consumer"}
              (-> {:mailman
                   {:type :nats
-                   :stream "test-stream"
-                   :consumer "test-consumer"}}
+                   :db {:stream "test-stream"
+                        :consumer "test-consumer"}}}
                  (sut/new-queue-options)))))))
