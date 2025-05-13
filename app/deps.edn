@@ -122,7 +122,7 @@
    :exec-fn monkey.build/jar
    :exec-args {:jar "target/monkeyci.jar"
                :lib com.monkeyci/app
-               :version [[:env "MONKEYCI_VERSION"] "0.16.10-SNAPSHOT"]
+               :version [[:env "MONKEYCI_VERSION"] "0.17.2-SNAPSHOT"]
                :main "monkey.ci.core"
                :scm {:url "https://github.com/monkey-projects/monkeyci"}
                :pom-data [[:licenses

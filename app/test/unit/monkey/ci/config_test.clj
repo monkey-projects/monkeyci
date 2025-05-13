@@ -1,14 +1,13 @@
 (ns monkey.ci.config-test
-  (:require
-   [clojure.java.io :as io]
-   [clojure.spec.alpha :as s]
-   [clojure.string :as cs]
-   [clojure.test :refer [deftest is testing]]
-   [monkey.ci.config :as sut]
-   [monkey.ci.logging]
-   [monkey.ci.spec :as spec]
-   [monkey.ci.test.helpers :as h]
-   [monkey.ci.web.github]))
+  (:require [clojure
+             [string :as cs]
+             [test :refer [deftest is testing]]]
+            [clojure.java.io :as io]
+            [clojure.spec.alpha :as s]
+            [monkey.ci
+             [config :as sut]
+             [spec :as spec]]
+            [monkey.ci.test.helpers :as h]))
 
 (defn- with-home-config [config body]
   (h/with-tmp-dir dir
@@ -56,6 +55,12 @@
         (is (nil? (spit f (pr-str {:work-dir "some-work-dir"}))))
         (let [c (sut/app-config {} {:config-file [(.getCanonicalPath f)]})]
           (is (cs/ends-with? (:work-dir c) "some-work-dir"))))))
+
+  (testing "loads config from `:monkeyci-config` env var"
+    (is (cs/ends-with? (-> {:monkeyci-config (pr-str {:work-dir "env-work-dir"})}
+                           (sut/app-config {})
+                           :work-dir)
+                       "env-work-dir")))
 
   (testing "can specify multiple config files"
     (h/with-tmp-dir dir

@@ -1,5 +1,7 @@
 (ns monkey.ci.events.mailman.nats-test
-  (:require [monkey.nats.core :as nats]
+  (:require [monkey.nats
+             [core :as nats]
+             [jetstream :as js]]
             [clojure.test :refer [deftest testing is]]
             [com.stuartsierra.component :as co]
             [monkey.ci.events.mailman :as em]
@@ -83,9 +85,25 @@
           (is (nil? (:conn c))))))
 
     (testing "`add-router`"
-      (with-redefs [nats/subscribe (constantly ::test-sub)]
-        (testing "registers listener per subject"
+      (testing "registers listener per subject"
+        (with-redefs [nats/subscribe (constantly ::test-sub)]
           (let [c (-> (sut/map->NatsComponent {:config {:prefix "test"}})
                       (co/start))
                 l (em/add-router c [[::test []]] {})]
-            (is (some? l))))))))
+            (is (some? l)))))
+
+      (testing "when stream and consumer, only registers consumer once"
+        (let [consumers (atom 0)]
+          (with-redefs [js/make-jetstream (constantly ::jetstream)
+                        js/consumer-ctx (constantly ::ctx)
+                        js/consume (fn [& args]
+                                     (swap! consumers inc)
+                                     ::test-cons)]
+            (let [c (-> (sut/map->NatsComponent {:config {:prefix "test"}})
+                        (co/start))
+                  l (em/add-router c
+                                   [[::test-1 []]
+                                    [::test-2 []]]
+                                   {:stream "test-stream"
+                                    :consumer "test-cons"})]
+              (is (some? l)))))))))

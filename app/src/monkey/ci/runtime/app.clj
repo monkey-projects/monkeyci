@@ -134,7 +134,8 @@
 (defn new-app-routes [conf]
   (letfn [(make-routes [{:keys [storage update-bus]}]
             (emd/make-routes storage update-bus))]
-    (em/map->RouteComponent {:make-routes make-routes})))
+    (em/map->RouteComponent {:make-routes make-routes
+                             :options (get-in conf [:mailman :db])})))
 
 (defn new-update-routes []
   (letfn [(make-routes [c]

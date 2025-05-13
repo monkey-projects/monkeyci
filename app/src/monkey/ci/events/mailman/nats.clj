@@ -31,12 +31,14 @@
     (log/debug "Connecting to NATS broker at" (get-in this [:config :urls]))
     (let [conf (:config this)
           conn (nats/make-connection conf)
-          subjects (types-to-subjects (:prefix conf))]
+          subjects (types-to-subjects (:prefix conf))
+          broker-conf (-> conf
+                          (select-keys [:stream :consumer])
+                          (merge {:subject-mapper (comp subjects :type)}))]
+      (log/debug "Using broker configuration:" broker-conf)
       (-> this
           (assoc :conn conn
-                 :broker (mnc/make-broker conn (-> (:config this)
-                                                   (select-keys [:stream :consumer])
-                                                   (merge {:subject-mapper (comp subjects :type)})))
+                 :broker (mnc/make-broker conn broker-conf)
                  :subjects subjects)
           (dissoc :config))))
   
@@ -51,11 +53,15 @@
           make-handler (fn [s]
                          (-> {:handler router
                               :subject s}
-                             (merge (select-keys opts [:queue]))))]
-      (->> routes
-           (map first)
-           (map (or (:subjects opts) subjects))
-           (distinct)
-           (map make-handler)
-           (map (partial mmc/add-listener broker))
-           (doall)))))
+                             (merge (select-keys opts [:queue :stream :consumer]))))]
+      ;; If we're using jetstream consumers, only register listener once and ignore
+      ;; the subjects because they are configured on jetstream level.
+      (if ((every-pred :stream :consumer) opts)
+        [(mmc/add-listener broker (make-handler nil))]
+        (->> routes
+             (map first)
+             (map (or (:subjects opts) subjects))
+             (distinct)
+             (map make-handler)
+             (map (partial mmc/add-listener broker))
+             (doall))))))

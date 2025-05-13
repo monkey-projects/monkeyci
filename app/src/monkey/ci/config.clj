@@ -5,6 +5,7 @@
    and merge multiple config files into one."
   (:require [aero.core :as ac]
             [babashka.fs :as fs]
+            [config.core :as cc]
             [medley.core :as mc]
             [meta-merge.core :as mm]
             [monkey.aero] ; Aero extensions
@@ -25,6 +26,11 @@
   (when (fs/exists? f)
     ;; Load using Aero
     (ac/read-config f)))
+
+(defn load-config-env [v]
+  (when v
+    (with-open [r (java.io.StringReader. v)]
+      (ac/read-config r))))
 
 (def max-script-timeout
   "Max msecs a build script can run before we terminate it"
@@ -61,10 +67,11 @@
 
 (defn load-raw-config
   "Loads raw (not normalized) configuration from its various sources"
-  [extra-files]
-  (-> (map load-config-file (concat [*global-config-file*
-                                     *home-config-file*]
-                                    extra-files))
+  [extra-files env]
+  (-> (mapv load-config-file (concat [*global-config-file*
+                                      *home-config-file*]
+                                     extra-files))
+      (conj (load-config-env (:monkeyci-config env)))
       (merge-configs)
       (u/prune-tree)))
 
@@ -89,7 +96,8 @@
                     dev-mode
                     work-dir
                     account]]
-      (-> (assoc config :args args)
+      (-> config
+          (assoc :args args)
           (as-> x (reduce do-apply x cli-args))))))
 
 (defn app-config
@@ -97,5 +105,5 @@
    configuration structure.  Args have precedence over env vars,
    which in turn override config loaded from files and default values."
   [env args]
-  (-> (load-raw-config (:config-file args))
+  (-> (load-raw-config (:config-file args) env)
       (apply-args args)))
