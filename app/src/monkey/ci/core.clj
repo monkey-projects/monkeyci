@@ -10,7 +10,8 @@
             [monkey.ci
              [cli :as mcli]
              [config :as config]
-             [version :as v]]))
+             [version :as v]]
+            [monkey.ci.logging.logback :as ll]))
 
 (defn system-invoker
   "Creates a new runtime and invokes the command using the specified application 
@@ -32,6 +33,8 @@
 (defn -main
   "Main entry point for the application."
   [& args]
+  ;; If the logback config is provided in an env var, load it first
+  (ll/configure-from-env "MONKEYCI_LOGBACK")
   (try
     (log/info "Starting MonkeyCI version" (v/version))
     (cli/run-cmd args (make-cli-config {:env env}))

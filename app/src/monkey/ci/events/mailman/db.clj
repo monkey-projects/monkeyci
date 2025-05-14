@@ -286,6 +286,8 @@
      [:build/pending
       [{:handler queue-build}]]
 
+     ;; TODO Also post build/update on queued, so users can see it
+
      [:build/initializing
       [{:handler build-initializing
         :interceptors build-int}]]
