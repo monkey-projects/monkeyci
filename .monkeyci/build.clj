@@ -333,7 +333,8 @@
        :target-img (str scw-api-img ":" (image-version ctx))
        :arch :amd
        :subdir (:path scw-api-config-artifact)
-       :container-opts {:dependencies ["prepare-scw-api-config"]
+       :container-opts {:dependencies ["prepare-scw-api-config"
+                                       "app-img-manifest"]
                         :restore-artifacts [scw-api-config-artifact]}
        :creds-param "docker-scw-credentials"})
      ctx)))

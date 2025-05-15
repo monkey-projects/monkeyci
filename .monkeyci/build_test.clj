@@ -163,16 +163,23 @@
             (is (bc/failed? @(mt/execute-job job (mt/with-checkout-dir ctx dir))))))))))
 
 (deftest build-scw-api-image
-  (mt/with-build-params {}
+  (mt/with-build-params {"docker-scw-credentials" "test-creds"}
     (testing "`nil` if not publishing app"
       (is (nil? (sut/build-scw-api-image mt/test-ctx))))
 
-    (testing "generates container job when publishing app"
-      (is (b/container-job?
-           (-> mt/test-ctx
-               (mt/with-git-ref "refs/heads/main")
-               (mt/with-changes (mt/modified ["app/deps.edn"]))
-               (sut/build-scw-api-image)))))))
+    (testing "when publishing app"
+      (let [job (-> mt/test-ctx
+                 (mt/with-git-ref "refs/heads/main")
+                 (mt/with-changes (mt/modified ["app/deps.edn"]))
+                 (sut/build-scw-api-image))]
+        (testing "generates container job"
+          (is (b/container-job? job)))
+
+        (testing "is dependent on config and oci image job"
+          (is (= 2 (count (:dependencies job))))
+          (is (= #{"prepare-scw-api-config"
+                   "app-img-manifest"}
+                 (set (:dependencies job)))))))))
 
 (deftest jobs
   (mt/with-build-params {}
