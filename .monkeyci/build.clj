@@ -299,7 +299,7 @@
     (println "Writing API config and Scaleway dockerfile to" dest)
     ;; Generate Dockerfile
     (spit-contents (fs/path dest "Dockerfile")
-                   (format "FROM %s\nCMD [\"-c\", \"%s\", \"internal\", \"server\"]\nCOPY %s %s"
+                   (format "FROM %s\nCMD [\"-c\", \"%s\", \"internal\", \"server\"]\nCOPY %s %s\n"
                            (oci-app-image ctx)
                            (str (fs/path config-path config-file))
                            config-file
@@ -332,8 +332,7 @@
       {:job-id "publish-scw-api-img"
        :target-img (str scw-api-img ":" (image-version ctx))
        :arch :amd
-       ;; Must be relative dir
-       :subdir (str "./" (:path scw-api-config-artifact))
+       ;;:subdir (:path scw-api-config-artifact)
        :container-opts {:dependencies ["prepare-scw-api-config"
                                        "app-img-manifest"]
                         :restore-artifacts [scw-api-config-artifact]}
