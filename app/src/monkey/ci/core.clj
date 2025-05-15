@@ -19,10 +19,16 @@
    testing purposes."
   [{:keys [command app-mode runtime?] :as cmd :or {runtime? true}} env]
   (fn [args]
-    (log/debug "Invoking command with arguments:" args)
-    (let [config (config/app-config env args)]
-      (log/info "Executing command:" command)
-      (command config))))
+    (try
+      (log/debug "Invoking command with arguments:" args)
+      (let [config (config/app-config env args)]
+        (log/info "Executing command:" command)
+        (command config))
+      (catch Throwable t
+        ;; Explicitly catch errors because cli-matic exits the vm, so we need
+        ;; to log the error here.
+        (log/error "Failed to run command" t)
+        1))))
 
 (defn make-cli-config [{:keys [cmd-invoker env] :or {cmd-invoker system-invoker}}]
   (letfn [(invoker [cmd]
