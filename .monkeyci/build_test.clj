@@ -130,6 +130,50 @@
           (mt/with-build-params {}
             (is (bc/failed? @(mt/execute-job job (mt/with-checkout-dir ctx dir))))))))))
 
+(deftest prepare-scw-api-config
+  (testing "api config artifact has path"
+    (is (= "scw-api" (:path sut/scw-api-config-artifact))))
+  
+  (testing "nothing if no api changes"
+    (is (nil? (sut/prepare-scw-api-config mt/test-ctx))))
+
+  (testing "with api changes"
+    (let [ctx (-> mt/test-ctx
+                  (mt/with-git-ref "refs/heads/main")
+                  (mt/with-changes (mt/modified ["app/deps.edn"])))
+          job (sut/prepare-scw-api-config ctx)]
+      (testing "creates action job"
+        (is (b/action-job? job)))
+
+      (testing "provides artifacts"
+        (is (not-empty (:save-artifacts job))))
+
+      (testing "creates config files from params"
+        (mt/with-tmp-dir dir
+          (mt/with-build-params {"scw-api-config" "test-api-config"}
+            (is (bc/success? @(mt/execute-job job (mt/with-checkout-dir ctx dir))))
+            (is (fs/exists? (fs/path dir "scw-api/config.edn"))
+                "config file exists")
+            (is (fs/exists? (fs/path dir "scw-api/Dockerfile"))
+                "Dockerfile exists"))))
+
+      (testing "fails when no config found"
+        (mt/with-tmp-dir dir
+          (mt/with-build-params {}
+            (is (bc/failed? @(mt/execute-job job (mt/with-checkout-dir ctx dir))))))))))
+
+(deftest build-scw-api-image
+  (mt/with-build-params {}
+    (testing "`nil` if not publishing app"
+      (is (nil? (sut/build-scw-api-image mt/test-ctx))))
+
+    (testing "generates container job when publishing app"
+      (is (b/container-job?
+           (-> mt/test-ctx
+               (mt/with-git-ref "refs/heads/main")
+               (mt/with-changes (mt/modified ["app/deps.edn"]))
+               (sut/build-scw-api-image)))))))
+
 (deftest jobs
   (mt/with-build-params {}
     (testing "with release tag"

@@ -50,3 +50,9 @@
     (am/run-agent (config/load-config-file "dev-resources/config/agent.edn")
                   (constantly d))
     d))
+
+(defn generate-token
+  ([config uid]
+   (server/generate-jwt (get-in config [:jwk :priv]) uid))
+  ([uid]
+   (generate-token (global-config) uid)))

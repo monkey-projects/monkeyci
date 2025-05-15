@@ -58,10 +58,13 @@
 (defn private-key []
   (some-> @server :rt :jwk :priv))
 
-(defn generate-jwt [uid]
-  (-> {:sub uid}
-      (auth/augment-payload)
-      (auth/sign-jwt (private-key))))
+(defn generate-jwt
+  ([pk uid]
+   (-> (auth/user-token uid)
+       (auth/augment-payload)
+       (auth/sign-jwt pk)))
+  ([uid]
+   (generate-jwt (private-key) uid)))
 
 (defn post-event
   "Posts an event using the runtime in the current server config"
