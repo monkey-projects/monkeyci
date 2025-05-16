@@ -96,6 +96,39 @@
                    (sut/get-repo-params)
                    :body)))))
 
+    (testing "matches all params when multiple labels"
+      (let [params [{:parameters
+                     [{:name "param-1"
+                       :value "value-1"}]
+                     :label-filters
+                     [[{:label "test-label"
+                        :value "value-1"}]]}
+                    {:parameters
+                     [{:name "param-2"
+                       :value "value-2"}]
+                     :label-filters
+                     [[{:label "test-label"
+                        :value "value-2"}]]}]]
+
+        (is (some? (st/save-repo st
+                                 {:id repo-id
+                                  :org-id org-id
+                                  :name "test repo"
+                                  :labels [{:name "test-label"
+                                            :value "value-1"}
+                                           {:name "test-label"
+                                            :value "value-2"}]})))
+        (is (some? (st/save-params st org-id params)))
+
+        (is (= [{:name "param-1" :value "value-1"}
+                {:name "param-2" :value "value-2"}]
+               (-> rt
+                   (h/->req)
+                   (h/with-path-params {:org-id org-id
+                                        :repo-id repo-id})
+                   (sut/get-repo-params)
+                   :body)))))
+
     (testing "decrypts parameters using vault"
       (let [iv (v/generate-iv)
             vault (v/make-fixed-key-vault {})

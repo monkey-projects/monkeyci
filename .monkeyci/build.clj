@@ -2,6 +2,7 @@
 (ns build
   (:require [babashka.fs :as fs]
             [clojure.string :as cs]
+            [medley.core :as mc]
             [monkey.ci.build
              [api :as api]
              [core :as core]
@@ -12,10 +13,6 @@
              [infra :as infra]
              [kaniko :as kaniko]
              [pushover :as po]]))
-
-;; Version assigned when building main branch
-;; TODO Read this from app/deps.edn
-(def snapshot-version "0.16.10-SNAPSHOT")
 
 (def tag-regex #"^refs/tags/(\d+\.\d+\.\d+(\.\d+)?$)")
 
@@ -76,12 +73,6 @@
       ;; Fallback
       "latest"))
 
-(defn lib-version
-  "Retrieves lib/jar version from the tag, or the next snapshot if this is the main branch."
-  [ctx]
-  (or (tag-version ctx)
-      snapshot-version))
-
 (defn clj-container 
   "Executes script in clojure container"
   [id dir & args]
@@ -123,12 +114,13 @@
 
 (defn app-uberjar [ctx]
   (when (publish-app? ctx)
-    (-> (clj-container "app-uberjar" "app" "-X:jar:uber")
-        (assoc 
-         :container/env {"MONKEYCI_VERSION" (lib-version ctx)}
-         :save-artifacts [{:id "uberjar"
-                           :path "app/target/monkeyci-standalone.jar"}])
-        (m/depends-on ["test-app"]))))
+    (let [v (tag-version ctx)]
+      (-> (clj-container "app-uberjar" "app" "-X:jar:uber")
+          (assoc 
+           :container/env (when v {"MONKEYCI_VERSION" v})
+           :save-artifacts [{:id "uberjar"
+                             :path "app/target/monkeyci-standalone.jar"}])
+          (m/depends-on ["test-app"])))))
 
 (def img-base "fra.ocir.io/frjdhmocn5qi")
 (def app-img (str img-base "/monkeyci"))
@@ -204,7 +196,7 @@
   [ctx id dir & [version]]
   (let [env (-> (api/build-params ctx)
                 (select-keys ["CLOJARS_USERNAME" "CLOJARS_PASSWORD"])
-                (assoc "MONKEYCI_VERSION" (or version (lib-version ctx))))]
+                (mc/assoc-some "MONKEYCI_VERSION" (or version (tag-version ctx))))]
     (-> (clj-container id dir
                        "-X:jar:deploy")
         (assoc :container/env env))))
@@ -217,7 +209,7 @@
 (defn publish-test-lib [ctx]
   (when (publish-test-lib? ctx)
     ;; TODO Overwrite monkeyci version if necessary
-    ;; (format "-Sdeps '{:override-deps {:mvn/version \"%s\"}}'" (lib-version ctx))
+    ;; (format "-Sdeps '{:override-deps {:mvn/version \"%s\"}}'" (tag-version ctx))
     (some-> (publish ctx "publish-test-lib" "test-lib")
             (m/depends-on ["test-test-lib"]))))
 

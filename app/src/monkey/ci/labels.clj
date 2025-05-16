@@ -4,17 +4,17 @@
 (defn matches-labels?
   "Predicate that checks if the given labels match filter `f`.  The filter
    is a list of a list of labels and values, where the first level represents a
-   disjunction (logical 'or') and the second a conjunction (logical 'and')."
+   disjunction (logical 'or') and the second a conjunction (logical 'and').
+   The labels are a map of label names and one or more values."
   [f labels]
-  (letfn [(filter-applies? [{:keys [label value]}]
-            ;; TODO Add support for regexes
-            (= value (get labels label)))
-          (conjunction-applies? [parts]
-            (every? filter-applies? parts))
-          (disjunction-applies? [parts]
-            (or (empty? parts)
-                (some conjunction-applies? parts)))]
-    (disjunction-applies? f)))
+  (let [labels (mc/map-vals set labels)]
+    (letfn [(filter-applies? [{:keys [label value]}]
+              ;; TODO Add support for regexes
+              (contains? (get labels label) value))
+            (conjunction-applies? [parts]
+              (every? filter-applies? parts))]
+      (or (empty? f)
+          (some conjunction-applies? f)))))
 
 (defn apply-label-filters
   "Given a single set of parameters with label filters, checks if the given
@@ -24,9 +24,10 @@
   [labels params]
   (matches-labels? (:label-filters params) labels))
 
-(defn labels->map [l]
-  (->> (map (juxt :name :value) l)
-       (into {})))
+(defn- labels->map [l]  
+  (->> l
+       (group-by :name)
+       (mc/map-vals (partial map :value))))
 
 (defn filter-by-label [repo entities]
   (filter (partial apply-label-filters (labels->map (:labels repo))) entities))
