@@ -267,11 +267,11 @@
                                  :value "test-project"}]])]
       (is (fn? f))
       (is (true? (f (dummy-job ::first
-                               {:labels {"name" "test-job"}}))))
+                               {:labels {"name" ["test-job"]}}))))
       (is (true? (f (dummy-job ::second
-                               {:labels {"project" "test-project"}}))))
+                               {:labels {"project" ["test-project"]}}))))
       (is (not (f (dummy-job ::third
-                             {:labels {"project" "other-project"}})))))))
+                             {:labels {"project" ["other-project"]}})))))))
 
 (deftest resolve-all
   (testing "resolves all jobs"
