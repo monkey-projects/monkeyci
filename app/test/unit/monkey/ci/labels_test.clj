@@ -1,29 +1,35 @@
-(ns monkey.ci.label-test
+(ns monkey.ci.labels-test
   (:require [clojure.test :refer [deftest testing is]]
             [monkey.ci.labels :as sut]))
 
 (deftest apply-label-filters
   (testing "matches params with empty filter"
     (is (true? (sut/apply-label-filters
-                {"test-label" "test-value"}
+                {"test-label" ["test-value"]}
                 {:label-filters []}))))
 
   (testing "matches params with single matching filter"
     (is (true? (sut/apply-label-filters
-                {"test-label" "test-value"}
+                {"test-label" ["test-value"]}
                 {:label-filters [[{:label "test-label"
                                    :value "test-value"}]]}))))
 
+  (testing "matches when multiple label values"
+    (is (true? (sut/apply-label-filters
+                {"test-label" ["first" "second"]}
+                {:label-filters [[{:label "test-label"
+                                   :value "first"}]]}))))
+
   (testing "does not match when no matching filter"
     (is (not (sut/apply-label-filters
-              {"test-label" "test-value"}
+              {"test-label" ["test-value"]}
               {:label-filters [[{:label "test-label"
                                  :value "other-value"}]]}))))
 
   (testing "matches conjunction filter"
     (is (true? (sut/apply-label-filters
-                {"first-label" "first-value"
-                 "second-label" "second-value"}
+                {"first-label" ["first-value"]
+                 "second-label" ["second-value"]}
                 {:label-filters [[{:label "first-label"
                                    :value "first-value"}
                                   {:label "second-label"
@@ -31,8 +37,8 @@
 
   (testing "does not match conjunction filter when only one value matches"
     (is (not (sut/apply-label-filters
-              {"first-label" "first-value"
-               "second-label" "other-value"}
+              {"first-label" ["first-value"]
+               "second-label" ["other-value"]}
               {:label-filters [[{:label "first-label"
                                  :value "first-value"}
                                 {:label "second-label"
@@ -40,12 +46,39 @@
   
   (testing "matches disjunction filter"
     (is (true? (sut/apply-label-filters
-                {"first-label" "first-value"
-                 "second-label" "second-value"}
+                {"first-label" ["first-value"]
+                 "second-label" ["second-value"]}
                 {:label-filters [[{:label "first-label"
                                    :value "first-value"}]
                                  [{:label "other-label"
                                    :value "other-value"}]]})))))
+
+(deftest filter-by-label
+  (testing "returns matching entities according to repo labels"
+    (let [[a b :as params] [{:params ::params-1
+                             :label-filters [[{:label "test-label"
+                                               :value "value-1"}]]}
+                            {:params ::params-2
+                             :label-filters [[{:label "test-label"
+                                               :value "value-2"}]]}]
+          repo {:labels [{:name "test-label"
+                          :value "value-1"}]}
+          f (sut/filter-by-label repo params)]
+      (is (= [a] f))))
+  
+  (testing "returns matching entities when multiple repo labels with same name"
+    (let [params [{:params ::params-1
+                   :label-filters [[{:label "test-label"
+                                     :value "value-1"}]]}
+                  {:params ::params-2
+                   :label-filters [[{:label "test-label"
+                                     :value "value-2"}]]}]
+          repo {:labels [{:name "test-label"
+                          :value "value-1"}
+                         {:name "test-label"
+                          :value "value-2"}]}
+          f (sut/filter-by-label repo params)]
+      (is (= params f)))))
 
 (deftest reconcile-labels
   (testing "all new labels should be inserted"
