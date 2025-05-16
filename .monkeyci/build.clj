@@ -332,7 +332,7 @@
       {:job-id "publish-scw-api-img"
        :target-img (str scw-api-img ":" (image-version ctx))
        :arch :amd
-       ;;:subdir (:path scw-api-config-artifact)
+       :subdir (:path scw-api-config-artifact)
        :container-opts {:dependencies ["prepare-scw-api-config"
                                        "app-img-manifest"]
                         :restore-artifacts [scw-api-config-artifact]}
