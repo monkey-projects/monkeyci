@@ -197,10 +197,13 @@
 
 (defmethod make-container-routes :oci [conf]
   (log/debug "Creating OCI container routes")
-  (c-oci/make-routes (-> conf
-                         (dissoc :containers)
-                         (assoc :oci (:containers conf)
-                                :api (bas/srv->api-config (:api conf))))))
+  (let [extract-keys [:promtail :sidecar]]
+    (c-oci/make-routes (-> conf
+                           (dissoc :containers)
+                           (assoc :oci (-> (:containers conf)
+                                           (as-> x (apply dissoc x extract-keys)))
+                                  :api (bas/srv->api-config (:api conf)))
+                           (merge (select-keys (:containers conf) extract-keys))))))
 
 (defn new-container-routes
   "Creates new event handler routes that handle events raised by the controller and 

@@ -3,6 +3,7 @@
             [clojure.test :refer [deftest is testing]]
             [com.stuartsierra.component :as co]
             [manifold.stream :as ms]
+            [monkey.ci.containers.oci :as c-oci]
             [monkey.ci.events.mailman :as em]
             [monkey.ci.metrics.core :as m]
             [monkey.ci.prometheus :as prom]
@@ -187,3 +188,43 @@
     
     (testing "forwards only build/canceled to local mailman"
       (is (= [cancel] (tm/get-posted local))))))
+
+(deftest new-container-routes
+  (let [conf-passed (atom nil)]
+    (defmethod sut/make-container-routes ::test [conf]
+      (reset! conf-passed conf))
+    
+    (testing "passes containers config to maker"
+      (let [containers {:type ::test
+                        :value ::containers}
+            c (sut/new-container-routes {:containers containers})]
+        (is (some? c))
+        (is (fn? (:make-routes c)))
+        (is (some? ((:make-routes c) {})))
+        (is (= {:containers containers}
+               @conf-passed))))
+
+    (remove-method sut/make-container-routes ::test)))
+
+(deftest make-container-routes
+  (testing "type `oci`"
+    (testing "creates oci routes with config"
+      (let [conf (atom nil)]
+        (with-redefs [c-oci/make-routes (fn [c]
+                                          (reset! conf c)
+                                          ::routes)]
+          (is (= ::routes (sut/make-container-routes {:containers
+                                                      {:type :oci
+                                                       :sidecar ::sidecar
+                                                       :promtail ::promtail}
+                                                      ::key ::value})))
+          (is (= {:type :oci} (:oci @conf))
+              "passes container config as `oci`")
+          (is (string? (get-in @conf [:api :url]))
+              "passes api url")
+          (is (= ::value (::key @conf))
+              "passes other config")
+          (is (= ::sidecar (:sidecar @conf))
+              "passes sidecar config")
+          (is (= ::promtail (:promtail @conf))
+              "passes promtail config"))))))
