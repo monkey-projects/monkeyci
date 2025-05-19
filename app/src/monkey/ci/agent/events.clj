@@ -69,7 +69,8 @@
       ;; TODO Set credit multiplier
       (sc/set-build (get-build ctx))
       ;; TODO This will only work if the container is in the host network
-      ;; Ideally, we could use UDS but netty does not support this (yet)
+      ;; Ideally, we could use UDS but netty does not support this (yet).
+      ;; We could use the network ip address instead.
       (sc/set-api {:url (str "http://localhost:" (-> ctx (get-config) :api-server :port))
                    :token (get-token ctx)})))
 

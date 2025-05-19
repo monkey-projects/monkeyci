@@ -44,6 +44,7 @@
   (letfn [(make-routes [co]
             (e/make-routes (-> (:agent config)
                                (merge co))))]
+    ;; TODO Explicitly poll for build/queued events when capacity is available
     (em/map->RouteComponent {:make-routes make-routes})))
 
 (defn- make-token [pk sid]

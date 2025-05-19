@@ -28,7 +28,8 @@
    :clients
    [(-> {:url (:loki-url conf)
          :tenant-id (:org-id conf)}
-        (mc/assoc-some :bearer-token (:token conf)))]
+        (mc/assoc-some :bearer-token (:token conf)
+                       :headers (:headers conf)))]
    :scrape-configs
    [{:job-name "build-logs"
      :static-configs
