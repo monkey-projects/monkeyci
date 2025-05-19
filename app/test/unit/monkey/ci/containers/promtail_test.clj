@@ -12,7 +12,8 @@
               :org-id "test-cust"
               :repo-id "test-repo"
               :build-id "test-build"
-              :job-id "test-job"}
+              :job-id "test-job"
+              :headers {"X-Auth-Token" "test-token"}}
         pc (sut/promtail-config conf)]
     
     (testing "contains default positions stanza"
@@ -26,7 +27,11 @@
 
       (testing "with bearer token"
         (is (= "test-token"
-               (-> pc :clients first :bearer-token)))))
+               (-> pc :clients first :bearer-token))))
+
+      (testing "with custom headers"
+        (is (= {"X-Auth-Token" "test-token"}
+               (-> pc :clients first :headers)))))
 
     (testing "adds scrape config"
       (let [sc (-> pc :scrape-configs first)]
