@@ -320,15 +320,15 @@
    containers don't (yet?) support custom commands and cannot mount configfiles."
   [ctx]
   (when (publish-app? ctx)
-    ((kaniko/image-job
-      {:job-id "publish-scw-api-img"
-       :target-img (str scw-api-img ":" (image-version ctx))
-       :arch :amd
-       :subdir (:path scw-api-config-artifact)
-       :container-opts {:dependencies ["prepare-scw-api-config"
-                                       "app-img-manifest"]
-                        :restore-artifacts [scw-api-config-artifact]}
-       :creds-param "docker-scw-credentials"})
+    (kaniko/image
+     {:job-id "publish-scw-api-img"
+      :target-img (str scw-api-img ":" (image-version ctx))
+      :arch :amd
+      :subdir (:path scw-api-config-artifact)
+      :container-opts {:dependencies ["prepare-scw-api-config"
+                                      "app-img-manifest"]
+                       :restore-artifacts [scw-api-config-artifact]}
+      :creds-param "docker-scw-credentials"}
      ctx)))
 
 (defn deploy
@@ -339,21 +339,21 @@
                     (filter (comp true? second))
                     (map (fn [[img _]]
                            [img (image-version ctx)]))
-                    (into {}))]
+                    (into {}))
+        token (get (api/build-params ctx) "github-token")]
     (when (and (should-publish? ctx)
                (not (release? ctx))
-               (not-empty images))
+               (not-empty images)
+               token)
       (-> (m/action-job
            "deploy"
            (fn [ctx]
-             (if-let [token (get (api/build-params ctx) "github-token")]
-               ;; Patch the kustomization file
-               (if (infra/patch+commit! (infra/make-client token)
-                                        :staging ; Only staging for now
-                                        images)
-                 m/success
-                 (-> m/failure (m/with-message "Unable to patch version in infra repo")))
-               (-> m/failure (m/with-message "No github token provided")))))
+             ;; Patch the kustomization file
+             (if (infra/patch+commit! (infra/make-client token)
+                                      :staging ; Only staging for now
+                                      images)
+               m/success
+               (-> m/failure (m/with-message "Unable to patch version in infra repo")))))
           (m/depends-on (->> [(when (publish-app? ctx) "app-img-manifest")
                               (when (publish-gui? ctx) "gui-img-manifest")]
                              (remove nil?)))))))
