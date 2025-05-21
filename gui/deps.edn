@@ -38,4 +38,7 @@
    :exec-args {:output "target/admin/index.html"}}
 
   :staging
-  {:exec-args {:base-url "staging.monkeyci.com"}}}}
+  {:exec-args {:base-url "staging.monkeyci.com"}}
+
+  :scw
+  {:exec-args {:base-url "scw.monkeyci.com"}}}}

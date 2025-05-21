@@ -21,7 +21,10 @@
   "Basic test context, to use in test jobs"
   {:build
    {:git
-    {:main-branch "main"}}})
+    {:main-branch "main"}}
+   :api
+   ;; Dummy api client
+   {:client (constantly (atom {}))}})
 
 (defn with-git-ref
   "Sets given ref in the context git configuration"
@@ -78,6 +81,11 @@
   "Configures a temporary checkout directory in the context"
   [ctx]
   (with-checkout-dir ctx (str (fs/create-temp-dir))))
+
+(defn with-build-id
+  "Sets build id in the context"
+  [ctx id]
+  (assoc-in ctx [:build :build-id] id))
 
 (defn execute-job
   "Executes given job with specified context. Look out for side effects!"
