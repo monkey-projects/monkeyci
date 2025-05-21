@@ -54,9 +54,9 @@
 
 (s/defschema log-query-schema
   {:query s/Str
-   :start s/Int
    :direction s/Str
-   (s/optional-key :end) s/Int})
+   (s/optional-key :end) s/Int
+   (s/optional-key :start) s/Int})
 
 (s/defschema UpdateParam
   {:name s/Str
