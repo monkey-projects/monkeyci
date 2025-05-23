@@ -9,7 +9,7 @@
             [monkey.mailman.core :as mmc]
             [monkey.mailman.nats.core :as mnc]))
 
-(def subject-types
+(def ^:private subject-types
   ;; Use the same as jms
   jms/destination-types)
 

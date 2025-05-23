@@ -16,7 +16,7 @@
 
 (defn- trigger-build-btn []
   (let [show? (rf/subscribe [:repo/show-trigger-form?])]
-    [:button.btn.btn-secondary
+    [:button.btn.btn-info
      (cond-> {:type :button
               :on-click #(rf/dispatch [:repo/show-trigger-build])}
        @show? (assoc :disabled true))
@@ -24,7 +24,7 @@
 
 (defn- edit-repo-btn []
   (let [c (rf/subscribe [:route/current])]
-    [:a.btn.btn-secondary
+    [:a.btn.btn-soft-primary
      {:href (r/path-for :page/repo-edit (get-in @c [:parameters :path]))}
      [:span.me-1 [co/icon :pencil-fill]] "Edit"]))
 
@@ -36,8 +36,8 @@
 
 (defn build-actions []
   [:<>
-   [trigger-build-btn]
-   [edit-repo-btn]])
+   [edit-repo-btn]
+   [trigger-build-btn]])
 
 (defn- trigger-type []
   [:select.form-select {:name :trigger-type}
@@ -217,6 +217,15 @@
      [:div.row
       [:div.col
        [:div.mb-2
+        [:label.form-label {:for "url"} "Url"]
+        [:input.form-control
+         {:id "url"
+          :value (:url @e)
+          :on-change (u/form-evt-handler [:repo/url-changed])}]
+        [:div.form-text
+         "This is used when manually triggering a build from the UI. "
+         "Use an ssh url for private repos."]]
+       [:div.mb-2
         [:label.form-label {:for "name"} "Repository name"]
         [:input.form-control
          {:id "name"
@@ -229,13 +238,6 @@
           :value (:main-branch @e)
           :on-change (u/form-evt-handler [:repo/main-branch-changed])}]
         [:div.form-text "Required when you want to determine the 'main branch' in the build script."]]
-       [:div.mb-2
-        [:label.form-label {:for "url"} "Url"]
-        [:input.form-control
-         {:id "url"
-          :value (:url @e)
-          :on-change (u/form-evt-handler [:repo/url-changed])}]
-        [:div.form-text "This is used when manually triggering a build from the UI."]]
        [:div.mb-2
         [:label.form-label {:for "github-id"} "Github Id"]
         [:input.form-control

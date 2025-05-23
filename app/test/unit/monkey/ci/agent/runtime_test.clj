@@ -1,5 +1,6 @@
 (ns monkey.ci.agent.runtime-test
   (:require [clojure.test :refer [deftest testing is]]
+            [com.stuartsierra.component :as co]
             [monkey.ci.agent.runtime :as sut]
             [monkey.ci.build.api-server :as bas]
             [monkey.ci.protocols :as p]
@@ -9,7 +10,8 @@
              [helpers :as h]]))
 
 (deftest make-system
-  (let [conf tc/base-config
+  (let [conf (assoc tc/base-config
+                    :poll-loop {:type :manifold})
         sys (sut/make-system conf)]
     (testing "provides build atom"
       (is (some? (:builds sys))))
@@ -47,8 +49,11 @@
     (testing "provides container routes"
       (is (some? (:container-routes sys))))
 
-    (testing "provides metris"
-      (is (some? (:metrics sys))))))
+    (testing "provides metrics"
+      (is (some? (:metrics sys))))
+
+    (testing "provides poll loop"
+      (is (some? (:poll-loop sys))))))
 
 (deftest params
   (let [params (sut/new-params {:api {:url "http://test-api"}
@@ -76,3 +81,20 @@
             fetcher (sut/new-ssh-keys-fetcher {:api {:url "http://test-api"}
                                                :jwk {:priv (h/generate-private-key)}})]
         (is (= ["test-key"] (fetcher sid)))))))
+
+(deftest poll-loop
+  (let [conf {:max-builds 0
+              :poll-interval 100}
+        p (-> (sut/new-poll-loop conf)
+              (assoc :builds (atom {}))
+              (co/start))]
+    
+    (testing "`start`"
+      (testing "creates polling future"
+        (is (some? (:future p)))
+        (is (true? @(:running? p)))))
+
+    (testing "`stop` stops poll loop"
+      (let [r (co/stop p)]
+        (is (nil? (:future r)))
+        (is (false? @(:running? p)))))))

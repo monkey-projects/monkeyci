@@ -12,6 +12,8 @@
                                      (future (.close (:server s))))]
     (h/with-tmp-dir dir
       (let [config-file (fs/path dir "config.edn")]
-        (is (nil? (spit (fs/file config-file) (pr-str tc/base-config))))
+        (is (nil? (spit (fs/file config-file) (-> tc/base-config
+                                                  (assoc :poll-loop {:type :manifold})
+                                                  (pr-str)))))
         (testing "starts agent runtime"
           (is (nil? (sut/-main (str config-file)))))))))
