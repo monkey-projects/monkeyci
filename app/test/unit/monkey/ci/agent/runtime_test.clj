@@ -83,8 +83,9 @@
         (is (= ["test-key"] (fetcher sid)))))))
 
 (deftest poll-loop
-  (let [conf {:max-builds 0
-              :poll-interval 100}
+  (let [conf {:poll-loop
+              {:max-builds 0
+               :poll-interval 100}}
         p (-> (sut/new-poll-loop conf)
               (assoc :builds (atom {}))
               (co/start))]

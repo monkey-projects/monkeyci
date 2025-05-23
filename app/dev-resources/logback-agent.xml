@@ -1,0 +1,36 @@
+<configuration scan="true" scanPeriod="5 seconds">
+  <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+    <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+      <level>INFO</level>
+    </filter>		
+    <encoder>
+      <pattern>[%blue(AGENT)] %d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+    </encoder>
+  </appender>
+
+  <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    <append>true</append>
+    <encoder>
+      <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+    </encoder>
+    <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+      <fileNamePattern>logs/agent-%d{yyyy-MM-dd}.log</fileNamePattern>
+      <maxHistory>30</maxHistory>
+      <totalSizeCap>1GB</totalSizeCap>
+    </rollingPolicy>
+  </appender>
+  
+  <logger name="org" level="WARN"/>
+  <logger name="com" level="WARN"/>
+  <logger name="net" level="WARN"/>
+  <logger name="io" level="WARN"/>
+  <logger name="monkey.ci" level="DEBUG"/>
+  <logger name="monkey.ci.agent" level="TRACE"/>
+  <logger name="monkey.mailman" level="DEBUG"/>
+  <logger name="monkey.nats" level="TRACE"/>
+  
+  <root level="INFO">
+    <appender-ref ref="STDOUT" />
+    <appender-ref ref="FILE" />
+  </root>
+</configuration>

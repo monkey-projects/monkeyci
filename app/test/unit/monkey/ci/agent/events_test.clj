@@ -289,7 +289,10 @@
     (testing "ignores types other than `build/queued`"
       (is (some? (mmc/post-events broker [{:type :job/queued}])))
       (is (some? (reset! state {})))
-      (is (nil? (sut/poll-next conf router max-reached?))))))
+      (is (nil? (sut/poll-next conf router max-reached?))))
+
+    (testing "posts back resulting events"
+      )))
 
 (deftest poll-loop
   (let [running? (atom true)]

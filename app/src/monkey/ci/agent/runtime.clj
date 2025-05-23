@@ -115,7 +115,10 @@
       (reset! running? true)
       (assoc this :future (future
                             (e/poll-loop (assoc config :mailman mailman)
-                                         (mmc/router (:routes agent-routes))
+                                         (let [r (mmc/router (:routes agent-routes))]
+                                           (fn [evt]
+                                             (let [res (r evt)]
+                                               (log/debug "Router result:" res))))
                                          running?
                                          max-reached?)))))
 
@@ -127,10 +130,11 @@
         (dissoc :future))))
 
 (defn new-poll-loop [conf]
-  (map->PollLoop {:running? (atom false)
-                  :config (merge {:poll-interval 1000
-                                  :max-builds 1}
-                                 conf)}))
+  (let [defaults {:poll-interval 1000
+                  :max-builds 1}]
+    (map->PollLoop {:running? (atom false)
+                    :config (->> (select-keys (:poll-loop conf) (keys defaults))
+                                 (merge defaults))})))
 
 (defn new-poll-mailman
   "Sets up a mailman component that will be used by the poll loop.  It should only

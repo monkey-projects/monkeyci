@@ -33,7 +33,7 @@
           conn (nats/make-connection conf)
           subjects (types-to-subjects (:prefix conf))
           broker-conf (-> conf
-                          (select-keys [:stream :consumer])
+                          (select-keys [:stream :consumer :poll-opts])
                           (merge {:subject-mapper (comp subjects :type)}))]
       (log/debug "Using broker configuration:" broker-conf)
       (-> this
