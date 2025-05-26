@@ -297,7 +297,9 @@
 (deftest poll-loop
   (let [running? (atom true)]
     (testing "polls next until no longer running"
-      (let [f (future (sut/poll-loop {:poll-interval 100}
+      (let [f (future (sut/poll-loop {:poll-interval 100
+                                      :mailman
+                                      {:broker ::test-broker}}
                                      (constantly nil)
                                      running?
                                      (constantly true)))] 

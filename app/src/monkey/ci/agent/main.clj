@@ -25,9 +25,5 @@
       (waiter sys))))
 
 (defn -main [& args]
-  (try
-    @(run-agent (c/load-config-file (first args))
-                (comp wh/on-server-close :api-server))
-    (finally
-      (log/info "Build agent terminated."))))
-
+  @(run-agent (c/load-config-file (first args))
+              (comp wh/on-server-close :api-server)))

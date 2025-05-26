@@ -219,13 +219,16 @@
 ;;; Polling
 
 (defn poll-next [{:keys [mailman]} router max-reached?]
-  (log/trace "Max reached?" (max-reached?))
-  (when-not (max-reached?)
-    (log/trace "Polling for next event")
-    (when-let [[evt] (mmc/poll-events (:broker mailman) 1)]
-      (when (= :build/queued (:type evt))
-        (log/debug "Polled next build event:" evt)
-        (router evt)))))
+  (try
+    (log/trace "Max reached?" (max-reached?))
+    (when-not (max-reached?)
+      (log/trace "Polling for next event")
+      (when-let [[evt] (mmc/poll-events (:broker mailman) 1)]
+        (when (= :build/queued (:type evt))
+          (log/trace "Polled next build event:" evt)
+          (router evt))))
+    (catch Exception ex
+      (log/warn "Got error when polling:" (ex-message ex) ex))))
 
 (defn poll-loop
   "Starts a poll loop that takes events from an event receiver as long as
