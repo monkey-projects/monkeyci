@@ -218,6 +218,13 @@
 
 ;;; Polling
 
+(defn- repost-results [mailman res]
+  (->> res
+       (map :result)
+       (flatten)
+       (remove nil?)
+       (em/post-events mailman)))
+
 (defn poll-next [{:keys [mailman]} router max-reached?]
   (try
     (log/trace "Max reached?" (max-reached?))
@@ -226,7 +233,7 @@
       (when-let [[evt] (mmc/poll-events (:broker mailman) 1)]
         (when (= :build/queued (:type evt))
           (log/trace "Polled next build event:" evt)
-          (router evt))))
+          (repost-results mailman (router evt)))))
     (catch Exception ex
       (log/warn "Got error when polling:" (ex-message ex) ex))))
 

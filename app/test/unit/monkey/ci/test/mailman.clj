@@ -11,7 +11,10 @@
   mmc/EventReceiver
   (add-listener [this l]
     ;; Noop
-    ))
+    )
+
+  (poll-events [this n]
+    (take n @posted)))
 
 (defn test-broker []
   (->TestBroker (atom [])))

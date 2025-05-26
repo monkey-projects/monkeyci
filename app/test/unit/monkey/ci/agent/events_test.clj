@@ -261,7 +261,7 @@
                                 (-> s
                                     (update :builds (fnil inc 0))
                                     (update :handled conj evt))))
-                 ::handled)
+                 [])
         conf {:max-builds 1
               :mailman {:broker broker}}
         max-reached? (fn []
@@ -271,7 +271,7 @@
       (let [evt {:type :build/queued
                  :sid ["first"]}]
         (is (some? (mmc/post-events broker [evt])))
-        (is (= ::handled (sut/poll-next conf router max-reached?)))
+        (is (some? (sut/poll-next conf router max-reached?)))
         (is (= [evt] (:handled @state)))))
 
     (testing "does not take next event if no capacity"
@@ -283,16 +283,22 @@
 
     (testing "when new capacity, again takes next event"
       (is (some? (swap! state update :builds dec)))
-      (is (= ::handled (sut/poll-next conf router max-reached?)))
+      (is (some? (sut/poll-next conf router max-reached?)))
       (is (= 2 (count (:handled @state)))))
 
     (testing "ignores types other than `build/queued`"
       (is (some? (mmc/post-events broker [{:type :job/queued}])))
       (is (some? (reset! state {})))
-      (is (nil? (sut/poll-next conf router max-reached?))))
+      (is (nil? (sut/poll-next conf router max-reached?)))))
 
-    (testing "posts back resulting events"
-      )))
+  (testing "posts back resulting events"
+    (let [broker (tm/test-component)
+          router (mmc/router [[:build/queued [{:handler (constantly [{:type ::second-event}])}]]])]
+      (is (some? (mmc/post-events (:broker broker) [{:type :build/queued}])))
+      (is (some? (sut/poll-next {:mailman broker} router (constantly false))))
+      (is (= [:build/queued
+              ::second-event]
+             (map :type (tm/get-posted broker)))))))
 
 (deftest poll-loop
   (let [running? (atom true)]
