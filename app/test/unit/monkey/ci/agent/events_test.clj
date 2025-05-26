@@ -13,7 +13,10 @@
             [monkey.ci.test
              [helpers :as h]
              [mailman :as tm]]
-            [monkey.mailman.core :as mmc]))
+            [monkey.mailman
+             [core :as mmc]
+             [mem :as mem]
+             [manifold :as mmm]]))
 
 (deftest routes
   (let [evts [:build/queued :build/end :script/initializing]
@@ -84,12 +87,15 @@
       (is (= ::config (-> (enter {})
                           (sut/get-config)))))))
 
+(defn- random-sid []
+  (repeatedly 3 (comp str random-uuid)))
+
 (deftest fetch-ssh-keys
   (let [{:keys [enter] :as i} (sut/fetch-ssh-keys identity)]
     (is (keyword? (:name i)))
 
     (testing "`enter` fetches keys for repo sid"
-      (let [sid (repeatedly 3 (comp str random-uuid))]
+      (let [sid (random-sid)]
         (is (= sid
                (-> {:event {:sid sid}}
                    (enter)
@@ -210,7 +216,7 @@
           (spec/explain-str ::ss/config conf)))))
 
 (deftest script-init
-  (let [sid (repeatedly 3 (comp str random-uuid))
+  (let [sid (random-sid)
         r (sut/script-init {:credit-multiplier ::cm}
                            {:event {:sid sid}})]
     (testing "returns `build/start`"
@@ -221,3 +227,84 @@
 
     (testing "adds credit multiplier from config"
       (is (= ::cm (-> r first :credit-multiplier))))))
+
+(deftest cleanup
+  (h/with-tmp-dir dir
+    (let [sid (random-sid)
+          conf {:work-dir dir
+                :cleanup? true}
+          wd (sut/build-work-dir conf sid)
+          {:keys [leave] :as i} sut/cleanup]
+      (is (keyword? (:name i)))
+
+      (is (some? (fs/create-dirs wd)))
+      
+      (testing "`leave`"
+        (let [base-ctx {:event {:sid sid}}]
+          (testing "does nothing if not enabled"
+            (let [ctx (-> base-ctx
+                          (sut/set-config (dissoc conf :cleanup?)))]
+              (is (= ctx (leave ctx)))
+              (is (fs/exists? wd))))
+
+          (testing "when enabled, deletes all files in work dir"
+            (let [ctx (sut/set-config base-ctx conf)]
+              (is (= ctx (leave ctx)))
+              (is (not (fs/exists? wd))))))))))
+
+(deftest poll-next
+  (let [broker (mem/make-memory-broker)
+        state (atom {:builds 0
+                     :handled []})
+        router (fn [evt]
+                 (swap! state (fn [s]
+                                (-> s
+                                    (update :builds (fnil inc 0))
+                                    (update :handled conj evt))))
+                 ::handled)
+        conf {:max-builds 1
+              :mailman {:broker broker}}
+        max-reached? (fn []
+                       (= (:max-builds conf) (:builds @state)))]
+    
+    (testing "handles next build/queued event"
+      (let [evt {:type :build/queued
+                 :sid ["first"]}]
+        (is (some? (mmc/post-events broker [evt])))
+        (is (= ::handled (sut/poll-next conf router max-reached?)))
+        (is (= [evt] (:handled @state)))))
+
+    (testing "does not take next event if no capacity"
+      (let [evt {:type :build/queued
+                 :sid ["second"]}]
+        (is (some? (mmc/post-events broker [evt])))
+        (is (nil? (sut/poll-next conf router max-reached?)))
+        (is (= 1 (count (:handled @state))))))
+
+    (testing "when new capacity, again takes next event"
+      (is (some? (swap! state update :builds dec)))
+      (is (= ::handled (sut/poll-next conf router max-reached?)))
+      (is (= 2 (count (:handled @state)))))
+
+    (testing "ignores types other than `build/queued`"
+      (is (some? (mmc/post-events broker [{:type :job/queued}])))
+      (is (some? (reset! state {})))
+      (is (nil? (sut/poll-next conf router max-reached?))))
+
+    (testing "posts back resulting events"
+      )))
+
+(deftest poll-loop
+  (let [running? (atom true)]
+    (testing "polls next until no longer running"
+      (let [f (future (sut/poll-loop {:poll-interval 100
+                                      :mailman
+                                      {:broker ::test-broker}}
+                                     (constantly nil)
+                                     running?
+                                     (constantly true)))] 
+        (is (some? f))
+
+        (is (false? (reset! running? false)))
+        (is (nil? (deref f 1000 :timeout))
+            "expect loop to terminate")))))

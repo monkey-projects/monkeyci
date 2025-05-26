@@ -12,7 +12,8 @@
             [monkey.ci.build.api-server :as bas]
             [monkey.ci.events.mailman :as em]
             [monkey.ci.events.mailman.interceptors :as emi]
-            [monkey.ci.script.config :as sc]))
+            [monkey.ci.script.config :as sc]
+            [monkey.mailman.core :as mmc]))
 
 (def m2-cache-path
   "Location of the m2 cache path in the container"
@@ -35,11 +36,14 @@
 (defn set-ssh-keys [ctx k]
   (assoc ctx ::ssh-keys k))
 
-(defn- build-work-dir [{:keys [work-dir]} sid]
+(defn build-work-dir [{:keys [work-dir]} sid]
   (str (apply fs/path work-dir sid)))
 
-(defn- ctx->wd [ctx]
-  (build-work-dir (get-config ctx) (get-in ctx [:event :sid])))
+(defn- ctx->wd
+  ([conf ctx]
+   (build-work-dir conf (get-in ctx [:event :sid])))
+  ([ctx]
+   (ctx->wd (get-config ctx) ctx)))
 
 (defn- checkout-dir [wd]
   (str (fs/create-dirs (fs/path wd "checkout"))))
@@ -83,7 +87,7 @@
 
 (def add-token
   "Generates a new token and adds it to the current build list.  This is used by the
-   http server to verify client requests."
+   http server to verify client requests.  The build list is shared across event handlers."
   {:name ::add-token
    :enter (fn [ctx]
             (let [token (bas/generate-token)]
@@ -135,6 +139,16 @@
    :leave (fn [ctx]
             (assoc ctx :result [(b/build-init-evt (::build ctx))]))})
 
+(def cleanup
+  "Interceptor that deletes all files from a build, after build end"
+  {:name ::cleanup
+   :leave (fn [ctx]
+            (when (:cleanup? (get-config ctx))
+              (let [wd (ctx->wd ctx)]
+                (log/debug "Cleaning up build files in" wd)
+                (fs/delete-tree wd)))
+            ctx)})
+
 ;;; Event handlers
 
 (defn prepare-build-cmd [ctx]
@@ -165,7 +179,8 @@
      :err (log-file wd "err.log")
      :exit-fn (p/exit-fn
                (fn [{:keys [exit]}]
-                 ;; TODO Clean up build files
+                 ;; TODO Clean up build files.  We could also do this using
+                 ;; a cronjob on the agent.
                  (log/info "Build container exited with code:" exit)
                  (em/post-events (:mailman conf)
                                  [(b/build-end-evt build exit)])))}))
@@ -183,7 +198,6 @@
 (defn make-routes [conf]
   [[:build/queued
     [{:handler prepare-build-cmd
-      ;; TODO Restore build cache
       :interceptors [emi/handle-build-error
                      (add-config conf)
                      add-token
@@ -198,6 +212,32 @@
 
    [:build/end
     [{:handler (constantly nil)
-      ;; TODO Save build cache
       :interceptors [(add-config conf)
-                     remove-token]}]]])
+                     remove-token
+                     cleanup]}]]])
+
+;;; Polling
+
+(defn poll-next [{:keys [mailman]} router max-reached?]
+  (try
+    (log/trace "Max reached?" (max-reached?))
+    (when-not (max-reached?)
+      (log/trace "Polling for next event")
+      (when-let [[evt] (mmc/poll-events (:broker mailman) 1)]
+        (when (= :build/queued (:type evt))
+          (log/trace "Polled next build event:" evt)
+          (router evt))))
+    (catch Exception ex
+      (log/warn "Got error when polling:" (ex-message ex) ex))))
+
+(defn poll-loop
+  "Starts a poll loop that takes events from an event receiver as long as
+   the max number of simultaneous builds has not been reached.  When a 
+   build finishes, a new event is taken from the queue.  This loop should
+   only receive `build/queued` events.  The list of builds is then updated
+   by an async listener whenever a build ends."
+  [{:keys [poll-interval] :or {poll-interval 1000} :as conf} router running? max-reached?]
+  (while @running?
+    (when-not (poll-next conf router max-reached?)
+      (Thread/sleep poll-interval)))
+  (log/debug "Poll loop terminated"))

@@ -1,19 +1,31 @@
 (ns monkey.ci.runtime.common
   (:require [clojure.tools.logging :as log]
             [com.stuartsierra.component :as co]
-            [manifold.deferred :as md]))
+            [manifold.deferred :as md]
+            [monkey.ci.utils :as u]))
 
 (defn- maybe-deref [x]
   (cond-> x
     (md/deferred? x) deref))
 
+(defn- system-stop [sys]
+  (let [stopping? (atom false)]
+    (fn []
+      (swap! stopping?
+             (fn [s]
+               (when-not s
+                 (log/debug "Stopping system")
+                 (co/stop sys)
+                 true))))))
+
 (defn with-system
   "Starts the system passes it to `f` and then shuts it down afterwards."
   [sys f]
   (let [sys (co/start sys)
-        stop (fn []
-               (log/debug "Stopping system")
-               (co/stop sys))]
+        stop (system-stop sys)]
+    ;; Also register shutdown hook, because finally is not always (never?) executed
+    ;; on VM exit.
+    (u/add-shutdown-hook! stop)
     (try
       ;; If `f` returns a deferred, deref it first
       (maybe-deref (f sys))
@@ -28,9 +40,10 @@
    but wrapped so the system is stopped when the deferred is realized."
   [sys f]
   (let [sys (co/start sys)
-        stop (fn []
-               (log/debug "Stopping system")
-               (co/stop sys))]
+        stop (system-stop sys)]
+    ;; Also register shutdown hook, because finally is not always (never?) executed
+    ;; on VM exit.
+    (u/add-shutdown-hook! stop)
     (md/finally (f sys) stop)))
 
 (defn with-runtime
