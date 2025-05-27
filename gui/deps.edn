@@ -1,7 +1,7 @@
 {:deps {binaryage/oops {:mvn/version "0.7.2"}
         day8.re-frame/http-fx {:mvn/version "0.2.4"}
         com.github.oliyh/martian-re-frame {:mvn/version "0.1.30"}
-        com.monkeyci/site-template {:mvn/version "0.2.2"}
+        com.monkeyci/site-template {:mvn/version "0.2.3-SNAPSHOT"}
         medley/medley {:mvn/version "1.4.0"}
         metosin/reitit-frontend {:mvn/version "0.8.0"}
         org.clojure/core.async {:mvn/version "1.8.741"}
@@ -41,4 +41,7 @@
   {:exec-args {:base-url "staging.monkeyci.com"}}
 
   :scw
-  {:exec-args {:base-url "scw.monkeyci.com"}}}}
+  {:exec-args {:base-url "scw.monkeyci.com"}}
+
+  :local
+  {:exec-args {:assets-format "http://localhost:8083/assets%s"}}}}

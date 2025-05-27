@@ -133,6 +133,20 @@
      [:img.me-2 {:src "/img/mark-gradient-blue-bitbucket.svg" :height "25px"}]
      "Watch Repository"]))
 
+(defn- watch-repo-btn [id]
+  [:<>
+   [add-github-repo-btn id]
+   [add-bitbucket-repo-btn id]])
+
+(defn- watch-repo-link [id]
+  (cond
+    @(rf/subscribe [:login/github-user?])
+    {:href (r/path-for :page/add-github-repo {:org-id id})
+     :title "Link an existing GitHub repository"}
+    @(rf/subscribe [:login/bitbucket-user?])
+    {:href (r/path-for :page/add-bitbucket-repo {:org-id id})
+     :title "Link an existing Bitbucket repository"}))
+
 (defn- edit-btn [id]
   [:a.btn.btn-outline-primary
    {:href (r/path-for :page/org-edit {:org-id id})
@@ -154,8 +168,7 @@
 (defn- org-actions [id]
   [:<>
    [edit-btn id]
-   [add-github-repo-btn id]
-   [add-bitbucket-repo-btn id]
+   [watch-repo-btn id]
    [params-btn id]
    [ssh-keys-btn id]])
 
@@ -215,7 +228,7 @@
   (let [c (rf/subscribe [:org/info])]
     (if (empty? (:repos @c))
       [:p "No repositories configured for this organization.  You can start by"
-       [:a.mx-1 {:href (r/path-for :page/add-github-repo {:org-id (:id @c)})} "watching one."]]
+       [:a.mx-1 (watch-repo-link (:id @c)) "watching one."]]
       [repos-list @c])))
 
 (defn- with-recent-reload [id msg]
@@ -261,10 +274,28 @@
      :header [:span [:span.me-2 co/repo-icon] "Repositories"]
      :contents [org-repos]}]])
 
-(defn- org-details [id]
+(defn- add-repo-btn [id]
+  ;; TODO Link
+  [:a.btn.btn-primary [:span.me-2 [co/icon :plus-square]] "Add Repository"])
+
+(defn- repo-intro [id]
   [:<>
-   [org-header]
-   [overview-tabs id]])
+   [:p.mt-2
+    "Looks like you have not configured any repositories yet.  You can add a new "
+    "repository manually, or use the " [:a (watch-repo-link id) "Watch Repository"]
+    " button to find one in your repository manager."]
+   [add-repo-btn id]
+   [:p.mt-2
+    "A repository points to a remote git site, that contains a MonkeyCI script.  See "
+    [co/docs-link "articles/repos" "the documentation on repositories."]]])
+
+(defn- org-details [id]
+  (let [o (rf/subscribe [:org/info])]
+    [:<>
+     [org-header]
+     (if (empty? (:repos @o))
+       [repo-intro id]
+       [overview-tabs id])]))
 
 (defn page
   "Organization overview page"

@@ -9,3 +9,4 @@ const apiRoot = "http://localhost:3000";
 //const logUrl = "http://localhost:3100/loki/api/v1";
 
 const hostBase = "staging.monkeyci.com";
+const assetsUrl = "http://localhost:8083/assets";

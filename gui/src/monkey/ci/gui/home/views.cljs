@@ -7,6 +7,8 @@
             [monkey.ci.gui.utils :as u]
             [monkey.ci.gui.home.events]
             [monkey.ci.gui.home.subs]
+            [monkey.ci.gui.template :as template]
+            [monkey.ci.template.components :as tc]
             [re-frame.core :as rf]))
 
 (defn- create-cust-btn []
@@ -41,31 +43,36 @@
    [join-cust-btn]])
 
 ;; TODO Configure centrally somewhere
-(def free-credits 5000)
+(def free-credits 1000)
+
+(defn- no-orgs []
+  [:<>
+   [:p "No organizations have been linked to your account yet.  You could either "
+    [:a {:href (r/path-for :page/org-new)} "create a new one"]
+    " or "
+    [:a {:href (r/path-for :page/org-join)} "request to join an existing one"] "."]
+   [:div.mb-2
+    [:span.me-2 [create-cust-btn]]
+    [join-cust-btn]]
+   [:p
+    "You can create one organization per user account." [:b.mx-1 "Creating an organization is free,"]
+    "a credit card is not required.  Each organization gets" [:b.mx-1 free-credits " free credits"]
+    "per month. "
+    "One credit can be spent on one cpu minute, or one memory GB per minute. "
+    "You can join an unlimited number of organizations.  See more details in "
+    [:a {:href (tc/docs-url template/config) :target :_blank} "the documentation."]]
+   [:p
+    "After you have created or joined an organization, you can start " [:b "adding repositories "]
+    "and unlock the full power of " [:i "MonkeyCI!"]]])
 
 (defn orgs []
   (let [c (rf/subscribe [:user/orgs])]
     (when @c
       [:<>
        [:h3 [:span.me-2 co/overview-icon] "Your Linked Organizations"]
-       [:p "Welcome! This screen shows all organizations linked to your user account."]
+       [:p [:b "Welcome! "] "This screen shows all organizations linked to your user account."]
        (if (empty? @c)
-         [:<>
-          [:p "No organizations have been linked to your account yet.  You could either "
-           [:a {:href (r/path-for :page/org-new)} "create a new one"]
-           " or "
-           [:a {:href (r/path-for :page/org-join)} "request to join an existing one"] "."]
-          [:div.mb-2
-           [:span.me-2 [create-cust-btn]]
-           [join-cust-btn]]
-          [:p
-           "You can create one organization per user account." [:b.mx-1 "Creating an organization is free,"]
-           "a credit card is not required.  Each organization gets" [:b.mx-1 free-credits " free credits"]
-           "per month. "
-           "One credit can be spent on one cpu minute, or one memory GB per minute. "
-           "You can join an unlimited number of organizations.  See more details in "
-           ;; TODO Make docs url configurable per env
-           [:a {:href "https://docs.monkeyci.com" :target :_blank} "the documentation."]]]
+         [no-orgs]
          [linked-orgs @c])])))
 
 (defn user-home [u]
