@@ -102,7 +102,20 @@
                                                        (complement
                                                         (comp (partial = (get-in ctx [:event :sid]))
                                                               b/sid))))
+            (log/debug "Builds after removing token:" (count @(:builds (get-config ctx))))
             ctx)})
+
+(def filter-known-builds
+  (emi/terminate-when 
+   ::filter-known-builds
+   (fn [ctx]
+     (->> (get-config ctx)
+          :builds
+          (deref)
+          vals
+          (filter (comp (partial = (get-in ctx [:event :sid]))
+                        b/sid))
+          (empty?)))))
 
 (defn fetch-ssh-keys [fetcher]
   {:name ::fetch-ssh-keys
@@ -213,6 +226,7 @@
    [:build/end
     [{:handler (constantly nil)
       :interceptors [(add-config conf)
+                     filter-known-builds
                      remove-token
                      cleanup]}]]])
 
@@ -225,7 +239,7 @@
        (remove nil?)
        (em/post-events mailman)))
 
-(defn poll-next [{:keys [mailman]} router max-reached?]
+(defn poll-next [{:keys [mailman mailman-out]} router max-reached?]
   (try
     (log/trace "Max reached?" (max-reached?))
     (when-not (max-reached?)
@@ -233,7 +247,7 @@
       (when-let [[evt] (mmc/poll-events (:broker mailman) 1)]
         (when (= :build/queued (:type evt))
           (log/trace "Polled next build event:" evt)
-          (repost-results mailman (router evt)))))
+          (repost-results (or mailman-out mailman) (router evt)))))
     (catch Exception ex
       (log/warn "Got error when polling:" (ex-message ex) ex))))
 

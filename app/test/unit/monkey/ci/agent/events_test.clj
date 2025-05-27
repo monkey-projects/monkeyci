@@ -3,6 +3,8 @@
             [clojure.spec.alpha :as spec]
             [clojure.string :as cs]
             [babashka.fs :as fs]
+            [io.pedestal.interceptor :as i]
+            [io.pedestal.interceptor.chain :as ic]
             [monkey.ci.agent.events :as sut]
             [monkey.ci
              [build :as b]
@@ -228,6 +230,28 @@
     (testing "adds credit multiplier from config"
       (is (= ::cm (-> r first :credit-multiplier))))))
 
+(deftest filter-known-builds
+  (let [{:keys [enter] :as i} sut/filter-known-builds]
+    (is (keyword? (:name i)))
+
+    (testing "`enter`"
+      (let [sid (random-sid)
+              builds (atom {"test-token" {:sid sid}})
+              ctx (-> {:event
+                       {:type :build/end
+                        :sid sid}}
+                      (sut/set-config {:builds builds})
+                      (ic/enqueue [(i/interceptor {:name ::test
+                                                   :enter identity})]))]
+        (testing "continues when build has known token"
+          (is (some? (-> (enter ctx)
+                         ::ic/queue))))
+
+        (testing "terminates when build token is unknown"
+          (is (empty? (reset! builds {})))
+          (is (nil? (-> (enter ctx)
+                        ::ic/queue))))))))
+
 (deftest cleanup
   (h/with-tmp-dir dir
     (let [sid (random-sid)
@@ -291,14 +315,16 @@
       (is (some? (reset! state {})))
       (is (nil? (sut/poll-next conf router max-reached?)))))
 
-  (testing "posts back resulting events"
-    (let [broker (tm/test-component)
+  (testing "posts back resulting events to outgoing broker"
+    (let [broker-in (tm/test-component)
+          broker-out (tm/test-component)
           router (mmc/router [[:build/queued [{:handler (constantly [{:type ::second-event}])}]]])]
-      (is (some? (mmc/post-events (:broker broker) [{:type :build/queued}])))
-      (is (some? (sut/poll-next {:mailman broker} router (constantly false))))
-      (is (= [:build/queued
-              ::second-event]
-             (map :type (tm/get-posted broker)))))))
+      (is (some? (mmc/post-events (:broker broker-in) [{:type :build/queued}])))
+      (is (some? (sut/poll-next {:mailman broker-in
+                                 :mailman-out broker-out}
+                                router (constantly false))))
+      (is (= [::second-event]
+             (map :type (tm/get-posted broker-out)))))))
 
 (deftest poll-loop
   (let [running? (atom true)]

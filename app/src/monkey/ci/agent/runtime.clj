@@ -106,7 +106,7 @@
 
 (def global-to-local-events #{:build/queued :build/canceled})
 
-(defrecord PollLoop [config running? mailman agent-routes builds]
+(defrecord PollLoop [config running? mailman mailman-out agent-routes builds]
   co/Lifecycle
   (start [this]
     (log/info "Starting poll loop with config:" config)
@@ -114,11 +114,10 @@
               (>= (count @(:builds this)) (:max-builds config)))]
       (reset! running? true)
       (assoc this :future (future
-                            (e/poll-loop (assoc config :mailman mailman)
-                                         (let [r (mmc/router (:routes agent-routes))]
-                                           (fn [evt]
-                                             (let [res (r evt)]
-                                               (log/debug "Router result:" res))))
+                            (e/poll-loop (assoc config
+                                                :mailman mailman
+                                                :mailman-out mailman-out)
+                                         (mmc/router (:routes agent-routes))
                                          running?
                                          max-reached?)))))
 
@@ -179,7 +178,9 @@
                  (new-poll-loop conf)
                  (-> [:agent-routes :builds]
                      (as-map)
-                     (assoc :mailman :poll-mailman)))
+                     ;; Post outgoing events to different mailman, to avoid loops
+                     (assoc :mailman :poll-mailman
+                            :mailman-out :mailman)))
      :params (new-params conf)
      :container-routes (co/using
                         (new-container-routes conf)
