@@ -209,6 +209,17 @@
                                             :sid (build-sid ctx)
                                             :checkout-dir (str (get-work-dir ctx)))))))})
 
+(defn cleanup 
+  "Deletes files after container job has finished"
+  [{:keys [cleanup?]}]
+  {:name ::cleanup
+   :leave (fn [ctx]
+            (when cleanup?
+              (let [jd (get-job-dir ctx)]
+                (log/debug "Deleting job dir" jd)
+                (fs/delete-tree jd)))
+            ctx)})
+
 ;;; Event handlers
 
 (def job-executed-evt
@@ -286,10 +297,10 @@
                        require-job]}]]
 
      [:podman/job-executed
-      ;; TODO Clean up files
       [{:handler job-exec
         :interceptors [emi/handle-job-error
                        state
+                       (cleanup conf)
                        (add-job-dir wd)
                        (add-job-ctx job-ctx)
                        (art/save-interceptor emi/get-job-ctx)

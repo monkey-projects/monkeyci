@@ -241,6 +241,27 @@
                  (-> (emi/get-job-ctx r)
                      :checkout-dir))))))))
 
+(deftest cleanup
+  (let [i (sut/cleanup {})]
+    (is (keyword? (:name i)))
+
+    (testing "`leave`"
+      (h/with-tmp-dir dir
+        (let [wd (fs/create-dirs dir "work")
+              {:keys [leave]} (sut/cleanup {:cleanup? false})]
+          (testing "does nothing if `cleanup?` is `false`"
+            (is (some? (-> {}
+                           (sut/set-job-dir wd)
+                           (leave))))
+            (is (fs/exists? wd)))
+
+          (testing "deletes job dir if `cleanup?` is `true`"
+            (let [{:keys [leave]} (sut/cleanup {:cleanup? true})]
+              (is (some? (-> {}
+                             (sut/set-job-dir wd)
+                             (leave))))
+              (is (not (fs/exists? wd))))))))))
+
 (deftest job-queued
   (testing "returns `job/initializing` event"
     (is (= [:job/initializing]

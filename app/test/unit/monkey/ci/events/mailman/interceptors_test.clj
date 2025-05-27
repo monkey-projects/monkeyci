@@ -1,14 +1,14 @@
 (ns monkey.ci.events.mailman.interceptors-test
-  (:require
-   [babashka.process :as bp]
-   [clojure.test :refer [deftest is testing]]
-   [manifold.bus :as mb]
-   [manifold.deferred :as md]
-   [manifold.stream :as ms]
-   [monkey.ci.events.mailman.interceptors :as sut]
-   [monkey.ci.test
-    [helpers :as h]
-    [mailman :as tm]]))
+  (:require [babashka.process :as bp]
+            [clojure.test :refer [deftest is testing]]
+            [manifold
+             [bus :as mb]
+             [deferred :as md]
+             [stream :as ms]]
+            [monkey.ci.events.mailman.interceptors :as sut]
+            [monkey.ci.test
+             [helpers :as h]
+             [mailman :as tm]]))
 
 (deftest add-time
   (let [{:keys [leave] :as i} sut/add-time]
