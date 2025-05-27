@@ -69,14 +69,13 @@
       (assoc :mvn/local-repo m2-cache-path)))
 
 (defn generate-script-config [ctx]
-  (-> sc/empty-config
-      ;; TODO Set credit multiplier
-      (sc/set-build (get-build ctx))
-      ;; TODO This will only work if the container is in the host network
-      ;; Ideally, we could use UDS but netty does not support this (yet).
-      ;; We could use the network ip address instead.
-      (sc/set-api {:url (str "http://localhost:" (-> ctx (get-config) :api-server :port))
-                   :token (get-token ctx)})))
+  (let [host (bas/get-ip-addr)]
+    (-> sc/empty-config
+        ;; TODO Set credit multiplier
+        (sc/set-build (get-build ctx))
+        ;; Use external ip address, so containers can access the api too
+        (sc/set-api {:url (str "http://" host ":" (-> ctx (get-config) :api-server :port))
+                     :token (get-token ctx)}))))
 
 ;;; Interceptors
 
@@ -182,7 +181,7 @@
            ;; m2 cache is common for the all repo builds
            "-v" (str (m2-cache (fs/parent wd)) ":" m2-cache-path ":Z")
            "--workdir" (script-dir lwd)
-           "--network=host"
+           ;;"--network=host" ; Necessary to access the api at localhost
            (:image conf)
            "clojure"
            "-Sdeps" (pr-str deps)

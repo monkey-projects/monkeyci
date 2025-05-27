@@ -169,8 +169,9 @@
         (is (= (str (apply fs/path dir (conj (b/sid build) "checkout/.monkeyci")))
                (:dir cmd))))
 
-      (testing "runs in host network"
-        (is (contains? (set (:cmd cmd)) "--network=host")))
+      ;; Disabled since we now access via ip address
+      #_(testing "runs in host network"
+          (is (contains? (set (:cmd cmd)) "--network=host")))
 
       (testing "deps"
         (let [deps (->> cmd
@@ -186,7 +187,7 @@
               (is (map? args)))
             
             (testing "contains api server url"
-              (is (re-matches #"^http://localhost:\d+$" (:url (sc/api args))))))))
+              (is (re-matches #"^http://\d+\.\d+.\d+.\d+:\d+$" (:url (sc/api args))))))))
 
       (testing "on exit, fires `build/end` event"
         (let [on-exit (:exit-fn cmd)]
