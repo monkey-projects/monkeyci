@@ -230,8 +230,3 @@
                      filter-known-builds
                      remove-token
                      cleanup]}]]])
-
-;;; Polling
-
-(defn poll-loop [conf router running? max-reached?]
-  (ep/poll-loop (assoc conf :event-types #{:build/queued}) router running? max-reached?))

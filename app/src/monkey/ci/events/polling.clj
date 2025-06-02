@@ -4,6 +4,7 @@
    next event.  This is useful for backpressure, when there is limited
    capacity to handle events."
   (:require [clojure.tools.logging :as log]
+            [com.stuartsierra.component :as co]
             [monkey.ci.events.mailman :as em]
             [monkey.mailman.core :as mmc]))
 
@@ -39,3 +40,23 @@
     (when-not (poll-next conf router max-reached?)
       (Thread/sleep poll-interval)))
   (log/debug "Poll loop terminated"))
+
+(defrecord PollLoop [config max-reached? running? mailman mailman-out routes]
+  co/Lifecycle
+  (start [this]
+    (log/info "Starting poll loop with config" config)
+    (reset! running? true)
+    (assoc this :future (future
+                          (poll-loop (assoc config
+                                            :mailman mailman
+                                            :mailman-out mailman-out)
+                                     (mmc/router (:routes routes))
+                                     running?
+                                     #(max-reached? this)))))
+
+  (stop [this]
+    (log/info "Stopping poll loop")
+    (reset! running? false)
+    (-> this
+        (assoc :result (deref (:future this) (* 2 (:poll-interval config)) :timeout))
+        (dissoc :future))))

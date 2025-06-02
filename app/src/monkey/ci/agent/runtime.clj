@@ -19,7 +19,9 @@
             [monkey.ci.containers
              [oci :as c-oci]
              [podman :as c-podman]]
-            [monkey.ci.events.mailman :as em]
+            [monkey.ci.events
+             [mailman :as em]
+             [polling :as ep]]
             [monkey.ci.metrics.core :as mc]
             [monkey.ci.runners.runtime :as rr]
             [monkey.ci.web.auth :as auth]
@@ -91,11 +93,15 @@
       (update :cache c/make-blob-repository)
       (c-podman/make-routes)))
 
-(defmethod make-container-routes :noop [conf]
+(defmethod make-container-routes :noop [conf _]
   (log/info "Not handling container routes")
   [])
 
-(defmethod make-container-routes :default [conf]
+(defmethod make-container-routes :agent [conf _]
+  (log/info "Using external agent for container jobs")
+  [])
+
+(defmethod make-container-routes :default [conf _]
   (log/warn "Unknown container runner type:" (:type conf))
   [])
 
@@ -106,39 +112,22 @@
 
 (def global-to-local-events #{:build/queued :build/canceled})
 
-(defrecord PollLoop [config running? mailman mailman-out agent-routes builds]
-  co/Lifecycle
-  (start [this]
-    (log/info "Starting poll loop with config:" config)
-    (letfn [(max-reached? []
-              (>= (count @(:builds this)) (:max-builds config)))]
-      (reset! running? true)
-      (assoc this :future (future
-                            (e/poll-loop (assoc config
-                                                :mailman mailman
-                                                :mailman-out mailman-out)
-                                         (mmc/router (:routes agent-routes))
-                                         running?
-                                         max-reached?)))))
-
-  (stop [this]
-    (log/info "Stopping poll loop")
-    (reset! running? false)
-    (-> this
-        (assoc :result (deref (:future this) (* 2 (:poll-interval config)) :timeout))
-        (dissoc :future))))
+(defn- max-builds-reached? [{:keys [builds config]}]
+  (>= (count @builds) (:max-builds config)))
 
 (defn new-poll-loop [conf]
   (let [defaults {:poll-interval 1000
-                  :max-builds 1}]
-    (map->PollLoop {:running? (atom false)
-                    :config (->> (select-keys (:poll-loop conf) (keys defaults))
-                                 (merge defaults))})))
+                  :max-builds 1
+                  :event-types #{:build/queued}}]
+    (ep/map->PollLoop {:running? (atom false)
+                       :config (->> (select-keys (:poll-loop conf) (keys defaults))
+                                    (merge defaults))
+                       :max-reached? max-builds-reached?})))
 
 (defn new-poll-mailman
   "Sets up a mailman component that will be used by the poll loop.  It should only
-   provide `build/queued` events, since the loop will stop polling as long as the
-   maximum number of builds has been reached."
+   provide events for the poll loop, since the loop will stop polling as long as
+   its capacity is reached."
   [conf]
   (em/make-component (:poll-loop conf)))
 
@@ -176,13 +165,51 @@
      ;; Poll loop that takes build/queued events, as long as there is capacity.
      :poll-loop (co/using
                  (new-poll-loop conf)
-                 (-> [:agent-routes :builds]
-                     (as-map)
-                     ;; Post outgoing events to different mailman, to avoid loops
-                     (assoc :mailman :poll-mailman
-                            :mailman-out :mailman)))
+                 ;; Post outgoing events to different mailman, to avoid loops
+                 {:builds :builds
+                  :mailman :poll-mailman
+                  :mailman-out :mailman
+                  :routes :agent-routes})
      :params (new-params conf)
      :container-routes (co/using
                         (new-container-routes conf)
                         [:mailman :artifacts :cache :workspace :api-server])
      :metrics (mc/make-metrics))))
+
+(defn- max-jobs-reached? [{:keys [state config]}]
+  (>= (c-podman/count-jobs @state) (:max-jobs config)))
+
+(defn new-container-poll-loop [conf]
+  (let [defaults {:poll-interval 1000
+                  :max-jobs 1
+                  :event-types #{:container/job-queued}}]
+    (ep/map->PollLoop {:running? (atom false)
+                       :config (->> (select-keys (:poll-loop conf) (keys defaults))
+                                    (merge defaults))
+                       :max-reached? max-jobs-reached?})))
+
+(defn make-container-system
+  "Creates a component system to be used by container agents"
+  [conf]
+  ;; Container agent always uses podman
+  (let [conf (assoc-in conf [:containers :type] :podman)]
+    (co/system-map
+     ;; Only local events are needed by podman, except for the trigger event, which
+     ;; is handled by the poller below.
+     :mailman (rr/new-local-mailman)
+     :artifacts (rr/new-artifacts conf)
+     :cache (rr/new-cache conf)
+     :workspace (rr/new-workspace conf)
+     :container-routes (co/using
+                        (new-container-routes conf)
+                        [:mailman :artifacts :cache :workspace :state])
+     ;; Set up separate mailman to poll only the container/job-queued subject
+     :poll-mailman (new-poll-mailman conf)
+     :poll-loop (co/using
+                 (new-container-poll-loop conf)
+                 {:mailman :poll-mailman
+                  :mailman-out :mailman
+                  :routes :container-routes
+                  :state :state})
+     ;; Shared state between container routes and poll loop for capacity calculation
+     :state (atom {}))))

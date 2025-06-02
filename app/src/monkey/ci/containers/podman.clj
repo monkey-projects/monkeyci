@@ -120,18 +120,26 @@
      [(mcc/image job)]
      (make-cmd job csd))))
 
-;;; Mailman event handling
+;;;; Mailman event handling
 
 ;;; Context management
 
 (def build-sid (comp :sid :event))
+(def ctx->job-id (comp :job-id :event))
 
 (defn get-job
   ([ctx id]
    (some-> (emi/get-state ctx)
            (get-in [:jobs (build-sid ctx) id])))
   ([ctx]
-   (get-job ctx (get-in ctx [:event :job-id]))))
+   (get-job ctx (ctx->job-id ctx))))
+
+(defn count-jobs [state]
+  (->> state
+       :jobs
+       vals
+       (map count)
+       (reduce + 0)))
 
 (defn set-job [ctx job]
   (emi/update-state ctx assoc-in [:jobs (build-sid ctx) (:id job)] job))
@@ -167,7 +175,7 @@
   [wd]
   {:name ::add-job-dir
    :enter (fn [ctx]
-            (->> (conj (build-sid ctx) (get-in ctx [:event :job-id]))
+            (->> (conj (build-sid ctx) (ctx->job-id ctx))
                  (apply fs/path wd)
                  (str)
                  (set-job-dir ctx)))})
@@ -195,7 +203,7 @@
 
 (def require-job
   "Terminates if no job is present in the state"
-  (emi/terminate-when ::require-job #(nil? (get-job % (get-in % [:event :job-id])))))
+  (emi/terminate-when ::require-job #(nil? (get-job % (ctx->job-id %)))))
 
 (defn add-job-ctx
   "Adds the job context to the event context, and adds the job from state.  Also
@@ -219,6 +227,23 @@
                 (log/debug "Deleting job dir" jd)
                 (fs/delete-tree jd)))
             ctx)})
+
+(def remove-job
+  "Interceptor that removes the job from the state, for cleanup"
+  (letfn [(clean-job [ctx jobs]
+            (let [upd (-> jobs
+                          (get (build-sid ctx))
+                          (dissoc (ctx->job-id ctx)))]
+              ;; When no more jobs remain, remove the entire sid from state
+              (if (empty? upd)
+                (dissoc jobs (build-sid ctx))
+                (assoc jobs (build-sid ctx) upd))))]
+    {:name ::remove-job
+     :leave (fn [ctx]
+              (emi/update-state
+               ctx
+               (fn [state]
+                 (update state :jobs (partial clean-job ctx)))))}))
 
 ;;; Event handlers
 
@@ -270,8 +295,8 @@
   (-> (select-keys conf [:artifacts :cache])
       (assoc :checkout-dir (b/checkout-dir (:build conf)))))
 
-(defn make-routes [{:keys [workspace work-dir mailman] :as conf}]
-  (let [state (emi/with-state (atom {}))
+(defn make-routes [{:keys [workspace work-dir mailman state] :as conf}]
+  (let [state (emi/with-state (or state (atom {})))
         job-ctx (make-job-ctx conf)
         wd (or work-dir (str (fs/create-temp-dir)))]
     (log/info "Creating podman container routes using work dir" wd)
@@ -300,6 +325,7 @@
       [{:handler job-exec
         :interceptors [emi/handle-job-error
                        state
+                       remove-job
                        (cleanup conf)
                        (add-job-dir wd)
                        (add-job-ctx job-ctx)
