@@ -400,7 +400,8 @@
 
 (deftest ^:sql queued-task
   (eh/with-prepared-db conn
-    (let [task (eh/gen-queued-task)]
+    (let [task (-> (eh/gen-queued-task)
+                   (assoc :task ::test-task))]
       (testing "can insert"
         (is (number? (:id (sut/insert-queued-task conn task)))))
 

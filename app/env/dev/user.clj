@@ -53,6 +53,6 @@
 
 (defn generate-token
   ([config uid]
-   (server/generate-jwt (get-in config [:jwk :priv]) uid))
+   (server/generate-jwt (get-in config [:runner :jwk :priv]) uid))
   ([uid]
    (generate-token (global-config) uid)))

@@ -110,10 +110,15 @@
   ;; clj -M:dispatcher
   {:main-opts ["-m" "monkey.ci.dispatcher.main"]}
 
-  :agent
-  ;; clj -M:agent
+  :agent/builds
+  ;; clj -M:agent/builds <config-file>
   {:main-opts ["-m" "monkey.ci.agent.main"]
    :jvm-opts ["-Dlogback.configurationFile=dev-resources/logback-agent.xml"]}
+
+  :agent/containers
+  ;; clj -M:agent/containers <config-file>
+  {:main-opts ["-m" "monkey.ci.agent.container"]
+   :jvm-opts ["-Dlogback.configurationFile=dev-resources/logback-container.xml"]}
 
   :agent/test
   ;; clj -X:agent/test '{:config "config.edn" :event "event.edn"}'

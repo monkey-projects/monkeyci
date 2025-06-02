@@ -241,6 +241,25 @@
                  (-> (emi/get-job-ctx r)
                      :checkout-dir))))))))
 
+(deftest remove-job
+  (let [{:keys [leave] :as i} sut/remove-job
+        sid [::test-cust ::test-repo ::test-build]]
+    (is (keyword? (:name i)))
+
+    (testing "`leave` removes job from state"
+      (let [ctx (-> {:event
+                     {:type :job/executed
+                      :sid sid
+                      :job-id ::test-job}}
+                    (emi/set-state {:jobs
+                                    {sid
+                                     {::test-job ::test-job}}}))]
+        (is (= ::test-job (sut/get-job ctx)))
+        (let [res (leave ctx)]
+          (is (nil? (sut/get-job res)))
+          (is (empty? (:jobs (emi/get-state res)))
+              "removes sid when no more jobs remain"))))))
+
 (deftest cleanup
   (let [i (sut/cleanup {})]
     (is (keyword? (:name i)))
@@ -308,3 +327,15 @@
                (sut/prepare-child-cmd)
                :cmd
                first)))))
+
+(deftest count-jobs
+  (testing "zero when state is empty"
+    (is (zero? (sut/count-jobs {}))))
+
+  (testing "counts all jobs"
+    (is (= 3 (sut/count-jobs {:jobs
+                              {:build-1
+                               {:job-1 ::job-1
+                                :job-2 ::job-2}
+                               :build-2
+                               {:job-3 ::job-3}}})))))

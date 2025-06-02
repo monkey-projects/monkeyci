@@ -99,3 +99,18 @@
       (let [r (co/stop p)]
         (is (nil? (:future r)))
         (is (false? @(:running? p)))))))
+
+(deftest container-system
+  (let [sys (sut/make-container-system (-> tc/base-config
+                                           (assoc :poll-loop {:type :manifold})))]
+    (testing "provides event broker"
+      (is (some? (:mailman sys))))
+    
+    (testing "provides container routes"
+      (is (some? (:container-routes sys))))
+
+    (testing "provides poll loop"
+      (is (some? (:poll-loop sys))))
+
+    (testing "provides state"
+      (is (some? (:state sys))))))

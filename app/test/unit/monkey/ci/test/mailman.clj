@@ -19,11 +19,16 @@
 (defn test-broker []
   (->TestBroker (atom [])))
 
+(defrecord TestListener [routes opts]
+  mmc/Listener
+  (unregister-listener [_]
+    ;; noop
+    nil))
+
 (defrecord TestComponent [broker]
   p/AddRouter
   (add-router [this r opts]
-    [{:routes r
-      :opts opts}]))
+    [(->TestListener r opts)]))
 
 (defn test-component []
   (->TestComponent (test-broker)))
