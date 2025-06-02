@@ -175,19 +175,21 @@
         sd (script-dir checkout)
         cd (config-dir wd)
         deps (generate-deps sd (:version conf) (generate-script-config ctx))]
-    {:cmd ["podman"
-           "run"
-           "--name" (str (:build-id build) "-" (t/now))
-           "--rm"
-           "-v" (str checkout ":" lwd ":Z")
-           ;; m2 cache is common for the all repo builds
-           "-v" (str (m2-cache (fs/parent wd)) ":" m2-cache-path ":Z")
-           "--workdir" (script-dir lwd)
-           ;;"--network=host" ; Necessary to access the api at localhost
-           (:image conf)
-           "clojure"
-           "-Sdeps" (pr-str deps)
-           "-X:monkeyci/build"]
+    {:cmd (->> ["podman"
+                "run"
+                "--name" (str (:build-id build) "-" (t/now))
+                (when (:cleanup? conf) "--rm")
+                "--network=host" ; Host network, otherwise can't access build api
+                "-v" (str checkout ":" lwd ":Z")
+                ;; m2 cache is common for the all repo builds
+                "-v" (str (m2-cache (fs/parent wd)) ":" m2-cache-path ":Z")
+                "--workdir" (script-dir lwd)
+                ;;"--network=host" ; Necessary to access the api at localhost
+                (:image conf)
+                "clojure"
+                "-Sdeps" (pr-str deps)
+                "-X:monkeyci/build"]
+               (remove nil?))
      :dir sd
      :out (log-file wd "out.log")
      :err (log-file wd "err.log")
