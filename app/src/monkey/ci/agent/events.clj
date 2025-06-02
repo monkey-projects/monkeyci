@@ -10,7 +10,9 @@
              [time :as t]
              [workspace :as ws]]
             [monkey.ci.build.api-server :as bas]
-            [monkey.ci.events.mailman :as em]
+            [monkey.ci.events
+             [mailman :as em]
+             [polling :as ep]]
             [monkey.ci.events.mailman.interceptors :as emi]
             [monkey.ci.script.config :as sc]
             [monkey.mailman.core :as mmc]))
@@ -231,33 +233,5 @@
 
 ;;; Polling
 
-(defn- repost-results [mailman res]
-  (->> res
-       (map :result)
-       (flatten)
-       (remove nil?)
-       (em/post-events mailman)))
-
-(defn poll-next [{:keys [mailman mailman-out]} router max-reached?]
-  (try
-    (log/trace "Max reached?" (max-reached?))
-    (when-not (max-reached?)
-      (log/trace "Polling for next event")
-      (when-let [[evt] (mmc/poll-events (:broker mailman) 1)]
-        (when (= :build/queued (:type evt))
-          (log/trace "Polled next build event:" evt)
-          (repost-results (or mailman-out mailman) (router evt)))))
-    (catch Exception ex
-      (log/warn "Got error when polling:" (ex-message ex) ex))))
-
-(defn poll-loop
-  "Starts a poll loop that takes events from an event receiver as long as
-   the max number of simultaneous builds has not been reached.  When a 
-   build finishes, a new event is taken from the queue.  This loop should
-   only receive `build/queued` events.  The list of builds is then updated
-   by an async listener whenever a build ends."
-  [{:keys [poll-interval] :or {poll-interval 1000} :as conf} router running? max-reached?]
-  (while @running?
-    (when-not (poll-next conf router max-reached?)
-      (Thread/sleep poll-interval)))
-  (log/debug "Poll loop terminated"))
+(defn poll-loop [conf router running? max-reached?]
+  (ep/poll-loop (assoc conf :event-types #{:build/queued}) router running? max-reached?))
