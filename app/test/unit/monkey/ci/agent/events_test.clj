@@ -139,7 +139,8 @@
                                    :work-dir dir
                                    :mailman broker
                                    :api-server
-                                   {:port 1234}})
+                                   {:port 1234}
+                                   :log-config "test-log-config"})
                   (sut/prepare-build-cmd))]
       (testing "executes podman"
         (is (= "podman" (-> cmd :cmd first))))
@@ -169,9 +170,8 @@
         (is (= (str (apply fs/path dir (conj (b/sid build) "checkout/.monkeyci")))
                (:dir cmd))))
 
-      ;; Disabled since we now access via ip address
-      #_(testing "runs in host network"
-          (is (contains? (set (:cmd cmd)) "--network=host")))
+      (testing "runs in host network"
+        (is (contains? (set (:cmd cmd)) "--network=host")))
 
       (testing "deps"
         (let [deps (->> cmd
@@ -187,7 +187,12 @@
               (is (map? args)))
             
             (testing "contains api server url"
-              (is (re-matches #"^http://\d+\.\d+.\d+.\d+:\d+$" (:url (sc/api args))))))))
+              (is (re-matches #"^http://\d+\.\d+.\d+.\d+:\d+$" (:url (sc/api args))))))
+
+          (testing "adds logback configuration"
+            (let [args (get-in deps [:aliases :monkeyci/build :jvm-opts])]
+              (is (not-empty args))
+              (is (re-matches #"^-Dlogback.configurationFile=.+$" (first args)))))))
 
       (testing "on exit, fires `build/end` event"
         (let [on-exit (:exit-fn cmd)]

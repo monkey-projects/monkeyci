@@ -66,9 +66,13 @@
   (fs/create-dirs (fs/path wd "ssh")))
 
 (defn generate-deps [script-dir lib-version conf]
+  ;; TODO Add logback configuration if available
   (-> (p/generate-deps script-dir lib-version)
       (p/update-alias assoc :exec-args {:config conf})
       (assoc :mvn/local-repo m2-cache-path)))
+
+(defn- add-log-config [deps path]
+  (p/add-logback-config deps :monkeyci/build path))
 
 (defn generate-script-config [ctx]
   (let [host (bas/get-ip-addr)]
@@ -78,6 +82,12 @@
         ;; Use external ip address, so containers can access the api too
         (sc/set-api {:url (str "http://" host ":" (-> ctx (get-config) :api-server :port))
                      :token (get-token ctx)}))))
+
+(defn- write-log-config [conf dest]
+  (when-let [lc (:log-config conf)]
+    (let [p (str (fs/path (fs/create-dirs dest) "logback.xml"))]
+      (spit p lc)
+      p)))
 
 ;;; Interceptors
 
@@ -174,7 +184,13 @@
         script-dir #(b/calc-script-dir % (b/script-dir build))
         sd (script-dir checkout)
         cd (config-dir wd)
-        deps (generate-deps sd (:version conf) (generate-script-config ctx))]
+        lcd "/etc/monkeyci"
+        log-path (write-log-config conf cd)
+        deps (-> (generate-deps sd (:version conf) (generate-script-config ctx))
+                 (add-log-config (some->> log-path
+                                          (fs/file-name)
+                                          (fs/path lcd)
+                                          str)))]
     {:cmd (->> ["podman"
                 "run"
                 "--name" (str (:build-id build) "-" (t/now))
@@ -183,12 +199,15 @@
                 "-v" (str checkout ":" lwd ":Z")
                 ;; m2 cache is common for the all repo builds
                 "-v" (str (m2-cache (fs/parent wd)) ":" m2-cache-path ":Z")
+                ;; Optional log config
+                (when log-path
+                  ["-v" (str cd ":" lcd)])
                 "--workdir" (script-dir lwd)
-                ;;"--network=host" ; Necessary to access the api at localhost
                 (:image conf)
                 "clojure"
                 "-Sdeps" (pr-str deps)
                 "-X:monkeyci/build"]
+               (flatten)
                (remove nil?))
      :dir sd
      :out (log-file wd "out.log")

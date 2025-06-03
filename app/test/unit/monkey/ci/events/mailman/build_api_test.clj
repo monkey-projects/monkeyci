@@ -26,9 +26,11 @@
   (let [stream (ms/stream)
         broker (sut/make-broker nil stream)
         recv (atom [])
-        l (mmc/add-listener broker (fn [evt]
-                                     (swap! recv conj evt)
-                                     nil))
+        l (mmc/add-listener broker
+                            {:handler
+                             (fn [evt]
+                               (swap! recv conj evt)
+                               nil)})
         evt {:type ::test-event}]
     (testing "listeners receive events from api SSE stream"
       (is (some? l))
@@ -44,10 +46,11 @@
         broker (sut/make-broker client stream)]
     (testing "re-posts resulting events"
       (let [recv (atom [])
-            l (mmc/add-listener broker (fn [evt]
-                                         (swap! recv conj evt)
-                                         (when (= ::first (:type evt))
-                                           [{:result [{:type ::second}]}])))]
+            l (mmc/add-listener broker {:handler
+                                        (fn [evt]
+                                          (swap! recv conj evt)
+                                          (when (= ::first (:type evt))
+                                            [{:result [{:type ::second}]}]))})]
         (is (some? (mmc/post-events broker [{:type ::first}])))
         (is (= 2 (count @recv)))
         (is (= [::first ::second] (map :type @recv)))))))

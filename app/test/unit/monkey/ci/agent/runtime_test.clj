@@ -19,8 +19,8 @@
     (testing "provides mailman event handler"
       (is (some? (:mailman sys))))
 
-    (testing "provides global mailman event handler"
-      (is (some? (:global-mailman sys))))
+    (testing "provides event forwarder"
+      (is (some? (:event-forwarder sys))))
 
     (testing "provides artifacts"
       (is (some? (:artifacts sys))))

@@ -7,14 +7,12 @@
             [monkey.ci.config :as c]
             [monkey.ci.runtime.common :as rc]))
 
-(defn run-agent [conf]
+(defn run-agent [conf f]
   (log/info "Starting build agent")
   (rc/with-system
     (ar/make-container-system conf)
-    (fn [sys]
-      ;; Wait for the poll loop to end
-      @(get-in sys [:poll-loop :future]))))
+    f))
 
 (defn -main [& args]
-  (run-agent (c/load-config-file (first args))))
+  (run-agent (c/load-config-file (first args)) #(deref (get-in % [:poll-loop :future]))))
 

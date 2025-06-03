@@ -51,6 +51,7 @@
   (add-router [{:keys [subjects]} routes opts]
     (let [router (mmc/router routes opts)
           make-handler (fn [s]
+                         (log/debug "Creating new handler for subject" s "with options" opts)
                          (-> {:handler router
                               :subject s}
                              (merge (select-keys opts [:queue :stream :consumer]))))]

@@ -1,6 +1,7 @@
 (ns monkey.ci.events.mailman-test
   (:require [clojure.test :refer [deftest is testing]]
             [com.stuartsierra.component :as co]
+            [manifold.stream :as ms]
             [monkey.ci.events.mailman :as sut]
             [monkey.ci.test.mailman :as tm]
             [monkey.mailman.core :as mmc]))
@@ -74,3 +75,15 @@
              [::type-2 [::handler-3]]]
             [[::type-1 [::handler-2]]]
             [[::type-2 [::handler-4]]])))))
+
+(deftest listener-stream
+  (let [broker (sut/make-component {:type :manifold})
+        s (sut/listener-stream broker {})]
+    
+    (testing "returns source"
+      (is (ms/source? s)))
+
+    (testing "posted events are sent to stream"
+      (let [evt {:type ::test-event}]
+        (is (some? (sut/post-events broker [evt])))
+        (is (= evt (deref (ms/take! s) 1000 :timeout)))))))

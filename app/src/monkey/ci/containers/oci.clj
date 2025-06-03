@@ -301,8 +301,6 @@
   (let [client (make-ci-context conf)
         state (emi/with-state (atom {}))]
     [[:container/job-queued
-      ;; TODO Switch to this event type when dispatcher works
-      ;;:oci/job-queued
       ;; Job picked up, start the container instance
       [{:handler job-queued
         :interceptors [emi/handle-job-error

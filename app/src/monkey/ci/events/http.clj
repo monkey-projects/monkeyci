@@ -63,10 +63,9 @@
                      (log/debug "Closing event stream")
                      (when @l
                        (mmc/unregister-listener @l))))
-    ;; FIXME Not portable, listener format depends on broker
-    (reset! l (mmc/add-listener broker (fn [evt]
-                                         (when (or (not pred) (pred evt))
-                                           (handler evt)))))
+    (reset! l (mmc/add-listener broker {:handler (fn [evt]
+                                                   (when (or (not pred) (pred evt))
+                                                     (handler evt)))}))
     (stream-response stream)))
 
 (defn bus-stream

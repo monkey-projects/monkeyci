@@ -52,7 +52,7 @@
   
   mmc/EventReceiver
   ;; Only listeners are supported, no polling
-  (add-listener [this h]
+  (add-listener [this {h :handler}]
     (let [s (ms/stream)
           id (random-uuid)
           l (->Listener id h s listeners)]

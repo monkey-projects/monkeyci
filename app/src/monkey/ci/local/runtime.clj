@@ -76,9 +76,10 @@
   co/Lifecycle
   (start [this]
     (assoc this :listener (mmc/add-listener (:broker mailman)
-                                            (fn [evt]
-                                              (ms/put! event-stream evt)
-                                              nil))))
+                                            {:handler
+                                             (fn [evt]
+                                               (ms/put! event-stream evt)
+                                               nil)})))
 
   (stop [{l :listener :as this}]
     (when l

@@ -25,7 +25,7 @@
           (log/trace "Polled next event:" evt)
           (repost-results (or mailman-out mailman) (router evt)))))
     (catch Exception ex
-      (log/warn "Got error when polling:" (ex-message ex) ex))))
+      (log/warn "Got error while polling:" (ex-message ex) ex))))
 
 (defn poll-loop
   "Starts a poll loop that takes events from an event receiver as long as

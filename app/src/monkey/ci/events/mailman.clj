@@ -2,6 +2,7 @@
   "Mailman-style event handling"
   (:require [clojure.tools.logging :as log]
             [com.stuartsierra.component :as co]
+            [manifold.stream :as ms]
             [monkey.ci.events.mailman
              [interceptors :as emi]
              [jms :as emj]
@@ -55,7 +56,7 @@
 
   p/AddRouter
   (add-router [this routes opts]
-    [(mmc/add-listener broker (mmc/router routes opts))]))
+    [(mmc/add-listener broker {:handler (mmc/router routes opts)})]))
 
 (defn make-generic-component [broker]
   (->GenericComponent broker nil))
@@ -94,3 +95,16 @@
 
 (defmethod make-component :nats [config]
   (emn/map->NatsComponent {:config config}))
+
+(defn listener-stream
+  "Registers a listener that posts received events to a stream.
+   Closing the stream unregisters the listener."
+  [m opts]
+  (let [s (ms/stream 1)
+        handler (fn [evt]
+                  @(ms/put! s evt)
+                  nil)
+        l (mmc/add-listener (:broker m) (assoc opts :handler handler))]
+    (ms/on-closed s (fn []
+                      (mmc/unregister-listener l)))
+    s))

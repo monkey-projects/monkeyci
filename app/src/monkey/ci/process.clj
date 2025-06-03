@@ -18,6 +18,12 @@
     {:exec-fn 'monkey.ci.script.runtime/run-script!
      :extra-deps {'com.monkeyci/app {:mvn/version (or lib-version (v/version))}}}}})
 
+(defn add-logback-config
+  "Updates the deps config to add jvm opts that configures logback
+   using the given path"
+  [deps alias path]
+  (update-in deps [:aliases alias :jvm-opts] conj (str "-Dlogback.configurationFile=" path)))
+
 (defn update-alias
   "Updates the monkeyci/build alias in the given deps"
   [deps f & args]

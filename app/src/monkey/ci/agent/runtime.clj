@@ -145,23 +145,25 @@
      :api-server (co/using
                   (new-api-server conf)
                   [:builds :artifacts :cache :workspace :mailman :event-stream :params :metrics])
-     :mailman (rr/new-local-mailman)
-     :global-mailman (rr/new-mailman conf)
-     :local-to-global (co/using
-                       (rr/new-local-to-global-forwarder global-to-local-events)
-                       [:global-mailman :mailman :event-stream])
-     ;; Pushes events received from global mailman to the local mailman.  This
-     ;; is actually only the build/canceled event, since the build/queued must
-     ;; be polled, and the rest is received via the build api on the local mailman.
-     :global-to-local (co/using
-                       (rr/global-to-local-routes global-to-local-events)
-                       {:mailman :global-mailman
-                        :local-mailman :mailman})
+     :mailman (rr/new-mailman conf)
+     ;; Set up separate mailman to poll only the build/queued subject
+     :poll-mailman (new-poll-mailman conf)
+     ;; :local-to-global (co/using
+     ;;                   (rr/new-local-to-global-forwarder global-to-local-events)
+     ;;                   [:global-mailman :mailman :event-stream])
+     ;; ;; Pushes events received from global mailman to the local mailman.  This
+     ;; ;; is actually only the build/canceled event, since the build/queued must
+     ;; ;; be polled, and the rest is received via the build api on the local mailman.
+     ;; :global-to-local (co/using
+     ;;                   (rr/global-to-local-routes global-to-local-events)
+     ;;                   {:mailman :global-mailman
+     ;;                    :local-mailman :mailman})
+     :event-forwarder (co/using
+                       (rr/new-event-stream-forwarder)
+                       [:event-stream :mailman])
      :agent-routes (co/using
                     (new-agent-routes conf)
                     [:mailman :api-server :git :builds :workspace :ssh-keys-fetcher])
-     ;; Set up separate mailman to poll only the build/queued subject
-     :poll-mailman (new-poll-mailman conf)
      ;; Poll loop that takes build/queued events, as long as there is capacity.
      :poll-loop (co/using
                  (new-poll-loop conf)
@@ -194,9 +196,10 @@
   ;; Container agent always uses podman
   (let [conf (assoc-in conf [:containers :type] :podman)]
     (co/system-map
-     ;; Only local events are needed by podman, except for the trigger event, which
-     ;; is handled by the poller below.
-     :mailman (rr/new-local-mailman)
+     :mailman (rr/new-mailman conf)
+     ;; :local-to-global (co/using
+     ;;                   (rr/new-local-to-global-forwarder #{:podman/job-executed})
+     ;;                   [:global-mailman :mailman])
      :artifacts (rr/new-artifacts conf)
      :cache (rr/new-cache conf)
      :workspace (rr/new-workspace conf)

@@ -50,3 +50,24 @@
                    :monkeyci/test
                    :exec-args
                    :watch?)))))
+
+(deftest add-logback-config
+  (testing "adds jvm opts to alias"
+    (is (= ["-Dlogback.configurationFile=/test/path"]
+           (-> {:aliases
+                {::test
+                 {:main-opts []}}}
+               (sut/add-logback-config ::test
+                                       "/test/path")
+               (get-in [:aliases ::test :jvm-opts])))))
+
+  (testing "adds jvm opts to existing"
+    (is (= ["-Xmx1g"
+            "-Dlogback.configurationFile=/test/path"]
+           (-> {:aliases
+                {::test
+                 {:main-opts []
+                  :jvm-opts ["-Xmx1g"]}}}
+               (sut/add-logback-config ::test
+                                       "/test/path")
+               (get-in [:aliases ::test :jvm-opts]))))))

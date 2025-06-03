@@ -202,7 +202,7 @@
             (set-job ctx (get-in ctx [:event :job])))})
 
 (def require-job
-  "Terminates if no job is present in the state"
+  "Terminates if the event job is not present in the state"
   (emi/terminate-when ::require-job #(nil? (get-job % (ctx->job-id %)))))
 
 (defn add-job-ctx
@@ -235,9 +235,12 @@
                           (get (build-sid ctx))
                           (dissoc (ctx->job-id ctx)))]
               ;; When no more jobs remain, remove the entire sid from state
-              (if (empty? upd)
-                (dissoc jobs (build-sid ctx))
-                (assoc jobs (build-sid ctx) upd))))]
+              (let [j (if (empty? upd)
+                        (dissoc jobs (build-sid ctx))
+                        (assoc jobs (build-sid ctx) upd))]
+                ;; Since state is deep merged with old state, we need to replace the
+                ;; empty jobs with `nil` otherwise they won't be cleared.
+                (if (empty? j) nil j))))]
     {:name ::remove-job
      :leave (fn [ctx]
               (emi/update-state
@@ -247,10 +250,10 @@
 
 ;;; Event handlers
 
-(def job-executed-evt
-  "Creates an internal job-executed event, specifically for podman containers.  This is used
+(def container-end-evt
+  "Creates a `container/end` event, specifically for podman containers.  This is used
    as an intermediate step to save artifacts."
-  (partial j/job-status-evt :podman/job-executed))
+  (partial j/job-status-evt :container/end))
 
 (defn prepare-child-cmd
   "Prepares podman command to execute as child process"
@@ -271,7 +274,7 @@
                  (log/info "Container job exited with code" exit)
                  (try
                    (em/post-events (emi/get-mailman ctx)
-                                   [(job-executed-evt job-id sid (if (= 0 exit) bc/success bc/failure))])
+                                   [(container-end-evt job-id sid (if (= 0 exit) bc/success bc/failure))])
                    (catch Exception ex
                      (log/error "Failed to post job/executed event" ex)))))}))
 
@@ -303,6 +306,7 @@
     [[:container/job-queued
       [{:handler prepare-child-cmd
         :interceptors [emi/handle-job-error
+                       emi/no-result
                        state
                        save-job
                        (add-job-dir wd)
@@ -321,10 +325,11 @@
                        state
                        require-job]}]]
 
-     [:podman/job-executed
+     [:container/end
       [{:handler job-exec
         :interceptors [emi/handle-job-error
                        state
+                       require-job
                        remove-job
                        (cleanup conf)
                        (add-job-dir wd)

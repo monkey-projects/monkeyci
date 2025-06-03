@@ -5,7 +5,8 @@
             [io.pedestal.interceptor.chain :as pi]
             [monkey.ci.containers.podman :as sut]
             [monkey.ci.events.mailman.interceptors :as emi]
-            [monkey.ci.test.helpers :as h :refer [contains-subseq?]]))
+            [monkey.ci.test.helpers :as h :refer [contains-subseq?]]
+            [monkey.mailman.core :as mmc]))
 
 (deftest build-cmd-args
   (h/with-tmp-dir dir
@@ -129,13 +130,27 @@
                (sut/job-work-dir {:work-dir "job-dir"}))))))
 
 (deftest make-routes
-  (let [routes (sut/make-routes {:work-dir "/tmp"})
-        expected [:container/job-queued
-                  :job/initializing
-                  :podman/job-executed]]
-    (doseq [t expected]
-      (testing (format "handles `%s`" t)
-        (is (contains? (set (map first routes)) t))))))
+  (h/with-tmp-dir dir
+    (let [routes (sut/make-routes {:work-dir dir})
+          expected [:container/job-queued
+                    :job/initializing
+                    :container/end]]
+      (doseq [t expected]
+        (testing (format "handles `%s`" t)
+          (is (contains? (set (map first routes)) t))))
+
+      (testing "`container/job-queued` results in `job/initializing`"
+        (let [fake-proc {:name ::emi/start-process
+                         :leave identity}
+              r (-> routes
+                    (mmc/router)
+                    (mmc/replace-interceptors [fake-proc]))
+              res (r {:type :container/job-queued
+                      :sid ["test" "build"]
+                      :job-id "test-job"})]
+          (is (= [:job/initializing] (->> res
+                                          (mapcat :result)
+                                          (map :type)))))))))
 
 (deftest add-job-dir
   (let [{:keys [enter] :as i} (sut/add-job-dir "/test/dir")]
@@ -257,7 +272,7 @@
         (is (= ::test-job (sut/get-job ctx)))
         (let [res (leave ctx)]
           (is (nil? (sut/get-job res)))
-          (is (empty? (:jobs (emi/get-state res)))
+          (is (nil? (:jobs (emi/get-state res)))
               "removes sid when no more jobs remain"))))))
 
 (deftest cleanup
@@ -310,7 +325,7 @@
 (deftest job-exec
   (testing "returns `job/executed` event"
     (let [r (-> {:event
-                {:type :podman/job-executed
+                {:type :container/end
                  :job-id "test-job"}}
                (sut/job-exec)
                first)]

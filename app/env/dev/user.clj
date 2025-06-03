@@ -8,7 +8,9 @@
              [commands :as cmd]
              [config :as config]
              [utils :as u]]
-            [monkey.ci.agent.main :as am]
+            [monkey.ci.agent
+             [container :as ac]
+             [main :as am]]
             [server :as server]))
 
 (defn global-config []
@@ -45,11 +47,27 @@
                         :lib-coords {:local/root (u/cwd)}
                         :log-config (str (fs/absolutize "dev-resources/logback-script.xml"))}))
 
-(defn run-agent []
+(defn run-build-agent
+  "Runs build agent with local config, returns a fn that stops the agent
+   server and poll loop when invoked."
+  []
   (let [d (md/deferred)]
-    (am/run-agent (config/load-config-file "dev-resources/config/agent.edn")
+    (am/run-agent (config/load-config-file "dev-resources/config/build-agent.edn")
                   (constantly d))
-    d))
+    (fn [] (md/success! d true))))
+
+(defn run-container-agent
+  "Runs container agent, returns a fn that stops the agent when invoked."
+  ([conf]
+   (let [stop (promise)]
+     (future
+       (ac/run-agent (config/load-config-file (str "dev-resources/config/" conf))
+                     (fn [sys]
+                       (deliver stop #(reset! (get-in sys [:poll-loop :running?]) false))
+                       @(get-in sys [:poll-loop :future]))))
+     @stop))
+  ([]
+   (run-container-agent "container-agent.edn")))
 
 (defn generate-token
   ([config uid]

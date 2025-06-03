@@ -25,10 +25,9 @@
   <logger name="net" level="WARN"/>
   <logger name="io" level="WARN"/>
   <logger name="monkey.ci" level="DEBUG"/>
-  <logger name="monkey.ci.events.mailman" level="TRACE"/>
   <logger name="monkey.ci.agent" level="TRACE"/>
-  <logger name="monkey.mailman" level="DEBUG"/>
-  <logger name="monkey.nats" level="TRACE"/>
+  <logger name="monkey.mailman.nats" level="TRACE"/>
+  <logger name="monkey.nats" level="DEBUG"/>
   <logger name="user" level="DEBUG"/>
   
   <root level="INFO">
