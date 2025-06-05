@@ -74,13 +74,15 @@
   (p/add-logback-config deps :monkeyci/build path))
 
 (defn generate-script-config [ctx]
-  (let [host (bas/get-ip-addr)]
+  (let [host (bas/get-ip-addr)
+        conf (get-config ctx)]
     (-> sc/empty-config
-        ;; TODO Set credit multiplier
-        (sc/set-build (get-build ctx))
-        (sc/set-archs (:archs (get-config ctx)))
+        (sc/set-build (-> (get-build ctx)
+                          ;; Also set credit multiplier, for action jobs
+                          (b/set-credit-multiplier (:credit-multiplier conf))))
+        (sc/set-archs (:archs conf))
         ;; Use external ip address, so containers can access the api too
-        (sc/set-api {:url (str "http://" host ":" (-> ctx (get-config) :api-server :port))
+        (sc/set-api {:url (str "http://" host ":" (-> conf :api-server :port))
                      :token (get-token ctx)}))))
 
 (defn- write-log-config [conf dest]

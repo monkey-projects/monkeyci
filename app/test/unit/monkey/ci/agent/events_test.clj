@@ -223,14 +223,19 @@
   (testing "builds script config"
     (let [conf (-> {:event {:build (h/gen-build)}}
                    (sut/set-config {:api-server {:port 1234}
-                                    :archs [:amd]})
+                                    :archs [:amd]
+                                    :credit-multiplier 7})
                    (sut/set-token "test-token")
                    (sut/generate-script-config))]
       (is (spec/valid? ::ss/config conf)
           (spec/explain-str ::ss/config conf))
 
       (is (= [:amd] (sc/archs conf))
-          "passes architectures from config"))))
+          "passes architectures from config")
+
+      (is (= 7 (-> conf
+                   (sc/build)
+                   :credit-multiplier))))))
 
 (deftest script-init
   (let [sid (random-sid)
