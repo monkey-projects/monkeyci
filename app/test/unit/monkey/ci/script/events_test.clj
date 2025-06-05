@@ -97,6 +97,16 @@
         (is (= 1 (count a)))
         (is (every? md/deferred? a))))
 
+    (testing "ignores non-action jobs"
+      (let [jobs (jobs->map [(bc/container-job "job-1" {:image "test-img"})])
+            r (-> {:event
+                   {:job-id "job-1"}}
+                  (sut/set-jobs jobs)
+                  (emi/set-job-ctx job-ctx)
+                  (enter))
+            a (sut/get-running-actions r)]
+        (is (empty? a))))
+
     (testing "fires `job/end` event"
       (testing "on exception"
         (let [job (bc/action-job "failing-sync" nil)
@@ -211,7 +221,6 @@
   (let [types [:script/initializing
                :script/start
                :script/end
-               :action/job-queued
                :job/queued
                :job/executed
                :job/end
@@ -328,13 +337,12 @@
   (let [jobs (jobs->map
               [(bc/action-job "action-job" (constantly nil))
                (bc/container-job "container-job" {})])]
-    (testing "for action job, returns `action/job-queued` event"
-      (is (= [:action/job-queued]
-             (-> {:event
-                  {:job-id "action-job"}}
-                 (sut/set-jobs jobs)
-                 (sut/job-queued)
-                 (as-> x (map :type x))))))
+    (testing "for action job, returns `nil`"
+      (is (empty?
+           (-> {:event
+                {:job-id "action-job"}}
+               (sut/set-jobs jobs)
+               (sut/job-queued)))))
 
     (testing "for container job, returns `container/job-queued` event"
       (is (= [:container/job-queued]

@@ -201,7 +201,7 @@
                 "-v" (str (m2-cache (fs/parent wd)) ":" m2-cache-path ":Z")
                 ;; Optional log config
                 (when log-path
-                  ["-v" (str cd ":" lcd)])
+                  ["-v" (str cd ":" lcd ":Z")])
                 "--workdir" (script-dir lwd)
                 (:image conf)
                 "clojure"

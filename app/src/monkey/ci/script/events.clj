@@ -1,7 +1,9 @@
 (ns monkey.ci.script.events
   "Mailman event routes for scripts"
   (:require [clojure.tools.logging :as log]
-            [manifold.deferred :as md]
+            [manifold
+             [deferred :as md]
+             [executor :as me]]
             [medley.core :as mc]
             [monkey.ci
              [build :as b]
@@ -120,21 +122,28 @@
   "Interceptor that executes the job in the input event in a new thread, provided
    it's an action job.  The job context must contain all necessary components for 
    the job to run properly, such as artifacts, cache and events."
-  (letfn [(post-job-error [job mailman {:keys [job-id sid]} ex]
-            (em/post-events mailman
-                            [(j/job-end-evt job-id sid (-> bc/failure
-                                                           (bc/with-message (ex-message ex))))]))
-          (execute-job [job ctx]
-            (let [job-ctx (emi/get-job-ctx ctx)]
-              (-> (j/execute! job job-ctx)
-                  ;; Catch exceptions and mark job failed in that case
-                  (md/catch (partial post-job-error job (:mailman job-ctx) (:event ctx))))))]
-    {:name ::execute-action
-     :enter (fn [ctx]
-              (let [job (get-job-from-state ctx)]
-                ;; TODO Only execute it if the max number of concurrent jobs has not been reached
-                ;; Execute the jobs with the job context
-                (set-running-actions ctx [(execute-job job ctx)])))}))
+  ;; TODO Make pool size configurable
+  (let [executor (me/fixed-thread-executor 5)]
+    (letfn [(post-job-error [job mailman {:keys [job-id sid]} ex]
+              (em/post-events mailman
+                              [(j/job-end-evt job-id sid (-> bc/failure
+                                                             (bc/with-message (ex-message ex))))]))
+            (execute-job [job ctx]
+              (log/debug "Scheduling action job for execution:" (j/job-id job))
+              (let [job-ctx (emi/get-job-ctx ctx)]
+                ;; Execute the job onto a fixed thread executor, to limit number of
+                ;; concurrent actions.
+                (me/with-executor executor
+                  (-> (j/execute! job job-ctx)
+                      ;; Catch exceptions and mark job failed in that case
+                      (md/catch (partial post-job-error job (:mailman job-ctx) (:event ctx)))))))]
+      {:name ::execute-action
+       :enter (fn [ctx]
+                (let [job (get-job-from-state ctx)]
+                  (cond-> ctx
+                    (bc/action-job? job)
+                    ;; Execute the jobs with the job context
+                    (set-running-actions [(execute-job job ctx)]))))})))
 
 (def enqueue-jobs
   "Interceptor that enqueues all jobs indicated in the `job/queued` events in the result"
@@ -224,10 +233,9 @@
             (-> (j/job-queued-evt job (build-sid ctx))
                 (assoc :type t)))]
     (let [job (get-job-from-state ctx)]
-      (cond
-        (bc/action-job? job) [(job-queued-evt :action/job-queued job)]
-        ;; TODO Change to container/job-pending events, so the dispatcher can assign it
-        (bc/container-job? job) [(job-queued-evt :container/job-queued job)]))))
+      ;; Action jobs do not result in an event, instead they are executed immediately.
+      (when (bc/container-job? job)
+        [(job-queued-evt :container/job-queued job)]))))
 
 (defn job-executed
   "Runs any extensions for the job in interceptors, then ends the job."
@@ -296,19 +304,12 @@
 
      [:job/queued
       ;; Raised when a new job is queued.  This handler splits it up according to
-      ;; type and executes before-extensions.
+      ;; type and executes before-extensions.  Action jobs are executed immediately.
       [{:handler job-queued
         :interceptors [handle-job-error
                        state
                        with-job-ctx
-                       ext/before-interceptor]}]]
-
-     [:action/job-queued
-      ;; Executes an action job.
-      [{:handler (constantly nil)
-        :interceptors [handle-job-error
-                       state
-                       add-job-ctx
+                       ext/before-interceptor
                        execute-action]}]]
 
      [:job/executed

@@ -7,6 +7,7 @@
              [artifacts :as art]
              [build :as b]
              [cache :as cache]
+             [config :as config]
              [errors :as err]
              [spec :as spec]]
             [monkey.ci.build.api :as api]
@@ -113,7 +114,7 @@
   [{:keys [config]}]
   (try
     (-> (run-script config)
-        (deref)
+        (deref config/max-script-timeout {:status err/error-script-timeout})
         (status->exit-code)
         (exit!))
     (catch Throwable ex

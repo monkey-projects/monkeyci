@@ -296,6 +296,44 @@
                              (leave))))
               (is (not (fs/exists? wd))))))))))
 
+(deftest inc-job-count
+  (let [{:keys [leave] :as i} sut/inc-job-count]
+    (is (keyword? (:name i)))
+    
+    (testing "`leave`"
+      (testing "increases job count on empty state"
+        (is (= 1 (-> {}
+                     (emi/set-state {})
+                     (leave)
+                     (emi/get-state)
+                     (sut/count-jobs)))))
+
+      (testing "increases job count on existing state"
+        (is (= 3 (-> {}
+                     (emi/set-state {:job-count 2})
+                     (leave)
+                     (emi/get-state)
+                     (sut/count-jobs))))))))
+
+(deftest dec-job-count
+  (let [{:keys [leave] :as i} sut/dec-job-count]
+    (is (keyword? (:name i)))
+    
+    (testing "`leave`"
+      (testing "decreases job count"
+        (is (= 1 (-> {}
+                     (emi/set-state {:job-count 2})
+                     (leave)
+                     (emi/get-state)
+                     (sut/count-jobs)))))
+
+      (testing "does not go below zero"
+        (is (= 0 (-> {}
+                     (emi/set-state {})
+                     (leave)
+                     (emi/get-state)
+                     (sut/count-jobs))))))))
+
 (deftest job-queued
   (testing "returns `job/initializing` event"
     (is (= [:job/initializing]
@@ -347,10 +385,5 @@
   (testing "zero when state is empty"
     (is (zero? (sut/count-jobs {}))))
 
-  (testing "counts all jobs"
-    (is (= 3 (sut/count-jobs {:jobs
-                              {:build-1
-                               {:job-1 ::job-1
-                                :job-2 ::job-2}
-                               :build-2
-                               {:job-3 ::job-3}}})))))
+  (testing "returns job count"
+    (is (= 3 (sut/count-jobs {:job-count 3})))))

@@ -8,7 +8,7 @@
             [monkey.ci.runtime.common :as rc]))
 
 (defn run-agent [conf f]
-  (log/info "Starting build agent")
+  (log/info "Starting container agent")
   (rc/with-system
     (ar/make-container-system conf)
     f))

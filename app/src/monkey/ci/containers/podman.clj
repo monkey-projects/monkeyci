@@ -92,6 +92,9 @@
         base-cmd (cond-> ["/usr/bin/podman" "run"
                           "-t"
                           "--name" cn
+                          ;; TODO Specify according to job specs
+                          "--cpus" "1"
+                          "--memory" "2g"
                           "-v" (vol-mnt base cwd)
                           "-v" (vol-mnt sd csd)
                           "-v" (vol-mnt (:log-dir opts) cld)
@@ -135,11 +138,7 @@
    (get-job ctx (ctx->job-id ctx))))
 
 (defn count-jobs [state]
-  (->> state
-       :jobs
-       vals
-       (map count)
-       (reduce + 0)))
+  (get state :job-count 0))
 
 (defn set-job [ctx job]
   (emi/update-state ctx assoc-in [:jobs (build-sid ctx) (:id job)] job))
@@ -248,6 +247,17 @@
                (fn [state]
                  (update state :jobs (partial clean-job ctx)))))}))
 
+(def inc-job-count
+  {:name ::inc-job-count
+   :leave (fn [ctx]
+            (emi/update-state ctx update :job-count (fnil inc 0)))})
+
+(def dec-job-count
+  {:name ::dec-job-count
+   :leave (fn [ctx]
+            (emi/update-state ctx update :job-count (comp (partial max 0)
+                                                          (fnil dec 0))))})
+
 ;;; Event handlers
 
 (def container-end-evt
@@ -309,6 +319,7 @@
                        emi/no-result
                        state
                        save-job
+                       inc-job-count
                        (add-job-dir wd)
                        (restore-ws workspace)
                        (emi/add-mailman mailman)
@@ -331,6 +342,7 @@
                        state
                        require-job
                        remove-job
+                       dec-job-count
                        (cleanup conf)
                        (add-job-dir wd)
                        (add-job-ctx job-ctx)

@@ -148,16 +148,6 @@
      :mailman (rr/new-mailman conf)
      ;; Set up separate mailman to poll only the build/queued subject
      :poll-mailman (new-poll-mailman conf)
-     ;; :local-to-global (co/using
-     ;;                   (rr/new-local-to-global-forwarder global-to-local-events)
-     ;;                   [:global-mailman :mailman :event-stream])
-     ;; ;; Pushes events received from global mailman to the local mailman.  This
-     ;; ;; is actually only the build/canceled event, since the build/queued must
-     ;; ;; be polled, and the rest is received via the build api on the local mailman.
-     ;; :global-to-local (co/using
-     ;;                   (rr/global-to-local-routes global-to-local-events)
-     ;;                   {:mailman :global-mailman
-     ;;                    :local-mailman :mailman})
      :event-forwarder (co/using
                        (rr/new-event-stream-forwarder)
                        [:event-stream :mailman])
@@ -179,7 +169,11 @@
      :metrics (mc/make-metrics))))
 
 (defn- max-jobs-reached? [{:keys [state config]}]
-  (>= (c-podman/count-jobs @state) (:max-jobs config)))
+  (let [c (c-podman/count-jobs @state)
+        m (:max-jobs config)]
+    (when (>= c m)
+      (log/trace "Max jobs reached:" c ">=" m)
+      true)))
 
 (defn new-container-poll-loop [conf]
   (let [defaults {:poll-interval 1000
@@ -197,9 +191,6 @@
   (let [conf (assoc-in conf [:containers :type] :podman)]
     (co/system-map
      :mailman (rr/new-mailman conf)
-     ;; :local-to-global (co/using
-     ;;                   (rr/new-local-to-global-forwarder #{:podman/job-executed})
-     ;;                   [:global-mailman :mailman])
      :artifacts (rr/new-artifacts conf)
      :cache (rr/new-cache conf)
      :workspace (rr/new-workspace conf)

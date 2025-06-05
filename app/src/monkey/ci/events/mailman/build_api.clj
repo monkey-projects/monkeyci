@@ -52,9 +52,16 @@
   
   mmc/EventReceiver
   ;; Only listeners are supported, no polling
-  (add-listener [this {h :handler}]
+  (add-listener [this {h :handler :as opts}]
     (let [s (ms/stream)
           id (random-uuid)
+          h (if h
+              h
+              (do
+                (log/warn "Handler is nil for opts" opts)
+                (if (ifn? opts)
+                  opts
+                  (throw (ex-info "No handler function given when adding listener" opts)))))
           l (->Listener id h s listeners)]
       (log/debug "Adding listener for build api events:" id)
       (swap! listeners assoc id l)
@@ -79,4 +86,4 @@
 
   p/AddRouter
   (add-router [this routes opts]
-    [(mmc/add-listener (:broker this) (mmc/router routes opts))]))
+    [(mmc/add-listener (:broker this) {:handler (mmc/router routes opts)})]))
