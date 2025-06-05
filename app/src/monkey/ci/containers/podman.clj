@@ -93,7 +93,9 @@
                           "-t"
                           "--name" cn
                           ;; TODO Specify according to job specs
-                          "--cpus" "1"
+                          ;; This is not always available, auto-check
+                          ;; See https://github.com/containers/podman/blob/main/troubleshooting.md#26-running-containers-with-cpu-limits-fails-with-a-permissions-error
+                          ;;"--cpus" "1"
                           "--memory" "2g"
                           "-v" (vol-mnt base cwd)
                           "-v" (vol-mnt sd csd)
