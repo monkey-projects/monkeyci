@@ -199,6 +199,9 @@
                 "-v" (str checkout ":" lwd ":Z")
                 ;; m2 cache is common for the all repo builds
                 "-v" (str (m2-cache (fs/parent wd)) ":" m2-cache-path ":Z")
+                ;; Resource limits
+                "--cpus=0.5"
+                "--memory=1g"
                 ;; Optional log config
                 (when log-path
                   ["-v" (str cd ":" lcd ":Z")])

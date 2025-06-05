@@ -292,3 +292,11 @@
 
 (defn set-credit-multiplier [job cm]
   (assoc job :credit-multiplier cm))
+
+(defn size->cpus [job]
+  (or (:size job) (:cpus job) 1))
+
+(defn size->mem [job]
+  (or (some-> (:size job) (* 2))
+      (:memory job)
+      2))

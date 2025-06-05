@@ -92,11 +92,10 @@
         base-cmd (cond-> ["/usr/bin/podman" "run"
                           "-t"
                           "--name" cn
-                          ;; TODO Specify according to job specs
-                          ;; This is not always available, auto-check
+                          ;; TODO This is not always available, auto-check
                           ;; See https://github.com/containers/podman/blob/main/troubleshooting.md#26-running-containers-with-cpu-limits-fails-with-a-permissions-error
-                          ;;"--cpus" "1"
-                          "--memory" "2g"
+                          "--cpus" (str (j/size->cpus job))
+                          "--memory" (str (j/size->mem job) "g")
                           "-v" (vol-mnt base cwd)
                           "-v" (vol-mnt sd csd)
                           "-v" (vol-mnt (:log-dir opts) cld)

@@ -37,6 +37,7 @@
 (s/def :job/restore-artifacts (s/coll-of ::blob))
 (s/def :job/memory int?)
 (s/def :job/cpus int?)
+(s/def :job/size int?)
 (s/def :job/arch #{:arm :amd})
 (s/def :job/credit-multiplier (s/with-gen int? #(gen/choose 1 10)))
 
@@ -46,7 +47,7 @@
 (s/def :script/job
   (-> (s/keys :req-un [:job/id]
               :opt-un [:job/type :job/dependencies :job/caches :job/save-artifacts :job/restore-artifacts
-                       :job/script :job/memory :job/cpus :job/arch :job/status ::c/timeout
+                       :job/script :job/memory :job/cpus :job/size :job/arch :job/status ::c/timeout
                        :job/credit-multiplier])))
 
 (s/def :script/jobs (s/coll-of :script/job))

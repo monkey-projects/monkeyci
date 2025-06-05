@@ -105,6 +105,26 @@
         (is (contains-subseq? (sut/build-cmd-args (assoc base-conf :arch :arm))
                               ["--arch" "arm64"])))
 
+      (testing "resources"
+        (testing "applies default memory and cpu limits"
+          (let [args (sut/build-cmd-args base-conf)]
+            (is (contains-subseq? args ["--cpus" "1"]))
+            (is (contains-subseq? args ["--memory" "2g"]))))
+
+        (testing "applies configured memory and cpu limits"
+          (let [args (-> base-conf
+                         (update :job assoc :memory 3 :cpus 2 )
+                         (sut/build-cmd-args))]
+            (is (contains-subseq? args ["--cpus" "2"]))
+            (is (contains-subseq? args ["--memory" "3g"]))))
+
+        (testing "applies size to memory and cpu limits"
+          (let [args (-> base-conf
+                         (assoc-in [:job :size] 2)
+                         (sut/build-cmd-args))]
+            (is (contains-subseq? args ["--cpus" "2"]))
+            (is (contains-subseq? args ["--memory" "4g"])))))
+
       (testing "uses build and job id as container name"
         (is (contains-subseq? (sut/build-cmd-args base-conf)
                               ["--name" "test-build-test-job"])))

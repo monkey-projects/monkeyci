@@ -280,3 +280,23 @@
 
   (testing "removes non-job objects"
     (is (empty? (sut/resolve-all {} [(constantly nil)])))))
+
+(deftest size->cpus
+  (testing "returns default value"
+    (is (= 1 (sut/size->cpus {}))))
+  
+  (testing "recalculates size to cpus"
+    (is (= 2 (sut/size->cpus {:size 2}))))
+
+  (testing "uses cpus if no size provided"
+    (is (= 2 (sut/size->cpus {:cpus 2})))))
+
+(deftest size->mem
+  (testing "returns default value"
+    (is (= 2 (sut/size->mem {}))))
+  
+  (testing "recalculates size to cpus"
+    (is (= 4 (sut/size->mem {:size 2}))))
+
+  (testing "uses memory if no size provided"
+    (is (= 3 (sut/size->mem {:memory 3})))))

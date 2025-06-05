@@ -173,6 +173,11 @@
       (testing "runs in host network"
         (is (contains? (set (:cmd cmd)) "--network=host")))
 
+      (testing "applies resource limits"
+        (let [c (set (:cmd cmd))]
+          (is (contains? c "--cpus=0.5"))
+          (is (contains? c "--memory=1g"))))
+
       (testing "deps"
         (let [deps (->> cmd
                         :cmd
