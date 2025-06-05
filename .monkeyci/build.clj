@@ -254,83 +254,6 @@
                                          (gen-idx ctx :admin)]))
         (assoc :save-artifacts [gui-release-artifact]))))
 
-(defn- spit-contents [dest contents]
-  (when contents
-    (fs/create-dirs (fs/parent dest))
-    (spit (str dest) contents)
-    contents))
-
-(defn- generate-gui-config [ctx]
-  (let [p (api/build-params ctx)
-        dir (m/in-work ctx "gui/resources/public/conf/")
-        write-conf (fn [f k]
-                     (let [c (get p k)
-                           dest (str (fs/path dir f))]
-                       (println "Writing config to file" dest ":" c)
-                       (spit-contents dest c)))]
-    (if (and (write-conf "config.js" "scw-gui-config")
-             (write-conf "admin-config.js" "scw-gui-admin-config"))
-      (println "Created config files in" dir)
-      (m/with-message m/failure "No config written"))))
-
-(defn prepare-scw-gui-config
-  "Creates config files to be included in the Scaleway gui image.  This is necessary
-   because Scaleway containers don't support mounting files, and using env vars is
-   not easy with nginx."
-  [ctx]
-  (when (publish-gui? ctx)
-    (-> (m/action-job
-         "prepare-scw-gui-config"
-         generate-gui-config)
-        (m/save-artifacts [scw-gui-config-artifact]))))
-
-(defn- generate-api-config [ctx]
-  (let [dest (m/in-work ctx (:path scw-api-config-artifact))
-        config-file "config.edn"
-        config-path "/home/monkeyci/config/"]
-    (println "Writing API config and Scaleway dockerfile to" dest)
-    ;; Generate Dockerfile
-    (spit-contents (fs/path dest "Dockerfile")
-                   (format "FROM %s\nCMD [\"-c\", \"%s\", \"internal\", \"server\"]\nCOPY %s %s\n"
-                           (oci-app-image ctx)
-                           (str (fs/path config-path config-file))
-                           config-file
-                           config-path))
-    ;; Write scw config
-    (if (spit-contents (fs/path dest config-file)
-                       (get (api/build-params ctx) "scw-api-config"))
-      (println "Created Dockerfile and config file in" dest)
-      (m/with-message m/failure "No api config available"))))
-
-(defn prepare-scw-api-config
-  "Creates config file to include in Scaleway api container.  We cannot easily
-   pass it all in using env vars, because there is a 1000 char limit.  In any
-   case we have to create a new container, because Scaleway containers also don't
-   support command arguments."
-  [ctx]
-  (when (publish-app? ctx)
-    (-> (m/action-job
-         "prepare-scw-api-config"
-         generate-api-config)
-        (m/save-artifacts [scw-api-config-artifact]))))
-
-(defn build-scw-api-image
-  "Builds and pushes an image for Scaleway, that is based upon the OCI image
-   but includes a configuration file and default command.  This because Scaleway
-   containers don't (yet?) support custom commands and cannot mount configfiles."
-  [ctx]
-  (when (publish-app? ctx)
-    (kaniko/image
-     {:job-id "publish-scw-api-img"
-      :target-img (str scw-api-img ":" (image-version ctx))
-      :arch :amd
-      :subdir (:path scw-api-config-artifact)
-      :container-opts {:dependencies ["prepare-scw-api-config"
-                                      "app-img-manifest"]
-                       :restore-artifacts [scw-api-config-artifact]}
-      :creds-param "docker-scw-credentials"}
-     ctx)))
-
 (defn deploy
   "Job that auto-deploys the image to staging by pushing the new image tag to infra repo."
   [ctx]
@@ -382,16 +305,10 @@
    publish-test-lib
    github-release
 
-   ;; OCI images
+   ;; Base images
    build-gui-release
    build-app-image
    build-gui-image
-
-   ;; Scaleway images
-   prepare-scw-gui-config
-   build-scw-gui-image
-   prepare-scw-api-config
-   build-scw-api-image
    
    deploy
    notify])

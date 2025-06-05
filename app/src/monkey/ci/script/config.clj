@@ -25,3 +25,7 @@
 (defn set-result [c b]
   (assoc c result b))
 
+(def archs ::ss/archs)
+
+(defn set-archs [c a]
+  (assoc c archs a))

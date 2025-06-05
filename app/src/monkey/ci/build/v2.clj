@@ -228,3 +228,7 @@
 (def git-ref
   "The git ref that triggered the build"
   bc/git-ref)
+
+(def archs
+  "Retrieves list of available container architectures from context"
+  :archs)

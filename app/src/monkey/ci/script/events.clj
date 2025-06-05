@@ -275,11 +275,11 @@
       ;; Otherwise, enqueue next jobs
       (map #(j/job-queued-evt % (build-sid ctx)) next-jobs))))
 
-(defn- make-job-ctx
+(defn make-job-ctx
   "Constructs job context object from the route configuration"
   [conf]
   (-> conf
-      (select-keys [:artifacts :cache :mailman :build])
+      (select-keys [:artifacts :cache :mailman :build :archs])
       (assoc :api {:client (:api-client conf)})))
 
 (defn make-routes [{:keys [build] :as conf}]
