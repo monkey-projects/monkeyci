@@ -222,11 +222,15 @@
 (deftest generate-script-config
   (testing "builds script config"
     (let [conf (-> {:event {:build (h/gen-build)}}
-                   (sut/set-config {:api-server {:port 1234}})
+                   (sut/set-config {:api-server {:port 1234}
+                                    :archs [:amd]})
                    (sut/set-token "test-token")
                    (sut/generate-script-config))]
       (is (spec/valid? ::ss/config conf)
-          (spec/explain-str ::ss/config conf)))))
+          (spec/explain-str ::ss/config conf))
+
+      (is (= [:amd] (sc/archs conf))
+          "passes architectures from config"))))
 
 (deftest script-init
   (let [sid (random-sid)

@@ -66,7 +66,6 @@
   (fs/create-dirs (fs/path wd "ssh")))
 
 (defn generate-deps [script-dir lib-version conf]
-  ;; TODO Add logback configuration if available
   (-> (p/generate-deps script-dir lib-version)
       (p/update-alias assoc :exec-args {:config conf})
       (assoc :mvn/local-repo m2-cache-path)))
@@ -79,6 +78,7 @@
     (-> sc/empty-config
         ;; TODO Set credit multiplier
         (sc/set-build (get-build ctx))
+        (sc/set-archs (:archs (get-config ctx)))
         ;; Use external ip address, so containers can access the api too
         (sc/set-api {:url (str "http://" host ":" (-> ctx (get-config) :api-server :port))
                      :token (get-token ctx)}))))
@@ -217,8 +217,6 @@
      :err (log-file wd "err.log")
      :exit-fn (p/exit-fn
                (fn [{:keys [exit]}]
-                 ;; TODO Clean up build files.  We could also do this using
-                 ;; a cronjob on the agent.
                  (log/info "Build container exited with code:" exit)
                  (em/post-events (:mailman conf)
                                  [(b/build-end-evt build exit)])))}))

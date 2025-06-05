@@ -24,6 +24,9 @@
 
 (s/def :context/api ::ba/client)
 
+(s/def ::arch #{:arm :amd})
+(s/def ::archs (s/coll-of ::arch))
+
 (s/def ::context
   (s/keys :req-un [::build :context/api]
-          :opt-un [::job]))
+          :opt-un [::job ::archs]))

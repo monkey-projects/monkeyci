@@ -5,7 +5,8 @@
             [medley.core :as mc]
             [monkey.ci.build
              [api :as ba]
-             [core :as bc]]
+             [core :as bc]
+             [v2 :as v2]]
             [monkey.ci.events.mailman :as em]
             [monkey.ci.events.mailman.interceptors :as emi]
             [monkey.ci
@@ -235,7 +236,9 @@
       (let [fake-loader {:name ::sut/load-jobs
                          :enter (fn [ctx]
                                   (cond-> ctx
-                                    (= ::test-client (-> ctx (sut/get-initial-job-ctx) (ba/ctx->api-client)))
+                                    (= ::test-client (-> ctx
+                                                         (sut/get-initial-job-ctx)
+                                                         (ba/ctx->api-client)))
                                     (sut/set-jobs {"test-job" {:id "test-job"}})))}
             r (-> (sut/make-routes {:api-client ::test-client})
                   (mmc/router)
@@ -270,6 +273,13 @@
                      first
                      :result
                      ext-id))))))))
+
+(deftest make-job-ctx
+  (testing "passes archs from config"
+    (let [archs [:arch-1 :arch-2]]
+      (is (= archs (-> {:archs archs}
+                       (sut/make-job-ctx)
+                       (v2/archs)))))))
 
 (deftest script-init
   (testing "fires `script/start` event with pending jobs"

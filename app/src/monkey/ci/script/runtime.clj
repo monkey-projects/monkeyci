@@ -58,7 +58,8 @@
   (letfn [(make-routes [c]
             (se/make-routes (assoc c
                                    :build (sc/build conf)
-                                   :result (sc/result conf))))]
+                                   :result (sc/result conf)
+                                   :archs (sc/archs conf))))]
     (em/map->RouteComponent {:make-routes make-routes})))
 
 (defn- using-api [obj]
