@@ -168,7 +168,7 @@
 
     (testing "retrieves builds"
       (let [repo (h/gen-repo)
-            cust (-> (h/gen-cust)
+            cust (-> (h/gen-org)
                      (assoc :repos {(:id repo) repo}))
             now (jt/instant)
             old-build {:org-id (:id cust)
@@ -234,7 +234,7 @@
   (testing "returns latest build for each org repo"
     (h/with-memory-store st
       (let [repos (repeatedly 2 h/gen-repo)
-            cust (-> (h/gen-cust)
+            cust (-> (h/gen-org)
                      (assoc :repos (->> repos
                                         (map (fn [r]
                                                [(:id r) r]))
@@ -264,7 +264,7 @@
 (deftest stats
   (h/with-memory-store st
     (let [repo (h/gen-repo)
-          cust (-> (h/gen-cust)
+          cust (-> (h/gen-org)
                    (assoc :repos {(:id repo) repo}))
           req  (-> {:storage st}
                    (h/->req)
@@ -317,7 +317,7 @@
                                                             :consumed-at (:end-time build)
                                                             :amount (:credits build)
                                                             :credit-id (:id cred)))))]
-          (let [cred (-> (h/gen-cust-credit)
+          (let [cred (-> (h/gen-org-credit)
                          (assoc :org-id (:id cust)
                                 :type :user
                                 :amount 1000))
@@ -333,7 +333,7 @@
                      (every? some?)))
 
             (let [stats (-> req
-                            (assoc-in [:parameters :query] {:since (ts 2024 9 17)
+                            (assoc-in [:parameters :query] {:since (ts 2024 9 16)
                                                             :until (ts 2024 9 20)})
                             (sut/stats)
                             :body)]
@@ -361,7 +361,7 @@
 
 (deftest credits
   (h/with-memory-store s
-    (let [cust (-> (h/gen-cust)
+    (let [cust (-> (h/gen-org)
                    (dissoc :repos))
           user (h/gen-user)]
       (is (some? (st/save-org s cust)))
