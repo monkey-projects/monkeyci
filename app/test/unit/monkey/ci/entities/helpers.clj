@@ -118,3 +118,6 @@
 
 (defn gen-queued-task []
   (gen-spec :db/queued-task))
+
+(defn gen-job-evt []
+  (gen-spec :db/job-event))

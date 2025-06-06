@@ -182,3 +182,12 @@
 (s/def :db/queued-task
   (-> (s/keys :req-un [:queued-task/creation-time :queued-task/task])
       (s/merge :db/common)))
+
+(s/def :db/job-id id?)
+(s/def :job-evt/time ts?)
+(s/def :job-evt/event keyword?)
+(s/def :job-evt/details map?)
+
+(s/def :db/job-event
+  (s/keys :req-un [:db/job-id :job-evt/time :job-evt/event]
+          :opt-un [:job-evt/details]))

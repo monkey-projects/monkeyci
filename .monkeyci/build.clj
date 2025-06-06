@@ -145,7 +145,8 @@
                                         :file (m/in-work ctx (:path uberjar-artifact))}))
                m/success
                m/failure))))
-        (m/depends-on ["app-uberjar"]))))
+        (m/depends-on ["app-uberjar"])
+        (m/restore-artifacts [uberjar-artifact]))))
 
 (def img-base "fra.ocir.io/frjdhmocn5qi")
 (def app-img (str img-base "/monkeyci"))

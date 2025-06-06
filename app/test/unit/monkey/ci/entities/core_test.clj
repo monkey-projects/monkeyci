@@ -47,9 +47,9 @@
 
 (deftest ^:sql repo-entities
   (eh/with-prepared-db conn
-    (let [cust (sut/insert-org conn (eh/gen-org))
+    (let [org (sut/insert-org conn (eh/gen-org))
           r (sut/insert-repo conn (-> (eh/gen-repo)
-                                      (assoc :org-id (:id cust))))]
+                                      (assoc :org-id (:id org))))]
       (testing "can insert"
         (is (some? (:cuid r)))
         (is (number? (:id r)))
@@ -72,14 +72,14 @@
 
 (deftest ^:sql repo-labels
   (eh/with-prepared-db conn
-    (let [cust (sut/insert-org
-                conn
-                {:name "test org"})
+    (let [org (sut/insert-org
+               conn
+               {:name "test org"})
           repo (sut/insert-repo
                 conn
                 {:name "test repo"
                  :display-id "test-repo"
-                 :org-id (:id cust)
+                 :org-id (:id org)
                  :url "http://test"})
           lbl  (sut/insert-repo-label
                 conn
@@ -101,31 +101,31 @@
 
 (deftest ^:sql org-params
   (eh/with-prepared-db conn
-    (let [cust  (sut/insert-org
-                 conn
-                 (eh/gen-org))
+    (let [org  (sut/insert-org
+                conn
+                (eh/gen-org))
           param (sut/insert-org-param
                  conn
-                 (assoc (eh/gen-org-param) :org-id (:id cust)))]
+                 (assoc (eh/gen-org-param) :org-id (:id org)))]
       (testing "can insert"
         (is (number? (:id param))))
 
       (testing "can select for org"
-        (is (= [param] (->> (sut/select-org-params conn (sut/by-org (:id cust)))
+        (is (= [param] (->> (sut/select-org-params conn (sut/by-org (:id org)))
                             (map #(select-keys % (keys param)))))))
 
       (testing "can delete"
         (is (= 1 (sut/delete-org-params conn (sut/by-id (:id param)))))
-        (is (empty? (sut/select-org-params conn (sut/by-org (:id cust)))))))))
+        (is (empty? (sut/select-org-params conn (sut/by-org (:id org)))))))))
 
 (deftest ^:sql org-param-values
   (eh/with-prepared-db conn
-    (let [cust  (sut/insert-org
-                 conn
-                 (eh/gen-org))
+    (let [org  (sut/insert-org
+                conn
+                (eh/gen-org))
           param (sut/insert-org-param
                  conn
-                 (assoc (eh/gen-org-param) :org-id (:id cust)))
+                 (assoc (eh/gen-org-param) :org-id (:id org)))
           value (sut/insert-org-param-value
                  conn
                  (assoc (eh/gen-param-value) :params-id (:id param)))]
@@ -141,14 +141,14 @@
 
 (deftest ^:sql webhooks
   (eh/with-prepared-db conn
-    (let [cust (sut/insert-org
-                conn
-                (eh/gen-org))
+    (let [org (sut/insert-org
+               conn
+               (eh/gen-org))
           repo (sut/insert-repo
                 conn
                 {:name "test repo"
                  :display-id "test-repo"
-                 :org-id (:id cust)}) 
+                 :org-id (:id org)}) 
           wh   (sut/insert-webhook
                 conn
                 {:repo-id (:id repo)
@@ -165,31 +165,31 @@
 
 (deftest ^:sql ssh-keys
   (eh/with-prepared-db conn
-    (let [cust (sut/insert-org
-                conn
-                (eh/gen-org))
+    (let [org (sut/insert-org
+               conn
+               (eh/gen-org))
           key  (sut/insert-ssh-key
                 conn
-                (assoc (eh/gen-ssh-key) :org-id (:id cust)))]
+                (assoc (eh/gen-ssh-key) :org-id (:id org)))]
       (testing "can insert"
         (is (number? (:id key))))
 
       (testing "can select for org"
-        (is (= [key] (sut/select-ssh-keys conn (sut/by-org (:id cust))))))
+        (is (= [key] (sut/select-ssh-keys conn (sut/by-org (:id org))))))
 
       (testing "can delete"
         (is (= 1 (sut/delete-ssh-keys conn (sut/by-id (:id key)))))
-        (is (empty? (sut/select-ssh-keys conn (sut/by-org (:id cust)))))))))
+        (is (empty? (sut/select-ssh-keys conn (sut/by-org (:id org)))))))))
 
 (deftest ^:sql builds
   (eh/with-prepared-db conn
-    (let [cust  (sut/insert-org
-                 conn
-                 (eh/gen-org))
+    (let [org  (sut/insert-org
+                conn
+                (eh/gen-org))
           repo  (sut/insert-repo
                  conn
                  (-> (eh/gen-repo)
-                     (assoc :org-id (:id cust))))
+                     (assoc :org-id (:id org))))
           build (sut/insert-build
                  conn
                  (-> (eh/gen-build)
@@ -215,17 +215,17 @@
 
 (deftest ^:sql jobs
   (eh/with-prepared-db conn
-    (let [cust  (sut/insert-org
-                 conn
-                 (eh/gen-org))
+    (let [org  (sut/insert-org
+                conn
+                (eh/gen-org))
           repo  (sut/insert-repo
                  conn
                  (-> (eh/gen-repo)
-                     (assoc :org-id (:id cust))))
+                     (assoc :org-id (:id org))))
           build (sut/insert-build
-                conn
-                (-> (eh/gen-build)
-                    (assoc :repo-id (:id repo))))
+                 conn
+                 (-> (eh/gen-build)
+                     (assoc :repo-id (:id repo))))
           job   (sut/insert-job
                  conn
                  (-> (eh/gen-job)
@@ -248,9 +248,9 @@
 
 (deftest ^:sql users
   (eh/with-prepared-db conn
-    (let [cust (sut/insert-org
-                conn
-                {:name "test org"})
+    (let [org (sut/insert-org
+               conn
+               {:name "test org"})
           user (sut/insert-user
                 conn
                 {:type "github"
@@ -264,32 +264,32 @@
 
       (testing "can link to org"
         (is (some? (sut/insert-user-org conn {:user-id (:id user)
-                                                   :org-id (:id cust)}))))
+                                              :org-id (:id org)}))))
 
       (testing "can delete"
         (is (= 1 (sut/delete-user-orgs conn [:and
-                                                  [:= :user-id (:id user)]
-                                                  [:= :org-id (:id cust)]])))
+                                             [:= :user-id (:id user)]
+                                             [:= :org-id (:id org)]])))
         (is (= 1 (sut/delete-users conn (sut/by-id (:id user)))))
         (is (empty? (sut/select-users conn (sut/by-id (:id user)))))))))
 
 (deftest ^:sql join-requests
   (eh/with-prepared-db conn
-    (let [cust (sut/insert-org conn (eh/gen-org))
+    (let [org (sut/insert-org conn (eh/gen-org))
           user (sut/insert-user conn (eh/gen-user))]
       (testing "can insert"
         (is (number? (:id (sut/insert-join-request
                            conn
                            (-> (eh/gen-join-request)
                                (assoc :user-id (:id user)
-                                      :org-id (:id cust))))))))
+                                      :org-id (:id org))))))))
 
       (testing "can select by user id"
         (is (some? (sut/select-join-request conn (sut/by-user (:id user))))))
 
       (testing "can delete"
         (is (= 1 (sut/delete-join-requests conn (sut/by-user (:id user)))))
-        (is (empty? (sut/select-join-requests conn (sut/by-org (:id cust)))))))))
+        (is (empty? (sut/select-join-requests conn (sut/by-org (:id org)))))))))
 
 (deftest ^:sql email-registration
   (eh/with-prepared-db conn
@@ -307,42 +307,42 @@
 
 (deftest ^:sql org-credits
   (eh/with-prepared-db conn
-    (let [cust (sut/insert-org conn (eh/gen-org))
+    (let [org (sut/insert-org conn (eh/gen-org))
           cred (-> (eh/gen-org-credit)
-                   (assoc :org-id (:id cust))
+                   (assoc :org-id (:id org))
                    (dissoc :subscription-id :user-id))]
       (testing "can insert"
         (is (number? (:id (sut/insert-org-credit conn cred)))))
 
       (testing "can select by org"
         (is (= [(:cuid cred)]
-               (->> (sut/select-org-credits conn (sut/by-org (:id cust)))
+               (->> (sut/select-org-credits conn (sut/by-org (:id org)))
                     (map :cuid))))))))
 
 (deftest ^:sql credit-subscriptions
   (eh/with-prepared-db conn
-    (let [cust (sut/insert-org conn (eh/gen-org))
+    (let [org (sut/insert-org conn (eh/gen-org))
           cred (-> (eh/gen-credit-subscription)
-                   (assoc :org-id (:id cust)))]
+                   (assoc :org-id (:id org)))]
       (testing "can insert"
         (is (number? (:id (sut/insert-credit-subscription conn cred)))))
 
       (testing "can select by org"
         (is (= [(:cuid cred)]
-               (->> (sut/select-credit-subscriptions conn (sut/by-org (:id cust)))
+               (->> (sut/select-credit-subscriptions conn (sut/by-org (:id org)))
                     (map :cuid))))))))
 
 (deftest ^:sql credit-consumptions
   (eh/with-prepared-db conn
-    (let [cust (sut/insert-org conn (eh/gen-org))
+    (let [org (sut/insert-org conn (eh/gen-org))
           repo (sut/insert-repo conn (assoc (eh/gen-repo)
-                                            :org-id (:id cust)))
+                                            :org-id (:id org)))
           build (sut/insert-build conn (assoc (eh/gen-build)
                                               :repo-id (:id repo)))
           cred (sut/insert-org-credit
                 conn
-                (-> (eh/gen-cust-credit)
-                    (assoc :org-id (:id cust))
+                (-> (eh/gen-org-credit)
+                    (assoc :org-id (:id org))
                     (dissoc :user-id :subscription-id)))
           ccons (-> (eh/gen-credit-consumption)
                     (assoc :build-id (:id build)
@@ -357,9 +357,9 @@
 
 (deftest ^:sql bb-webhook
   (eh/with-prepared-db conn
-    (let [cust (sut/insert-org conn (eh/gen-org))
+    (let [org (sut/insert-org conn (eh/gen-org))
           repo (sut/insert-repo conn (assoc (eh/gen-repo)
-                                            :org-id (:id cust)))
+                                            :org-id (:id org)))
           wh (sut/insert-webhook conn (-> (eh/gen-webhook)
                                           (assoc :repo-id (:id repo))))
           bb-wh (-> (eh/gen-bb-webhook)
@@ -378,9 +378,9 @@
 
 (deftest ^:sql invoice
   (eh/with-prepared-db conn
-    (let [cust (sut/insert-org conn (eh/gen-org))
+    (let [org (sut/insert-org conn (eh/gen-org))
           inv (-> (eh/gen-invoice)
-                  (assoc :org-id (:id cust)
+                  (assoc :org-id (:id org)
                          :net-amount 100M
                          :vat-perc 21M
                          :details [{:net-amount 100M
@@ -395,7 +395,7 @@
                        (dissoc :id)))))
 
       (testing "can select by org id"
-        (is (= inv (-> (sut/select-invoice conn (sut/by-org (:id cust)))
+        (is (= inv (-> (sut/select-invoice conn (sut/by-org (:id org)))
                        (dissoc :id))))))))
 
 (deftest ^:sql queued-task
@@ -414,3 +414,23 @@
       (testing "can delete"
         (is (= 1 (sut/delete-queued-tasks conn (sut/by-cuid (:cuid task)))))
         (is (empty? (sut/select-queued-tasks conn nil)))))))
+
+(deftest ^:sql job-history
+  (eh/with-prepared-db conn
+    (let [org (sut/insert-org conn (eh/gen-org))
+          repo (-> (eh/gen-repo)
+                   (assoc :org-id (:id org))
+                   (as-> r (sut/insert-repo conn r)))
+          build (-> (eh/gen-build)
+                    (assoc :repo-id (:id repo))
+                    (as-> b (sut/insert-build conn b)))
+          job (-> (eh/gen-job)
+                  (assoc :build-id (:id build))
+                  (as-> j (sut/insert-job conn j)))
+          evt (-> (eh/gen-job-evt)
+                  (assoc :details {:message "test event"}
+                         :event :job/start
+                         :job-id (:id job)))]
+      (is (number? (:id org)))
+      (is (number? (:id job)))
+      (is (some? (:id evt))))))
