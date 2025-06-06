@@ -333,7 +333,7 @@
                      (every? some?)))
 
             (let [stats (-> req
-                            (assoc-in [:parameters :query] {:since (ts 2024 9 16)
+                            (assoc-in [:parameters :query] {:since (ts 2024 9 17)
                                                             :until (ts 2024 9 20)})
                             (sut/stats)
                             :body)]
