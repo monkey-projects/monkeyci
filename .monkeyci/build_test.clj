@@ -1,5 +1,6 @@
 (ns build-test
   (:require [clojure.test :refer [deftest testing is]]
+            [amazonica.aws.s3 :as s3]
             [babashka.fs :as fs]
             [build :as sut]
             [monkey.ci.build
@@ -110,6 +111,40 @@
 
           (testing "creates manifest job"
             (is (contains? job-ids "gui-img-manifest"))))))))
+
+(deftest upload-uberjar
+  (testing "`nil` if no uberjar published"
+    (is (nil? (sut/upload-uberjar mt/test-ctx))))
+
+  (testing "when uberjar published"
+    (let [job (-> mt/test-ctx
+                  (mt/with-git-ref "refs/heads/main")
+                  (mt/with-changes (mt/modified ["app/deps.edn"]))
+                  (sut/upload-uberjar))]
+      (testing "returns action job"
+        (is (bc/action-job? job)))
+
+      (mt/with-build-params {"s3-url" "http://test-url"
+                             "s3-bucket" "test-bucket"
+                             "s3-access-key" "test-access"
+                             "s3-secret-key" "test-secret"}
+        (let [inv (atom nil)]
+          (with-redefs [s3/put-object (fn [opts dest]
+                                        (reset! inv {:opts opts
+                                                     :dest dest}))]
+            (testing "puts object to s3 bucket using params"
+              (is (bc/success? (mt/execute-job job (-> mt/test-ctx
+                                                       (mt/with-git-ref "refs/tags/1.2.3")))))
+              (is (some? @inv))
+              (is (= {:endpoint "http://test-url"
+                      :access-key "test-access"
+                      :secret-key "test-secret"}
+                     (:opts @inv))))
+
+            (testing "adds version to file"
+              (is (= {:bucket-name "test-bucket"
+                      :key "monkeyci/release-1.2.3.jar"}
+                     (:dest @inv))))))))))
 
 (deftest jobs
   (mt/with-build-params {}

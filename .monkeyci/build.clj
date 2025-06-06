@@ -1,6 +1,7 @@
 ;; Build script for Monkey-ci itself
 (ns build
-  (:require [babashka.fs :as fs]
+  (:require [amazonica.aws.s3 :as s3]
+            [babashka.fs :as fs]
             [clojure.string :as cs]
             [medley.core :as mc]
             [monkey.ci.build
@@ -112,23 +113,42 @@
                  :junit {:artifact-id (:id junit-artifact)
                          :path "junit.xml"})))))
 
+(def uberjar-artifact
+  (m/artifact "uberjar" "app/target/monkeyci-standalone.jar"))
+
 (defn app-uberjar [ctx]
   (when (publish-app? ctx)
     (let [v (tag-version ctx)]
       (-> (clj-container "app-uberjar" "app" "-X:jar:uber")
           (assoc 
            :container/env (when v {"MONKEYCI_VERSION" v})
-           :save-artifacts [{:id "uberjar"
-                             :path "app/target/monkeyci-standalone.jar"}])
+           :save-artifacts [uberjar-artifact])
           (m/depends-on ["test-app"])))))
+
+(defn upload-uberjar
+  "Job that uploads the uberjar to configured s3 bucket"
+  [ctx]
+  (when (publish-app? ctx)
+    (-> (m/action-job
+         "upload-uberjar"
+         (fn [ctx]
+           (let [params (api/build-params ctx)
+                 url (get params "s3-url")
+                 access-key (get params "s3-access-key")
+                 secret-key (get params "s3-secret-key")
+                 bucket (get params "s3-bucket")]
+             (if (some? (s3/put-object {:endpoint url
+                                        :access-key access-key
+                                        :secret-key secret-key}
+                                       {:bucket-name bucket
+                                        :key (format "monkeyci/%s.jar" (image-version ctx))}))
+               m/success
+               m/failure))))
+        (m/depends-on ["app-uberjar"]))))
 
 (def img-base "fra.ocir.io/frjdhmocn5qi")
 (def app-img (str img-base "/monkeyci"))
 (def gui-img (str img-base "/monkeyci-gui"))
-
-(def scw-img-base "rg.fr-par.scw.cloud/monkeyci/")
-(def scw-api-img (str scw-img-base "monkeyci"))
-(def scw-gui-img (str scw-img-base "monkeyci-gui"))
 
 ;; Disabled arm because no compute capacity
 (def archs [#_:arm :amd])
@@ -155,12 +175,6 @@
 (def gui-release-artifact
   (m/artifact "gui-release" "target"))
 
-(def scw-gui-config-artifact
-  (m/artifact "scw-gui-config" "gui/resources/public/conf"))
-
-(def scw-api-config-artifact
-  (m/artifact "scw-api-config" "scw-api"))
-
 (defn- gui-image-config [id img version]
   {:subdir "gui"
    :dockerfile "Dockerfile"
@@ -180,15 +194,6 @@
   (when (publish-gui? ctx)
     (kaniko/multi-platform-image
      (gui-image-config "gui-img" gui-img (image-version ctx))
-     ctx)))
-
-(defn build-scw-gui-image [ctx]
-  (when (publish-gui? ctx)
-    (kaniko/multi-platform-image
-     (-> (gui-image-config "scw-gui-img" scw-gui-img (image-version ctx))
-         (assoc :creds-param "docker-scw-credentials")
-         (update-in [:image :container-opts :dependencies] conj "prepare-scw-gui-config")
-         (update-in [:image :container-opts :restore-artifacts] conj scw-gui-config-artifact))
      ctx)))
 
 (defn publish 
@@ -301,6 +306,7 @@
    test-test-lib
            
    app-uberjar
+   upload-uberjar
    publish-app
    publish-test-lib
    github-release
