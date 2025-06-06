@@ -141,7 +141,8 @@
                                         :access-key access-key
                                         :secret-key secret-key}
                                        {:bucket-name bucket
-                                        :key (format "monkeyci/%s.jar" (image-version ctx))}))
+                                        :key (format "monkeyci/%s.jar" (image-version ctx))
+                                        :file (m/in-work ctx (:path uberjar-artifact))}))
                m/success
                m/failure))))
         (m/depends-on ["app-uberjar"]))))

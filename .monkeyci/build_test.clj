@@ -143,7 +143,8 @@
 
             (testing "adds version to file"
               (is (= {:bucket-name "test-bucket"
-                      :key "monkeyci/release-1.2.3.jar"}
+                      :key "monkeyci/release-1.2.3.jar"
+                      :file "app/target/monkeyci-standalone.jar"}
                      (:dest @inv))))))))))
 
 (deftest jobs
