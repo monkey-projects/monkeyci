@@ -92,10 +92,12 @@
         base-cmd (cond-> ["/usr/bin/podman" "run"
                           "-t"
                           "--name" cn
-                          ;; TODO This is not always available, auto-check
+                          ;; TODO This is not always available, add an auto-check
                           ;; See https://github.com/containers/podman/blob/main/troubleshooting.md#26-running-containers-with-cpu-limits-fails-with-a-permissions-error
                           "--cpus" (str (j/size->cpus job))
                           "--memory" (str (j/size->mem job) "g")
+                          ;; TODO Use volumes with limited size, to prevent jobs
+                          ;; from filling up the entire agent disk.
                           "-v" (vol-mnt base cwd)
                           "-v" (vol-mnt sd csd)
                           "-v" (vol-mnt (:log-dir opts) cld)

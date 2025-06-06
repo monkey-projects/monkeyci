@@ -1,4 +1,4 @@
-{:deps {com.monkeyci/app {:mvn/version "0.10.0"}}
+{:deps {com.monkeyci/app {:mvn/version "0.17.2-SNAPSHOT"}}
  :paths ["src" "resources"]
 
  :aliases
@@ -7,7 +7,7 @@
    :extra-paths ["test" "dev-resources" "env/dev"]}
 
   :test
-  {:extra-deps {com.monkeyprojects/build {:mvn/version "0.2.0"}}
+  {:extra-deps {com.monkeyprojects/build {:mvn/version "0.3.1"}}
    :extra-paths ["test" "dev-resources"]
    :exec-fn monkey.test/all}
 
@@ -18,10 +18,10 @@
   {:exec-fn monkey.test/watch}
 
   :jar
-  {:extra-deps {com.monkeyprojects/build {:mvn/version "0.2.0"}}
+  {:extra-deps {com.monkeyprojects/build {:mvn/version "0.3.1"}}
    :exec-fn monkey.build/jar
    :exec-args {:lib com.monkeyci/test
-               :version-env "MONKEYCI_VERSION"
+               :version [[:env "MONKEYCI_VERSION"] "0.17.2-SNAPSHOT"]
                :jar "target/monkeyci-test.jar"}}
 
   :install
