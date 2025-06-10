@@ -830,9 +830,34 @@
         (is (true? (st/delete-queued-task st (:id task))))
         (is (empty? (st/list-queued-tasks st)))))))
 
-#_(deftest ^:sql job-events
+(deftest ^:sql job-events
   (with-storage conn st
-    (let [job (h/gen-job)])))
+    (let [org (h/gen-org)
+          repo (-> (h/gen-repo)
+                   (assoc :org-id (:id org)))
+          build (-> (h/gen-build)
+                    (assoc :repo-id (:id repo)
+                           :org-id (:id org)))
+          job (-> (h/gen-job)
+                  (assoc :org-id (:id org)
+                         :repo-id (:id repo)
+                         :build-id (:build-id build)))
+          evt (-> (h/gen-job-evt)
+                  (assoc :org-id (:id org)
+                         :repo-id (:id repo)
+                         :build-id (:build-id build)
+                         :job-id (:id job)
+                         :details {:status :running}))
+          job->sid (juxt :org-id :repo-id :build-id :id)]
+
+      (is (some? (st/save-org st org)))
+      (is (some? (st/save-repo st repo)))
+      (is (some? (st/save-build st build)))
+      (is (some? (st/save-job st (b/sid build) job)))
+      
+      (testing "can save and list for job"
+        (is (sid/sid? (st/save-job-event st evt)))
+        (is (= [evt] (st/list-job-events st (job->sid job))))))))
 
 (deftest make-storage
   (testing "creates sql storage object using connection settings"

@@ -18,4 +18,3 @@
            (ec/select conn)
            first
            (ec/convert-job-select)))
-

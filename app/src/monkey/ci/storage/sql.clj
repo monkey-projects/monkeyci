@@ -870,12 +870,36 @@
 (defn- delete-queued-task [conn cuid]
   (ec/delete-queued-tasks conn (ec/by-cuid cuid)))
 
+(defn- job-evt->db [evt]
+  (-> evt
+      (select-keys [:event :time :details :job-id])))
+
+(defn- insert-job-event [conn sid evt]
+  (when-let [job (->> sid
+                      (drop 2)
+                      (ej/select-by-sid conn))]
+    (ec/insert-job-event conn (-> evt
+                                  (assoc :job-id (:id job))
+                                  (job-evt->db)))))
+
+(defn- select-job-events [{:keys [conn]} job-sid]
+  (when-let [job (ej/select-by-sid conn job-sid)]
+    (let [job-props (zipmap [:org-id :repo-id :build-id :job-id] job-sid)
+          db->job-evt (fn [r]
+                        (-> r
+                            (dissoc :id)
+                            (merge job-props)))]
+      (->> (ec/select-job-events conn [:= :job-id (:id job)])
+           (map db->job-evt)))))
+
 (defn- sid-pred [t sid]
   (t sid))
 
 (def runner-details? (partial global-sid? st/runner-details))
 
 (def queued-task? (partial global-sid? st/queued-task))
+
+(def job-event? (partial global-sid? st/job-event))
 
 (defrecord SqlStorage [conn vault]
   p/Storage
@@ -950,6 +974,8 @@
             (upsert-runner-details conn (runner-details-sid->build-sid sid) obj)
             queued-task?
             (upsert-queued-task conn (last sid) obj)
+            job-event?
+            (insert-job-event conn sid obj)
             (log/warn "Unrecognized sid when writing:" sid))
       sid))
 
@@ -1068,7 +1094,8 @@
     :find-latest select-latest-build}
    :job
    {:save upsert-job
-    :find select-job}
+    :find select-job
+    :list-events select-job-events}
    :email-registration
    {:list select-email-registrations
     :find-by-email select-email-registration-by-email}
