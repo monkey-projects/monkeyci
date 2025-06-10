@@ -1,6 +1,7 @@
 (ns monkey.ci.entities.core
   "Core functionality for database entities.  Allows to store/retrieve basic entities."
-  (:require [clojure.tools.logging :as log]
+  (:require [clojure.string :as cs]
+            [clojure.tools.logging :as log]
             [honey.sql :as h]
             [honey.sql.helpers :as hh]
             [medley.core :as mc]
@@ -232,8 +233,15 @@
 (def end-time->int (partial time->int :end-time))
 (def int->end-time (partial int->time :end-time))
 
+(defn- serialize-keyword [k]
+  (when k
+    (->> k
+         ((juxt namespace name))
+         (remove nil?)
+         (cs/join "/"))))
+
 (defn- keyword->str [k x]
-  (mc/update-existing x k (u/or-nil name)))
+  (mc/update-existing x k serialize-keyword))
 
 (defn- str->keyword [k x]
   (mc/update-existing x k (u/or-nil keyword)))

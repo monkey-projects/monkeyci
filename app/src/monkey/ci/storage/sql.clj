@@ -405,7 +405,6 @@
 (defn- build->db [build]
   (-> build
       (select-keys [:status :start-time :end-time :idx :git :credits :source :message])
-      (mc/update-existing :status name)
       ;; Drop some sensitive information
       (mc/update-existing :git dissoc :ssh-keys-dir)
       (mc/update-existing-in [:git :ssh-keys] (partial map #(select-keys % [:id :description])))
@@ -415,7 +414,6 @@
 (defn- db->build [build]
   (-> build
       (select-keys [:status :start-time :end-time :idx :git :credits :source :message])
-      (mc/update-existing :status keyword)
       (ec/start-time->int)
       (ec/end-time->int)
       (assoc :build-id (:display-id build)
@@ -428,7 +426,7 @@
 (defn- job->db [job]
   (-> job
       (select-keys [:status :start-time :end-time :credit-multiplier])
-      (mc/update-existing :status (fnil name :error))
+      (mc/update-existing :status (fnil identity :error))
       (assoc :display-id (:id job)
              :details (dissoc job :id :status :start-time :end-time))))
 
@@ -436,7 +434,6 @@
   (-> job
       (select-keys [:status :start-time :end-time])
       (merge (:details job))
-      (mc/update-existing :status keyword)
       (assoc :id (:display-id job))
       (drop-nil)))
 

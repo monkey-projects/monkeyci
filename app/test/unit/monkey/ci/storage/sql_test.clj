@@ -797,13 +797,14 @@
 (deftest ^:sql runner-details
   (with-storage conn st
     (let [repo (h/gen-repo)
-          cust (-> (h/gen-org)
-                   (assoc :repos {(:id repo) repo}))
+          org (-> (h/gen-org)
+                  (assoc :repos {(:id repo) repo}))
           build (-> (h/gen-build)
-                    (assoc :org-id (:id cust)
-                           :repo-id (:id repo)))
+                    (assoc :org-id (:id org)
+                           :repo-id (:id repo)
+                           :status :success))
           sid (st/ext-build-sid build)]
-      (is (sid/sid? (st/save-org st cust)))
+      (is (sid/sid? (st/save-org st org)))
       (is (sid/sid? (st/save-build st build)))
       
       (testing "can save and find by build sid"
@@ -828,6 +829,10 @@
       (testing "can delete"
         (is (true? (st/delete-queued-task st (:id task))))
         (is (empty? (st/list-queued-tasks st)))))))
+
+#_(deftest ^:sql job-events
+  (with-storage conn st
+    (let [job (h/gen-job)])))
 
 (deftest make-storage
   (testing "creates sql storage object using connection settings"

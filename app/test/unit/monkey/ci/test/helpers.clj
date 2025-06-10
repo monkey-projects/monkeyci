@@ -282,6 +282,9 @@
       ;; Fixed task, to avoid brittle tests
       (assoc :task {:key :value})))
 
+(defn gen-job-evt []
+  (gen-entity :entity/job-event))
+
 (defn gen-build-sid []
   (repeatedly 3 cuid/random-cuid))
 

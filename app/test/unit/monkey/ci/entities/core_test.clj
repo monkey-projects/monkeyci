@@ -427,11 +427,17 @@
           job (-> (eh/gen-job)
                   (assoc :build-id (:id build))
                   (as-> j (sut/insert-job conn j)))
-          evt (-> (eh/gen-job-evt)
-                  (assoc :details {:message "test event"}
-                         :event :job/start
-                         :job-id (:id job))
-                  (as-> e (sut/insert-job-event conn e)))]
-      (is (number? (:id org)))
-      (is (number? (:id job)))
-      (is (some? (:id evt))))))
+          orig-evt (-> (eh/gen-job-evt)
+                       (assoc :details {:message "test event"}
+                              :event :job/start
+                              :job-id (:id job)))
+          evt (sut/insert-job-event conn orig-evt)]
+
+      (testing "can insert"
+        (is (number? (:id org)))
+        (is (number? (:id job)))
+        (is (some? (:id evt))))
+
+      (testing "can select"
+        (is (= [(assoc orig-evt :id (:id evt))]
+               (sut/select-job-events conn (sut/by-id (:id evt)))))))))
