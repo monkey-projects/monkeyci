@@ -874,6 +874,14 @@
   (-> evt
       (select-keys [:event :time :details :job-id])))
 
+(defn- db->job-evt [evt]
+  (-> evt
+      (select-keys [:event :time :details])
+      (assoc :job-id (:job-display-id evt)
+             :build-id (:build-display-id evt)
+             :repo-id (:repo-display-id evt)
+             :org-id (:org-cuid evt))))
+
 (defn- insert-job-event [conn sid evt]
   (when-let [job (->> sid
                       (drop 2)
@@ -883,14 +891,8 @@
                                   (job-evt->db)))))
 
 (defn- select-job-events [{:keys [conn]} job-sid]
-  (when-let [job (ej/select-by-sid conn job-sid)]
-    (let [job-props (zipmap [:org-id :repo-id :build-id :job-id] job-sid)
-          db->job-evt (fn [r]
-                        (-> r
-                            (dissoc :id)
-                            (merge job-props)))]
-      (->> (ec/select-job-events conn [:= :job-id (:id job)])
-           (map db->job-evt)))))
+  (->> (ej/select-events conn job-sid)
+       (map db->job-evt)))
 
 (defn- sid-pred [t sid]
   (t sid))
