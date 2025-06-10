@@ -405,7 +405,6 @@
 (defn- build->db [build]
   (-> build
       (select-keys [:status :start-time :end-time :idx :git :credits :source :message])
-      (mc/update-existing :status name)
       ;; Drop some sensitive information
       (mc/update-existing :git dissoc :ssh-keys-dir)
       (mc/update-existing-in [:git :ssh-keys] (partial map #(select-keys % [:id :description])))
@@ -415,7 +414,6 @@
 (defn- db->build [build]
   (-> build
       (select-keys [:status :start-time :end-time :idx :git :credits :source :message])
-      (mc/update-existing :status keyword)
       (ec/start-time->int)
       (ec/end-time->int)
       (assoc :build-id (:display-id build)
@@ -428,7 +426,7 @@
 (defn- job->db [job]
   (-> job
       (select-keys [:status :start-time :end-time :credit-multiplier])
-      (mc/update-existing :status (fnil name :error))
+      (mc/update-existing :status (fnil identity :error))
       (assoc :display-id (:id job)
              :details (dissoc job :id :status :start-time :end-time))))
 
@@ -436,7 +434,6 @@
   (-> job
       (select-keys [:status :start-time :end-time])
       (merge (:details job))
-      (mc/update-existing :status keyword)
       (assoc :id (:display-id job))
       (drop-nil)))
 
@@ -873,12 +870,38 @@
 (defn- delete-queued-task [conn cuid]
   (ec/delete-queued-tasks conn (ec/by-cuid cuid)))
 
+(defn- job-evt->db [evt]
+  (-> evt
+      (select-keys [:event :time :details :job-id])))
+
+(defn- db->job-evt [evt]
+  (-> evt
+      (select-keys [:event :time :details])
+      (assoc :job-id (:job-display-id evt)
+             :build-id (:build-display-id evt)
+             :repo-id (:repo-display-id evt)
+             :org-id (:org-cuid evt))))
+
+(defn- insert-job-event [conn sid evt]
+  (when-let [job (->> sid
+                      (drop 2)
+                      (ej/select-by-sid conn))]
+    (ec/insert-job-event conn (-> evt
+                                  (assoc :job-id (:id job))
+                                  (job-evt->db)))))
+
+(defn- select-job-events [{:keys [conn]} job-sid]
+  (->> (ej/select-events conn job-sid)
+       (map db->job-evt)))
+
 (defn- sid-pred [t sid]
   (t sid))
 
 (def runner-details? (partial global-sid? st/runner-details))
 
 (def queued-task? (partial global-sid? st/queued-task))
+
+(def job-event? (partial global-sid? st/job-event))
 
 (defrecord SqlStorage [conn vault]
   p/Storage
@@ -953,6 +976,8 @@
             (upsert-runner-details conn (runner-details-sid->build-sid sid) obj)
             queued-task?
             (upsert-queued-task conn (last sid) obj)
+            job-event?
+            (insert-job-event conn sid obj)
             (log/warn "Unrecognized sid when writing:" sid))
       sid))
 
@@ -1071,7 +1096,8 @@
     :find-latest select-latest-build}
    :job
    {:save upsert-job
-    :find select-job}
+    :find select-job
+    :list-events select-job-events}
    :email-registration
    {:list select-email-registrations
     :find-by-email select-email-registration-by-email}

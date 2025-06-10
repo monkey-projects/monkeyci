@@ -1,6 +1,7 @@
 (ns monkey.ci.storage-test
   (:require [clojure.test :refer [deftest is testing]]
             [monkey.ci
+             [build :as b]
              [cuid :as cuid]
              [sid :as sid]
              [storage :as sut]
@@ -14,13 +15,13 @@
 (deftest orgs
   (h/with-memory-store st
     (testing "can find multiple"
-      (let [custs (repeatedly 3 h/gen-org)]
-        (doseq [c custs]
+      (let [orgs (repeatedly 3 h/gen-org)]
+        (doseq [c orgs]
           (sut/save-org st c))
-        (let [r (sut/find-orgs st (->> custs
+        (let [r (sut/find-orgs st (->> orgs
                                             (take 2)
                                             (map :id)))]
-          (is (= (take 2 custs) r)))))))
+          (is (= (take 2 orgs) r)))))))
 
 (deftest webhooks
   (testing "webhook-sid is a sid"
@@ -572,3 +573,17 @@
       (testing "can delete"
         (is (true? (sut/delete-queued-task st (:id task))))
         (is (empty? (sut/list-queued-tasks st)))))))
+
+(deftest job-events
+  (h/with-memory-store st
+    (let [job (h/gen-job)
+          evt (-> (h/gen-job-evt)
+                  (assoc :job-id (:id job))
+                  (merge (select-keys job [:org-id :repo-id :build-id])))
+          job-sid (conj (vec (b/sid job)) (:id job))]
+      (is (= 4 (count job-sid)))
+      (is (= 5 (count (sut/job-event->sid evt))))
+      
+      (testing "can save and list for job"
+        (is (sid/sid? (sut/save-job-event st evt)))
+        (is (= [evt] (sut/list-job-events st job-sid)))))))

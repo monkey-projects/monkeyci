@@ -65,7 +65,7 @@
 (s/def :job/credit-multiplier (s/int-in 0 100))
 
 (s/def :entity/job
-  (-> (s/keys :req-un [:display/id]
+  (-> (s/keys :req-un [:entity/org-id :entity/repo-id :entity/build-id :display/id]
               :opt-un [:job/status :entity/labels :job/credit-multiplier])
       (s/merge :entity/timed)))
 
@@ -186,8 +186,6 @@
 (s/def :invoice/detail
   (s/keys :req-un [:invoice/net-amount :invoice/vat-perc :entity/description]))
 
-(s/def :runner/details map?)
-
 (s/def :entity/runner keyword?)
 (s/def :runner/details map?)
 
@@ -197,3 +195,13 @@
 (s/def :entity/queued-task
   (-> (s/keys :req-un [:queued-task/creation-time :queued-task/task])
       (s/merge :entity/common)))
+
+(s/def :entity/job-id string?)
+(s/def :job-evt/time ts?)
+(s/def :job-evt/event keyword?)
+(s/def :job-evt/details map?)
+
+(s/def :entity/job-event
+  (s/keys :req-un [:entity/org-id :entity/repo-id :entity/build-id :entity/job-id
+                   :job-evt/time :job-evt/event]
+          :opt-un [:job-evt/details]))

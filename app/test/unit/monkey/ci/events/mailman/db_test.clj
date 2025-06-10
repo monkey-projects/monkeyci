@@ -3,6 +3,7 @@
             [clojure.test :refer [deftest is testing]]
             [manifold.bus :as mb]
             [monkey.ci
+             [build :as b]
              [cuid :as cuid]
              [storage :as st]]
             [monkey.ci.events.mailman :as em]
@@ -180,13 +181,17 @@
       (is (keyword? (:name i)))
       (is (some? (st/save-build s build)))
 
-      (testing "`leave` saves job from result in db"
-        (is (= job (-> evt
-                       (emi/set-db s)
-                       (em/set-result {:build (assoc-in build [:script :jobs (:id job)] job)})
-                       (leave)
-                       (sut/get-job))))
-        (is (= job (st/find-job s (concat sid [(:id job)]))))))))
+      (testing "`leave`"
+        (testing "saves job from result in db"
+          (is (= job (-> evt
+                         (emi/set-db s)
+                         (em/set-result {:build (assoc-in build [:script :jobs (:id job)] job)})
+                         (leave)
+                         (sut/get-job))))
+          (is (= job (st/find-job s (concat sid [(:id job)])))))
+
+        (testing "creates job event"
+          (is (= 1 (count (st/list-job-events s (conj (b/sid build) (:id job)))))))))))
 
 (deftest save-credit-consumption
   (let [{:keys [leave] :as i} sut/save-credit-consumption]

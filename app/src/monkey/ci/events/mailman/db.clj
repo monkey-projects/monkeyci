@@ -118,10 +118,17 @@
   "Saves the job found in the result build by id specified in the event."
   {:name ::save-job
    :leave (transactional
-           (fn [{{:keys [sid job-id]} :event :as ctx}]
-             (let [job (let [j (-> ctx (em/get-result) (get-in [:build :script :jobs job-id]))]
-                         (if (and j (st/save-job (get-db ctx) sid j))
+           (fn [{{:keys [sid job-id] :as evt} :event :as ctx}]
+             (let [db (get-db ctx)
+                   job (let [j (-> ctx (em/get-result) (get-in [:build :script :jobs job-id]))]
+                         (if (and j (st/save-job db sid j))
                            (do (log/debug "Updated job in db:" j)
+                               (st/save-job-event db (-> st/build-sid-keys
+                                                         (zipmap sid)
+                                                         (assoc :job-id job-id
+                                                                :event (:type evt)
+                                                                :time (:time evt)
+                                                                :details evt)))
                                j)
                            (log/warn "Failed to update job in db:" j)))]
                (cond-> ctx

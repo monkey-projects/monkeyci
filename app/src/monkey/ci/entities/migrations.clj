@@ -78,6 +78,7 @@
 (def org-col (fk-col :org-id))
 (def repo-col (fk-col :repo-id))
 (def user-col (fk-col :user-id))
+(def job-col (fk-col :job-id))
 
 (defn fk
   "Defines a foreign key constraint on the column that references another table column."
@@ -89,6 +90,7 @@
 (def fk-org (fk :org-id :customers :id))
 (def fk-repo (fk :repo-id :repos :id))
 (def fk-user (fk :user-id :users :id))
+(def fk-job (fk :job-id :jobs :id))
 
 (defn- idx-name [table col]
   (keyword (str (name table) "-" (name col) "-idx")))
@@ -537,7 +539,17 @@
     [{:alter-table :user-customers
       :rename-table :user-orgs}]
     [{:alter-table :user-orgs
-      :rename-table :user-customers}])])
+      :rename-table :user-customers}])
+
+   (table-migration
+    43 :job-events
+    [id-col
+     job-col
+     [:event [:varchar 30] [:not nil]]
+     [:time :timestamp]
+     [:details :text]
+     fk-job]
+    [(col-idx :job-events :job-id)])])
 
 (defn prepare-migrations
   "Prepares all migrations by formatting to sql, creates a ragtime migration object from it."

@@ -844,3 +844,21 @@
 (defn delete-queued-task
   [st id]
   (p/delete-obj st (queued-task-sid id)))
+
+(def job-event :job-event)
+(defn job-event-sid [parts]
+  (into [global (name job-event)] parts))
+
+(def job-event->sid (juxt :org-id :repo-id :build-id :job-id (comp str :time)))
+
+(defn save-job-event [st evt]
+  (p/write-obj st (job-event-sid (job-event->sid evt)) evt))
+
+(def list-job-events
+  (override-or
+   [:job :list-events]
+   (fn [st job-sid]
+     (->> (p/list-obj st (job-event-sid job-sid))
+          (map (comp job-event-sid (partial conj job-sid)))
+          (map (partial p/read-obj st))
+          (sort-by :time)))))
