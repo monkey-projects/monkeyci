@@ -415,7 +415,7 @@
         (is (= 1 (sut/delete-queued-tasks conn (sut/by-cuid (:cuid task)))))
         (is (empty? (sut/select-queued-tasks conn nil)))))))
 
-(deftest ^:sql job-history
+(deftest ^:sql job-events
   (eh/with-prepared-db conn
     (let [org (sut/insert-org conn (eh/gen-org))
           repo (-> (eh/gen-repo)
@@ -430,7 +430,8 @@
           evt (-> (eh/gen-job-evt)
                   (assoc :details {:message "test event"}
                          :event :job/start
-                         :job-id (:id job)))]
+                         :job-id (:id job))
+                  (as-> e (sut/insert-job-event conn e)))]
       (is (number? (:id org)))
       (is (number? (:id job)))
       (is (some? (:id evt))))))

@@ -543,7 +543,8 @@
 
    (table-migration
     43 :job-events
-    [job-col
+    [id-col
+     job-col
      [:event [:varchar 30] [:not nil]]
      [:time :timestamp]
      [:details :text]

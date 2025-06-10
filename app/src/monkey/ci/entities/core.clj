@@ -454,3 +454,23 @@
    :before-update prepare-queued-task
    :after-update  convert-queued-task
    :after-select  convert-queued-task-select})
+
+(def prepare-job-evt
+  (comp (partial prop->edn :details)
+        (partial int->time :time)
+        (partial keyword->str :event)))
+(def convert-job-evt
+  (comp (partial copy-prop :details)
+        (partial time->int :time)
+        (partial str->keyword :event)))
+(def convert-job-evt-select
+  (comp (partial edn->prop :details)
+        (partial time->int :time)
+        (partial str->keyword :event)))
+
+(defaggregate job-event
+  {:before-insert prepare-job-evt
+   :after-insert  convert-job-evt
+   :before-update prepare-job-evt
+   :after-update  convert-job-evt
+   :after-select  convert-job-evt-select})
