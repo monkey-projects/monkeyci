@@ -116,6 +116,12 @@
 (def uberjar-artifact
   (m/artifact "uberjar" "app/target/monkeyci-standalone.jar"))
 
+(defn- as-dir
+  "Converts artifact that points to a file, to one that points to its parent
+   directory."
+  [art]
+  (update art :path (comp str fs/parent)))
+
 (defn app-uberjar [ctx]
   (when (publish-app? ctx)
     (let [v (tag-version ctx)]
@@ -146,7 +152,7 @@
                m/success
                m/failure))))
         (m/depends-on ["app-uberjar"])
-        (m/restore-artifacts [uberjar-artifact]))))
+        (m/restore-artifacts [(as-dir uberjar-artifact)]))))
 
 (def img-base "fra.ocir.io/frjdhmocn5qi")
 (def app-img (str img-base "/monkeyci"))
@@ -167,8 +173,7 @@
       :image
       {:job-id "publish-app-img"
        :container-opts
-       {:restore-artifacts [{:id "uberjar"
-                             :path "app/target"}]
+       {:restore-artifacts [(as-dir uberjar-artifact)]
         :dependencies ["app-uberjar"]}}
       :manifest
       {:job-id "app-img-manifest"}}
