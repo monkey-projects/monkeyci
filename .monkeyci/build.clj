@@ -70,7 +70,7 @@
   [ctx]
   ;; Prefix prod images with "release" for image retention policies
   (or (some->> (tag-version ctx) (str "release-"))
-      (get-in ctx [:build :build-id])
+      (m/build-id ctx)
       ;; Fallback
       "latest"))
 
@@ -84,12 +84,12 @@
        [(str "cd " dir
              " && "
              (cs/join " " (concat ["clojure" "-Sdeps" "'{:mvn/local-repo \"../m2\"}'"] args)))])
-      (m/caches [{:id "mvn-local-repo"
-                  :path "m2"}])))
+      (m/caches [(m/cache "mvn-local-repo" "m2")])))
 
 (defn- junit-artifact [dir]
-  {:id (str dir "-junit")
-   :path (str dir "/junit.xml")})
+  (m/artifact 
+   (str dir "-junit")
+   (str dir "/junit.xml")))
 
 (defn coverage-artifact [dir]
   {:id (str dir "-coverage")
@@ -158,9 +158,6 @@
 (def app-img (str img-base "/monkeyci"))
 (def gui-img (str img-base "/monkeyci-gui"))
 
-;; Disabled arm because no compute capacity
-(def archs [#_:arm :amd])
-
 (defn oci-app-image [ctx]
   (str app-img ":" (image-version ctx)))
 
@@ -168,7 +165,7 @@
   (when (publish-app? ctx)
     (kaniko/multi-platform-image
      {:dockerfile "docker/Dockerfile"
-      :archs archs
+      :archs (m/archs ctx)
       :target-img (oci-app-image ctx)
       :image
       {:job-id "publish-app-img"
@@ -182,7 +179,7 @@
 (def gui-release-artifact
   (m/artifact "gui-release" "target"))
 
-(defn- gui-image-config [id img version]
+(defn- gui-image-config [id img version archs]
   {:subdir "gui"
    :dockerfile "Dockerfile"
    :target-img (str img ":" version)
@@ -200,7 +197,7 @@
 (defn build-gui-image [ctx]
   (when (publish-gui? ctx)
     (kaniko/multi-platform-image
-     (gui-image-config "gui-img" gui-img (image-version ctx))
+     (gui-image-config "gui-img" gui-img (image-version ctx) (m/archs ctx))
      ctx)))
 
 (defn publish 
@@ -237,10 +234,8 @@
        ["npm install"
         (str "clojure -Sdeps '{:mvn/local-repo \".m2\"}' -M:test -m shadow.cljs.devtools.cli release "
              build)])
-      (m/caches [{:id "mvn-gui-repo"
-                  :path ".m2"}
-                 {:id "node-modules"
-                  :path "node_modules"}])))
+      (m/caches [(m/cache "mvn-gui-repo" ".m2")
+                 (m/cache "node-modules" "node_modules")])))
 
 (defn test-gui [ctx]
   (when (build-gui? ctx)
@@ -249,8 +244,7 @@
       (-> (shadow-release "test-gui" :test/node)
           ;; Explicitly run the tests, since :autorun always returns zero
           (update :script conj (str "node target/js/node.js > " junit))
-          (assoc :save-artifacts [{:id art-id
-                                   :path junit}]
+          (assoc :save-artifacts [(m/artifact art-id junit)]
                  :junit {:artifact-id art-id
                          :path junit})))))
 

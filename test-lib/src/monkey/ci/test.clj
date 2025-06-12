@@ -24,7 +24,8 @@
     {:main-branch "main"}}
    :api
    ;; Dummy api client
-   {:client (constantly (atom {}))}})
+   {:client (constantly (atom {}))}
+   :archs [:amd]})
 
 (defn with-git-ref
   "Sets given ref in the context git configuration"
@@ -105,3 +106,8 @@
   `(with-tmp-dir*
      (fn [~dir]
        ~@body)))
+
+(defn with-archs
+  "Configures context to provide specified architectures."
+  [ctx archs]
+  (assoc ctx :archs archs))

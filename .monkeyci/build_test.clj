@@ -101,12 +101,13 @@
     (testing "on main branch"
       (testing "with gui changed"
         (let [ctx (-> mt/test-ctx
+                      (assoc :archs [:amd])
                       (mt/with-git-ref "refs/heads/main")
                       (mt/with-changes (mt/modified ["gui/deps.edn"])))
               jobs (sut/build-gui-image ctx)
               job-ids (set (map b/job-id jobs))]
           (testing "creates publish job for each arch"
-            (doseq [a sut/archs]
+            (doseq [a (b/archs ctx)]
               (is (contains? job-ids (str "publish-gui-img-" (name a))))))
 
           (testing "creates manifest job"
@@ -153,7 +154,8 @@
       (let [jobs (mt/resolve-jobs
                   sut/jobs
                   (-> mt/test-ctx
-                      (mt/with-git-ref "refs/tags/0.16.4")))
+                      (mt/with-git-ref "refs/tags/0.16.4")
+                      (assoc :archs [:amd])))
             ids (set (map b/job-id jobs))]
         (testing "contains pushover job"
           (is (contains? ids "pushover")))
