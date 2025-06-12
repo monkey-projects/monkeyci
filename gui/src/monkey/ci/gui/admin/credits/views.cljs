@@ -52,7 +52,7 @@
     [:h3 "Credit Management"]
     [:div.mt-3
      [as/search-orgs
-      {:get-route #(vector :admin/cust-credits {:org-id (:id %)})
+      {:get-route #(vector :admin/org-credits {:org-id (:id %)})
        :init-view [:p.card-text "Search for an organization to manage its credits."]}]]
     [:div.mt-3
      [issue-all]]]])

@@ -46,7 +46,7 @@
         {:url (r/path-for :page/repo-edit (r/path-params (r/current db)))
          :name "Edit"}))
 
-(defn- cust-watch-repo [db]
+(defn- org-watch-repo [db]
   (conj (default-breadcrumb db)
         {:url (r/path-for :page/add-repo (r/path-params (r/current db)))
          :name "Watch Repo"}))
@@ -56,7 +56,7 @@
         {:url (r/path-for :admin/credits)
          :name "Credits"}))
 
-(defn- cust-credits-breadcrumb [db]
+(defn- org-credits-breadcrumb [db]
   (mc/insert-nth
    1
    {:url (r/path-for :admin/credits)
@@ -69,9 +69,9 @@
   {:page/org-params params-breadcrumb
    :page/org-ssh-keys ssh-keys-breadcrumb
    :page/repo-edit repo-edit-breadcrumb
-   :page/add-repo cust-watch-repo
+   :page/add-repo org-watch-repo
    :admin/credits credits-breadcrumb
-   :admin/cust-credits cust-credits-breadcrumb})
+   :admin/org-credits org-credits-breadcrumb})
 
 (rf/reg-sub
  :breadcrumb/path

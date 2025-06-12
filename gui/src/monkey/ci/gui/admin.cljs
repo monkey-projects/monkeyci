@@ -75,9 +75,9 @@
   {:admin/root admin-root
    :admin/login login/page
    :admin/credits credits/overview
-   :admin/cust-credits credits/org-credits
+   :admin/org-credits credits/org-credits
    :admin/invoicing inv/page
-   :admin/cust-invoices inv/org-invoices
+   :admin/org-invoices inv/org-invoices
    :admin/clean-builds clean/page})
 
 (defn render-page [route]
