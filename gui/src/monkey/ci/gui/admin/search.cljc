@@ -102,8 +102,8 @@
         [:input.form-control {:type :text
                               :name :org-filter
                               :id :org-filter
-                              :placeholder "Search for org"
-                              :aria-label "Search for org"}]]
+                              :placeholder "Search for organization"
+                              :aria-label "Search for organization"}]]
        [org-search-btn]]]]]])
 
 (defn- orgs-table [get-route]
@@ -130,7 +130,7 @@
         [orgs-table (:get-route opts)]
         (or
          (:init-view opts)
-         [:p.card-text "Search for a org."]))]]))
+         [:p.card-text "Search for an organization."]))]]))
 
 (defn search-orgs [opts]
   [:<>

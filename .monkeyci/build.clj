@@ -161,11 +161,15 @@
 (defn oci-app-image [ctx]
   (str app-img ":" (image-version ctx)))
 
+(defn archs [ctx]
+  ;; Use fallback for safety
+  (or (m/archs ctx) [:amd]))
+
 (defn build-app-image [ctx]
   (when (publish-app? ctx)
     (kaniko/multi-platform-image
      {:dockerfile "docker/Dockerfile"
-      :archs (m/archs ctx)
+      :archs (archs ctx)
       :target-img (oci-app-image ctx)
       :image
       {:job-id "publish-app-img"
@@ -197,7 +201,7 @@
 (defn build-gui-image [ctx]
   (when (publish-gui? ctx)
     (kaniko/multi-platform-image
-     (gui-image-config "gui-img" gui-img (image-version ctx) (m/archs ctx))
+     (gui-image-config "gui-img" gui-img (image-version ctx) (archs ctx))
      ctx)))
 
 (defn publish 

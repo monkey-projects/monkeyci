@@ -121,11 +121,6 @@
      :body-schema {:org NewOrg}})
 
    (api-route
-    {:route-name :search-orgs
-     :path-parts ["/org"]
-     :body-schema {:org NewOrg}})
-
-   (api-route
     {:route-name :update-org
      :method :put
      :path-parts org-path

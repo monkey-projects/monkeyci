@@ -53,7 +53,7 @@
     [:div.mt-3
      [as/search-orgs
       {:get-route #(vector :admin/cust-credits {:org-id (:id %)})
-       :init-view [:p.card-text "Search for a org to manage their credits."]}]]
+       :init-view [:p.card-text "Search for an organization to manage its credits."]}]]
     [:div.mt-3
      [issue-all]]]])
 
