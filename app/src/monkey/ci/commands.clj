@@ -211,20 +211,20 @@
 (defn issue-creds
   "Issues credits.  Mainly used by cronjobs to automatically issue credits according
    to active subscriptions."
-  [{:keys [args]}]
+  [{:keys [args issue-creds]}]
   (let [date (jt/format
               :iso-date
               (or (some-> (:date args) (jt/local-date))
                   (jt/local-date)))]
     (log/debug "Issuing credits using arguments:" args)
-    (admin-request args
+    (admin-request (merge issue-creds args)
                    "/admin/credits/issue"
                    {:date date})))
 
 (defn cancel-dangling-builds
   "Invokes the reaper endpoint of the configured api, using and admin token."
-  [{:keys [args]}]
+  [{:keys [args dangling-builds]}]
   (log/debug "Canceling dangling builds using args:" args)
-  (admin-request args
+  (admin-request (merge dangling-builds args)
                  "/admin/reaper"
                  nil))

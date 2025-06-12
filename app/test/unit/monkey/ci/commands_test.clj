@@ -158,35 +158,55 @@
       (is (= ::ok (sut/controller tc/base-config))))))
 
 (deftest issue-creds
-  (testing "sends http request to api endpoint"
-    (h/with-tmp-dir dir
-      (at/with-fake-http [{:url "http://test/admin/credits/issue"
-                           :request-method :post}
-                          {:status 200}]
-        (let [pk (h/generate-private-key)
-              pk-file (str (fs/path dir "test-key"))]
-          (is (nil? (spit pk-file (pem/private-key->pem pk))))
+  (h/with-tmp-dir dir
+    (at/with-fake-http [{:url "http://test/admin/credits/issue"
+                         :request-method :post}
+                        {:status 200}]
+      (let [pk (h/generate-private-key)
+            pk-file (str (fs/path dir "test-key"))]
+        (is (nil? (spit pk-file (pem/private-key->pem pk))))
+
+        (testing "sends http request to api endpoint"
           (is (zero?
                (sut/issue-creds
                 {:args
                  {:all true
                   :username "testuser"
                   :private-key pk-file
-                  :api "http://test"}}))))))))
+                  :api "http://test"}}))))
+
+        (testing "merges config with args"
+          (is (zero?
+               (sut/issue-creds
+                {:issue-creds
+                 {:api "http://test"}
+                 :args
+                 {:all true
+                  :username "testuser"
+                  :private-key pk-file}}))))))))
 
 (deftest cancel-dangling-builds
-  (testing "sends http request to api endpoint"
-    (h/with-tmp-dir dir
-      (at/with-fake-http [{:url "http://test/admin/reaper"
-                           :request-method :post}
-                          {:status 200}]
-        (let [pk (h/generate-private-key)
-              pk-file (str (fs/path dir "test-key"))]
-          (is (nil? (spit pk-file (pem/private-key->pem pk))))
+  (h/with-tmp-dir dir
+    (at/with-fake-http [{:url "http://test/admin/reaper"
+                         :request-method :post}
+                        {:status 200}]
+      (let [pk (h/generate-private-key)
+            pk-file (str (fs/path dir "test-key"))]
+        (is (nil? (spit pk-file (pem/private-key->pem pk))))
+
+        (testing "sends http request to api endpoint"
           (is (zero?
                (sut/cancel-dangling-builds
                 {:args
-                 {:all true
-                  :username "testuser"
+                 {:username "testuser"
                   :private-key pk-file
-                  :api "http://test"}}))))))))
+                  :api "http://test"}}))))
+
+        (testing "merges config with args"
+          (is (zero?
+               (sut/cancel-dangling-builds
+                {:dangling-builds
+                 {:api "http://test"}
+                 :args
+                 {:username "testuser"
+                  :private-key pk-file}}))))))))
