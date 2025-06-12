@@ -44,7 +44,8 @@
 
     (testing "passes initial job ctx"
       (let [init-ctx {::key ::value
-                      :build ::test-build}
+                      :build ::test-build
+                      :archs ::archs}
             job-ctx (atom nil)]
         (with-redefs [sc/load-jobs (fn [_ ctx]
                                      (reset! job-ctx ctx)
@@ -52,7 +53,8 @@
           (is (some? (-> {}
                          (sut/set-initial-job-ctx init-ctx)
                          (enter))))
-          (is (= {:build ::test-build}
+          (is (= {:build ::test-build
+                  :archs ::archs}
                  @job-ctx)))))))
 
 (deftest add-job-ctx
