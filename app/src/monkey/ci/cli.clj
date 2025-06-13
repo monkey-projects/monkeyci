@@ -167,16 +167,19 @@
            :option "username"
            :short "u"
            :type :string
+           :env "MONKEYCI_USERNAME"
            :default :present}
           {:as "Private key file"
            :option "private-key"
            :short "k"
            :type :string
+           :env "MONKEYCI_PRIVATE_KEY"
            :default :present}
           {:as "API url"
            :option "api"
            :short "a"
            :type :string
+           :env "MONKEYCI_API"
            :default "https://api.monkeyci.com/v1"}]
    :subcommands [issue-creds-cmd
                  reaper-cmd]})

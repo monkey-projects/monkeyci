@@ -206,7 +206,7 @@
           (is (zero?
                (sut/cancel-dangling-builds
                 {:dangling-builds
-                 {:api "http://test"}
+                 {:api "http://test"
+                  :private-key pk}
                  :args
-                 {:username "testuser"
-                  :private-key pk-file}}))))))))
+                 {:username "testuser"}}))))))))

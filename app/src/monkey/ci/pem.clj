@@ -17,3 +17,5 @@
   [str]
   (with-open [r (java.io.StringReader. str)]
     (pem/read-privkey r nil)))
+
+(def private-key? (partial instance? java.security.PrivateKey))

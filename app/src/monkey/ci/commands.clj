@@ -179,13 +179,23 @@
     (fn [sys]
       (rc/run-controller (:runtime sys)))))
 
+(defn- load-pk
+  "If `pk` is a private key, returns it, otherwise assumes it's a file and
+   reads it."
+  [pk]
+  (if (pem/private-key? pk)
+    pk
+    (do
+      (log/debug "Loading private key from" pk)
+      (-> pk
+          (slurp)
+          (pem/pem->private-key)))))
+
 (defn- generate-admin-token
   "Generates administration token using the credentials specified in the arguments"
   [{:keys [username private-key]}]
-  (log/debug "Generating admin JWT for user" username "and private key located at" private-key)
-  (let [pk (-> private-key
-               (slurp)
-               (pem/pem->private-key))
+  (log/debug "Generating admin JWT for user" username)
+  (let [pk (load-pk private-key)
         token (-> (auth/sysadmin-token [auth/role-sysadmin username])
                   (auth/augment-payload))]
     (auth/sign-jwt token pk)))
