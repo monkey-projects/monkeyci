@@ -37,11 +37,11 @@
    :exec-fn monkey.ci.gui.build/gen-admin
    :exec-args {:output "target/admin/index.html"}}
 
+  ;; clj -X:gen-main:staging or -X:gen-admin:staging
   :staging
   {:exec-args {:base-url "staging.monkeyci.com"}}
 
-  :scw
-  {:exec-args {:base-url "scw.monkeyci.com"}}
-
+  ;; clj -X:gen-main:local or -X:gen-admin:local
   :local
-  {:exec-args {:assets-format "http://localhost:8083/assets%s"}}}}
+  {:exec-args {:assets-url "http://localhost:8083/assets"
+               :output "dev-resources/sites/public/index.html"}}}}

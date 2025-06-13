@@ -198,19 +198,21 @@
      (confirm-delete-modal @repo))))
 
 (defn- delete-btn []
-  (let [d? (rf/subscribe [:repo/deleting?])]
-    ;; Ask for confirmation first
-    [:div
-     [confirm-delete-modal]
-     [:button.btn.btn-danger
-      (cond-> {:title "Delete this repository"
-               :data-bs-toggle :modal
-               :data-bs-target (u/->dom-id delete-modal-id)
-               :on-click u/noop-handler}
-        @d? (assoc :disabled true))
-      [:span.me-2 co/delete-icon] "Delete"]]))
+  (let [repo (rf/subscribe [:repo/info])
+        d? (rf/subscribe [:repo/deleting?])]
+    (when @repo
+      ;; Ask for confirmation first
+      [:div
+       [confirm-delete-modal @repo]
+       [:button.btn.btn-danger
+        (cond-> {:title "Delete this repository"
+                 :data-bs-toggle :modal
+                 :data-bs-target (u/->dom-id delete-modal-id)
+                 :on-click u/noop-handler}
+          @d? (assoc :disabled true))
+        [:span.me-2 co/delete-icon] "Delete"]])))
 
-(defn- edit-form [route]
+(defn- edit-form [close-btn]
   (let [e (rf/subscribe [:repo/editing])]
     [:form
      {:on-submit (f/submit-handler [:repo/save])}
@@ -255,9 +257,7 @@
       [:div.row
        [:div.d-flex.gap-2
         [save-btn]
-        [co/close-btn [:route/goto :page/repo (-> route
-                                                  (r/path-params)
-                                                  (select-keys [:repo-id :org-id]))]]
+        close-btn
         [:span.ms-auto [delete-btn]]]]]]))
 
 (defn edit
@@ -273,4 +273,21 @@
         [:div.card
          [:div.card-body
           [co/alerts [:repo/edit-alerts]]
-          [edit-form @route]]]]])))
+          [edit-form
+           [co/close-btn [:route/goto :page/repo (-> @route
+                                                     (r/path-params)
+                                                     (select-keys [:repo-id :org-id]))]]]]]]])))
+
+(defn new [route]
+  (l/default
+   [:<>
+    [:h3 [:span.me-2 co/repo-icon] "Watch Repository"]
+    [:p
+     "Configure a new repository to be watched by " [:i "MonkeyCI"] ". After saving, "
+     "the repository will show up in the list on your overview page. If a " [:b "webhook"]
+     " is configured, any push will result in a new build."]
+    [:div.card
+     [:div.card-body
+      [co/alerts [:repo/edit-alerts]]
+      [edit-form [co/cancel-btn
+                  [:route/goto :page/org (r/path-params route)]]]]]]))

@@ -275,8 +275,9 @@
      :contents [org-repos]}]])
 
 (defn- add-repo-btn [id]
-  ;; TODO Link
-  [:a.btn.btn-primary [:span.me-2 [co/icon :plus-square]] "Add Repository"])
+  [:a.btn.btn-primary
+   {:href (r/path-for :page/add-repo {:org-id id})}
+   [:span.me-2 [co/icon :plus-square]] "Add Repository"])
 
 (defn- repo-intro [id]
   [:<>
