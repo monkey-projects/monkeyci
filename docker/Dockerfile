@@ -11,8 +11,4 @@ VOLUME /home/monkeyci/config
 # Override default memory limit for sidecar when smaller available memory
 ENTRYPOINT ["java", "-Xmx1g", "-Dlogback.configurationFile=config/logback.xml", "-jar", "monkeyci.jar"]
 
-VOLUME /home/monkeyci/work
-
-ENV MONKEYCI_WORK_DIR=/home/monkeyci/work
-
 COPY app/target/monkeyci-standalone.jar monkeyci.jar
