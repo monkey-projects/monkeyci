@@ -216,16 +216,26 @@
                                           {:ref "test-ref"})]
           (is (= "test-ref" (get-in r [:git :ref])))))))
 
-  (testing "sets `main-branch`"
+  (testing "`main-branch`"
     (h/with-memory-store s
       (let [wh (test-webhook)]
         (is (st/sid? (st/save-webhook s wh)))
-        (let [r (sut/create-webhook-build {:storage s}
-                                          (:id wh)
-                                          {:ref "test-ref"
-                                           :repository {:master-branch "test-main"}})]
-          (is (= "test-main"
-                 (get-in r [:git :main-branch])))))))
+
+        (testing "set from `master-branch` property"
+          (let [r (sut/create-webhook-build {:storage s}
+                                            (:id wh)
+                                            {:ref "test-ref"
+                                             :repository {:master-branch "test-main"}})]
+            (is (= "test-main"
+                   (get-in r [:git :main-branch])))))
+
+        (testing "set from `default-branch` property"
+          (let [r (sut/create-webhook-build {:storage s}
+                                            (:id wh)
+                                            {:ref "test-ref"
+                                             :repository {:default-branch "test-main"}})]
+            (is (= "test-main"
+                   (get-in r [:git :main-branch]))))))))
 
   (testing "sets `commit-id`"
     (h/with-memory-store s
