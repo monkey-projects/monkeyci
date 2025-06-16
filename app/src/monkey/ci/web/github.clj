@@ -54,16 +54,17 @@
    event and eventually passed on to a runner.  Creating the entity in the database is
    up to the event handler, to ensure uniqueness of assigned ids."
   [{st :storage :as rt} {:keys [org-id repo-id] :as init-build} payload]
-  (let [{:keys [master-branch clone-url ssh-url private]} (:repository payload)
+  (let [{:keys [clone-url ssh-url private]} (:repository payload)
         commit-id (get-in payload [:head-commit :id])
-        ssh-keys (find-ssh-keys rt org-id repo-id)]
+        ssh-keys (find-ssh-keys rt org-id repo-id)
+        main-branch (some-fn :master-branch :default-branch)]
     (-> init-build
         (assoc :id (s/new-id)
                :git (-> payload
                         :head-commit
                         (select-keys [:message :author])
                         (assoc :url (if private ssh-url clone-url)
-                               :main-branch master-branch
+                               :main-branch (main-branch (:repository payload))
                                :ref (:ref payload)
                                :commit-id commit-id)
                         (mc/assoc-some :ssh-keys ssh-keys))

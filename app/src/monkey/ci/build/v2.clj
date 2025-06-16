@@ -111,19 +111,29 @@
   ([job wd]
    (try-unwrap job assoc :work-dir wd)))
 
-(defn cpus
-  "Gets or sets requested cpu count for container jobs"
+(defn ^:deprecated cpus
+  "Gets or sets requested cpu count for container jobs.  Deprecated, use
+   `size` instead."
   ([job]
    (:cpus job))
   ([job n]
    (try-unwrap job assoc :cpus n)))
 
-(defn memory
-  "Gets or sets requested memory for container jobs, in GBs"
+(defn ^:deprecated memory
+  "Gets or sets requested memory for container jobs, in GBs.  Deprecated,
+   use `size` instead."
   ([job]
    (:memory job))
   ([job n]
    (try-unwrap job assoc :memory n)))
+
+(defn size
+  "Gets or sets the resource size of the container job.  Size 1 means 1 cpu,
+   2 GB, size 2 doubles that, etc..."
+  ([job]
+   (:size job))
+  ([job s]
+   (try-unwrap job assoc :size s)))
 
 (defn artifact
   "Defines a new artifact with given id, located at given `path`.  This can be passed
