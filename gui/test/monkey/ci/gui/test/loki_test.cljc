@@ -17,3 +17,11 @@
     (is (= "{repo_id=\"test-repo\",build_id=\"test-build\",job_id=\"test-job\"}"
            (sut/query->str
             (sut/job-query ["test-cust" "test-repo" "test-build"] "test-job"))))))
+
+(deftest request-params
+  (testing "adds start and end time from job"
+    (let [job {:start-time 10000
+               :end-time 20000}
+          q (sut/request-params ["test"] job)]
+      (is (some? (:start q)))
+      (is (some? (:end q))))))

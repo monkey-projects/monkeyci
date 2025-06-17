@@ -18,16 +18,17 @@
    "build_id" build-id
    "job_id" job-id})
 
+(defn- millis->nanos [ms]
+  (* ms 1000000))
+
 (defn request-params [sid {:keys [id start-time end-time]}]
-  #_(cond-> {:query (query->str (job-query sid id))
-           :start (int (/ start-time 1000))
+  ;; Timestamp is required otherwise loki may return empty results
+  ;; when query cache is cleared.  We take the time period extra large
+  ;; to ensure logs that have been committed later are also found.
+  (cond-> {:query (query->str (job-query sid id))
+           :start (millis->nanos (- start-time 10000))
            :direction "forward"}
-    ;; Add one second to end time
-    end-time (assoc :end (inc (int (/ end-time 1000)))))
-  ;; Don't add timestamps, they can be unreliable with differing timezones,
-  ;; and they are not needed anyway, as the job sid narrows down the results enough.
-  {:query (query->str (job-query sid id))
-   :direction "forward"})
+    end-time (assoc :end (millis->nanos (+ end-time 10000)))))
 
 (defn with-query
   "Sets given query on the job request"
