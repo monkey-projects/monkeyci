@@ -47,7 +47,7 @@
   co/Lifecycle
   (start [this]
     (assoc this
-           :listener (mmc/add-listener broker (make-router (:routes routes)))))
+           :listener (mmc/add-listener broker {:handler (make-router (:routes routes))})))
 
   (stop [{:keys [listener] :as this}]
     (when listener
