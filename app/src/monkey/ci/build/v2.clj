@@ -6,7 +6,8 @@
    The general intention is to provide functions for most purposes, without the user
    having to resort to using keywords and maps."
   
-  (:require [monkey.ci.build
+  (:require [babashka.fs :as fs]
+            [monkey.ci.build
              [api :as api]
              [core :as bc]
              [shell :as bs]]
@@ -141,6 +142,12 @@
   [id path]
   {:id id
    :path path})
+
+(defn dir-artifact
+  "Converts artifact that points to a file, to one that points to its parent
+   directory."
+  [art]
+  (update art :path (comp str fs/parent)))
 
 (defn save-artifacts
   "Configures the artifacts to save on a job."

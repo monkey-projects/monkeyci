@@ -125,14 +125,14 @@
 (defn app-uberjar [ctx]
   (when (publish-app? ctx)
     (let [v (tag-version ctx)]
-      (-> (clj-container "app-uberjar" "app" "-X:jar:uber")
-          (assoc 
-           :container/env (when v {"MONKEYCI_VERSION" v})
-           :save-artifacts [uberjar-artifact])
-          (m/depends-on ["test-app"])))))
+      (cond-> (-> (clj-container "app-uberjar" "app" "-X:jar:uber")
+                  (m/depends-on ["test-app"])
+                  (m/save-artifacts uberjar-artifact))
+        v (m/env {"MONKEYCI_VERSION" v})))))
 
 (defn upload-uberjar
-  "Job that uploads the uberjar to configured s3 bucket"
+  "Job that uploads the uberjar to configured s3 bucket.  From there it 
+   will be downloaded by Ansible scripts."
   [ctx]
   (when (publish-app? ctx)
     (-> (m/action-job
@@ -154,8 +154,8 @@
         (m/depends-on ["app-uberjar"])
         (m/restore-artifacts [(as-dir uberjar-artifact)]))))
 
-(def img-base "fra.ocir.io/frjdhmocn5qi")
-(def app-img (str img-base "/monkeyci"))
+(def img-base "rg.fr-par.scw.cloud/monkeyci")
+(def app-img (str img-base "/monkeyci-api"))
 (def gui-img (str img-base "/monkeyci-gui"))
 
 (defn oci-app-image [ctx]
