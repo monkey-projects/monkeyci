@@ -31,7 +31,12 @@
 
 (def get-token ::token)
 
-(def get-build (comp :build :event))
+(defn set-build [ctx build]
+  (assoc ctx ::build build))
+
+(def get-build ::build)
+
+(def evt->build (comp :build :event))
 
 (def get-ssh-keys ::ssh-keys)
 
@@ -104,7 +109,7 @@
   {:name ::add-token
    :enter (fn [ctx]
             (let [token (bas/generate-token)]
-              (swap! (:builds (get-config ctx)) assoc token (get-build ctx))
+              (swap! (:builds (get-config ctx)) assoc token (evt->build ctx))
               (set-token ctx token)))})
 
 (def remove-token
@@ -141,7 +146,7 @@
    :enter (fn [ctx]
             (let [conf (get-config ctx)
                   clone (-> conf :git :clone)
-                  build (get-build ctx)
+                  build (evt->build ctx)
                   wd (build-work-dir conf (get-in ctx [:event :sid]))
                   opts (-> build
                            :git
@@ -156,14 +161,14 @@
 (def save-workspace
   {:name ::save-workspace
    :enter (fn [ctx]
-            (assoc ctx ::build (-> (get-build ctx)
-                                   (b/set-checkout-dir (::checkout-dir ctx))
-                                   (ws/create-workspace (get-config ctx)))))})
+            (set-build ctx (-> (evt->build ctx)
+                               (b/set-checkout-dir (::checkout-dir ctx))
+                               (ws/create-workspace (get-config ctx)))))})
 
 (def result-build-init-evt
   {:name ::result-build-init-evt
    :leave (fn [ctx]
-            (assoc ctx :result [(b/build-init-evt (::build ctx))]))})
+            (assoc ctx :result [(b/build-init-evt (get-build ctx))]))})
 
 (def cleanup
   "Interceptor that deletes all files from a build, after build end"
@@ -179,7 +184,7 @@
 
 (defn prepare-build-cmd [ctx]
   (let [conf (get-config ctx)
-        build (get-build ctx)
+        build (evt->build ctx)
         wd (build-work-dir conf (get-in ctx [:event :sid]))
         lwd "/home/monkeyci"
         checkout (checkout-dir wd)

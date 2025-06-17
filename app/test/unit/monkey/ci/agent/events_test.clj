@@ -221,10 +221,12 @@
 
 (deftest generate-script-config
   (testing "builds script config"
-    (let [conf (-> {:event {:build (h/gen-build)}}
+    (let [build (h/gen-build)
+          conf (-> {:event {:build build}}
                    (sut/set-config {:api-server {:port 1234}
                                     :archs [:amd]
                                     :credit-multiplier 7})
+                   (sut/set-build (assoc build :checkout-dir "/test/dir"))
                    (sut/set-token "test-token")
                    (sut/generate-script-config))]
       (is (spec/valid? ::ss/config conf)
@@ -235,7 +237,11 @@
 
       (is (= 7 (-> conf
                    (sc/build)
-                   :credit-multiplier))))))
+                   :credit-multiplier)))
+
+      (is (= "/test/dir"
+             (-> conf (sc/build) :checkout-dir))
+          "takes build from context, not event"))))
 
 (deftest script-init
   (let [sid (random-sid)
