@@ -8,7 +8,8 @@
             [monkey.ci.blob
              [common :as bc]
              [disk :as bd]
-             [oci :as bo]]
+             [oci :as bo]
+             [s3 :as bs3]]
             [monkey.oci.os.core :as os]))
 
 (defn save
@@ -36,3 +37,6 @@
         client (-> (os/make-client oci-conf)
                    (oci/add-inv-interceptor :blob))]
     (bo/->OciBlobStore client oci-conf )))
+
+(defmethod make-blob-store :s3 [conf k]
+  (bs3/->S3BlobStore (get conf k)))

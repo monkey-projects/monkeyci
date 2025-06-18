@@ -7,8 +7,7 @@
              [protocols :as p]
              [utils :as u]]
             [monkey.ci.blob.common :as bc]
-            [monkey.ci.build.archive :as a])
-  (:import (java.io PipedOutputStream)))
+            [monkey.ci.build.archive :as a]))
 
 (deftype DiskBlobStore [dir]
   p/BlobStore
@@ -25,7 +24,6 @@
 
   (restore-blob [_ src dest]
     (let [f (io/file dest)
-          os (PipedOutputStream.)
           srcf (io/file dir src)]
       (log/debug "Restoring blob from" srcf)
       (md/future
