@@ -195,34 +195,38 @@
  (fn [{:keys [db]} _]
    (let [params (-> (r/current db)
                     (r/path-params)
-                    (select-keys [:org-id :repo-id]))]
+                    (select-keys [:org-id :repo-id]))
+         new? (nil? (:repo-id params))]
      {:dispatch [:secure-request
-                 :update-repo
+                 (if new? :create-repo :update-repo)
                  (-> params
                      (assoc :repo (-> (db/editing db)
                                       (assoc :id (:repo-id params)
                                              :org-id (:org-id params)))))
-                 [:repo/save--success]
-                 [:repo/save--failed]]
+                 [:repo/save--success new?]
+                 [:repo/save--failed new?]]
       :db (-> db
               (db/mark-saving)
               (db/reset-edit-alerts))})))
 
 (rf/reg-event-db
  :repo/save--success
- (fn [db [_ {:keys [body]}]]
+ (fn [db [_ new? {:keys [body]}]]
    (-> db
        (cdb/replace-repo body)
        (db/unmark-saving)
-       (db/set-edit-alerts [{:type :success
-                             :message "Repository changes have been saved."}]))))
+       (db/set-edit-alerts [(if new?
+                              a/repo-create-success
+                              a/repo-update-success)]))))
 
 (rf/reg-event-db
  :repo/save--failed
- (fn [db [_ err]]
+ (fn [db [_ new? err]]
    (-> db
-       (db/set-edit-alerts [{:type :danger
-                             :message (str "Failed to save changes: " (u/error-msg err))}])
+       (db/set-edit-alerts [((if new?
+                               a/repo-create-failed
+                               a/repo-update-failed)
+                             err)])
        (db/unmark-saving))))
 
 (rf/reg-event-fx
