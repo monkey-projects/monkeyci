@@ -10,10 +10,10 @@
              [stream :as ms]]
             [monkey.ci
              [artifacts :as a]
-             [blob :as blob]
              [build :as b]
              [cache :as c]
              [protocols :as p]]
+            [monkey.ci.blob.disk :as blob]
             [monkey.ci.containers.podman :as cp]
             [monkey.ci.events.mailman :as em]
             [monkey.ci.local
