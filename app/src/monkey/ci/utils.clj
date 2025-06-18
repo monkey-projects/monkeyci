@@ -193,3 +193,7 @@
     (with-open [in (io/input-stream path)]
       (-> (bch/md5 in)
           (bcc/bytes->hex)))))
+
+(defn maybe-deref [x]
+  (cond-> x
+    (md/deferred? x) (deref)))

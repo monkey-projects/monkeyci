@@ -190,7 +190,8 @@
             (let [dest (fs/create-dirs (get-work-dir ctx))
                   ws (ws/->BlobWorkspace workspace (str dest))]
               (log/debug "Restoring workspace to" dest)
-              (assoc ctx ::workspace @(p/restore-workspace ws (build-sid ctx)))))})
+              (assoc ctx ::workspace (-> (p/restore-workspace ws (build-sid ctx))
+                                         (u/maybe-deref)))))})
 
 (def filter-container-job
   "Interceptor that terminates when the job in the event is not a container job"

@@ -197,7 +197,14 @@
           (testing "adds logback configuration"
             (let [args (get-in deps [:aliases :monkeyci/build :jvm-opts])]
               (is (not-empty args))
-              (is (re-matches #"^-Dlogback.configurationFile=.+$" (first args)))))))
+              (is (re-matches #"^-Dlogback.configurationFile=.+$" (first args)))))
+
+          (testing "sets in-container work dir as checkout dir"
+            (is (= "/home/monkeyci"
+                   (-> deps
+                       (get-in [:aliases :monkeyci/build :exec-args :config])
+                       ::ss/build
+                       :checkout-dir))))))
 
       (testing "on exit, fires `build/end` event"
         (let [on-exit (:exit-fn cmd)]
@@ -226,9 +233,8 @@
                    (sut/set-config {:api-server {:port 1234}
                                     :archs [:amd]
                                     :credit-multiplier 7})
-                   (sut/set-build (assoc build :checkout-dir "/test/dir"))
                    (sut/set-token "test-token")
-                   (sut/generate-script-config))]
+                   (sut/generate-script-config build))]
       (is (spec/valid? ::ss/config conf)
           (spec/explain-str ::ss/config conf))
 
@@ -237,11 +243,7 @@
 
       (is (= 7 (-> conf
                    (sc/build)
-                   :credit-multiplier)))
-
-      (is (= "/test/dir"
-             (-> conf (sc/build) :checkout-dir))
-          "takes build from context, not event"))))
+                   :credit-multiplier))))))
 
 (deftest script-init
   (let [sid (random-sid)

@@ -4,10 +4,6 @@
             [manifold.deferred :as md]
             [monkey.ci.utils :as u]))
 
-(defn- maybe-deref [x]
-  (cond-> x
-    (md/deferred? x) deref))
-
 (defn- system-stop [sys]
   (let [stopping? (atom false)]
     (fn []
@@ -28,7 +24,7 @@
     (u/add-shutdown-hook! stop)
     (try
       ;; If `f` returns a deferred, deref it first
-      (maybe-deref (f sys))
+      (u/maybe-deref (f sys))
       (catch Throwable ex
         (log/error "Got exception in system:" ex)
         (throw ex))

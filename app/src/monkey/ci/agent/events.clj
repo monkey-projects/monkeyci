@@ -78,11 +78,11 @@
 (defn- add-log-config [deps path]
   (p/add-logback-config deps :monkeyci/build path))
 
-(defn generate-script-config [ctx]
+(defn generate-script-config [ctx build]
   (let [host (bas/get-ip-addr)
         conf (get-config ctx)]
     (-> sc/empty-config
-        (sc/set-build (-> (get-build ctx)
+        (sc/set-build (-> build
                           ;; Also set credit multiplier, for action jobs
                           (b/set-credit-multiplier (:credit-multiplier conf))))
         (sc/set-archs (:archs conf))
@@ -193,7 +193,9 @@
         cd (config-dir wd)
         lcd "/etc/monkeyci"
         log-path (write-log-config conf cd)
-        deps (-> (generate-deps sd (:version conf) (generate-script-config ctx))
+        deps (-> (generate-deps sd (:version conf) (generate-script-config
+                                                    ctx
+                                                    (b/set-checkout-dir build lwd)))
                  (add-log-config (some->> log-path
                                           (fs/file-name)
                                           (fs/path lcd)

@@ -128,7 +128,8 @@
               (emi/set-mailman mailman)
               (sut/set-api {:port 1234
                             :token "test-token"})
-              (sut/set-child-opts {:log-config "test-config.xml"})
+              (sut/set-child-opts {:log-config "test-config.xml"
+                                   :lib-coords {:mvn/version "test"}})
               (sut/prepare-child-cmd))]
     (testing "starts child process command"
       (testing "in script dir"
@@ -155,6 +156,10 @@
                    (-> deps
                        (get-in [:aliases :monkeyci/build :jvm-opts])
                        first))))
+
+          (testing "with lib coords"
+            (is (= {:mvn/version "test"}
+                   (get-in deps [:aliases :monkeyci/build :extra-deps 'com.monkeyci/app]))))
 
           (testing "with m2 cache dir"))))
 

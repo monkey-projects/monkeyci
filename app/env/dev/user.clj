@@ -42,10 +42,12 @@
        (map (juxt :id :display-name :time-created :lifecycle-state))))
 
 (defn run-local [wd & [sd]]
-  (cmd/run-build-local {:workdir wd
-                        :dir sd
-                        :lib-coords {:local/root (u/cwd)}
-                        :log-config (str (fs/absolutize "dev-resources/logback-script.xml"))}))
+  (cmd/run-build-local
+   {:args
+    {:workdir wd
+     :dir sd}
+    :lib-coords {:local/root (u/cwd)}
+    :log-config (str (fs/absolutize "dev-resources/logback-script.xml"))}))
 
 (defn run-build-agent
   "Runs build agent with local config, returns a fn that stops the agent

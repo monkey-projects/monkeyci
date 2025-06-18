@@ -249,3 +249,7 @@
 (def archs
   "Retrieves list of available container architectures from context"
   :archs)
+
+(def source
+  "Returns the trigger source (e.g. `api`)"
+  (comp :source :build))

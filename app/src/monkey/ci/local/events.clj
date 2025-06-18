@@ -17,6 +17,7 @@
    server-side builds."
   (:require [babashka.fs :as fs]
             [clojure.tools.logging :as log]
+            [medley.core :as mc]
             [monkey.ci
              [build :as b]
              [git :as git]
@@ -145,7 +146,7 @@
 
 (defn generate-deps [script-dir {:keys [lib-coords log-config m2-cache-dir]}]
   (cond-> (p/generate-deps script-dir nil)
-    true (assoc-in [:aliases :monkeyci/build :exta-deps] {'com.monkeyci/app lib-coords})
+    true (update-in [:aliases :monkeyci/build :extra-deps] mc/assoc-some 'com.monkeyci/app lib-coords)
     log-config (p/update-alias assoc :jvm-opts
                                [(str "-Dlogback.configurationFile=" log-config)]))
     ;; m2 cache dir?
