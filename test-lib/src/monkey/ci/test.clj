@@ -111,3 +111,8 @@
   "Configures context to provide specified architectures."
   [ctx archs]
   (assoc ctx :archs archs))
+
+(defn set-trigger-source
+  "Sets build trigger source (e.g. `:api`, `:github-webhook`)"
+  [ctx src]
+  (assoc-in ctx [:build :source] src))
