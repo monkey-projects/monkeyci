@@ -8,6 +8,7 @@
              [blob :as sut]
              [protocols :as p]
              [utils :as u]]
+            [monkey.ci.blob.oci :as bo]
             [monkey.ci.test.helpers :as h]
             [monkey.oci.os
              [martian :as om]
@@ -173,8 +174,8 @@
         
         (is (fs/exists? arch))
         (is (pos? (fs/size arch)))
-        (with-redefs [sut/head-object (constantly true)
-                      sut/get-object (constantly (md/success-deferred (fs/read-all-bytes arch)))]
+        (with-redefs [bo/head-object (constantly true)
+                      bo/get-object (constantly (md/success-deferred (fs/read-all-bytes arch)))]
           (let [res @(sut/restore blob "remote/path" r)]
             
             (testing "unzips and unarchives to destination"
@@ -189,8 +190,8 @@
             (testing "deletes tmp files"
               (is (not (fs/exists? tmp-dir))))))
 
-        (with-redefs [sut/head-object (constantly false)
-                      sut/get-object (fn [& args]
+        (with-redefs [bo/head-object (constantly false)
+                      bo/get-object (fn [& args]
                                        (throw (ex-info "This should not be invoked" {:args args})))]
           (let [res @(sut/restore blob "remote/path" r)]
             
@@ -204,12 +205,12 @@
           path "/test/path"]
 
       (testing "returns raw stream"
-        (with-redefs [sut/head-object (constantly true)
-                      sut/get-object (constantly (md/success-deferred (.getBytes "this is a test")))]
+        (with-redefs [bo/head-object (constantly true)
+                      bo/get-object (constantly (md/success-deferred (.getBytes "this is a test")))]
           (is (instance? java.io.InputStream @(sut/input-stream blob path)))))
 
       (testing "`nil` if blob does not exist"
-        (with-redefs [sut/head-object (constantly false)]
+        (with-redefs [bo/head-object (constantly false)]
           (is (nil? @(sut/input-stream blob path)))))
 
       (testing "can upload raw stream"

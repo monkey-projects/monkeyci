@@ -4,10 +4,10 @@
             [com.stuartsierra.component :as csc]
             [manifold.deferred :as md]
             [monkey.ci
-             [blob :as blob]
              [cache :as cache]
              [protocols :as p]
              [storage :as st]]
+            [monkey.ci.blob.disk :as blob]
             [monkey.ci.build
              [api-server :as bas]
              [api :as ba]]

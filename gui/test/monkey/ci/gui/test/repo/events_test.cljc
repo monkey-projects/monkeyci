@@ -309,44 +309,74 @@
   (rft/run-test-sync
    (let [c (h/catch-fx :martian.re-frame/request)
          [org-id repo-id] (test-repo-path!)]
-     (swap! app-db #(-> %
-                        (db/set-editing {:name "updated repo name"})
-                        (db/set-edit-alerts [{:type :warning}])))
      (h/initialize-martian {:update-repo {:error-code :no-error}})
 
-     (is (not-empty (r/path-params (r/current @app-db))))
+     (testing "existing repo"
+       (swap! app-db #(-> %
+                          (db/set-editing {:name "updated repo name"})
+                          (db/set-edit-alerts [{:type :warning}])))
 
-     (rf/dispatch [:repo/save])
+       (is (not-empty (r/path-params (r/current @app-db))))
 
-     (testing "updates repo in backend"
-       (is (= 1 (count @c))))
+       (rf/dispatch [:repo/save])
 
-     (testing "adds org and repo id to body"
-       (let [args (-> @c first (nth 3) :repo)]
-         (is (map? args))
-         (is (= org-id (:org-id args)))
-         (is (= repo-id (:id args)))))
+       (testing "updates repo in backend"
+         (is (= 1 (count @c)))
+         (is (= :update-repo (-> @c first (nth 2)))))
 
-     (testing "adds org and repo id to params"
-       (let [args (-> @c first (nth 3))]
-         (is (map? args))
-         (is (= org-id (:org-id args)))
-         (is (= repo-id (:repo-id args)))))
+       (testing "adds org and repo id to body"
+         (let [args (-> @c first (nth 3) :repo)]
+           (is (map? args))
+           (is (= org-id (:org-id args)))
+           (is (= repo-id (:id args)))))
 
-     (testing "marks saving"
-       (is (db/saving? @app-db)))
+       (testing "adds org and repo id to params"
+         (let [args (-> @c first (nth 3))]
+           (is (map? args))
+           (is (= org-id (:org-id args)))
+           (is (= repo-id (:repo-id args)))))
 
-     (testing "clears alerts"
-       (is (empty? (db/edit-alerts @app-db)))))))
+       (testing "marks saving"
+         (is (db/saving? @app-db)))
+
+       (testing "clears alerts"
+         (is (empty? (db/edit-alerts @app-db)))))
+
+     (testing "new repo"
+       (swap! app-db #(-> %
+                          (db/set-editing {:name "new repo name"})
+                          (db/set-edit-alerts [{:type :warning}])
+                          (r/set-current {:parameters
+                                          {:path
+                                           {:org-id org-id}}})))
+
+       (is (not-empty (r/path-params (r/current @app-db))))
+
+       (rf/dispatch [:repo/save])
+
+       (testing "updates repo in backend"
+         (is (= 2 (count @c)))
+         (is (= :create-repo (-> @c last (nth 2)))))
+
+       (testing "adds org id to body"
+         (let [args (-> @c first (nth 3) :repo)]
+           (is (map? args))
+           (is (= org-id (:org-id args)))))
+
+       (testing "adds org id to params"
+         (let [args (-> @c first (nth 3))]
+           (is (map? args))
+           (is (= org-id (:org-id args)))))))))
 
 (deftest repo-save--success
-  (testing "updates repo in db"
+  (testing "updates existing repo in db"
     (reset! app-db (cdb/set-org {}
                                 {:name "test org"
                                  :repos [{:id "test-repo"
                                           :name "original repo"}]}))
-    (rf/dispatch-sync [:repo/save--success {:body {:id "test-repo"
-                                                   :name "updated repo"}}])
+    (rf/dispatch-sync [:repo/save--success false
+                       {:body {:id "test-repo"
+                               :name "updated repo"}}])
     (is (= "updated repo"
            (-> @app-db
                (lo/get-value cdb/org)
@@ -354,13 +384,26 @@
                first
                :name))))
 
+  (testing "adds new repo to db"
+    (reset! app-db (cdb/set-org {}
+                                {:name "test org"
+                                 :repos [{:id "other-repo"
+                                          :name "other repo"}]}))
+    (rf/dispatch-sync [:repo/save--success true
+                       {:body {:id "test-repo"
+                               :name "new repo"}}])
+    (is (= ["other-repo" "test-repo"]
+           (->> (lo/get-value @app-db cdb/org)
+                :repos
+                (map :id)))))
+
   (testing "unmarks saving"
     (reset! app-db (db/mark-saving {}))
-    (rf/dispatch-sync [:repo/save--success {}])
+    (rf/dispatch-sync [:repo/save--success true {}])
     (is (not (db/saving? @app-db))))
 
   (testing "sets success alert"
-    (rf/dispatch-sync [:repo/save--success {}])
+    (rf/dispatch-sync [:repo/save--success false {}])
     (is (= 1 (count (db/edit-alerts @app-db))))
     (is (= :success (-> (db/edit-alerts @app-db)
                         first
@@ -368,7 +411,7 @@
 
 (deftest repo-save--failed
   (testing "sets error alert"
-    (rf/dispatch-sync [:repo/save--failed {}])
+    (rf/dispatch-sync [:repo/save--failed true {}])
     (is (= 1 (count (db/edit-alerts @app-db))))
     (is (= :danger (-> (db/edit-alerts @app-db)
                        first
@@ -376,7 +419,7 @@
 
   (testing "unmarks saving"
     (reset! app-db (db/mark-saving {}))
-    (rf/dispatch-sync [:repo/save--failed {}])
+    (rf/dispatch-sync [:repo/save--failed false {}])
     (is (not (db/saving? @app-db)))))
 
 (deftest repo-delete

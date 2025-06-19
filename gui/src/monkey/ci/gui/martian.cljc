@@ -52,6 +52,8 @@
    (s/optional-key :github-id) s/Int
    (s/optional-key :labels) [Label]})
 
+(def NewRepo UpdateRepo)
+
 (s/defschema log-query-schema
   {:query s/Str
    :direction s/Str
@@ -258,6 +260,13 @@
      :method :get
      :path-parts repo-path
      :path-schema repo-schema})
+
+   (api-route
+    {:route-name :create-repo
+     :method :post
+     :path-parts (into org-path ["/repo"])
+     :path-schema org-schema
+     :body-schema {:repo NewRepo}})
 
    (api-route
     {:route-name :update-repo

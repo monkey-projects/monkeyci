@@ -121,6 +121,20 @@
 (def org-save-ssh-keys-failed
   (error-msg "Failed to save SSH keys"))
 
+(def repo-update-success
+  {:type :success
+   :message "Repository changes have been saved."})
+
+(def repo-create-success
+  {:type :success
+   :message "Repository has been created."})
+
+(def repo-update-failed
+  (error-msg "Failed to save changes"))
+
+(def repo-create-failed
+  (error-msg "Failed to create repo"))
+
 (def admin-login-failed
   (error-msg "Failed to authenticate"))
 

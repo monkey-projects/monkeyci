@@ -6,8 +6,8 @@
             [clojure.java.io :as io]
             [monkey.ci
              [artifacts :as sut]
-             [blob :as blob]
              [protocols :as p]]
+            [monkey.ci.blob.disk :as blob]
             [monkey.ci.build
              [api :as api]
              [api-server :as bas]]
