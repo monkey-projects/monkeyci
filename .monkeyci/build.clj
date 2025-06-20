@@ -163,7 +163,11 @@
 
 (defn archs [ctx]
   ;; Use fallback for safety
-  (or (m/archs ctx) [:amd]))
+  #_(or (m/archs ctx) [:amd])
+  ;; Using single arch for now.  When using a container agent, it may happen that
+  ;; multiple builds run on the same agent but for different architectures, which may
+  ;; mess up the result (e.g. amd container but actually arm arch)
+  [:amd])
 
 (defn build-app-image [ctx]
   (when (publish-app? ctx)
