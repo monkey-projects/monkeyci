@@ -41,11 +41,12 @@
   (->> @(i/list-active)
        (map (juxt :id :display-name :time-created :lifecycle-state))))
 
-(defn run-local [wd & [sd]]
+(defn run-local [wd & [sd params]]
   (cmd/run-build-local
    {:args
     {:workdir wd
-     :dir sd}
+     :dir (or sd ".monkeyci")
+     :param params}
     :lib-coords {:local/root (u/cwd)}
     :log-config (str (fs/absolutize "dev-resources/logback-script.xml"))}))
 

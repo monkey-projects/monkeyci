@@ -75,7 +75,12 @@
           
           (testing "accepts build sid"
             (is (= "test-sid" (-> (run-cli "build" "run" "--sid" "test-sid")
-                                  (get-in [:args :sid]))))))
+                                  (get-in [:args :sid])))))
+
+          (testing "accepts multiple build params"
+            (is (= ["key1=value1" "key2=value2"]
+                   (-> (run-cli "build" "run" "-p" "key1=value1" "--param" "key2=value2")
+                       (get-in [:args :param]))))))
         
         #_(testing "`watch` subcommand"
           (testing "runs `watch` command"

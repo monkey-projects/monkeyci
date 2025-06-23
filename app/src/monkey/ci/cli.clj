@@ -33,7 +33,12 @@
            :type :string}
           {:as "Repository sid"
            :option "sid"
-           :type :string}]
+           :type :string}
+          {:as "Build param"
+           :option "param"
+           :short "p"
+           :type :string
+           :multiple true}]
    :runs {:command cmd/run-build-local
           :app-mode :cli}})
 

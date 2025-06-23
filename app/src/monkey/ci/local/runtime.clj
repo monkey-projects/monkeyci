@@ -40,6 +40,7 @@
 (defn- new-podman-routes [conf]
   (letfn [(make-routes [{:keys [config build] :as c}]
             (let [sid (b/sid build)]
+              (log/debug "Creating local podman routes for build" build)
               (-> (select-keys c [:mailman :artifacts :cache :workspace])
                   (update :artifacts a/make-blob-repository sid)
                   (update :cache c/make-blob-repository sid)
@@ -59,6 +60,7 @@
 (defrecord FixedBuildParams [params]
   p/BuildParams
   (get-build-params [_ _]
+    (log/debug "Returning fixed build params:" (map :name params))
     (md/success-deferred params)))
 
 (defn- new-params [conf]
@@ -113,7 +115,7 @@
                   [:mailman :api-config])
    :podman       (co/using
                   (new-podman-routes conf)
-                  [:mailman :artifacts :cache :workspace])
+                  [:mailman :artifacts :cache :workspace :build])
    :artifacts    (new-artifacts conf)
    :cache        (new-cache conf)
    :workspace    (copy-store conf)

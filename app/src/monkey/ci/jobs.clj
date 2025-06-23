@@ -87,6 +87,7 @@
   ;; Add output to the result
   (.flush writer)
   (let [out (.toString writer)]
+    (log/trace "Output from job:" out)
     (cond-> r
       (not-empty out) (assoc :output out))))
 

@@ -49,6 +49,23 @@
                              :script
                              :script-dir)))))))
 
+(deftest parse-params
+  (testing "empty when empty input"
+    (is (= [] (sut/parse-params []))))
+
+  (testing "splits key/value pairs by ="
+    (is (= [{:name "param1" :value "value1"}
+            {:name "param2" :value "value2"}]
+           (sut/parse-params ["param1=value1"
+                              "param2=value2"]))))
+
+  (testing "fails on invalid param"
+    (is (thrown? Exception (sut/parse-params ["invalid"]))))
+
+  (testing "takes additional = chars"
+    (is (= [{:name "key" :value "key=value"}]
+           (sut/parse-params ["key=key=value"])))))
+
 (deftest verify-build
   (testing "zero when successful"
     (is (zero? (sut/verify-build {:work-dir "examples"

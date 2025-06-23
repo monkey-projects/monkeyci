@@ -4,6 +4,7 @@
             [babashka.fs :as fs]
             [cheshire.core :as json]
             [clj-commons.byte-streams :as bs]
+            [clojure.string :as cs]
             [clojure.tools.logging :as log]
             [java-time.api :as jt]
             [manifold.deferred :as md]
@@ -36,6 +37,14 @@
              [auth :as auth]
              [http :as wh]]))
 
+(defn parse-params [params]
+  (letfn [(parse [l]
+            (let [idx (.indexOf l "=")]
+              (if (neg? idx)
+                (throw (ex-info "Invalid parameter" {:param l}))
+                {:name (.trim (subs l 0 idx)) :value (.trim (subs l (inc idx)))})))]
+    (mapv parse params)))
+
 (defn run-build-local
   "Run a build locally, normally from local source but can also be from a git checkout.
    Returns a deferred that will hold zero if the build succeeds, nonzero if it fails."
@@ -53,7 +62,8 @@
                 dir (b/set-script-dir dir))
         conf (-> (select-keys config [:mailman :lib-coords :log-config]) ; Allow override for testing
                  (lc/set-work-dir wd)
-                 (lc/set-build build))]
+                 (lc/set-build build)
+                 (lc/set-params (parse-params (get-in config [:args :param]))))]
     (log/info "Running local build for src:" (:checkout-dir build))
     (log/debug "Using working directory" (str wd))
     (lr/start-and-post conf (ec/make-event :build/pending

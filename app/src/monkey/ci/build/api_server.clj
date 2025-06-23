@@ -22,7 +22,8 @@
              [cache :as cache]
              [edn :as edn]
              [protocols :as p]
-             [spec :as spec]]
+             [spec :as spec]
+             [utils :as u]]
             [monkey.ci.events
              [http :as eh]
              [mailman :as em]]
@@ -108,7 +109,9 @@
       (rur/status 500)))
 
 (defn get-params [req]
-  (rur/response @(p/get-build-params (req->params req) (req->build req))))
+  (-> (p/get-build-params (req->params req) (req->build req))
+      (u/maybe-deref)
+      (rur/response)))
 
 (defn get-all-ip-addresses
   "Lists all non-loopback, non-virtual site local ip addresses"
