@@ -28,7 +28,7 @@
   (cond-> {:query (query->str (job-query sid id))
            :start (millis->nanos (- start-time 10000))
            :direction "forward"}
-    end-time (assoc :end (millis->nanos (+ end-time 10000)))))
+    end-time (assoc :end (millis->nanos (+ end-time 30000)))))
 
 (defn with-query
   "Sets given query on the job request"
