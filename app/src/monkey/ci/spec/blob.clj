@@ -2,7 +2,7 @@
   (:require [clojure.spec.alpha :as s]
             [monkey.ci.spec.common :as c]))
 
-(s/def ::type #{:disk :oci})
+(s/def ::type #{:disk :oci :s3})
 
 (s/def ::blob-config
   ;; TODO Multimethod

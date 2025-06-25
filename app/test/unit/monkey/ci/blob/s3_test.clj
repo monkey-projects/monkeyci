@@ -40,9 +40,22 @@
               (let [details (-> @inv :metadata :details)]
                 (is (= "test-bucket" (:bucket-name details)))
                 (is (= "test/dest" (:key details)))
-                (is (string? (:file details))))))))
+                (is (string? (:file details)))))
 
-      (testing "`restore-blob` downloads and extracts"
+            (testing "prepends prefix to key"
+              (let [store (blob/make-blob-store {:store
+                                                 {:type :s3
+                                                  :bucket-name "test-bucket"
+                                                  :prefix "test-prefix/"}}
+                                                :store)]
+                (is (some? @(blob/save store src "test/dest")))
+                (is (some? @inv))
+                (let [details (-> @inv :metadata :details)]
+                  (is (= "test-bucket" (:bucket-name details)))
+                  (is (= "test-prefix/test/dest" (:key details)))
+                  (is (string? (:file details)))))))))
+
+      (testing "`restore-blob`"
         (let [inv (atom nil)
               dest (fs/path dir "extracted")]
           (with-redefs [s3/get-object (fn [opts bucket path]
@@ -51,10 +64,23 @@
                                                       :details {:bucket-name bucket
                                                                 :key path}}})
                                         {:input-stream (io/input-stream arch)})]
-            (is (some? @(blob/restore store "test/src" (str dest))))
-            (is (fs/exists? dest))
-            (is (= "test file" (slurp (str (fs/path dest "test.txt")))))
-            (is (some? @inv)))))
+            (testing "downloads and extracts"
+              (is (some? @(blob/restore store "test/src" (str dest))))
+              (is (fs/exists? dest))
+              (is (= "test file" (slurp (str (fs/path dest "test.txt")))))
+              (is (some? @inv)))
+
+            (testing "prepends prefix"
+              (let [store (blob/make-blob-store {:store
+                                                 {:type :s3
+                                                  :bucket-name "test-bucket"
+                                                  :prefix "test-prefix/"}}
+                                                :store)]
+                (is (some? @(blob/restore store "test/src" (str dest))))
+                (is (= "test-prefix/test/src" (-> @inv
+                                                  :metadata
+                                                  :details
+                                                  :key))))))))
 
       (testing "`get-blob-stream` returns blob as input stream"
         (let [dest (fs/path dir "extracted")]

@@ -78,7 +78,7 @@
 (defmulti blob-type :type)
 
 (s/def :blob/store p/blob-store?)
-(s/def :blob/type #{:disk :oci})
+(s/def :blob/type #{:disk :oci :s3})
 (s/def :disk-blob/dir string?)
 
 (defmethod blob-type :disk [_]
@@ -89,6 +89,16 @@
 (defmethod blob-type :oci [_]
   (s/keys :req-un [:blob/type :oci/bucket-name :oci/ns]
           :opt-un [:oci/credentials :oci/prefix :oci-blob/tmp-dir]))
+
+(s/def :s3/bucket-name string?)
+(s/def :s3/endpoint string?)
+(s/def :s3/access-key string?)
+(s/def :s3/secret-key string?)
+(s/def :s3/prefix string?)
+
+(defmethod blob-type :s3 [_]
+  (s/keys :req-un [:blob/type :s3/bucket-name :s3/endpoint :s3/access-key :s3/secret-key]
+          :opt-un [:s3/prefix]))
 
 (s/def :conf/blob (s/multi-spec blob-type :type))
 
