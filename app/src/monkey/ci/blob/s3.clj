@@ -26,10 +26,10 @@
     ;; an additional thread.
     (let [tmp (c/tmp-archive conf)
           r (c/make-archive src tmp)
-          details {:bucket-name (:bucket-name conf)
-                   :key (with-prefix dest conf)
-                   :file (u/abs-path tmp)
-                   :metadata md}]
+          details (-> {:bucket-name (:bucket-name conf)
+                       :key (with-prefix dest conf)
+                       :file (u/abs-path tmp)}
+                      (mc/assoc-some :metadata md))]
       (log/debug "Uploading to bucket:" details)
       (-> (md/future (s3/put-object conf details))
           (md/chain (constantly r))
