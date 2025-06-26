@@ -16,6 +16,14 @@
   (cond->> dest
     (some? prefix) (str prefix)))
 
+(defn- conf->client [conf]
+  (dissoc conf :bucket-name :type :prefix))
+
+(defn- object-exists?
+  "Asynchronously checks if object exists"
+  [conf path]
+  (md/future (s3/does-object-exist (conf->client conf) (:bucket-name conf) path)))
+
 ;; Configuration contains all settings needed to connect to the bucket endpoint,
 ;; including bucket-name.
 (defrecord S3BlobStore [conf]
@@ -31,24 +39,31 @@
                        :file (u/abs-path tmp)}
                       (mc/assoc-some :metadata md))]
       (log/debug "Uploading to bucket:" details)
-      (-> (md/future (s3/put-object conf details))
+      (-> (md/future (s3/put-object (conf->client conf) details))
           (md/chain (constantly r))
           (md/finally #(fs/delete tmp)))))
   
   (restore-blob [this src dest]
     (let [src (with-prefix src conf)]
       (log/debug "Restoring blob from bucket" (:bucket-name conf) ", path" src "to" dest)
-      (let [res (md/future (s3/get-object conf (:bucket-name conf) src))]
-        (-> res
-            (md/chain #(a/extract (:input-stream %) dest))
-            (md/finally #(.close (:input-stream @res)))))))
+      (-> (object-exists? conf src)
+          (md/chain
+           (fn [exists?]
+             (when exists?
+               (let [res (s3/get-object (conf->client conf) (:bucket-name conf) src)]
+                 (-> res
+                     (md/chain #(a/extract (:input-stream %) dest))
+                     (md/finally #(.close (:input-stream res)))))))))))
   
   (get-blob-stream [this src]
     (let [src (with-prefix src conf)]
       (log/debug "Downloading stream from bucket" (:bucket-name conf) "at" src)
-      (-> (s3/get-object conf (:bucket-name conf) src)
-          (md/future)
-          (md/chain :input-stream))))
+      (-> (object-exists? conf src)
+          (md/chain
+           (fn [exists?]
+             (when exists?
+               (s3/get-object (conf->client conf) (:bucket-name conf) src)))
+           :input-stream))))
   
   (put-blob-stream [this src dest]
     (let [dest (with-prefix dest conf)
@@ -56,7 +71,7 @@
                    :key dest
                    :input-stream src}]
       (log/debug "Uploading stream to bucket:" details)
-      (-> (s3/put-object conf details)
+      (-> (s3/put-object (conf->client conf) details)
           (md/future)
           (md/chain (fn [_]
                       {:src src
@@ -64,12 +79,17 @@
   
   (get-blob-info [this src]
     (let [src (with-prefix src conf)]
-      (-> (s3/get-object-metadata conf {:bucket-name (:bucket-name conf) :key src})
-          (md/future)
-          (md/chain (fn [res]
-                      (-> {:src src
-                           :size (:content-length res)
-                           :metadata (:user-metadata res)
-                           :result res}
-                          (merge (select-keys res [:last-modified :content-type]))
-                          (mc/update-existing :last-modified jt/instant))))))))
+      (-> (object-exists? conf src)
+          (md/chain
+           (fn [exists?]
+             (when exists?
+               (s3/get-object-metadata (conf->client conf)
+                                       {:bucket-name (:bucket-name conf) :key src})))
+           (fn [res]
+             (when res
+               (-> {:src src
+                    :size (:content-length res)
+                    :metadata (:user-metadata res)
+                    :result res}
+                   (merge (select-keys res [:last-modified :content-type]))
+                   (mc/update-existing :last-modified jt/instant)))))))))

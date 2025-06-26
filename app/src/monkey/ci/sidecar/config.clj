@@ -1,9 +1,8 @@
 (ns monkey.ci.sidecar.config
   "Functions for handling sidecar configuration"
   (:require [medley.core :as mc]
-            [monkey.ci.spec
-             [blob :as bs]
-             [sidecar :as ss]]))
+            [monkey.ci.spec :as s]
+            [monkey.ci.spec.sidecar :as ss]))
 
 (defn- ns-keys [m]
   (mc/map-keys (comp (partial keyword "monkey.ci.spec.sidecar") name)))
@@ -65,17 +64,17 @@
 (defn set-abort-file [conf f]
   (assoc conf ::ss/abort-file f))
                        
-(def workspace ::bs/workspace)
+(def workspace :conf/workspace)
 
 (defn set-workspace [conf ws]
-  (assoc conf ::bs/workspace ws))
+  (assoc conf :conf/workspace ws))
                        
-(def artifacts ::bs/artifacts)
+(def artifacts :conf/artifacts)
 
 (defn set-artifacts [conf ws]
-  (assoc conf ::bs/artifacts ws))
+  (assoc conf :conf/artifacts ws))
                        
-(def cache ::bs/cache)
+(def cache :conf/cache)
 
 (defn set-cache [conf ws]
-  (assoc conf ::bs/cache ws))
+  (assoc conf :conf/cache ws))

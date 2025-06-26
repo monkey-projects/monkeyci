@@ -53,11 +53,13 @@
 (defn run-build-agent
   "Runs build agent with local config, returns a fn that stops the agent
    server and poll loop when invoked."
-  []
-  (let [d (md/deferred)]
-    (am/run-agent (config/load-config-file "dev-resources/config/build-agent.edn")
-                  (constantly d))
-    (fn [] (md/success! d true))))
+  ([conf]
+   (let [d (md/deferred)]
+     (am/run-agent (config/load-config-file (str "dev-resources/config/" conf))
+                   (constantly d))
+     (fn [] (md/success! d true))))
+  ([]
+   (run-build-agent "build-agent.edn")))
 
 (defn run-container-agent
   "Runs container agent, returns a fn that stops the agent when invoked."

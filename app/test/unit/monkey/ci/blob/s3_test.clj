@@ -57,13 +57,16 @@
 
       (testing "`restore-blob`"
         (let [inv (atom nil)
-              dest (fs/path dir "extracted")]
+              dest (fs/path dir "extracted")
+              exists? (atom true)]
           (with-redefs [s3/get-object (fn [opts bucket path]
                                         (reset! inv {:metadata
                                                      {:opts opts
                                                       :details {:bucket-name bucket
                                                                 :key path}}})
-                                        {:input-stream (io/input-stream arch)})]
+                                        {:input-stream (io/input-stream arch)})
+                        s3/does-object-exist (fn [opts bucket path]
+                                               @exists?)]
             (testing "downloads and extracts"
               (is (some? @(blob/restore store "test/src" (str dest))))
               (is (fs/exists? dest))
@@ -80,12 +83,17 @@
                 (is (= "test-prefix/test/src" (-> @inv
                                                   :metadata
                                                   :details
-                                                  :key))))))))
+                                                  :key)))))
+
+            (testing "`nil` when object does not exist"
+              (is (false? (reset! exists? false)))
+              (is (nil? @(blob/restore store "test/src" (str dest))))))))
 
       (testing "`get-blob-stream` returns blob as input stream"
         (let [dest (fs/path dir "extracted")]
           (with-redefs [s3/get-object (fn [opts bucket path]
-                                        {:input-stream (io/input-stream arch)})]
+                                        {:input-stream (io/input-stream arch)})
+                        s3/does-object-exist (constantly true)]
             (with-open [res @(p/get-blob-stream store "test/src")]
               (is (input-stream? res))
               (is (some? (a/extract res (str dest))))
@@ -113,7 +121,8 @@
                           (reset! inv {:opts opts
                                        :details details
                                        ;; s3 lib uses joda time
-                                       :last-modified (org.joda.time.DateTime.)}))]
+                                       :last-modified (org.joda.time.DateTime.)}))
+                        s3/does-object-exist (constantly true)]
             (let [res @(p/get-blob-info store "test/src")]
               (testing "fetches object metadata"
                 (is (some? @inv)))
