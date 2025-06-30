@@ -30,6 +30,7 @@
                           :deleter st/delete-repo
                           :new-id repo-id})
 
+;; TODO Also return the full webhook url
 (c/make-entity-endpoints "webhook"
                          {:get-id (c/id-getter :webhook-id)
                           :getter (comp #(dissoc % :secret-key)

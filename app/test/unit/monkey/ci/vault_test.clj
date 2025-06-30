@@ -9,12 +9,13 @@
             [monkey.oci.vault :as v]))
 
 (deftest oci-vault
-  (let [config {:compartment-id "test-compartment"
+  (let [config {:type :oci
+                :compartment-id "test-compartment"
                 :vault-id "test-vault"
                 :key-id "test-key"
                 :secret-name "test-secret"}
         iv (sut/generate-iv)
-        vault (sut/make-oci-vault config)]
+        vault (sut/make-vault config)]
     (is (satisfies? p/Vault vault) "is a vault")
     (is (some? iv))
 
@@ -48,7 +49,8 @@
                             (throw (ex-info "Invalid arguments" opts))))
                         v/create-secret
                         (fn [_ opts]
-                          (if (and (= config (select-keys opts (keys config)))
+                          (if (and (= (dissoc config :type)
+                                      (select-keys opts (keys config)))
                                    (= enc-key (get-in opts [:secret-content :content])))
                             {:id "new-secret-id"}
                             (throw (ex-info "Invalid secret details" opts))))]
