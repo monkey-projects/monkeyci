@@ -32,7 +32,7 @@
                              req)))
 
 (defn update-ssh-keys [req]
-  (letfn [(encrypt-and-save [st cust-id ssh-keys]
+  (letfn [(encrypt-and-save [st org-id ssh-keys]
             (->> (encrypt-all req ssh-keys)
-                 (st/save-ssh-keys st cust-id)))]
+                 (st/save-ssh-keys st org-id)))]
     (c/update-for-org encrypt-and-save req)))

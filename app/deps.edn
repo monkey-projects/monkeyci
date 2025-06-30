@@ -1,6 +1,7 @@
 {:deps {org.clojure/clojure {:mvn/version "1.12.0"}
-        aleph/aleph {:mvn/version "0.8.3"} ; For http SSE receiving
-        amazonica/amazonica {:mvn/version "0.3.168"}
+        aleph/aleph {:mvn/version "0.9.0"} ; For http SSE receiving
+        ;; TODO Replace amazonica because it makes jar size explode
+        amazonica/amazonica {:mvn/version "0.3.168"} 
         babashka/process {:mvn/version "0.6.23"}
         buddy/buddy-auth {:mvn/version "3.0.323"}
         buddy/buddy-core {:mvn/version "1.12.0-430"}
@@ -15,11 +16,11 @@
                                         org.bouncycastle/bcprov-jdk18on
                                         org.bouncycastle/bcpkix-jdk18on
                                         org.bouncycastle/bcutil-jdk18on]}
-        clj-kondo/clj-kondo {:mvn/version "2025.04.07"}
+        clj-kondo/clj-kondo {:mvn/version "2025.06.05"}
         clojure.java-time/clojure.java-time {:mvn/version "1.4.3"}
-        com.github.loki4j/loki-logback-appender {:mvn/version "1.6.0"}
-        com.github.seancorfield/honeysql {:mvn/version "2.7.1295"}
-        com.github.seancorfield/next.jdbc {:mvn/version "1.3.1002"}
+        com.github.loki4j/loki-logback-appender {:mvn/version "2.0.0"}
+        com.github.seancorfield/honeysql {:mvn/version "2.7.1310"}
+        com.github.seancorfield/next.jdbc {:mvn/version "1.3.1048"}
         com.monkeyprojects/aero-ext {:mvn/version "0.3.1"}
         com.monkeyprojects/clj-scw-client {:mvn/version "0.1.1-SNAPSHOT"}
         com.monkeyprojects/clompress {:mvn/version "0.1.3"}
@@ -39,19 +40,20 @@
         com.zaxxer/HikariCP {:mvn/version "6.3.0"}
         dev.weavejester/ragtime {:mvn/version "0.11.0"}
         com.stuartsierra/component {:mvn/version "1.1.0"}
-        com.taoensso/telemere {:mvn/version "1.0.0"}
+        com.taoensso/telemere {:mvn/version "1.0.1"}
         commons-io/commons-io {:mvn/version "2.19.0"}
-        io.prometheus/prometheus-metrics-core {:mvn/version "1.3.6"}
-        io.prometheus/prometheus-metrics-exporter-pushgateway {:mvn/version "1.3.6"}
-        io.prometheus/prometheus-metrics-instrumentation-jvm {:mvn/version "1.3.6"}
-        io.prometheus/prometheus-metrics-tracer-initializer {:mvn/version "1.3.6"}
+        io.prometheus/prometheus-metrics-core {:mvn/version "1.3.8"}
+        io.prometheus/prometheus-metrics-exporter-pushgateway {:mvn/version "1.3.8"}
+        io.prometheus/prometheus-metrics-instrumentation-jvm {:mvn/version "1.3.8"}
+        io.prometheus/prometheus-metrics-tracer-initializer {:mvn/version "1.3.8"}
         lambdaisland/kaocha {:mvn/version "1.91.1392"} ; Used for running build tests
         medley/medley {:mvn/version "1.4.0"}
-        metosin/reitit-middleware {:mvn/version "0.8.0"}
-        metosin/reitit-ring {:mvn/version "0.8.0"}
-        metosin/reitit-schema {:mvn/version "0.8.0"}
-        metosin/reitit-swagger {:mvn/version "0.8.0"}
-        nubank/k8s-api {:mvn/version "1.0.0"}
+        metosin/reitit-middleware {:mvn/version "0.9.1"}
+        metosin/reitit-ring {:mvn/version "0.9.1"}
+        metosin/reitit-schema {:mvn/version "0.9.1"}
+        metosin/reitit-swagger {:mvn/version "0.9.1"}
+        ;; Disabled until martian update is merged in
+        ;; nubank/k8s-api {:mvn/version "1.0.0"}
         org.apache.activemq/artemis-server {:mvn/version "2.41.0"}
         org.apache.activemq/artemis-amqp-protocol {:mvn/version "2.41.0"}
         org.clojure/core.async {:mvn/version "1.8.741"}

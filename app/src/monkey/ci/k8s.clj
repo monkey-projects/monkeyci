@@ -1,7 +1,7 @@
 (ns monkey.ci.k8s
   "Kubernetes functionality, used by build and container runners."
   (:require [clojure.math :as m]
-            [kubernetes-api.core :as k8s]))
+            #_[kubernetes-api.core :as k8s]))
 
 (def mem-regex #"^(\d+)(G|M|K|Gi|Mi|Ki)$")
 
@@ -18,10 +18,10 @@
                "Ki" #(/ % (m/pow 2 20))}]
       (int ((get dpu u) (Integer/parseInt n))))))
 
-(defn make-client [url token]
+#_(defn make-client [url token]
   (k8s/client url {:token token :insecure? true}))
 
-(defn list-nodes
+#_(defn list-nodes
   "Lists all kubernetes nodes."
   [cl]
   (->> (k8s/invoke cl {:kind :Node
