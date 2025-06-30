@@ -21,7 +21,10 @@
    from base64 before passing it to `common/encrypt`."
   [{:keys [ctx] :as client}]
   (md/chain
-   (mc/response-for ctx :generate-data-key (select-keys client [:region :key-id]))
+   (mc/response-for ctx :generate-data-key
+                    (-> client
+                        (select-keys [:region :key-id])
+                        (assoc :without-plaintext false)))
    fail-on-error
    :body
    (fn [{:keys [ciphertext plaintext]}]

@@ -11,7 +11,7 @@
     (testing "generates encryption key using api"
       (with-redefs [mc/response-for (fn [ctx id opts]
                                       (when (and (= :generate-data-key id)
-                                                 (= config opts))
+                                                 (= config (select-keys opts (keys config))))
                                         (future {:status 200
                                                  :body
                                                  {:key-id id

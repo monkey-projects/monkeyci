@@ -8,7 +8,8 @@
 
 (def iv-size 16)
 
-;; Fixed key vault, that uses a preconfigured key.  Useful for testing or developing.
+;; Fixed key vault, that uses a preconfigured key.  Useful for testing or developing,
+;; or when using a temporary data encryption key (DEK).
 (defrecord FixedKeyVault [encryption-key]
   p/Vault
   (encrypt [_ iv txt]

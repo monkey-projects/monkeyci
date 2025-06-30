@@ -67,8 +67,11 @@
   (-> (s/keys :req-un [:build/repo-id :github/secret])
       (s/merge :db/common)))
 
+;; Data encryption key
+(s/def :db/dek string?)
+
 (s/def :db/ssh-key
-  (s/keys :req-un [:db/org-id :ssh/private-key :ssh/public-key :db/description]))
+  (s/keys :req-un [:db/org-id :ssh/private-key :ssh/public-key :db/description :db/dek]))
 
 (s/def :label/label string?)
 (s/def :label/value string?)
@@ -80,7 +83,7 @@
 (s/def :db/label-filters (s/coll-of :db/label-filter-conjunction))
 
 (s/def :db/org-param
-  (s/keys :req-un [:db/org-id]
+  (s/keys :req-un [:db/org-id :db/dek]
           :opt-un [:db/label-filters :db/description]))
 
 (s/def :db/params-id id?)
@@ -153,8 +156,11 @@
                        (comp (partial = 16) count))
                 #(sg/fixed-byte-array 16)))
 
+;; Master data encryption key, one per org
+(s/def :db/master-dek string?)
+
 (s/def :db/crypto
-  (s/keys :req-un [:db/org-id :db/iv]))
+  (s/keys :req-un [:db/org-id :db/iv :db/master-dek]))
 
 (s/def :db/password string?)
 
