@@ -291,7 +291,7 @@
 (defn- param->db [param org-id]
   (-> param
       (id->cuid)
-      (select-keys [:cuid :description :label-filters])
+      (select-keys [:cuid :description :label-filters :dek])
       (assoc :org-id org-id)))
 
 (defn- insert-param [conn param org-id]

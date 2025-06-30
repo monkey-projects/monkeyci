@@ -19,7 +19,7 @@
                        (select-keys pv [:name :value]))
         ->params (fn [pvs]
                    (map (fn [p]
-                          (-> (select-keys p [:description :label-filters])
+                          (-> (select-keys p [:description :label-filters :dek])
                               (assoc :id (:cuid p)
                                      :org-id (:org-cuid p)
                                      :parameters (map ->param-vals (get pvs (:id p))))

@@ -9,6 +9,7 @@
                             :k.public-key
                             :k.description
                             :k.label-filters
+                            :k.dek
                             [:c.cuid :org-id]]
                    :from [[:ssh-keys :k]
                           [:orgs :c]]
