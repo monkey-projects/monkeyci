@@ -24,3 +24,24 @@
     (testing "throws on error"
       (with-redefs [mc/response-for (constantly {:status 400})]
         (is (thrown? Exception @(sut/generate-dek client)))))))
+
+(deftest decrypt-dek
+  (let [config {:region "fr-par"
+                :key-id "test-key-id"}
+        client (sut/make-client config)]
+    (testing "invokes decryption endpoint"
+      (with-redefs [mc/response-for (fn [ctx id opts]
+                                      (when (and (= :decrypt id)
+                                                 (= config (select-keys opts (keys config)))
+                                                 (= "encrypted-key" (:ciphertext opts)))
+                                        (future {:status 200
+                                                 :body
+                                                 {:key-id id
+                                                  :ciphertext "encrypted-key"
+                                                  :plaintext "plain-key"}})))]
+        (is (= "plain-key"
+               @(sut/decrypt-dek client "encrypted-key")))))
+
+    (testing "throws on error"
+      (with-redefs [mc/response-for (constantly {:status 400})]
+        (is (thrown? Exception @(sut/decrypt-dek client "test-key")))))))
