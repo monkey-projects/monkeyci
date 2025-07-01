@@ -1,13 +1,16 @@
 (ns monkey.ci.blob.s3-test
   (:require [clojure.test :refer [deftest testing is]]
-            [amazonica.aws.s3 :as s3]
             [babashka.fs :as fs]
             [clj-commons.byte-streams :as bs]
             [clojure.java.io :as io]
+            [java-time.api :as jt]
+            [manifold.deferred :as md]
             [monkey.ci
              [blob :as blob]
              [protocols :as p]]
-            [monkey.ci.blob.s3 :as sut]
+            [monkey.ci.blob
+             [minio :as minio]
+             [s3 :as sut]]
             [monkey.ci.build.archive :as a]
             [monkey.ci.test.helpers :as h]))
 
@@ -15,9 +18,12 @@
 
 (deftest s3-blob-store
   (h/with-tmp-dir dir
-    (let [store (blob/make-blob-store {:store
-                                       {:type :s3
-                                        :bucket-name "test-bucket"}}
+    (let [conf {:type :s3
+                :endpoint "http://test"
+                :access-key "testkey"
+                :secret-key "testsecret"
+                :bucket-name "test-bucket"}
+          store (blob/make-blob-store {:store conf}
                                       :store)
           src (str (fs/create-dirs (fs/path dir "src")))
           archive-dir (str (fs/create-dirs (fs/path dir "archives")))
@@ -30,43 +36,37 @@
 
       (testing "`save-blob`"
         (let [inv (atom nil)]
-          (with-redefs [s3/put-object (fn [opts details]
-                                        (reset! inv {:metadata
-                                                     {:opts opts
-                                                      :details details}}))]
+          (with-redefs [minio/put-object (fn [client bucket path opts]
+                                           (reset! inv {:opts opts
+                                                        :bucket bucket
+                                                        :path path}))]
             (testing "puts archive in bucket"
               (is (some? @(blob/save store src "test/dest")))
               (is (some? @inv))
-              (let [details (-> @inv :metadata :details)]
-                (is (= "test-bucket" (:bucket-name details)))
-                (is (= "test/dest" (:key details)))
+              (let [details (-> @inv :opts)]
+                (is (= "test-bucket" (:bucket @inv)))
+                (is (= "test/dest" (:path @inv)))
                 (is (string? (:file details)))))
 
             (testing "prepends prefix to key"
               (let [store (blob/make-blob-store {:store
-                                                 {:type :s3
-                                                  :bucket-name "test-bucket"
-                                                  :prefix "test-prefix/"}}
+                                                 (assoc conf :prefix "test-prefix/")}
                                                 :store)]
                 (is (some? @(blob/save store src "test/dest")))
                 (is (some? @inv))
-                (let [details (-> @inv :metadata :details)]
-                  (is (= "test-bucket" (:bucket-name details)))
-                  (is (= "test-prefix/test/dest" (:key details)))
-                  (is (string? (:file details)))))))))
+                (is (= "test-prefix/test/dest" (:path @inv))))))))
 
       (testing "`restore-blob`"
         (let [inv (atom nil)
               dest (fs/path dir "extracted")
               exists? (atom true)]
-          (with-redefs [s3/get-object (fn [opts bucket path]
-                                        (reset! inv {:metadata
-                                                     {:opts opts
-                                                      :details {:bucket-name bucket
-                                                                :key path}}})
-                                        {:input-stream (io/input-stream arch)})
-                        s3/does-object-exist (fn [opts bucket path]
-                                               @exists?)]
+          (with-redefs [minio/get-object (fn [client bucket path]
+                                           (reset! inv {:client client
+                                                        :details {:bucket-name bucket
+                                                                  :key path}})
+                                           (md/success-deferred (io/input-stream arch)))
+                        minio/object-exists? (fn [client bucket path]
+                                               (md/success-deferred @exists?))]
             (testing "downloads and extracts"
               (is (some? @(blob/restore store "test/src" (str dest))))
               (is (fs/exists? dest))
@@ -75,13 +75,10 @@
 
             (testing "prepends prefix"
               (let [store (blob/make-blob-store {:store
-                                                 {:type :s3
-                                                  :bucket-name "test-bucket"
-                                                  :prefix "test-prefix/"}}
+                                                 (assoc conf :prefix "test-prefix/")}
                                                 :store)]
                 (is (some? @(blob/restore store "test/src" (str dest))))
                 (is (= "test-prefix/test/src" (-> @inv
-                                                  :metadata
                                                   :details
                                                   :key)))))
 
@@ -91,9 +88,9 @@
 
       (testing "`get-blob-stream` returns blob as input stream"
         (let [dest (fs/path dir "extracted")]
-          (with-redefs [s3/get-object (fn [opts bucket path]
-                                        {:input-stream (io/input-stream arch)})
-                        s3/does-object-exist (constantly true)]
+          (with-redefs [minio/get-object (fn [opts bucket path]
+                                           (md/success-deferred (io/input-stream arch)))
+                        minio/object-exists? (constantly (md/success-deferred true))]
             (with-open [res @(p/get-blob-stream store "test/src")]
               (is (input-stream? res))
               (is (some? (a/extract res (str dest))))
@@ -101,38 +98,32 @@
 
       (testing "`put-blob-stream` directly uploads the stream to bucket"
         (let [inv (atom nil)]
-          (with-redefs [s3/put-object (fn [opts details]
-                                        (reset! inv {:metadata
-                                                     {:opts opts
-                                                      :details details}}))]
+          (with-redefs [minio/put-object (fn [client bucket path opts]
+                                           (reset! inv {:opts opts
+                                                        :bucket bucket
+                                                        :path path}))]
             (testing "puts archive in bucket"
               (let [stream (java.io.ByteArrayInputStream. (.getBytes "test stream"))]
                 (is (some? @(p/put-blob-stream store stream "test/dest")))
                 (is (some? @inv))
-                (let [details (-> @inv :metadata :details)]
-                  (is (= "test-bucket" (:bucket-name details)))
-                  (is (= "test/dest" (:key details)))
-                  (is (= stream (:input-stream details)))))))))
+                (is (= "test-bucket" (:bucket @inv)))
+                (is (= "test/dest" (:path @inv)))
+                (is (= stream (-> @inv :opts :stream))))))))
 
       (testing "`get-blob-info`"
         (let [inv (atom nil)]
-          (with-redefs [s3/get-object-metadata
-                        (fn [opts details]
-                          (reset! inv {:opts opts
-                                       :details details
-                                       ;; s3 lib uses joda time
-                                       :last-modified (org.joda.time.DateTime.)}))
-                        s3/does-object-exist (constantly true)]
+          (with-redefs [minio/get-object-details
+                        (fn [_ bucket path]
+                          (reset! inv {:bucket bucket
+                                       :path path
+                                       :last-modified (jt/zoned-date-time)}))
+                        minio/object-exists? (constantly (md/success-deferred true))]
             (let [res @(p/get-blob-info store "test/src")]
               (testing "fetches object metadata"
                 (is (some? @inv)))
 
-              (testing "returns original result in response"
-                (is (= {:bucket-name "test-bucket"
-                        :key "test/src"}
-                       (-> res
-                           :result
-                           :details))))
+              (testing "returns object details"
+                (is (= "test/src" (:src res))))
 
               (testing "converts last-modified to java instant"
                 (is (instance? java.time.Instant (:last-modified res)))))))))))
