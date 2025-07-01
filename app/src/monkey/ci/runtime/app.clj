@@ -22,6 +22,7 @@
             [monkey.ci.runners.oci :as ro]
             [monkey.ci.runtime.common :as rc]
             [monkey.ci.storage.sql]
+            [monkey.ci.vault.scw :as v-scw]
             [monkey.ci.web
              [handler :as wh]
              [http :as http]]
@@ -86,6 +87,24 @@
 
 (defn- new-vault [config]
   (v/make-vault (:vault config)))
+
+(defmulti dek-generator
+  "Creates a 0-arity function that generates new data encryption keys.  Returns both the
+   encrypted (for storage) and unencrypted key."
+  :type)
+
+(defmethod dek-generator :default [_]
+  (constantly nil))
+
+(defmethod dek-generator :scw [conf]
+  (let [client (v-scw/make-client conf)]
+    #(v-scw/generate-dek client)))
+
+(defn- new-dek-generator
+  "Creates a new data encryption key generator function, which is used to
+   create new keys as needed."
+  [config]
+  (dek-generator (:dek config)))
 
 (defrecord ServerRuntime [config]
   co/Lifecycle
@@ -182,7 +201,8 @@
                    (assoc :options :queue-options)))
    :runtime   (co/using
                (new-server-runtime config)
-               [:artifacts :metrics :storage :jwk :process-reaper :vault :mailman :update-bus])
+               [:artifacts :metrics :storage :jwk :process-reaper :vault :mailman :update-bus
+                :dek-generator])
    :storage   (co/using
                (new-storage config)
                [:vault])
@@ -193,6 +213,7 @@
                     [:metrics :mailman])
    :process-reaper (new-process-reaper config)
    :vault     (new-vault config)
+   :dek-generator (new-dek-generator config)
    :mailman   (new-mailman config)
    :queue-options (new-queue-options config)
    :mailman-routes (co/using

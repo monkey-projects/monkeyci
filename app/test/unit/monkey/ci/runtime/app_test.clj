@@ -47,7 +47,10 @@
             (is (ifn? (:process-reaper rt))))
 
           (testing "provides vault"
-            (is (p/vault? (:vault rt))))))
+            (is (p/vault? (:vault rt))))
+
+          (testing "provides data encryption key generator"
+            (is (fn? (:dek-generator rt))))))
 
       (testing "provides metrics routes"
         (is (some? (:metrics-routes sys))))
@@ -113,3 +116,10 @@
                    :db {:stream "test-stream"
                         :consumer "test-consumer"}}}
                  (sut/new-queue-options)))))))
+
+(deftest dek-generator
+  (testing "constantly nil by default"
+    (is (nil? ((sut/dek-generator {})))))
+
+  (testing "provides function for scaleway"
+    (is (fn? (sut/dek-generator {:type :scw})))))

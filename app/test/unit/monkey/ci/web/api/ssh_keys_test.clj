@@ -49,7 +49,7 @@
                              :body
                              first))))))
 
-(deftest update-ssh-key
+(deftest update-ssh-keys
   (testing "encrypts private keys using vault"
     (let [{st :storage :as rt} (-> (trt/test-runtime)
                                    (trt/set-vault (h/fake-vault (constantly "encrypted")

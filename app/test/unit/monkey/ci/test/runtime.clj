@@ -44,6 +44,9 @@
 (defn set-vault [rt v]
   (assoc rt :vault v))
 
+(defn set-dek-generator [rt f]
+  (assoc rt :dek-generator f))
+
 (defn test-runtime []
   (-> empty-runtime
       (set-artifacts (h/fake-blob-store))
@@ -55,4 +58,5 @@
       (set-jwk (auth/keypair->rt (auth/generate-keypair)))
       (set-runner (constantly (md/success-deferred 0)))
       (set-process-reaper (constantly []))
-      (set-vault (h/fake-vault))))
+      (set-vault (h/fake-vault))
+      (set-dek-generator (constantly nil))))
