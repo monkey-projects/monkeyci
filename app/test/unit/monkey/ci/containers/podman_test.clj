@@ -77,13 +77,13 @@
                       (sut/build-cmd-args))]
             (is (contains-subseq? r ["-v" "/host/path:/container/path"])))))
 
-      (testing "adds env vars"
+      (testing "adds env vars without values"
         (let [r (-> base-conf
                     (assoc-in [:job :container/env] {"VAR1" "value1"
                                                      "VAR2" "value2"})
                     (sut/build-cmd-args))]
-          (is (contains-subseq? r ["-e" "VAR1=value1"]))
-          (is (contains-subseq? r ["-e" "VAR2=value2"]))))
+          (is (contains-subseq? r ["-e" "VAR1"]))
+          (is (contains-subseq? r ["-e" "VAR2"]))))
 
       (testing "passes entrypoint as json if specified"
         (let [r (-> base-conf
@@ -393,13 +393,23 @@
 (deftest prepare-child-cmd
   (testing "executes podman"
     (is (= "/usr/bin/podman"
-           (-> {:job {:id "test-job"
-                      :image "test-image"}
-                :job-id "test-job"
-                :sid ["test" "build"]}
+           (-> {:event
+                {:job {:id "test-job"
+                       :image "test-image"}
+                 :job-id "test-job"
+                 :sid ["test" "build"]}}
                (sut/prepare-child-cmd)
                :cmd
-               first)))))
+               first))))
+
+  (testing "passes job env"
+    (is (= {"test-key" "test-val"}
+           (-> {:event
+                {:job {:id "env-job"
+                       :image "debian"
+                       :container/env {"test-key" "test-val"}}}}
+               (sut/prepare-child-cmd)
+               :env)))))
 
 (deftest count-jobs
   (testing "zero when state is empty"

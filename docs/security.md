@@ -47,8 +47,12 @@ information.  The job controller in turn is also aware of the build DEK and
 can also contact the API to decrypt it.  It will then use the DEK to decrypt
 environment variables before passing them to the container itself.
 
-When using ssh keys to check out a private repository, the key is decrypted
-using the same DEK before invoking the `git clone` command.
+When using ssh keys to check out a private repository, the ssh keys are fetched
+directly from the database using the API, which is using TLS so it's already
+secure.  Similarly, the build script retrieves the parameters using an API
+call.  But when a container job is started, the environment variables are
+included in the event, so they should be re-encrypted at this point, only
+to be decrypted when they are passed to the container.
 
 ### Data at Rest
 
