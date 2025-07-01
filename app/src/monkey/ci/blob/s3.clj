@@ -1,12 +1,13 @@
 (ns monkey.ci.blob.s3
   "Implementation of blob store that uses an Amazon S3-compatible bucket as backend"
-  (:require [amazonica.aws.s3 :as s3]
-            [babashka.fs :as fs]
+  (:require [babashka.fs :as fs]
             [clojure.tools.logging :as log]
             [java-time.api :as jt]
             [manifold.deferred :as md]
             [medley.core :as mc]
-            [monkey.ci.blob.common :as c]
+            [monkey.ci.blob
+             [common :as c]
+             [minio :as minio]]
             [monkey.ci.build.archive :as a]
             [monkey.ci
              [protocols :as p]
@@ -21,12 +22,15 @@
 
 (defn- object-exists?
   "Asynchronously checks if object exists"
-  [conf path]
-  (md/future (s3/does-object-exist (conf->client conf) (:bucket-name conf) path)))
+  [client conf path]
+  (minio/object-exists? client (:bucket-name conf) path))
+
+(defn make-client [{:keys [endpoint access-key secret-key]}]
+  (minio/make-client endpoint access-key secret-key))
 
 ;; Configuration contains all settings needed to connect to the bucket endpoint,
 ;; including bucket-name.
-(defrecord S3BlobStore [conf]
+(defrecord S3BlobStore [client conf]
   p/BlobStore
   (save-blob [this src dest md]
     ;; We could also drop the intermediate file and use piped streams instead, which
@@ -34,62 +38,55 @@
     ;; an additional thread.
     (let [tmp (c/tmp-archive conf)
           r (c/make-archive src tmp)
-          details (-> {:bucket-name (:bucket-name conf)
-                       :key (with-prefix dest conf)
-                       :file (u/abs-path tmp)}
+          bucket (:bucket-name conf)
+          details (-> {:file (u/abs-path tmp)}
                       (mc/assoc-some :metadata md))]
-      (log/debug "Uploading to bucket:" details)
-      (-> (md/future (s3/put-object (conf->client conf) details))
+      (log/debug "Uploading to bucket" bucket ":" details)
+      (-> (minio/put-object client bucket (with-prefix dest conf) details)
           (md/chain (constantly r))
           (md/finally #(fs/delete tmp)))))
   
   (restore-blob [this src dest]
     (let [src (with-prefix src conf)]
       (log/debug "Restoring blob from bucket" (:bucket-name conf) ", path" src "to" dest)
-      (-> (object-exists? conf src)
-          (md/chain
-           (fn [exists?]
-             (when exists?
-               (let [res (s3/get-object (conf->client conf) (:bucket-name conf) src)]
-                 (-> res
-                     (md/chain #(a/extract (:input-stream %) dest))
-                     (md/finally #(.close (:input-stream res)))))))))))
+      (md/chain
+       (object-exists? client conf src)
+       (fn [exists?]
+         (when exists?
+           (let [res (minio/get-object client (:bucket-name conf) src)]
+             (-> res
+                 (md/chain #(a/extract % dest))
+                 (md/finally #(.close @res)))))))))
   
   (get-blob-stream [this src]
     (let [src (with-prefix src conf)]
       (log/debug "Downloading stream from bucket" (:bucket-name conf) "at" src)
-      (-> (object-exists? conf src)
-          (md/chain
-           (fn [exists?]
-             (when exists?
-               (s3/get-object (conf->client conf) (:bucket-name conf) src)))
-           :input-stream))))
+      (md/chain
+       (object-exists? client conf src)
+       (fn [exists?]
+         (when exists?
+           (minio/get-object client (:bucket-name conf) src))))))
   
   (put-blob-stream [this src dest]
     (let [dest (with-prefix dest conf)
-          details {:bucket-name (:bucket-name conf)
-                   :key dest
-                   :input-stream src}]
-      (log/debug "Uploading stream to bucket:" details)
-      (-> (s3/put-object (conf->client conf) details)
-          (md/future)
-          (md/chain (fn [_]
-                      {:src src
-                       :dest dest})))))
+          details {:stream src}]
+      (log/debug "Uploading stream to bucket:" dest)
+      (md/chain
+       (minio/put-object client (:bucket-name conf) dest details)
+       (fn [_]
+         {:src src
+          :dest dest}))))
   
   (get-blob-info [this src]
     (let [src (with-prefix src conf)]
-      (-> (object-exists? conf src)
-          (md/chain
-           (fn [exists?]
-             (when exists?
-               (s3/get-object-metadata (conf->client conf)
-                                       {:bucket-name (:bucket-name conf) :key src})))
-           (fn [res]
-             (when res
-               (-> {:src src
-                    :size (:content-length res)
-                    :metadata (:user-metadata res)
-                    :result res}
-                   (merge (select-keys res [:last-modified :content-type]))
-                   (mc/update-existing :last-modified jt/instant)))))))))
+      (md/chain
+       (object-exists? client conf src)
+       (fn [exists?]
+         (when exists?
+           (minio/get-object-details client (:bucket-name conf) src)))
+       (fn [res]
+         (when res
+           (-> (select-keys res [:size :metadata :last-modified :content-type])
+               (assoc :src src
+                      :result res)
+               (mc/update-existing :last-modified jt/instant))))))))
