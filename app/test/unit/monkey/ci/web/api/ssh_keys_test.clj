@@ -9,8 +9,7 @@
 (deftest get-org-ssh-keys
   (testing "decrypts private key using vault"
     (let [{st :storage :as rt} (-> (trt/test-runtime)
-                                   (trt/set-vault (h/fake-vault (constantly "encrypted")
-                                                                (constantly "decrypted"))))
+                                   (trt/set-decrypter (constantly "decrypted")))
           org (h/gen-org)
           org-id (:id org)
           _ (st/save-org st org)
@@ -29,8 +28,7 @@
 (deftest get-repo-ssh-keys
   (testing "decrypts private key using vault"
     (let [{st :storage :as rt} (-> (trt/test-runtime)
-                                   (trt/set-vault (h/fake-vault (constantly "encrypted")
-                                                                (constantly "decrypted"))))
+                                   (trt/set-decrypter (constantly "decrypted")))
           repo (h/gen-repo)
           org (-> (h/gen-org)
                   (assoc :repos {(:id repo) repo}))
@@ -52,8 +50,8 @@
 (deftest update-ssh-keys
   (testing "encrypts private keys using vault"
     (let [{st :storage :as rt} (-> (trt/test-runtime)
-                                   (trt/set-vault (h/fake-vault (constantly "encrypted")
-                                                                (constantly "decrypted"))))
+                                   (trt/set-encrypter (fn [_ cuid]
+                                                        (str "encrypted with " cuid))))
           org (h/gen-org)
           org-id (:id org)
           _ (st/save-org st org)
@@ -69,6 +67,7 @@
                   (sut/update-ssh-keys))
           key-id (-> res :body first :id)]
       (is (= 200 (:status res)))
-      (is (= "encrypted" (-> (st/find-ssh-keys st org-id)
-                             first
-                             :private-key))))))
+      (is (= (str "encrypted with " key-id)
+             (-> (st/find-ssh-keys st org-id)
+                 first
+                 :private-key))))))

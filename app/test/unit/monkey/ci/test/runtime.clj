@@ -47,6 +47,12 @@
 (defn set-dek-generator [rt f]
   (assoc rt :dek-generator f))
 
+(defn set-decrypter [rt f]
+  (assoc rt :decrypter f))
+
+(defn set-encrypter [rt f]
+  (assoc rt :encrypter f))
+
 (defn test-runtime []
   (-> empty-runtime
       (set-artifacts (h/fake-blob-store))
@@ -59,4 +65,6 @@
       (set-runner (constantly (md/success-deferred 0)))
       (set-process-reaper (constantly []))
       (set-vault (h/fake-vault))
-      (set-dek-generator (constantly nil))))
+      (set-dek-generator (constantly nil))
+      (set-decrypter (constantly nil))
+      (set-encrypter (constantly nil))))

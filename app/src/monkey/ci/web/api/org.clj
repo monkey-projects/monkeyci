@@ -8,7 +8,9 @@
              [cuid :as cuid]
              [storage :as st]
              [time :as t]]
-            [monkey.ci.web.common :as c]
+            [monkey.ci.web
+             [common :as c]
+             [crypto :as crypto]]
             [ring.util.response :as rur]))
 
 (def query-params (comp :query :parameters))
@@ -56,6 +58,13 @@
                               :amount (:amount cs)
                               :from-time ts}))))
 
+(defn- create-crypto [req org-id]
+  (let [st (c/req->storage req)
+        dek (crypto/generate-dek req)]
+    ;; Store the encrypted key
+    (st/save-crypto st {:org-id org-id
+                        :dek (:enc dek)})))
+
 (defn create-org [req]
   ;; Remove the transaction when it's configured on all endpoints
   (st/with-transaction (c/req->storage req) st
@@ -67,6 +76,7 @@
         (let [org-id (get-in reply [:body :id])]
           (maybe-link-user req st org-id)
           (create-subscription st org-id)
+          (create-crypto req org-id)
           reply)))))
 
 (defn search-orgs [req]

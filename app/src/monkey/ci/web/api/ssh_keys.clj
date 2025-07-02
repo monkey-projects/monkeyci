@@ -5,7 +5,7 @@
              [crypto :as cr]]))
 
 (defn- update-pk [f ssh-key]
-  (update ssh-key :private-key f))
+  (update ssh-key :private-key f (:id ssh-key)))
 
 (defn- encrypt [encrypter ssh-key]
   (update-pk encrypter ssh-key))

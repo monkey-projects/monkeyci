@@ -8,18 +8,19 @@
             [monkey.ci.test
              [helpers :as h]
              [runtime :as trt]]
+            [monkey.ci.web.crypto :as wc]
             [monkey.ci.web.api.org :as sut]))
 
 (deftest get-org
   (testing "returns org in body"
-    (let [cust {:id "test-org"
+    (let [org {:id "test-org"
                 :name "Test org"}
           {st :storage :as rt} (trt/test-runtime)
           req (-> rt
                   (h/->req)
-                  (h/with-path-param :org-id (:id cust)))]
-      (is (sid/sid? (st/save-org st cust)))
-      (is (= cust (:body (sut/get-org req))))))
+                  (h/with-path-param :org-id (:id org)))]
+      (is (sid/sid? (st/save-org st org)))
+      (is (= org (:body (sut/get-org req))))))
 
   (testing "404 not found when no match"
     (is (= 404 (-> (trt/test-runtime)
@@ -29,17 +30,17 @@
                    :status))))
 
   (testing "converts repo map into list"
-    (let [cust {:id (st/new-id)
+    (let [org {:id (st/new-id)
                 :name "Org with projects"}
           repo {:id "test-repo"
                 :name "Test repository"
-                :org-id (:id cust)}
+                :org-id (:id org)}
           {st :storage :as rt} (trt/test-runtime)]
-      (is (sid/sid? (st/save-org st cust)))
+      (is (sid/sid? (st/save-org st org)))
       (is (sid/sid? (st/save-repo st repo)))
       (let [r (-> rt
                   (h/->req)
-                  (h/with-path-param :org-id (:id cust))
+                  (h/with-path-param :org-id (:id org))
                   (sut/get-org)
                   :body)
             repos (-> r :repos)]
@@ -62,6 +63,8 @@
                  (dissoc :orgs))
         {st :storage :as rt} (trt/test-runtime)
         r (-> rt
+              (trt/set-dek-generator (constantly {:enc "encrypted-key"
+                                                  :key "plain-key"}))
               (h/->req)
               (h/with-body {:name "another org"})
               (h/with-identity user)
@@ -74,49 +77,55 @@
                            :orgs)))
       (is (= [r] (st/list-user-orgs st (:id user)))))
 
-    (let [cust-id (:id r)]
+    (let [org-id (:id r)]
       (testing "creates subscription"
-        (is (= 1 (-> (st/list-org-credit-subscriptions st cust-id)
+        (is (= 1 (-> (st/list-org-credit-subscriptions st org-id)
                      (count)))))
 
       (testing "issues credits"
-        (let [cc (st/list-org-credits st cust-id)]
+        (let [cc (st/list-org-credits st org-id)]
           (is (= 1 (count cc)))
           (is (some? (->> cc
                           first
                           :subscription-id
-                          (vector cust-id)
-                          (st/find-credit-subscription st)))))))))
+                          (vector org-id)
+                          (st/find-credit-subscription st))))))
+
+      (testing "generates data encryption key"
+        (let [c (st/find-crypto st org-id)]
+          (is (some? c))
+          (is (= "encrypted-key" (:dek c))
+              "stores encrypted key"))))))
 
 (deftest update-org
   (testing "returns org in body"
-    (let [cust {:id "test-org"
+    (let [org {:id "test-org"
                 :name "Test org"}
           {st :storage :as rt} (trt/test-runtime)
           req (-> rt
                   (h/->req)
-                  (h/with-path-param :org-id (:id cust))
+                  (h/with-path-param :org-id (:id org))
                   (h/with-body {:name "updated"}))]
-      (is (sid/sid? (st/save-org st cust)))
-      (is (= {:id (:id cust)
+      (is (sid/sid? (st/save-org st org)))
+      (is (= {:id (:id org)
               :name "updated"}
              (:body (sut/update-org req))))))
 
   (testing "can update with repos"
-    (let [cust {:id "other-cust"
+    (let [org {:id "other-org"
                 :name "Other org"
                 :repos {"test-repo" {:id "test-repo"}}}
           {st :storage :as rt} (trt/test-runtime)
           req (-> rt
                   (h/->req)
-                  (h/with-path-param :org-id (:id cust))
+                  (h/with-path-param :org-id (:id org))
                   (h/with-body {:name "updated"}))]
-      (is (sid/sid? (st/save-org st cust)))
+      (is (sid/sid? (st/save-org st org)))
       (is (= "updated" (-> req
                            (sut/update-org)
                            :body
                            :name)))
-      (is (= ["test-repo"] (-> (st/find-org st (:id cust))
+      (is (= ["test-repo"] (-> (st/find-org st (:id org))
                                :repos
                                (keys))))))
 
@@ -129,19 +138,19 @@
 
 (deftest search-orgs
   (let [{st :storage :as rt} (trt/test-runtime)
-        cust {:id (st/new-id)
+        org {:id (st/new-id)
               :name "Test org"}
-        sid (st/save-org st cust)]
+        sid (st/save-org st org)]
     (testing "retrieves org by id"
-      (is (= [cust]
+      (is (= [org]
              (-> rt
                  (h/->req)
-                 (h/with-query-param :id (:id cust))
+                 (h/with-query-param :id (:id org))
                  (sut/search-orgs)
                  :body))))
     
     (testing "searches orgs by name"
-      (is (= [cust]
+      (is (= [org]
              (-> rt
                  (h/->req)
                  (h/with-query-param :name "Test")
@@ -168,10 +177,10 @@
 
     (testing "retrieves builds"
       (let [repo (h/gen-repo)
-            cust (-> (h/gen-org)
+            org (-> (h/gen-org)
                      (assoc :repos {(:id repo) repo}))
             now (jt/instant)
-            old-build {:org-id (:id cust)
+            old-build {:org-id (:id org)
                        :repo-id (:id repo)
                        :build-id "build-1"
                        :idx 1
@@ -179,7 +188,7 @@
                                        (jt/minus (jt/days 2))
                                        (jt/to-millis-from-epoch))
                        :script {:jobs nil}}
-            new-build {:org-id (:id cust)
+            new-build {:org-id (:id org)
                        :repo-id (:id repo)
                        :build-id "build-2"
                        :idx 2
@@ -187,7 +196,7 @@
                                        (jt/minus (jt/hours 2))
                                        (jt/to-millis-from-epoch))
                        :script {:jobs nil}}]
-        (is (some? (st/save-org st cust)))
+        (is (some? (st/save-org st org)))
         (is (some? (st/save-build st old-build)))
         (is (some? (st/save-build st new-build)))
         
@@ -197,7 +206,7 @@
                      (h/->req)
                      (assoc :parameters
                             {:path
-                             {:org-id (:id cust)}})
+                             {:org-id (:id org)}})
                      (sut/recent-builds)
                      :body))))
 
@@ -208,7 +217,7 @@
                      (h/->req)
                      (assoc :parameters
                             {:path
-                             {:org-id (:id cust)}
+                             {:org-id (:id org)}
                              :query
                              {:since (-> now
                                          (jt/minus (jt/days 3))
@@ -223,7 +232,7 @@
                      (h/->req)
                      (assoc :parameters
                             {:path
-                             {:org-id (:id cust)}
+                             {:org-id (:id org)}
                              :query
                              {:n 10}})
                      (sut/recent-builds)
@@ -234,7 +243,7 @@
   (testing "returns latest build for each org repo"
     (h/with-memory-store st
       (let [repos (repeatedly 2 h/gen-repo)
-            cust (-> (h/gen-org)
+            org (-> (h/gen-org)
                      (assoc :repos (->> repos
                                         (map (fn [r]
                                                [(:id r) r]))
@@ -242,14 +251,14 @@
             builds (->> repos
                         (map (fn [r]
                                (-> (h/gen-build)
-                                   (assoc :org-id (:id cust)
+                                   (assoc :org-id (:id org)
                                           :repo-id (:id r))))))]
-        (is (sid/sid? (st/save-org st cust)))
+        (is (sid/sid? (st/save-org st org)))
         (doseq [b builds]
           (is (sid/sid? (st/save-build st b))))
         (let [res (-> {:storage st}
                       (h/->req)
-                      (assoc-in [:parameters :path :org-id] (:id cust))
+                      (assoc-in [:parameters :path :org-id] (:id org))
                       (sut/latest-builds))]
           (is (= 200 (:status res)))
           (is (= 2 (count (:body res))))
@@ -264,15 +273,15 @@
 (deftest stats
   (h/with-memory-store st
     (let [repo (h/gen-repo)
-          cust (-> (h/gen-org)
+          org (-> (h/gen-org)
                    (assoc :repos {(:id repo) repo}))
           req  (-> {:storage st}
                    (h/->req)
                    (assoc :parameters
                           {:path
-                           {:org-id (:id cust)}}))]
+                           {:org-id (:id org)}}))]
       
-      (is (some? (st/save-org st cust)))
+      (is (some? (st/save-org st org)))
       
       (testing "zero values if no builds"
         (is (every? (comp zero? :seconds)
@@ -303,7 +312,7 @@
         (letfn [(gen-build [start end creds]
                   (-> (h/gen-build)
                       (assoc :repo-id (:id repo)
-                             :org-id (:id cust)
+                             :org-id (:id org)
                              :start-time start
                              :end-time end
                              :credits creds)))
@@ -318,7 +327,7 @@
                                                             :amount (:credits build)
                                                             :credit-id (:id cred)))))]
           (let [cred (-> (h/gen-org-credit)
-                         (assoc :org-id (:id cust)
+                         (assoc :org-id (:id org)
                                 :type :user
                                 :amount 1000))
                 builds [(gen-build (ts 2024 9 17 10) (ts 2024 9 17 10 5)  10)
@@ -361,12 +370,12 @@
 
 (deftest credits
   (h/with-memory-store s
-    (let [cust (-> (h/gen-org)
+    (let [org (-> (h/gen-org)
                    (dissoc :repos))
           user (h/gen-user)]
-      (is (some? (st/save-org s cust)))
+      (is (some? (st/save-org s org)))
       (is (some? (st/save-user s user)))
-      (is (some? (st/save-org-credit s {:org-id (:id cust)
+      (is (some? (st/save-org-credit s {:org-id (:id org)
                                         :amount 100M
                                         :type :user
                                         :user-id (:id user)
@@ -375,7 +384,7 @@
       (testing "provides available credits"
         (is (= 100M (-> {:storage s}
                         (h/->req)
-                        (assoc-in [:parameters :path :org-id] (:id cust))
+                        (assoc-in [:parameters :path :org-id] (:id org))
                         (sut/credits)
                         :body
                         :available))))

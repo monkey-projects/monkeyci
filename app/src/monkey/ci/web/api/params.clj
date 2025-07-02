@@ -1,32 +1,47 @@
 (ns monkey.ci.web.api.params
   "Api functions for managing build parameters"
-  (:require [monkey.ci.storage :as st]
+  (:require [monkey.ci
+             [cuid :as cuid]
+             [storage :as st]]
             [monkey.ci.web
              [common :as c]
              [crypto :as cr]]))
 
-(defn- encrypt-one [req]
-  (let [encrypter (cr/encrypter req)]
-    (letfn [(encrypt-vals [p]
-              (map #(update % :value encrypter) p))]
-      (update-in req [:parameters :body :parameters] encrypt-vals))))
+(defn- req->param-id [req]
+  (get-in req [:parameters :path :param-id]))
+
+(defn- encrypt-one
+  ([req id]
+   (let [encrypter (cr/encrypter req)]
+     (letfn [(encrypt-vals [p]
+               (map (fn [v]
+                      (update v :value #(encrypter % id)))
+                    p))]
+       (update-in req [:parameters :body :parameters] encrypt-vals))))
+  ([req]
+   (encrypt-one req (req->param-id req))))
 
 (defn- encrypt-all [req]
   (let [encrypter (cr/encrypter req)]
-    (letfn [(encrypt-vals [p]
-              (map #(update % :value encrypter) p))
+    (letfn [(encrypt-vals [params-id p]
+              (map (fn [v]
+                     (update v :value #(encrypter % params-id)))
+                   p))
             (encrypt-params [b]
-              (map #(update % :parameters encrypt-vals) b))]
+              (map (fn [{:keys [id] :as p}]
+                     (update p :parameters (partial encrypt-vals id)))
+                   b))]
       (update-in req [:parameters :body] encrypt-params))))
 
 (defn- decrypt
   "Decryps all parameter values using the vault from the request"
   [req params]
   (let [decrypter (cr/decrypter req)]
-    (letfn [(decrypt-vals [p]
-              (mapv #(update % :value decrypter) p))]
-      (->> params
-           (map #(update % :parameters decrypt-vals))))))
+    (letfn [(decrypt-vals [d p]
+              (mapv #(update % :value d) p))
+            (decrypt-param [{:keys [id] :as p}]
+              (update p :parameters (partial decrypt-vals #(decrypter % id))))]
+      (map decrypt-param params))))
 
 (defn- decrypt-one [req param]
   (->> (decrypt req [param])
@@ -39,7 +54,7 @@
 
 (defn- get-param-id [req]
   (st/params-sid (c/org-id req)
-                 (get-in req [:parameters :path :param-id])))
+                 (req->param-id req)))
 
 (c/make-entity-endpoints
  "param"
@@ -54,10 +69,13 @@
                                                    st/find-param))]
     (getter req)))
 
-(def create-param 
-  (comp (c/entity-creator st/save-param c/default-id)
-        assign-org-id
-        encrypt-one))
+(defn create-param [req]
+  (let [id (cuid/random-cuid)
+        ec (c/entity-creator st/save-param (constantly id))]
+    (-> req
+        (encrypt-one id)
+        (assign-org-id)
+        (ec))))
 
 (def update-param 
   (comp (c/entity-updater get-param-id st/find-param st/save-param)

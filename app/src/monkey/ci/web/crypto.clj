@@ -31,18 +31,57 @@
      (crypto-iv st org-id))))
 
 (defn- with-vault-and-iv [req f]
-  ;; TODO Add support for DEKs
-  (let [iv (crypto-iv req)
+  (let [iv (delay (crypto-iv req))
         v (wc/req->vault req)]
-    (partial f v iv)))
+    (fn [x]
+      ;; Deprecated
+      (log/warn "Calling deprecated crypto fn that uses old-style iv")
+      (f v @iv x))))
 
-(defn encrypter
-  "Returns an encrypter fn, using the information retrieved from the request context.
-   It's a 1-arity function that encrypts its argument."
-  [req]
-  (with-vault-and-iv req p/encrypt))
+(defn encrypter [req]
+  (or (wc/from-rt req :encrypter)
+      ;; For backwards compatibility
+      (with-vault-and-iv req p/encrypt)))
 
-(defn decrypter
-  "Similar to `encrypter`, but for decryption."
+(defn decrypter [req]
+  (or (wc/from-rt req :decrypter)
+      ;; For backwards compatibility
+      (with-vault-and-iv req p/decrypt)))
+
+(defn dek?
+  "Checks if the argument is a valid data encryption key"
+  [x]
+  (and (instance? byte/1 x)
+       (= v/iv-size (count x))))
+
+(def dek-generator #(wc/from-rt % :dek-generator))
+
+(defn generate-dek
+  "Generates a new DEK using request context.  Returns both the encrypted and 
+   unencrypted key."
   [req]
-  (with-vault-and-iv req p/decrypt))
+  ((dek-generator req)))
+
+#_(def dek-provider #(wc/from-rt % :dek-provider))
+
+#_(defn get-dek
+  "Decrypts the given encrypted data encryption key using the key decrypter from the
+   request.  Returns the unencrypted key, which can be passed to `encrypt` or `decrypt`
+   along with an initialization vector (iv)."
+  [req dek]
+  ((dek-decrypter req) dek))
+
+;; (defn encrypter
+;;   "Returns an encrypter fn, using the information retrieved from the request context.
+;;    It's a multi-arity function that encrypts its argument.  The 1-arity variant loads
+;;    the iv from the crypto record, but this is deprecated.  The 2-arity variant takes
+;;    a cuid, which is used to calculate the iv."
+;;   [req]
+;;   ;; Old style, deprecated
+;;   (with-vault-and-iv req p/encrypt))
+
+;; (defn decrypter
+;;   "Similar to `encrypter`, but for decryption."
+;;   [req]
+;;   ;; Old style, deprecated
+;;   (with-vault-and-iv req p/decrypt))
