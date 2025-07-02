@@ -1,23 +1,20 @@
 (ns monkey.ci.web.api.params
   "Api functions for managing build parameters"
-  (:require [clojure.tools.logging :as log]
-            [monkey.ci
-             [protocols :as p]
-             [storage :as st]]
-            [monkey.ci.web.common :as c]))
+  (:require [monkey.ci.storage :as st]
+            [monkey.ci.web
+             [common :as c]
+             [crypto :as cr]]))
 
 (defn- encrypt-one [req]
-  (let [v (c/req->vault req)
-        iv (c/crypto-iv req)]
+  (let [encrypter (cr/encrypter req)]
     (letfn [(encrypt-vals [p]
-              (map #(update % :value (partial p/encrypt v iv)) p))]
+              (map #(update % :value encrypter) p))]
       (update-in req [:parameters :body :parameters] encrypt-vals))))
 
 (defn- encrypt-all [req]
-  (let [v (c/req->vault req)
-        iv (c/crypto-iv req)]
+  (let [encrypter (cr/encrypter req)]
     (letfn [(encrypt-vals [p]
-              (map #(update % :value (partial p/encrypt v iv)) p))
+              (map #(update % :value encrypter) p))
             (encrypt-params [b]
               (map #(update % :parameters encrypt-vals) b))]
       (update-in req [:parameters :body] encrypt-params))))
@@ -25,10 +22,9 @@
 (defn- decrypt
   "Decryps all parameter values using the vault from the request"
   [req params]
-  (let [v (c/req->vault req)
-        iv (c/crypto-iv req)]
+  (let [decrypter (cr/decrypter req)]
     (letfn [(decrypt-vals [p]
-              (mapv #(update % :value (partial p/decrypt v iv)) p))]
+              (mapv #(update % :value decrypter) p))]
       (->> params
            (map #(update % :parameters decrypt-vals))))))
 

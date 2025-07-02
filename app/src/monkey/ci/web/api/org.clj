@@ -22,35 +22,35 @@
   (some-> p
           (mc/update-existing :repos (comp (partial map repo->out) vals))))
 
-(defn- save-org [st cust]
+(defn- save-org [st org]
   ;; Since the getter converts repos to a list, convert it back here before saving
-  (letfn [(repos->map [{:keys [repos] :as cust}]
-            (cond-> cust
+  (letfn [(repos->map [{:keys [repos] :as org}]
+            (cond-> org
               (sequential? repos) (update :repos (partial zipmap (map :id repos)))))]
-    (st/save-org st (repos->map cust))))
+    (st/save-org st (repos->map org))))
 
 (c/make-entity-endpoints "org"
                          {:get-id (c/id-getter :org-id)
                           :getter (comp repos->out st/find-org)
                           :saver save-org})
 
-(defn- maybe-link-user [req st cust-id]
+(defn- maybe-link-user [req st org-id]
   (let [user (:identity req)
         user? (every-pred :type)]
     ;; When a user is creating the org, link them up
     (if (user? user)
-      (st/save-user st (update user :orgs conj cust-id))
+      (st/save-user st (update user :orgs conj org-id))
       (log/warn "No user in request, so creating org that is not linked to a user."))))
 
-(defn- create-subscription [st cust-id]
+(defn- create-subscription [st org-id]
   (let [ts (t/now)
         cs {:id (cuid/random-cuid)
-            :org-id cust-id
+            :org-id org-id
             :amount config/free-credits
             :valid-from ts}]
     (when (st/save-credit-subscription st cs)
       (st/save-org-credit st {:id (cuid/random-cuid)
-                              :org-id cust-id
+                              :org-id org-id
                               :subscription-id (:id cs)
                               :type :subscription
                               :amount (:amount cs)
@@ -59,14 +59,14 @@
 (defn create-org [req]
   ;; Remove the transaction when it's configured on all endpoints
   (st/with-transaction (c/req->storage req) st
-    (let [creator (c/entity-creator (fn [_ cust]
+    (let [creator (c/entity-creator (fn [_ org]
                                       ;; Use trx storage
-                                      (st/save-org st cust))
+                                      (st/save-org st org))
                                     c/default-id)]
       (when-let [reply (creator req)]
-        (let [cust-id (get-in reply [:body :id])]
-          (maybe-link-user req st cust-id)
-          (create-subscription st cust-id)
+        (let [org-id (get-in reply [:body :id])]
+          (maybe-link-user req st org-id)
+          (create-subscription st org-id)
           reply)))))
 
 (defn search-orgs [req]
@@ -186,6 +186,6 @@
   "Returns details of org credits"
   [req]
   (let [s (c/req->storage req)
-        cust-id (c/org-id req)
-        avail (st/calc-available-credits s cust-id)]
+        org-id (c/org-id req)
+        avail (st/calc-available-credits s org-id)]
     (rur/response {:available avail})))

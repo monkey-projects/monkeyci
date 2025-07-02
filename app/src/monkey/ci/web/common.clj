@@ -252,22 +252,6 @@
 (defn new-build-id [idx]
   (str "build-" idx))
 
-(defn crypto-iv
-  "Looks up crypto initialization vector for the org associated with the
-   request.  If no crypto record is found, one is generated."
-  ([st org-id]
-   (if-let [crypto (st/find-crypto st org-id)]
-     (:iv crypto)
-     (let [iv (v/generate-iv)]
-       (log/debug "No crypto record found for org" org-id ", generating a new one")
-       (when (st/save-crypto st {:org-id org-id
-                                 :iv iv})
-         iv))))
-  ([req]
-   (let [org-id (org-id req)
-         st (req->storage req)]
-     (crypto-iv st org-id))))
-
 (defn find-ssh-keys
   "Finds ssh keys for the given repo, in encrypted form."
   [st repo]
