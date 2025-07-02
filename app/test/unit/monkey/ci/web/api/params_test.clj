@@ -1,22 +1,10 @@
 (ns monkey.ci.web.api.params-test
   (:require [clojure.test :refer [deftest is testing]]
-            [monkey.ci
-             [protocols :as p]
-             [storage :as st]
-             [vault :as v]]
+            [monkey.ci.storage :as st]
             [monkey.ci.test
              [helpers :as h]
              [runtime :as trt]]
             [monkey.ci.web.api.params :as sut]))
-
-(defrecord TestVault []
-  p/Vault
-  (encrypt [_ _ _]
-    "encrypted")
-  (decrypt [_ _ _]
-    "decrypted"))
-
-(def test-vault (->TestVault))
 
 (deftest get-org-params
   (testing "empty vector if no params"

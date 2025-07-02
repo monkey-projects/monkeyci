@@ -31,8 +31,11 @@
     (is (fn? (sut/make-app {})))))
 
 (defn- test-rt [& [opts]]
-  (-> (merge {:config {:dev-mode true}
-              :vault (h/dummy-vault)}
+  (-> (merge (trt/test-runtime)
+             {:config {:dev-mode true}
+              :vault (h/dummy-vault)
+              :encrypter (fn [x _] x)
+              :decrypter (fn [x _] x)}
              opts)
       (update :storage #(or % (st/make-memory-storage)))))
 
@@ -190,7 +193,8 @@
                        (dev-app)
                        :status)))))))
 
-(defn- verify-entity-endpoints [{:keys [path base-entity updated-entity name creator can-update? can-delete?]
+(defn- verify-entity-endpoints [{:keys [path base-entity updated-entity name
+                                        creator can-update? can-delete?]
                                  :or {can-update? true can-delete? false}}]
   (let [st (st/make-memory-storage)
         app (make-test-app st)
@@ -260,13 +264,13 @@
     (testing "`/join-request`"
       (h/with-memory-store st
         (let [app (make-test-app st)
-              cust (h/gen-cust)
+              org (h/gen-org)
               user (h/gen-user)
               jr {:id (st/new-id)
                   :status "pending"
-                  :org-id (:id cust)
+                  :org-id (:id org)
                   :user-id (:id user)}]
-          (is (some? (st/save-org st cust)))
+          (is (some? (st/save-org st org)))
           (is (some? (st/save-user st user)))
           (is (some? (st/save-join-request st jr)))
 
@@ -274,7 +278,7 @@
           
           (testing "`GET` retrieves join requests for org"
             (is (= [jr]
-                   (-> (mock/request :get (str "/org/" (:id cust) "/join-request"))
+                   (-> (mock/request :get (str "/org/" (:id org) "/join-request"))
                        (app)
                        (h/reply->json)))))
 
@@ -284,7 +288,7 @@
             (testing "approves join request with message"
               (is (= 200
                      (-> (h/json-request
-                          :post (str "/org/" (:id cust) "/join-request/" (:id jr) "/approve")
+                          :post (str "/org/" (:id org) "/join-request/" (:id jr) "/approve")
                           {:message "Very well"})
                          (app)
                          :status)))
@@ -295,7 +299,7 @@
             (testing "returns 404 not found for non existing request"
               (is (= 404
                      (-> (h/json-request
-                          :post (str "/org/" (:id cust) "/join-request/" (st/new-id) "/approve")
+                          :post (str "/org/" (:id org) "/join-request/" (st/new-id) "/approve")
                           {})
                          (app)
                          :status))))
@@ -312,7 +316,7 @@
             (testing "rejects join request with message"
               (is (= 200
                      (-> (h/json-request
-                          :post (str "/org/" (:id cust) "/join-request/" (:id jr) "/reject")
+                          :post (str "/org/" (:id org) "/join-request/" (:id jr) "/reject")
                           {:message "No way"})
                          (app)
                          :status)))
@@ -323,7 +327,7 @@
             (testing "returns 404 not found for non existing request"
               (is (= 404
                      (-> (h/json-request
-                          :post (str "/org/" (:id cust) "/join-request/" (st/new-id) "/reject")
+                          :post (str "/org/" (:id org) "/join-request/" (st/new-id) "/reject")
                           {})
                          (app)
                          :status))))
@@ -338,36 +342,36 @@
 
     (h/with-memory-store st
       (let [app (make-test-app st)
-            cust (h/gen-cust)]
-        (is (some? (st/save-org st cust)))
+            org (h/gen-org)]
+        (is (some? (st/save-org st org)))
         
         (testing "`/builds`"
           (testing "`/recent` retrieves builds from latest 24h"
-            (is (= 200 (-> (mock/request :get (str "/org/" (:id cust) "/builds/recent"))
+            (is (= 200 (-> (mock/request :get (str "/org/" (:id org) "/builds/recent"))
                            (app)
                            :status))))
 
           (testing "`/latest` retrieves latest builds for each repo"
-            (is (= 200 (-> (mock/request :get (str "/org/" (:id cust) "/builds/latest"))
+            (is (= 200 (-> (mock/request :get (str "/org/" (:id org) "/builds/latest"))
                            (app)
                            :status)))))
 
         (testing "`GET /stats` retrieves org statistics"
-          (is (= 200 (-> (mock/request :get (str "/org/" (:id cust) "/stats"))
+          (is (= 200 (-> (mock/request :get (str "/org/" (:id org) "/stats"))
                          (app)
                          :status))))
 
         (testing "`/credits`"
           (testing "`GET` retrieves org credit details"
-            (is (= 200 (-> (mock/request :get (str "/org/" (:id cust) "/credits"))
+            (is (= 200 (-> (mock/request :get (str "/org/" (:id org) "/credits"))
                            (app)
                            :status)))))
 
         (testing "`/webhook/bitbucket`"
           (let [repo (h/gen-repo)
-                cust (assoc cust :repos {(:id repo) repo})
+                org (assoc org :repos {(:id repo) repo})
                 wh {:id (cuid/random-cuid)
-                    :org-id (:id cust)
+                    :org-id (:id org)
                     :repo-id (:id repo)
                     :secret "test secret"}
                 bb {:webhook-id (:id wh)
@@ -375,13 +379,13 @@
                     :repo-slug "test-repo"
                     :bitbucket-id (str (random-uuid))}
                 search (fn [path]
-                         (-> (mock/request :get (str (format "/org/%s/webhook/bitbucket" (:id cust)) path))
+                         (-> (mock/request :get (str (format "/org/%s/webhook/bitbucket" (:id org)) path))
                              (app)
                              :body
                              slurp
                              (h/parse-json)))
                 select-props #(select-keys % (keys bb))]
-            (is (some? (st/save-org st cust)))
+            (is (some? (st/save-org st org)))
             (is (some? (st/save-webhook st wh)))
             (is (some? (st/save-bb-webhook st bb)))
             
@@ -391,7 +395,7 @@
 
             (testing "contains org and repo id"
               (let [r (-> (search "") first)]
-                (is (= (:id cust) (:org-id r)))
+                (is (= (:id org) (:org-id r)))
                 (is (= (:id repo) (:repo-id r)))))
             
             (testing "allows filtering by query params"
@@ -401,16 +405,16 @@
 
         (testing "`/invoice`"
           (let [inv (-> (h/gen-invoice)
-                        (assoc :org-id (:id cust)))]
+                        (assoc :org-id (:id org)))]
             (is (some? (st/save-invoice st inv)))
             
             (testing "`GET` searches invoices"
-              (is (= 200 (-> (mock/request :get (str "/org/" (:id cust) "/invoice"))
+              (is (= 200 (-> (mock/request :get (str "/org/" (:id org) "/invoice"))
                              (app)
                              :status))))
 
             (testing "`GET /:id` retrieves by id"
-              (is (= 200 (-> (mock/request :get (str "/org/" (:id cust) "/invoice/" (:id inv)))
+              (is (= 200 (-> (mock/request :get (str "/org/" (:id org) "/invoice/" (:id inv)))
                              (app)
                              :status)))))))))
 
@@ -419,7 +423,7 @@
           rt (test-rt {:storage st
                        :jwk (auth/keypair->rt kp)
                        :config {:dev-mode false}})
-          cust-id (st/new-id)
+          org-id (st/new-id)
           github-id 6453
           app (sut/make-app rt)
           token-info {:sub (str "github/" github-id)
@@ -428,14 +432,14 @@
           make-token (fn [ti]
                        (auth/sign-jwt ti (.getPrivate kp)))
           token (make-token token-info)
-          _ (st/save-org st {:id cust-id
-                                  :name "test org"})
+          _ (st/save-org st {:id org-id
+                             :name "test org"})
           _ (st/save-user st {:type "github"
                               :type-id github-id
-                              :orgs [cust-id]})]
+                              :orgs [org-id]})]
 
       (testing "ok if user has access to org"
-        (is (= 200 (-> (mock/request :get (str "/org/" cust-id))
+        (is (= 200 (-> (mock/request :get (str "/org/" org-id))
                        (mock/header "authorization" (str "Bearer " token))
                        (app)
                        :status))))
@@ -447,12 +451,12 @@
                        :status))))
       
       (testing "unauthenticated if no user credentials"
-        (is (= 401 (-> (mock/request :get (str "/org/" cust-id))
+        (is (= 401 (-> (mock/request :get (str "/org/" org-id))
                        (app)
                        :status))))
 
       (testing "unauthenticated if token expired"
-        (is (= 401 (-> (mock/request :get (str "/org/" cust-id))
+        (is (= 401 (-> (mock/request :get (str "/org/" org-id))
                        (mock/header "authorization" (str "Bearer " (make-token
                                                                     (assoc token-info :exp (- (u/now) 1000)))))
                        (app)
@@ -625,8 +629,8 @@
     (testing "/org/:org-id"
       
       (testing path
-        (let [cust-id (st/new-id)
-              full-path (format "/org/%s%s" cust-id path)]
+        (let [org-id (st/new-id)
+              full-path (format "/org/%s%s" org-id path)]
           
           (testing (str "empty when no " desc)
             (is (empty? (get-entity full-path))))
@@ -645,10 +649,10 @@
                 entity))))
 
       (testing (str "/repo/:repo-id" path)
-        (let [[cust-id repo-id] (repeatedly st/new-id)
-              full-path (format "/org/%s/repo/%s%s" cust-id repo-id path)
-              _ (st/save-org st {:id cust-id
-                                      :repos {repo-id {:name "test repo"}}})]
+        (let [[org-id repo-id] (repeatedly st/new-id)
+              full-path (format "/org/%s/repo/%s%s" org-id repo-id path)
+              _ (st/save-org st {:id org-id
+                                 :repos {repo-id {:name "test repo"}}})]
           
           (testing (str "empty when no " desc)
             (is (empty? (get-entity full-path))))
@@ -671,19 +675,19 @@
      :label-filters []}]
    :parameters)
 
-  (let [cust-id (st/new-id)
+  (let [org-id (st/new-id)
         param {:parameters [{:name "test-param"
                              :value "test value"}]
                :description "original desc"
-               :org-id cust-id
+               :org-id org-id
                :label-filters []}]
     (verify-entity-endpoints
      {:name "org param"
-      :path (format "/org/%s/param" cust-id)
+      :path (format "/org/%s/param" org-id)
       :base-entity param
       :updated-entity {:description "updated description"}
       :creator (fn [s p]
-                 (st/save-param s (assoc p :org-id cust-id)))
+                 (st/save-param s (assoc p :org-id org-id)))
       :can-delete? true})))
 
 (deftest ssh-keys-endpoints
@@ -1089,9 +1093,10 @@
         (is (nil? (:d k)) "should not contain private exponent")))
 
     (testing "404 when no jwk configured"
-      (is (= 404 (-> (mock/request :get "/auth/jwks")
-                     (test-app)
-                     :status))))))
+      (let [app (sut/make-app {})]
+        (is (= 404 (-> (mock/request :get "/auth/jwks")
+                       (app)
+                       :status)))))))
 
 (deftest metrics
   (testing "`GET /metrics`"
