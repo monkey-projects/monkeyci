@@ -3,6 +3,7 @@
             [buddy.core.nonce :as nonce]
             [com.stuartsierra.component :as co]
             [monkey.ci
+             [cuid :as cuid]
              [protocols :as p]
              [utils :as u]
              [vault :as sut]]
@@ -67,3 +68,15 @@
             enc (p/encrypt vault iv txt)]
         (is (string? enc))
         (is (= txt (p/decrypt vault iv enc)))))))
+
+(deftest cuid->iv
+  (testing "generates iv from cuid"
+    (is (= 16 (count (sut/cuid->iv (cuid/random-cuid))))))
+
+  (testing "takes last 6 bits"
+    (is (->> (repeat cuid/cuid-length 0x40)
+             (byte-array)
+             (String.)
+             (sut/cuid->iv)
+             (seq)
+             (every? zero?)))))

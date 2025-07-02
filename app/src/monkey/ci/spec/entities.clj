@@ -83,19 +83,17 @@
 
 (s/def :entity/label-filters (s/coll-of :entity/label-filter-conjunction))
 
-(s/def :entity/dek string?)
-
 (s/def :ssh/private-key string?)
 (s/def :ssh/public-key string?)
 
 (s/def :entity/ssh-key
   (-> (s/keys :req-un [:entity/org-id :ssh/private-key :ssh/public-key
-                       :entity/description :entity/dek]
+                       :entity/description]
               :opt-un [:entity/label-filters])
       (s/merge :entity/common)))
 
 (s/def :entity/org-params
-  (-> (s/keys :req-un [:entity/org-id :entity/parameters :entity/dek]
+  (-> (s/keys :req-un [:entity/org-id :entity/parameters]
               :opt-un [:entity/description :entity/label-filters])
       (s/merge :entity/common)))
 
@@ -168,10 +166,10 @@
                            (comp (partial = 16) count))
                     #(sg/fixed-byte-array 16)))
 
-(s/def :entity/master-dek string?)
+(s/def :entity/dek string?)
 
 (s/def :entity/crypto
-  (s/keys :req-un [:entity/org-id :entity/iv :entity/master-dek]))
+  (s/keys :req-un [:entity/org-id :entity/iv :entity/dek]))
 
 (s/def :entity/password string?)
 

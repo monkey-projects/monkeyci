@@ -554,22 +554,8 @@
    (migration
     (mig-id 44 :add-crypto-dek)
     [{:alter-table :cryptos
-      :add-column [:master-dek [:varchar 100]]}]
+      :add-column [:dek [:varchar 100]]}]
     [{:alter-table :cryptos
-      :drop-column :master-dek}])
-
-   (migration
-    (mig-id 45 :add-ssh-keys-dek)
-    [{:alter-table :ssh-keys
-      :add-column [:dek [:varchar 100]]}]
-    [{:alter-table :ssh-keys
-      :drop-column :dek}])
-
-   (migration
-    (mig-id 46 :add-params-dek)
-    [{:alter-table :org-params
-      :add-column [:dek [:varchar 100]]}]
-    [{:alter-table :org-params
       :drop-column :dek}])])
 
 (defn prepare-migrations
