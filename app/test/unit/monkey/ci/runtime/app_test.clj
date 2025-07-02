@@ -2,11 +2,13 @@
   (:require [aleph.http :as aleph]
             [clojure.test :refer [deftest is testing]]
             [com.stuartsierra.component :as co]
+            [manifold.deferred :as md]
             [monkey.ci
              [oci :as oci]
              [protocols :as p]
              [storage :as st]]
             [monkey.ci.runtime.app :as sut]
+            [monkey.ci.vault.scw :as v-scw]
             [monkey.ci.test.config :as tc]))
 
 (def server-config
@@ -50,7 +52,13 @@
             (is (p/vault? (:vault rt))))
 
           (testing "provides data encryption key generator"
-            (is (fn? (:dek-generator rt))))))
+            (is (fn? (:dek-generator rt))))
+
+          (testing "provides encrypter"
+            (is (fn? (:encrypter rt))))
+
+          (testing "provides decrypter"
+            (is (fn? (:decrypter rt))))))
 
       (testing "provides metrics routes"
         (is (some? (:metrics-routes sys))))
@@ -117,9 +125,18 @@
                         :consumer "test-consumer"}}}
                  (sut/new-queue-options)))))))
 
-(deftest dek-generator
-  (testing "constantly nil by default"
-    (is (nil? ((sut/dek-generator {})))))
+(deftest dek-utils
+  (testing "default key generator"
+    (let [u (sut/dek-utils {})]
+      (testing "constantly nil"
+        (is (nil? ((:generator u)))))))
 
-  (testing "provides function for scaleway"
-    (is (fn? (sut/dek-generator {:type :scw})))))
+  (testing "scaleway"
+    (with-redefs [v-scw/generate-dek (constantly (md/success-deferred "new-dek"))]
+      (let [{:keys [generator decrypter]} (sut/dek-utils {:type :scw})]
+        (testing "provides generator function"
+          (is (fn? generator))
+          (is (= "new-dek" (generator))))
+
+        (testing "provides key decrypter"
+          (is (fn? decrypter)))))))
