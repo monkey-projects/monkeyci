@@ -36,7 +36,7 @@
 
 (deftest get-repo-params
   (let [{st :storage :as rt} (-> (trt/test-runtime)
-                                 (trt/set-decrypter (fn [x _] x)))
+                                 (trt/set-decrypter (fn [x _ _] x)))
         [org-id repo-id] (repeatedly st/new-id)
         _ (st/save-org st {:id org-id
                            :repos {repo-id
@@ -110,9 +110,11 @@
                    [{:name "test-param"
                      :value "test-value"}]}
             _ (st/save-org st org)
-            _ (st/save-params st org-id [param])
+            {params-id :id} (st/save-params st org-id [param])
             res (-> rt
-                    (trt/set-decrypter (constantly "decrypted"))
+                    (trt/set-decrypter (fn [_ _ cuid]
+                                         (when (= cuid params-id)
+                                           "decrypted")))
                     (h/->req)
                     (h/with-path-params {:org-id org-id
                                          :repo-id (:id repo)})
@@ -155,10 +157,11 @@
 
 (deftest create-param
   (testing "encrypts values"
-    (let [{st :storage :as rt} (-> (trt/test-runtime)
-                                   (trt/set-encrypter (fn [_ cuid]
+    (let [org-id "test-org"
+          {st :storage :as rt} (-> (trt/test-runtime)
+                                   (trt/set-encrypter (fn [_ _ cuid]
                                                         (str "encrypted with " cuid))))
-          org-id "test-org"
+          
           req (-> rt
                   (h/->req)
                   (assoc :parameters
@@ -178,22 +181,24 @@
 
 (deftest update-params
   (testing "encrypts values"
-    (let [{st :storage :as rt} (-> (trt/test-runtime)
-                                   (trt/set-encrypter (fn [_ cuid]
-                                                        (str "encrypted with " cuid))))
+    (let [org-id "test-org"
           id "test-params-id"
+          {st :storage :as rt} (-> (trt/test-runtime)
+                                   (trt/set-encrypter (fn [_ _ cuid]
+                                                        (when (= id cuid)
+                                                          (str "encrypted with " cuid)))))
           req (-> rt
                   (h/->req)
                   (assoc :parameters
                          {:path
-                          {:org-id "test-org"}
+                          {:org-id org-id}
                           :body
                           [{:id id
                             :parameters [{:name "test-param"
                                           :value "test-val"}]}]}))]
       (is (some? (sut/update-params req)))
       (is (= (str "encrypted with " id)
-             (-> (st/find-params st "test-org")
+             (-> (st/find-params st org-id)
                  first
                  :parameters
                  first

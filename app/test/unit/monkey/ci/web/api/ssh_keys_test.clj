@@ -50,7 +50,7 @@
 (deftest update-ssh-keys
   (testing "encrypts private keys using vault"
     (let [{st :storage :as rt} (-> (trt/test-runtime)
-                                   (trt/set-encrypter (fn [_ cuid]
+                                   (trt/set-encrypter (fn [_ _ cuid]
                                                         (str "encrypted with " cuid))))
           org (h/gen-org)
           org-id (:id org)

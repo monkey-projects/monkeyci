@@ -15,7 +15,7 @@
    (let [encrypter (cr/encrypter req)]
      (letfn [(encrypt-vals [p]
                (map (fn [v]
-                      (update v :value #(encrypter % id)))
+                      (update v :value #(encrypter % (c/org-id req) id)))
                     p))]
        (update-in req [:parameters :body :parameters] encrypt-vals))))
   ([req]
@@ -25,9 +25,10 @@
   (let [encrypter (cr/encrypter req)]
     (letfn [(encrypt-vals [params-id p]
               (map (fn [v]
-                     (update v :value #(encrypter % params-id)))
+                     (update v :value #(encrypter % (c/org-id req) params-id)))
                    p))
             (encrypt-params [b]
+              ;; FIXME This does not work for update if id is not specified in the body
               (map (fn [{:keys [id] :as p}]
                      (update p :parameters (partial encrypt-vals id)))
                    b))]
@@ -40,7 +41,7 @@
     (letfn [(decrypt-vals [d p]
               (mapv #(update % :value d) p))
             (decrypt-param [{:keys [id] :as p}]
-              (update p :parameters (partial decrypt-vals #(decrypter % id))))]
+              (update p :parameters (partial decrypt-vals #(decrypter % (c/org-id req) id))))]
       (map decrypt-param params))))
 
 (defn- decrypt-one [req param]

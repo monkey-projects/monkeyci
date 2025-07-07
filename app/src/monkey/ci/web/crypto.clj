@@ -31,13 +31,16 @@
       (log/warn "Calling deprecated crypto fn that uses old-style iv")
       (f v @iv x))))
 
+(defn- from-crypto [req f]
+  (wc/from-rt req (comp f :crypto)))
+
 (defn encrypter [req]
-  (or (wc/from-rt req :encrypter)
+  (or (from-crypto req :encrypter)
       ;; For backwards compatibility
       (with-vault-and-iv req p/encrypt)))
 
 (defn decrypter [req]
-  (or (wc/from-rt req :decrypter)
+  (or (from-crypto req :decrypter)
       ;; For backwards compatibility
       (with-vault-and-iv req p/decrypt)))
 
@@ -47,7 +50,7 @@
   (and (instance? byte/1 x)
        (= v/dek-size (count x))))
 
-(def dek-generator #(wc/from-rt % :dek-generator))
+(def dek-generator #(from-crypto % :dek-generator))
 
 (defn generate-dek
   "Generates a new DEK using request context for given org id.  Returns both 

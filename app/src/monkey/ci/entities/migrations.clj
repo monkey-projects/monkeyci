@@ -239,7 +239,7 @@
                  ;; Decrypt using vault, then re-encrypt using the org id as nonce
                  (assoc obj prop (-> (prop obj)
                                      (as-> ev (mp/decrypt vault (:iv obj) ev))
-                                     (e (:org-id obj)))))]
+                                     (e (:org-cuid obj) (:cuid obj)))))]
          (->> (ec/select conn query)
               (map re-encrypt)
               (map (partial updater conn))
@@ -250,7 +250,7 @@
        (letfn [(re-encrypt [obj]
                  ;; Decrypt using vault, then re-encrypt using the org id as nonce
                  (assoc obj prop (-> (prop obj)
-                                     (d (:org-id obj))
+                                     (d (:org-cuid obj) (:cuid obj))
                                      (as-> dv (mp/encrypt vault (:iv obj) dv)))))]
          (->> (ec/select conn query)
               (map re-encrypt)
@@ -263,9 +263,10 @@
   [idx]
   (re-encrypt-value-mig
    (str idx "-re-encrypt-params")
-   {:select [:pv.id :pv.params-id :pv.value :c.org-id :c.dek :c.iv]
+   {:select [:pv.id :op.cuid :pv.params-id :pv.value :c.org-id [:o.cuid :org-cuid] :c.dek :c.iv]
     :from [[:org-param-values :pv]]
     :join [[:org-params :op] [:= :op.id :pv.params-id]
+           [:orgs :o] [:= :o.id :op.org-id]
            [:cryptos :c] [:= :c.org-id :op.org-id]]}
    :value
    (fn [conn pv]
@@ -277,9 +278,10 @@
   [idx]
   (re-encrypt-value-mig
    (str idx "-re-encrypt-ssh-keys")
-   {:select [:sk.id :sk.org-id :sk.private-key :c.dek :c.iv]
+   {:select [:sk.id :sk.cuid :sk.org-id :sk.private-key :c.dek :c.iv [:o.cuid :org-cuid]]
     :from [[:ssh-keys :sk]]
-    :join [[:cryptos :c] [:= :c.org-id :sk.org-id]]}
+    :join [[:cryptos :c] [:= :c.org-id :sk.org-id]
+           [:orgs :o] [:= :o.id :sk.org-id]]}
    :private-key
    (fn [conn k]
      (ec/update-ssh-key conn (select-keys k [:id :private-key])))))

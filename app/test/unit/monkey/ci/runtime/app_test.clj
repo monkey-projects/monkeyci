@@ -61,13 +61,13 @@
             (is (p/vault? (:vault rt))))
 
           (testing "provides data encryption key generator"
-            (is (fn? (:dek-generator rt))))
+            (is (fn? (get-in rt [:crypto :dek-generator]))))
 
           (testing "provides encrypter"
-            (is (fn? (:encrypter rt))))
+            (is (fn? (get-in rt [:crypto :encrypter]))))
 
           (testing "provides decrypter"
-            (is (fn? (:decrypter rt))))))
+            (is (fn? (get-in rt [:crypto :decrypter]))))))
 
       (testing "provides metrics routes"
         (is (some? (:metrics-routes sys))))
@@ -189,7 +189,7 @@
                 v "value to encrypt"
                 validate (fn []
                            (= (encrypt v)
-                              (e v org-id)))]
+                              (e v org-id org-id)))]
             (is (fn? e))
             
             (testing "encrypts value using cached key"
@@ -207,7 +207,7 @@
                            (= (vc/decrypt (bcc/b64->bytes (:key k))
                                           (v/cuid->iv org-id)
                                           v)
-                              (d v org-id)))]
+                              (d v org-id org-id)))]
             (is (fn? d))
             
             (testing "decrypts value using cached key"

@@ -121,6 +121,7 @@
     (let [{dg :generator kd :decrypter} (dek-utils config)
           cache (or (:cache this) (atom {}))]
       (letfn [(lookup-dek [org-id]
+                (log/debug "Looking up data encryption key for" org-id)
                 (let [enc (some-> (s/find-crypto (:storage this) org-id)
                                   :dek)
                       plain (kd enc)]
@@ -139,11 +140,11 @@
                    (swap! cache assoc org-id k)
                    k))
                :encrypter
-               (fn [v org-id]
-                 (vc/encrypt (get-dek org-id) (v/cuid->iv org-id) v))
+               (fn [v org-id cuid]
+                 (vc/encrypt (get-dek org-id) (v/cuid->iv cuid) v))
                :decrypter
-               (fn [v org-id]
-                 (vc/decrypt (get-dek org-id) (v/cuid->iv org-id) v))))))
+               (fn [v org-id cuid]
+                 (vc/decrypt (get-dek org-id) (v/cuid->iv cuid) v))))))
 
   (stop [this]
     this))
@@ -159,9 +160,7 @@
   (start [this]
     (-> this
         (assoc :jwk (get-in this [:jwk :jwk])
-               :metrics (get-in this [:metrics :registry]))
-        (merge (:crypto this))
-        (dissoc :crypto)))
+               :metrics (get-in this [:metrics :registry]))))
 
   (stop [this]
     this))

@@ -45,13 +45,13 @@
   (assoc rt :vault v))
 
 (defn set-dek-generator [rt f]
-  (assoc rt :dek-generator f))
+  (assoc-in rt [:crypto :dek-generator] f))
 
 (defn set-decrypter [rt f]
-  (assoc rt :decrypter f))
+  (assoc-in rt [:crypto :decrypter] f))
 
 (defn set-encrypter [rt f]
-  (assoc rt :encrypter f))
+  (assoc-in rt [:crypto :encrypter] f))
 
 (defn test-runtime []
   (-> empty-runtime

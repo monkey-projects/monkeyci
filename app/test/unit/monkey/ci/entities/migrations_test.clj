@@ -194,10 +194,10 @@
                                    {:org-id (:id org)
                                     :iv (v/generate-iv)})
           conn (assoc conn
-                      :crypto {:encrypter (fn [p id]
+                      :crypto {:encrypter (fn [p org-id id]
                                             (when (= "vault-decrypted" p)
                                               "dek-encrypted"))
-                               :decrypter (fn [p id]
+                               :decrypter (fn [p org-id id]
                                             (when (= "dek-encrypted" p)
                                               "dek-decrypted"))}
                       :vault (h/dummy-vault (fn [obj]
@@ -241,10 +241,10 @@
                                    {:org-id (:id org)
                                     :iv (v/generate-iv)})
           conn (assoc conn
-                      :crypto {:encrypter (fn [p id]
+                      :crypto {:encrypter (fn [p org-id id]
                                             (when (= "vault-decrypted" p)
                                               "dek-encrypted"))
-                               :decrypter (fn [p id]
+                               :decrypter (fn [p org-id id]
                                             (when (= "dek-encrypted" p)
                                               "dek-decrypted"))}
                       :vault (h/dummy-vault (fn [obj]
