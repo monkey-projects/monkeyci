@@ -40,6 +40,9 @@
 (defn- drop-nil [m]
   (mc/filter-vals some? m))
 
+(defn- get-conn [c]
+  ((:get-conn c) c))
+
 (defn- db->labels [labels]
   (map #(select-keys % [:name :value]) labels))
 
@@ -127,13 +130,14 @@
   (doseq [[_ r] repos]
     (upsert-repo conn r org-id)))
 
-(defn- delete-repo [{:keys [conn]} sid]
-  (when-let [repo-id (select-repo-id-by-sid conn sid)]
-    ;; Other records are deleted by cascading
-    (pos? (ec/delete-repos conn (ec/by-id repo-id)))))
+(defn- delete-repo [st sid]
+  (let [conn (get-conn st)]
+    (when-let [repo-id (select-repo-id-by-sid conn sid)]
+      ;; Other records are deleted by cascading
+      (pos? (ec/delete-repos conn (ec/by-id repo-id))))))
 
-(defn- select-repo-display-ids [{:keys [conn]} org-id]
-  (er/repo-display-ids conn org-id))
+(defn- select-repo-display-ids [st org-id]
+  (er/repo-display-ids (get-conn st) org-id))
 
 (defn- org->db [org]
   (-> org
@@ -185,16 +189,16 @@
 
 (defn- select-orgs
   "Finds orgs by filter"
-  [{:keys [conn]} {:keys [id name]}]
+  [st {:keys [id name]}]
   (let [query (cond
                 id (ec/by-cuid id)
                 ;; By default, this will use case insensitive search (depends on collation)
                 name [:like :name (str "%" name "%")])]
-    (->> (ec/select-orgs conn query)
+    (->> (ec/select-orgs (get-conn st) query)
          (map db->org-with-repos))))
 
-(defn- select-orgs-by-id [{:keys [conn]} ids]
-  (->> (ec/select-orgs conn [:in :cuid (distinct ids)])
+(defn- select-orgs-by-id [st ids]
+  (->> (ec/select-orgs (get-conn st) [:in :cuid (distinct ids)])
        (map db->org)))
 
 (defn- global-sid? [type sid]
@@ -226,8 +230,8 @@
   (-> (ewh/select-webhooks-as-entity conn (ewh/by-cuid cuid))
       (first)))
 
-(defn- select-repo-webhooks [{:keys [conn]} [org-id repo-id]]
-  (ewh/select-webhooks-as-entity conn (ewh/by-repo org-id repo-id)))
+(defn- select-repo-webhooks [st [org-id repo-id]]
+  (ewh/select-webhooks-as-entity (get-conn st) (ewh/by-repo org-id repo-id)))
 
 (defn- delete-webhook [conn cuid]
   (ec/delete-webhooks conn (ec/by-cuid cuid)))
@@ -324,16 +328,17 @@
   ;; Select org params and values for org cuid
   (eparam/select-org-params-with-values conn org-id))
 
-(defn- upsert-org-param [{:keys [conn]} {:keys [org-id] :as param}]
-  (when-let [{db-id :id} (ec/select-org conn (ec/by-cuid org-id))]
-    (upsert-param conn param db-id)
-    (st/params-sid org-id (:id param))))
+(defn- upsert-org-param [st {:keys [org-id] :as param}]
+  (let [conn (get-conn st)]
+    (when-let [{db-id :id} (ec/select-org conn (ec/by-cuid org-id))]
+      (upsert-param conn param db-id)
+      (st/params-sid org-id (:id param)))))
 
-(defn- select-org-param [{:keys [conn]} [_ _ param-id]]
-  (eparam/select-param-with-values conn param-id))
+(defn- select-org-param [st [_ _ param-id]]
+  (eparam/select-param-with-values (get-conn st) param-id))
 
-(defn- delete-org-param [{:keys [conn]} [_ _ param-id]]
-  (pos? (ec/delete-org-params conn (ec/by-cuid param-id))))
+(defn- delete-org-param [st [_ _ param-id]]
+  (pos? (ec/delete-org-params (get-conn st) (ec/by-cuid param-id))))
 
 (defn user? [sid]
   (and (= 4 (count sid))
@@ -387,11 +392,11 @@
                                [:= :type type]
                                [:= :type-id type-id]]))
 
-(defn- select-user [{:keys [conn]} id]
-  (select-user-by-filter conn (ec/by-cuid id)))
+(defn- select-user [st id]
+  (select-user-by-filter (get-conn st) (ec/by-cuid id)))
 
-(defn- select-user-orgs [{:keys [conn]} id]
-  (->> (eu/select-user-orgs conn id)
+(defn- select-user-orgs [st id]
+  (->> (eu/select-user-orgs (get-conn st) id)
        (map db->org-with-repos)))
 
 (defn build? [sid]
@@ -476,14 +481,14 @@
 
 (defn- select-repo-builds
   "Retrieves all builds and their details for given repository"
-  [{:keys [conn]} [org-id repo-id]]
+  [st [org-id repo-id]]
   (letfn [(add-ids [b]
             (assoc b
                    :org-id org-id
                    :repo-id repo-id))]
     ;; Fetch all build details, don't include jobs since we don't need them at this point
     ;; and they can become a very large dataset.
-    (->> (eb/select-builds-for-repo conn org-id repo-id)
+    (->> (eb/select-builds-for-repo (get-conn st) org-id repo-id)
          (map db->build)
          (map add-ids))))
 
@@ -493,24 +498,24 @@
 (defn- select-repo-build-ids [conn sid]
   (apply eb/select-build-ids-for-repo conn sid))
 
-(defn- select-org-builds-since [{:keys [conn]} org-id ts]
-  (->> (eb/select-builds-for-org-since conn org-id ts)
+(defn- select-org-builds-since [st org-id ts]
+  (->> (eb/select-builds-for-org-since (get-conn st) org-id ts)
        (map db->build)))
 
-(defn- select-latest-build [{:keys [conn]} [org-id repo-id]]
-  (some-> (eb/select-latest-build conn org-id repo-id)
+(defn- select-latest-build [st [org-id repo-id]]
+  (some-> (eb/select-latest-build (get-conn st) org-id repo-id)
           (db->build)))
 
-(defn- select-latest-org-builds [{:keys [conn]} org-id]
-  (->> (eb/select-latest-builds conn org-id)
+(defn- select-latest-org-builds [st org-id]
+  (->> (eb/select-latest-builds (get-conn st) org-id)
        (map db->build)))
 
-(defn- select-latest-n-org-builds [{:keys [conn]} org-id n]
-  (->> (eb/select-latest-n-builds conn org-id n)
+(defn- select-latest-n-org-builds [st org-id n]
+  (->> (eb/select-latest-n-builds (get-conn st) org-id n)
        (map db->build)))
 
-(defn- select-next-build-idx [{:keys [conn]} [org-id repo-id]]
-  (er/next-repo-idx conn org-id repo-id))
+(defn- select-next-build-idx [st [org-id repo-id]]
+  (er/next-repo-idx (get-conn st) org-id repo-id))
 
 (defn- insert-job [conn job build-sid]
   (when-let [build (apply eb/select-build-by-sid conn build-sid)]
@@ -527,13 +532,14 @@
       ;; Return build sid
       ((juxt :org-cuid :repo-display-id :build-display-id) existing))))
 
-(defn- upsert-job [{:keys [conn]} build-sid job]
-  (if-let [existing (ej/select-by-sid conn (concat build-sid [(:id job)]))]
-    (update-job conn job existing)
-    (insert-job conn job build-sid)))
+(defn- upsert-job [st build-sid job]
+  (let [conn (get-conn st)]
+    (if-let [existing (ej/select-by-sid conn (concat build-sid [(:id job)]))]
+      (update-job conn job existing)
+      (insert-job conn job build-sid))))
 
-(defn- select-job [{:keys [conn]} job-sid]
-  (some-> (ej/select-by-sid conn job-sid)
+(defn- select-job [st job-sid]
+  (some-> (ej/select-by-sid (get-conn st) job-sid)
           (db->job)))
 
 (def join-request? (partial global-sid? st/join-requests))
@@ -563,10 +569,10 @@
 (defn- select-join-request [conn cuid]
   (jr/select-join-request-as-entity conn cuid))
 
-(defn- select-user-join-requests [{:keys [conn]} user-cuid]
+(defn- select-user-join-requests [st user-cuid]
   (letfn [(db->jr [r]
             (update r :status keyword))]
-    (->> (jr/select-user-join-requests conn user-cuid)
+    (->> (jr/select-user-join-requests (get-conn st) user-cuid)
          (map db->jr))))
 
 (def email-registration? (partial global-sid? st/email-registrations))
@@ -578,12 +584,12 @@
   (some-> (ec/select-email-registration conn (ec/by-cuid cuid))
           (db->email-registration)))
 
-(defn- select-email-registration-by-email [{:keys [conn]} email]
-  (some-> (ec/select-email-registration conn [:= :email email])
+(defn- select-email-registration-by-email [st email]
+  (some-> (ec/select-email-registration (get-conn st) [:= :email email])
           (db->email-registration)))
 
-(defn- select-email-registrations [{:keys [conn]}]
-  (->> (ec/select-email-registrations conn nil)
+(defn- select-email-registrations [st]
+  (->> (ec/select-email-registrations (get-conn st) nil)
        (map db->email-registration)))
 
 (defn- insert-email-registration [conn reg]
@@ -630,11 +636,11 @@
   (->> (ecsub/select-credit-subs conn f)
        (map db->credit-sub)))
 
-(defn- select-org-credit-subs [{:keys [conn]} org-id]
-  (select-credit-subs conn (ecsub/by-org org-id)))
+(defn- select-org-credit-subs [st org-id]
+  (select-credit-subs (get-conn st) (ecsub/by-org org-id)))
 
-(defn- select-active-credit-subs [{:keys [conn]} at]
-  (select-credit-subs conn (ecsub/active-at at)))
+(defn- select-active-credit-subs [st at]
+  (select-credit-subs (get-conn st) (ecsub/active-at at)))
 
 (def org-credit? (partial global-sid? st/org-credits))
 
@@ -671,20 +677,20 @@
            (first)
            (db->org-credit)))
 
-(defn- select-org-credits-since [{:keys [conn]} org-id since]
-  (->> (ecc/select-org-credits conn (ecc/by-org-since org-id since))
+(defn- select-org-credits-since [st org-id since]
+  (->> (ecc/select-org-credits (get-conn st) (ecc/by-org-since org-id since))
        (map db->org-credit)))
 
-(defn- select-org-credits [{:keys [conn]} org-id]
-  (->> (ecc/select-org-credits conn (ecc/by-org org-id))
+(defn- select-org-credits [st org-id]
+  (->> (ecc/select-org-credits (get-conn st) (ecc/by-org org-id))
        (map db->org-credit)))
 
-(defn- select-avail-credits-amount [{:keys [conn]} org-id]
+(defn- select-avail-credits-amount [st org-id]
   ;; TODO Use the available-credits table for faster lookup
-  (ecc/select-avail-credits-amount conn org-id))
+  (ecc/select-avail-credits-amount (get-conn st) org-id))
 
-(defn- select-avail-credits [{:keys [conn]} org-id]
-  (->> (ecc/select-avail-credits conn org-id)
+(defn- select-avail-credits [st org-id]
+  (->> (ecc/select-avail-credits (get-conn st) org-id)
        (map db->org-credit)))
 
 (def credit-consumption? (partial global-sid? st/credit-consumptions))
@@ -725,12 +731,12 @@
            (first)
            (db->credit-cons)))
 
-(defn- select-org-credit-cons [{:keys [conn]} org-id]
-  (->> (eccon/select-credit-cons conn (eccon/by-org org-id))
+(defn- select-org-credit-cons [st org-id]
+  (->> (eccon/select-credit-cons (get-conn st) (eccon/by-org org-id))
        (map db->credit-cons)))
 
-(defn- select-org-credit-cons-since [{:keys [conn]} org-id since]
-  (->> (eccon/select-credit-cons conn (eccon/by-org-since org-id since))
+(defn- select-org-credit-cons-since [st org-id since]
+  (->> (eccon/select-credit-cons (get-conn st) (eccon/by-org-since org-id since))
        (map db->credit-cons)))
 
 (def bb-webhook? (partial global-sid? st/bb-webhooks))
@@ -748,13 +754,13 @@
           first
           (cuid->id)))
 
-(defn- select-bb-webhook-for-webhook [{:keys [conn]} cuid]
-  (some-> (ebbwh/select-bb-webhooks conn (ebbwh/by-wh-cuid cuid))
+(defn- select-bb-webhook-for-webhook [st cuid]
+  (some-> (ebbwh/select-bb-webhooks (get-conn st) (ebbwh/by-wh-cuid cuid))
           (first)
           (cuid->id)))
 
-(defn- select-bb-webhooks-by-filter [{:keys [conn]} f]
-  (->> (ebbwh/select-bb-webhooks-with-repos conn (ebbwh/by-filter f))
+(defn- select-bb-webhooks-by-filter [st f]
+  (->> (ebbwh/select-bb-webhooks-with-repos (get-conn st) (ebbwh/by-filter f))
        (map cuid->id)))
 
 (def crypto? (partial global-sid? st/crypto))
@@ -809,8 +815,8 @@
   (some-> (ei/select-invoice-with-org conn cuid)
           db->invoice))
 
-(defn- select-invoices-for-org [{:keys [conn]} org-cuid]
-  (->> (ei/select-invoices-for-org conn org-cuid)
+(defn- select-invoices-for-org [st org-cuid]
+  (->> (ei/select-invoices-for-org (get-conn st) org-cuid)
        (map db->invoice)))
 
 (defn- insert-invoice [conn inv]
@@ -863,8 +869,8 @@
     (update-queued-task conn task match)
     (insert-queued-task conn task)))
 
-(defn- select-queued-tasks [{:keys [conn]}]
-  (->> (ec/select-queued-tasks conn nil)
+(defn- select-queued-tasks [st]
+  (->> (ec/select-queued-tasks (get-conn st) nil)
        (map cuid->id)))
 
 (defn- delete-queued-task [conn cuid]
@@ -890,8 +896,8 @@
                                   (assoc :job-id (:id job))
                                   (job-evt->db)))))
 
-(defn- select-job-events [{:keys [conn]} job-sid]
-  (->> (ej/select-events conn job-sid)
+(defn- select-job-events [st job-sid]
+  (->> (ej/select-events (get-conn st) job-sid)
        (map db->job-evt)))
 
 (defn- sid-pred [t sid]
@@ -903,138 +909,131 @@
 
 (def job-event? (partial global-sid? st/job-event))
 
-(defrecord SqlStorage [conn]
+(defrecord SqlStorage [pool]
   p/Storage
-  (read-obj [_ sid]
-    (condp sid-pred sid
-      org?
-      (select-org conn (global-sid->cuid sid))
-      user?
-      (select-user-by-type conn (drop 2 sid))
-      build?
-      (select-build conn (rest sid))
-      webhook?
-      (select-webhook conn (global-sid->cuid sid))
-      ssh-key?
-      (select-ssh-keys conn (second sid))
-      params?
-      (select-params conn (second sid))
-      join-request?
-      (select-join-request conn (global-sid->cuid sid))
-      email-registration?
-      (select-email-registration conn (global-sid->cuid sid))
-      credit-subscription?
-      (select-credit-subscription conn (last sid))
-      credit-consumption?
-      (select-credit-consumption conn (last sid))
-      org-credit?
-      (select-org-credit conn (global-sid->cuid sid))
-      bb-webhook?
-      (select-bb-webhook conn (last sid))
-      crypto?
-      (select-crypto conn (last sid))
-      sysadmin?
-      (select-sysadmin conn (last sid))
-      invoice?
-      (select-invoice conn (last sid))
-      runner-details?
-      (select-runner-details conn (runner-details-sid->build-sid sid))))
+  (read-obj [this sid]
+    (let [conn (get-conn this)]
+      (condp sid-pred sid
+        org?
+        (select-org conn (global-sid->cuid sid))
+        user?
+        (select-user-by-type conn (drop 2 sid))
+        build?
+        (select-build conn (rest sid))
+        webhook?
+        (select-webhook conn (global-sid->cuid sid))
+        ssh-key?
+        (select-ssh-keys conn (second sid))
+        params?
+        (select-params conn (second sid))
+        join-request?
+        (select-join-request conn (global-sid->cuid sid))
+        email-registration?
+        (select-email-registration conn (global-sid->cuid sid))
+        credit-subscription?
+        (select-credit-subscription conn (last sid))
+        credit-consumption?
+        (select-credit-consumption conn (last sid))
+        org-credit?
+        (select-org-credit conn (global-sid->cuid sid))
+        bb-webhook?
+        (select-bb-webhook conn (last sid))
+        crypto?
+        (select-crypto conn (last sid))
+        sysadmin?
+        (select-sysadmin conn (last sid))
+        invoice?
+        (select-invoice conn (last sid))
+        runner-details?
+        (select-runner-details conn (runner-details-sid->build-sid sid)))))
   
-  (write-obj [_ sid obj]
-    (when (condp sid-pred sid
-            org?
-            (upsert-org conn obj)
-            user?
-            (upsert-user conn obj)
-            join-request?
-            (upsert-join-request conn obj)
-            build?
-            (upsert-build conn obj)
-            webhook?
-            (upsert-webhook conn obj)
-            ssh-key?
-            (upsert-ssh-keys conn (last sid) obj)
-            params?
-            (upsert-params conn (last sid) obj)
-            email-registration?
-            (insert-email-registration conn obj)
-            credit-subscription?
-            (upsert-credit-subscription conn obj)
-            credit-consumption?
-            (upsert-credit-consumption conn obj)
-            org-credit?
-            (upsert-org-credit conn obj)
-            bb-webhook?
-            (upsert-bb-webhook conn obj)
-            crypto?
-            (upsert-crypto conn obj)
-            sysadmin?
-            (upsert-sysadmin conn obj)
-            invoice?
-            (upsert-invoice conn obj)
-            runner-details?
-            (upsert-runner-details conn (runner-details-sid->build-sid sid) obj)
-            queued-task?
-            (upsert-queued-task conn (last sid) obj)
-            job-event?
-            (insert-job-event conn sid obj)
-            (log/warn "Unrecognized sid when writing:" sid))
-      sid))
+  (write-obj [this sid obj]
+    (let [conn (get-conn this)]
+      (when (condp sid-pred sid
+              org?
+              (upsert-org conn obj)
+              user?
+              (upsert-user conn obj)
+              join-request?
+              (upsert-join-request conn obj)
+              build?
+              (upsert-build conn obj)
+              webhook?
+              (upsert-webhook conn obj)
+              ssh-key?
+              (upsert-ssh-keys conn (last sid) obj)
+              params?
+              (upsert-params conn (last sid) obj)
+              email-registration?
+              (insert-email-registration conn obj)
+              credit-subscription?
+              (upsert-credit-subscription conn obj)
+              credit-consumption?
+              (upsert-credit-consumption conn obj)
+              org-credit?
+              (upsert-org-credit conn obj)
+              bb-webhook?
+              (upsert-bb-webhook conn obj)
+              crypto?
+              (upsert-crypto conn obj)
+              sysadmin?
+              (upsert-sysadmin conn obj)
+              invoice?
+              (upsert-invoice conn obj)
+              runner-details?
+              (upsert-runner-details conn (runner-details-sid->build-sid sid) obj)
+              queued-task?
+              (upsert-queued-task conn (last sid) obj)
+              job-event?
+              (insert-job-event conn sid obj)
+              (log/warn "Unrecognized sid when writing:" sid))
+        sid)))
 
-  (obj-exists? [_ sid]
-    (condp sid-pred sid
-      org?
-      (org-exists? conn (global-sid->cuid sid))
-      build?
-      (build-exists? conn (rest sid))
-      nil))
+  (obj-exists? [this sid]
+    (let [conn (get-conn this)]
+      (condp sid-pred sid
+        org?
+        (org-exists? conn (global-sid->cuid sid))
+        build?
+        (build-exists? conn (rest sid))
+        nil)))
 
-  (delete-obj [_ sid]
-    (deleted?
-     (condp sid-pred sid
-       org?
-       (delete-org conn (global-sid->cuid sid))
-       email-registration?
-       (delete-email-registration conn (global-sid->cuid sid))
-       webhook?
-       (delete-webhook conn (last sid))
-       credit-subscription?
-       (delete-credit-subscription conn (last sid))
-       queued-task?
-       (delete-queued-task conn (last sid))
-       (log/warn "Deleting entity" sid "is not supported"))))
+  (delete-obj [this sid]
+    (let [conn (get-conn this)]
+      (deleted?
+       (condp sid-pred sid
+         org?
+         (delete-org conn (global-sid->cuid sid))
+         email-registration?
+         (delete-email-registration conn (global-sid->cuid sid))
+         webhook?
+         (delete-webhook conn (last sid))
+         credit-subscription?
+         (delete-credit-subscription conn (last sid))
+         queued-task?
+         (delete-queued-task conn (last sid))
+         (log/warn "Deleting entity" sid "is not supported")))))
 
-  (list-obj [_ sid]
-    (condp sid-pred sid
-      build-repo?
-      (select-repo-build-ids conn (rest sid))
-      (log/warn "Unable to list objects for sid" sid)))
+  (list-obj [this sid]
+    (let [conn (get-conn this)]
+      (condp sid-pred sid
+        build-repo?
+        (select-repo-build-ids conn (rest sid))
+        (log/warn "Unable to list objects for sid" sid))))
 
   p/Transactable
   (transact [this f]
-    (jdbc/transact
-     (:ds conn)
-     (fn [c]
-       ;; Recreate storage object, with the transacted connection
-       (f (map->SqlStorage {:conn (assoc conn :ds c)
-                            :overrides (:overrides this)})))))
+    (let [conn (get-conn this)]
+      (jdbc/transact
+       (:ds conn)
+       (fn [c]
+         ;; Recreate storage object, with the transacted connection
+         (f (map->SqlStorage {:get-conn (constantly (assoc conn :ds c))
+                              :overrides (:overrides this)})))))))
 
-  ;; It would be cleaner to remove migrations from storage, and put
-  ;; it in a separate component
-  co/Lifecycle
-  (start [this]
-    (log/debug "Starting DB connection")
-    (emig/run-migrations! (merge conn (select-keys this [:vault :crypto])))
-    this)
-
-  (stop [this]
-    (when-let [ds (:ds conn)]
-      (log/debug "Closing DB connection")
-      (.close ds))
-    this))
-
-(defn select-watched-github-repos [{:keys [conn]} github-id]
-  (let [matches (ec/select-repos conn [:= :github-id github-id])
+(defn select-watched-github-repos [st github-id]
+  (let [conn (get-conn st)
+        matches (ec/select-repos conn [:= :github-id github-id])
         ;; Select all org records for the repos
         orgs (when (not-empty matches)
                (->> matches
@@ -1050,18 +1049,20 @@
                   (db->repo e add-org-cuid))]
     (map convert matches)))
 
-(defn watch-github-repo [{:keys [conn]} {:keys [org-id] :as repo}]
-  (when-let [org (ec/select-org conn (ec/by-cuid org-id))]
-    (let [r (ec/insert-repo conn (repo->db repo (:id org)))]
-      (sid/->sid [org-id (:display-id r)]))))
+(defn watch-github-repo [st {:keys [org-id] :as repo}]
+  (let [conn (get-conn st)]
+    (when-let [org (ec/select-org conn (ec/by-cuid org-id))]
+      (let [r (ec/insert-repo conn (repo->db repo (:id org)))]
+        (sid/->sid [org-id (:display-id r)])))))
 
-(defn unwatch-github-repo [{:keys [conn]} [org-id repo-id]]
-  ;; TODO Use a single query with join
-  (some? (when-let [org (ec/select-org conn (ec/by-cuid org-id))]
-           (when-let [repo (ec/select-repo conn [:and
-                                                 [:= :org-id (:id org)]
-                                                 [:= :display-id repo-id]])]
-             (ec/update-repo conn (assoc repo :github-id nil))))))
+(defn unwatch-github-repo [st [org-id repo-id]]
+  (let [conn (get-conn st)]
+    ;; TODO Use a single query with join
+    (some? (when-let [org (ec/select-org conn (ec/by-cuid org-id))]
+             (when-let [repo (ec/select-repo conn [:and
+                                                   [:= :org-id (:id org)]
+                                                   [:= :display-id repo-id]])]
+               (ec/update-repo conn (assoc repo :github-id nil)))))))
 
 (def overrides
   {:watched-github-repos
@@ -1115,14 +1116,32 @@
    :queued-task
    {:list select-queued-tasks}})
 
-(defn make-storage [conn]
-  (map->SqlStorage {:conn conn
+(defn make-storage [conn-fn]
+  (map->SqlStorage {:get-conn conn-fn
                     :overrides overrides}))
 
-(defmethod st/make-storage :sql [{conf :storage}]
-  (log/debug "Using SQL storage with configuration:" (dissoc conf :password))
-  (let [conn {:ds (conn/->pool HikariDataSource (-> conf
-                                                    (dissoc :url :type)
-                                                    (assoc :jdbcUrl (:url conf))))
-              :sql-opts {:dialect :mysql :quoted-snake true}}]
-    (make-storage conn)))
+(defn- pool->conn [pool]
+  {:ds (pool)
+   :sql-opts {:dialect :mysql :quoted-snake true}})
+
+(defmethod st/make-storage :sql [_]
+  (make-storage (comp pool->conn :pool)))
+
+(defn pool-component [conf]
+  (log/debug "Creating SQL connection pool with configuration:" (dissoc conf :password))
+  (conn/component HikariDataSource
+                  (-> conf
+                      (dissoc :url :type)
+                      (assoc :jdbcUrl (:url conf)))))
+
+(defrecord DbMigrator [pool]
+  co/Lifecycle
+  (start [this]
+    (emig/run-migrations! (merge (pool->conn pool) (select-keys this [:vault :crypto])))
+    this)
+
+  (stop [this]
+    this))
+
+(defn migrations-component []
+  (->DbMigrator nil))

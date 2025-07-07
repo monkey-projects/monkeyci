@@ -19,7 +19,7 @@
 
 (defmacro with-storage [conn s & body]
   `(eh/with-prepared-db ~conn
-     (let [~s (sut/make-storage ~conn)]
+     (let [~s (sut/make-storage (constantly ~conn))]
        ~@body)))
 
 (deftest ^:sql orgs
@@ -36,7 +36,7 @@
       (st/with-transaction s tx
         (let [org (h/gen-org)]
           (is (sid/sid? (st/save-org tx org)))
-          (is (some? (ec/select-org (:conn tx) (ec/by-cuid (:id org)))))
+          (is (some? (ec/select-org ((:get-conn tx) tx) (ec/by-cuid (:id org)))))
           (is (= (assoc org :repos {})
                  (st/find-org tx (:id org)))))))
 
@@ -859,9 +859,16 @@
         (is (sid/sid? (st/save-job-event st evt)))
         (is (= [evt] (st/list-job-events st (job->sid job))))))))
 
+(deftest pool-component
+  (testing "creates sql connection pool using settings"
+    (let [s (sut/pool-component {:type :sql
+                                 :url (:jdbcUrl eh/h2-config)})]
+      (is (some? s)))))
+
 (deftest make-storage
-  (testing "creates sql storage object using connection settings"
-    (let [s (st/make-storage {:storage {:type :sql
-                                        :url (:jdbcUrl eh/h2-config)}})]
-      (is (some? s))
-      (is (some? (-> s :conn :ds))))))
+  (testing "creates storage component"
+    (let [conf {:type :sql
+                :url (:jdbcUrl eh/h2-config)}
+          s (-> (st/make-storage {:storage conf})
+                (assoc :pool (sut/pool-component conf)))]
+      (is (fn? (:get-conn s))))))

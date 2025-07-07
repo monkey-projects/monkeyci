@@ -22,7 +22,7 @@
             [monkey.ci.reporting.print]
             [monkey.ci.runners.oci :as ro]
             [monkey.ci.runtime.common :as rc]
-            [monkey.ci.storage.sql]
+            [monkey.ci.storage.sql :as sql]
             [monkey.ci.vault
              [common :as vc]
              [scw :as v-scw]]
@@ -61,6 +61,16 @@
   "Creates new mailman event broker component."
   [config]
   (em/make-component (:mailman config)))
+
+(defn- new-db-pool [{conf :storage}]
+  (if (= :sql (:type conf))
+    (sql/pool-component conf)
+    {}))
+
+(defn- new-db-migrator [{conf :storage}]
+  (if (= :sql (:type conf))
+    (sql/migrations-component)
+    {}))
 
 (defn- new-storage [config]
   (if (not-empty (:storage config))
@@ -243,9 +253,13 @@
                (new-server-runtime config)
                [:artifacts :metrics :storage :jwk :process-reaper :vault :mailman :update-bus
                 :crypto])
+   :pool      (new-db-pool config)
+   :migrator  (co/using
+               (new-db-migrator config)
+               [:pool :vault :crypto])
    :storage   (co/using
                (new-storage config)
-               [:vault :crypto])
+               [:pool])
    :jwk       (new-jwk config)
    :metrics   (new-metrics)
    :metrics-routes (co/using
@@ -253,7 +267,9 @@
                     [:metrics :mailman])
    :process-reaper (new-process-reaper config)
    :vault     (new-vault config)
-   :crypto    (new-crypto config)
+   :crypto    (co/using
+               (new-crypto config)
+               [:storage])
    :mailman   (new-mailman config)
    :queue-options (new-queue-options config)
    :mailman-routes (co/using
