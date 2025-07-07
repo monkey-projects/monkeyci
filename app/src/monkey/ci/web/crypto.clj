@@ -45,15 +45,15 @@
   "Checks if the argument is a valid data encryption key"
   [x]
   (and (instance? byte/1 x)
-       (= v/iv-size (count x))))
+       (= v/dek-size (count x))))
 
 (def dek-generator #(wc/from-rt % :dek-generator))
 
 (defn generate-dek
-  "Generates a new DEK using request context.  Returns both the encrypted and 
-   unencrypted key."
-  [req]
-  ((dek-generator req)))
+  "Generates a new DEK using request context for given org id.  Returns both 
+   the encrypted and unencrypted key."
+  [req org-id]
+  ((dek-generator req) org-id))
 
 #_(def dek-provider #(wc/from-rt % :dek-provider))
 

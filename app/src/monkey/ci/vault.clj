@@ -8,6 +8,7 @@
   (:import java.util.BitSet))
 
 (def iv-size 16)
+(def dek-size 32)
 
 ;; Fixed key vault, that uses a preconfigured key.  Useful for testing or developing,
 ;; or when using a temporary data encryption key (DEK).
@@ -22,7 +23,7 @@
 (defn generate-key
   "Generates random encryption key"
   []
-  (bcn/random-nonce 32))
+  (bcn/random-nonce dek-size))
 
 (defn make-fixed-key-vault [config]
   (->FixedKeyVault (or (:encryption-key config) (generate-key))))

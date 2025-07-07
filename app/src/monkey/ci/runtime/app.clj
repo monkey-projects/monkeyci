@@ -1,6 +1,7 @@
 (ns monkey.ci.runtime.app
   "Functions for setting up a runtime for application (cli or server)"
-  (:require [clojure.tools.logging :as log]
+  (:require [buddy.core.codecs :as bcc]
+            [clojure.tools.logging :as log]
             [com.stuartsierra.component :as co]
             [manifold.bus :as mb]
             [monkey.ci
@@ -22,7 +23,9 @@
             [monkey.ci.runners.oci :as ro]
             [monkey.ci.runtime.common :as rc]
             [monkey.ci.storage.sql]
-            [monkey.ci.vault.scw :as v-scw]
+            [monkey.ci.vault
+             [common :as vc]
+             [scw :as v-scw]]
             [monkey.ci.web
              [handler :as wh]
              [http :as http]]
@@ -102,15 +105,44 @@
     {:generator (comp deref #(v-scw/generate-dek client))
      :decrypter (comp deref #(v-scw/decrypt-dek client %))}))
 
-(defn- new-crypto
+(defrecord Crypto [config]
+  co/Lifecycle
+  (start [this]
+    (let [{dg :generator kd :decrypter} (dek-utils config)
+          cache (or (:cache this) (atom {}))]
+      (letfn [(lookup-dek [org-id]
+                (let [enc (some-> (s/find-crypto (:storage this) org-id)
+                                  :dek)
+                      plain (kd enc)]
+                  (log/debug "Looked up encrypted key for" org-id ":" enc)
+                  (swap! cache assoc org-id {:enc enc
+                                             :key plain})
+                  (bcc/b64->bytes plain)))
+              (get-dek [org-id]
+                (or (some-> (get-in @cache [org-id :key])
+                            (bcc/b64->bytes))
+                    (lookup-dek org-id)))]
+        (assoc this
+               :dek-generator
+               (fn [org-id]
+                 (let [k (dg)]
+                   (swap! cache assoc org-id k)
+                   k))
+               :encrypter
+               (fn [v org-id]
+                 (vc/encrypt (get-dek org-id) (v/cuid->iv org-id) v))
+               :decrypter
+               (fn [v org-id]
+                 (vc/decrypt (get-dek org-id) (v/cuid->iv org-id) v))))))
+
+  (stop [this]
+    this))
+
+(defn new-crypto
   "Creates functions for data encryption, such as a new data encryption key
    generator function, which is used to create new keys as needed."
-  [config]
-  (let [{dg :generator kd :decrypter} (dek-utils (:dek config))]
-    {:dek-generator dg
-     ;; TODO
-     :encrypter (constantly nil)
-     :decrypter (constantly nil)}))
+  [conf]
+  (->Crypto (:dek conf)))
 
 (defrecord ServerRuntime [config]
   co/Lifecycle

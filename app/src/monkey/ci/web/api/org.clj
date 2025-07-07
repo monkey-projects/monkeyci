@@ -60,7 +60,7 @@
 
 (defn- create-crypto [req org-id]
   (let [st (c/req->storage req)
-        dek (crypto/generate-dek req)]
+        dek (crypto/generate-dek req org-id)]
     ;; Store the encrypted key
     (st/save-crypto st {:org-id org-id
                         :dek (:enc dek)})))

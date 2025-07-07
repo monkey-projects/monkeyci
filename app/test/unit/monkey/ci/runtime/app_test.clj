@@ -1,15 +1,24 @@
 (ns monkey.ci.runtime.app-test
   (:require [aleph.http :as aleph]
+            [buddy.core.codecs :as bcc]
             [clojure.test :refer [deftest is testing]]
             [com.stuartsierra.component :as co]
             [manifold.deferred :as md]
             [monkey.ci
+             [cuid :as cuid]
              [oci :as oci]
              [protocols :as p]
-             [storage :as st]]
+             [storage :as st]
+             [utils :as u]
+             [vault :as v]]
             [monkey.ci.runtime.app :as sut]
-            [monkey.ci.vault.scw :as v-scw]
-            [monkey.ci.test.config :as tc]))
+            [monkey.ci.vault
+             [common :as vc]
+             [scw :as v-scw]]
+            [monkey.ci.web.crypto :as crypto]
+            [monkey.ci.test
+             [config :as tc]
+             [helpers :as h]]))
 
 (def server-config
   (assoc tc/base-config
@@ -140,3 +149,73 @@
 
         (testing "provides key decrypter"
           (is (fn? decrypter)))))))
+
+(deftest crypto
+  (h/with-memory-store st
+    (let [k {:enc "encrypted-dek"
+             :key (bcc/bytes->b64 (v/generate-key))}]
+      (defmethod sut/dek-utils ::test [_]
+        {:generator (constantly k)
+         :decrypter (fn [v]
+                      (when (= (:enc k) v)
+                        (:key k)))})
+
+      (let [cache (atom {})
+            org-id (cuid/random-cuid)
+            crypto (-> (sut/new-crypto {:dek
+                                        {:type ::test}})
+                       (assoc :cache cache
+                              :storage st)
+                       (co/start))
+            encrypt (fn [v]
+                      (vc/encrypt (bcc/b64->bytes (:key k))
+                                  (v/cuid->iv org-id)
+                                  v))]
+
+        (testing "`generator`"
+          (testing "provides dek generator fn"
+            (is (fn? (:dek-generator crypto))))
+
+          (testing "stores decrypted key in cache"
+            (let [res ((:dek-generator crypto) org-id)]
+              (is (string? (:enc res)))
+              (is (crypto/dek? (bcc/b64->bytes (:key res))))
+              (is (= [org-id] (keys @cache)))
+              (is (some? (st/save-crypto st {:org-id org-id
+                                             :dek (:enc res)}))))))
+
+        (testing "`encrypter`"
+          (let [e (:encrypter crypto)
+                v "value to encrypt"
+                validate (fn []
+                           (= (encrypt v)
+                              (e v org-id)))]
+            (is (fn? e))
+            
+            (testing "encrypts value using cached key"
+              (is true? (validate)))
+
+            (testing "looks up and decrypts stored key"
+              (is (empty? (reset! cache {})))
+              (is (true? (validate)))
+              (is (not-empty @cache)))))
+
+        (testing "`decrypter`"
+          (let [d (:decrypter crypto)
+                v (encrypt "value to decrypt")
+                validate (fn []
+                           (= (vc/decrypt (bcc/b64->bytes (:key k))
+                                          (v/cuid->iv org-id)
+                                          v)
+                              (d v org-id)))]
+            (is (fn? d))
+            
+            (testing "decrypts value using cached key"
+              (is true? (validate)))
+
+            (testing "looks up and decrypts stored key"
+              (is (empty? (reset! cache {})))
+              (is (true? (validate)))
+              (is (not-empty @cache))))))))
+
+  (is (some? (remove-method sut/dek-utils ::test))))
