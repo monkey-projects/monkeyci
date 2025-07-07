@@ -33,10 +33,10 @@
 (defn- test-rt [& [opts]]
   (-> (merge (trt/test-runtime)
              {:config {:dev-mode true}
-              :vault (h/dummy-vault)
-              :encrypter (fn [x _] x)
-              :decrypter (fn [x _] x)}
+              :vault (h/dummy-vault)}
              opts)
+      (trt/set-encrypter (fn [x _ _] x))
+      (trt/set-decrypter (fn [x _ _] x))
       (update :storage #(or % (st/make-memory-storage)))))
 
 (defn- make-test-app
