@@ -7,13 +7,6 @@
              [vault :as v]]
             [monkey.ci.web.common :as wc]))
 
-(defn crypto-details
-  "Retrieves crypto information for the org in the request.  If no crypto record
-   is found, one is created with a new initialization vector (iv) and a master
-   data encryption key (DEK).  Returns a map containing an iv and an unencrypted
-   DEK."
-  [req])
-
 (defn crypto-iv
   "Looks up crypto initialization vector for the org associated with the
    request.  If no crypto record is found, one is generated."

@@ -11,7 +11,7 @@
               :join [[:orgs :c] [:= :c.id :p.org-id]]
               :where f}))
 
-(defn- select-params-with-values
+(defn select-params-with-values
   "Selects parameters and their values using the filter"
   [conn f]
   (let [params (select-params-with-org conn f)

@@ -212,6 +212,78 @@
      ;; Delete them all
      (ec/delete-repo-indices conn [:> :next-idx 0]))))
 
+(defn generate-org-deks
+  "Generates a data encryption key (DEK) for each org that does not yet have one."
+  [idx]
+  (->FunctionMigration
+   (str idx "-generate-org-deks")
+   (fn [conn]
+     (let [dg (get-in conn [:crypto :dek-generator])]
+       ;; Read all org and crypto records, generate DEK and write back
+       (->> (ec/select-cryptos conn [:is :dek nil])
+            (map (fn [o]
+                   (assoc o :dek (:enc (dg)))))
+            (map (fn [o]
+                   (ec/update-crypto conn o)))
+            (doall))))
+   (fn [conn]
+     ;; Noop
+     )))
+
+(defn- re-encrypt-value-mig [id query prop updater]
+  (->FunctionMigration
+   id
+   (fn [{:keys [vault] :as conn}]
+     (let [e (get-in conn [:crypto :encrypter])]
+       (letfn [(re-encrypt [obj]
+                 ;; Decrypt using vault, then re-encrypt using the org id as nonce
+                 (assoc obj prop (-> (prop obj)
+                                     (as-> ev (mp/decrypt vault (:iv obj) ev))
+                                     (e (:org-id obj)))))]
+         (->> (ec/select conn query)
+              (map re-encrypt)
+              (map (partial updater conn))
+              (doall)))))
+   
+   (fn [{:keys [vault] :as conn}]
+     (let [d (get-in conn [:crypto :decrypter])]
+       (letfn [(re-encrypt [obj]
+                 ;; Decrypt using vault, then re-encrypt using the org id as nonce
+                 (assoc obj prop (-> (prop obj)
+                                     (d (:org-id obj))
+                                     (as-> dv (mp/encrypt vault (:iv obj) dv)))))]
+         (->> (ec/select conn query)
+              (map re-encrypt)
+              (map (partial updater conn))
+              (doall)))))))
+
+(defn re-encrypt-params
+  "Reads and decrypts all params that do not yet use the organization DEK, and
+   re-encrypts them."
+  [idx]
+  (re-encrypt-value-mig
+   (str idx "-re-encrypt-params")
+   {:select [:pv.id :pv.params-id :pv.value :c.org-id :c.dek :c.iv]
+    :from [[:org-param-values :pv]]
+    :join [[:org-params :op] [:= :op.id :pv.params-id]
+           [:cryptos :c] [:= :c.org-id :op.org-id]]}
+   :value
+   (fn [conn pv]
+     (ec/update-org-param-value conn (select-keys pv [:id :value])))))
+
+(defn re-encrypt-ssh-keys
+  "Reads and decrypts all private ssh keys that do not yet use the organization DEK, and
+   re-encrypts them."
+  [idx]
+  (re-encrypt-value-mig
+   (str idx "-re-encrypt-ssh-keys")
+   {:select [:sk.id :sk.org-id :sk.private-key :c.dek :c.iv]
+    :from [[:ssh-keys :sk]]
+    :join [[:cryptos :c] [:= :c.org-id :sk.org-id]]}
+   :private-key
+   (fn [conn k]
+     (ec/update-ssh-key conn (select-keys k [:id :private-key])))))
+
 (def migrations
   [(entity-table-migration
     1 :customers
@@ -556,7 +628,11 @@
     [{:alter-table :cryptos
       :add-column [:dek [:varchar 100]]}]
     [{:alter-table :cryptos
-      :drop-column :dek}])])
+      :drop-column :dek}])
+
+   (generate-org-deks 45)
+   (re-encrypt-params 46)
+   (re-encrypt-ssh-keys 47)])
 
 (defn prepare-migrations
   "Prepares all migrations by formatting to sql, creates a ragtime migration object from it."

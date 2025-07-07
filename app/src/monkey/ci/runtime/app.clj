@@ -106,8 +106,8 @@
   "Creates functions for data encryption, such as a new data encryption key
    generator function, which is used to create new keys as needed."
   [config]
-  (let [de (dek-utils (:dek config))]
-    {:dek-generator (:generator de)
+  (let [{dg :generator kd :decrypter} (dek-utils (:dek config))]
+    {:dek-generator dg
      ;; TODO
      :encrypter (constantly nil)
      :decrypter (constantly nil)}))
@@ -213,7 +213,7 @@
                 :crypto])
    :storage   (co/using
                (new-storage config)
-               [:vault])
+               [:vault :crypto])
    :jwk       (new-jwk config)
    :metrics   (new-metrics)
    :metrics-routes (co/using

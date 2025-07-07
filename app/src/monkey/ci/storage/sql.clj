@@ -903,7 +903,7 @@
 
 (def job-event? (partial global-sid? st/job-event))
 
-(defrecord SqlStorage [conn vault]
+(defrecord SqlStorage [conn]
   p/Storage
   (read-obj [_ sid]
     (condp sid-pred sid
@@ -1024,7 +1024,7 @@
   co/Lifecycle
   (start [this]
     (log/debug "Starting DB connection")
-    (emig/run-migrations! (assoc conn :vault vault))
+    (emig/run-migrations! (merge conn (select-keys this [:vault :crypto])))
     this)
 
   (stop [this]
