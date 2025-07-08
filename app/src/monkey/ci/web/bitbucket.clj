@@ -17,7 +17,8 @@
              [auth :as auth]
              [common :as c]
              [oauth2 :as oauth2]
-             [response :as r]]
+             [response :as r]
+             [trigger :as wt]]
             [ring.util.response :as rur]))
 
 (defn- handle-error [ex]
@@ -184,21 +185,15 @@
   (let [st (c/req->storage req)
         rsid [org-id repo-id]
         body (c/body req)
-        repo (st/find-repo st rsid)
-        ssh-keys (c/find-ssh-keys st repo)]
+        repo (st/find-repo st rsid)]
     (-> (zipmap [:org-id :repo-id] rsid)
-        (assoc :id (st/new-id)
-               :source :bitbucket-webhook
-               :start-time (t/now)
-               :status :pending
-               ;; TODO Changed files
+        (assoc ;; TODO Changed files
                :git (cond-> {:url (:url repo)
                              :ref (git-ref body)}
-                      ;; TODO Re-encrypt using build-specific DEK
-                      (not-empty ssh-keys) (assoc :ssh-keys ssh-keys)
                       true (mc/assoc-some :message (some-> (new-changes body)
                                                            :target
-                                                           :message)))))))
+                                                           :message))))
+        (wt/prepare-triggered-build (c/req->rt req) repo))))
 
 (defn- handle-push [req]
   (let [st (c/req->storage req)

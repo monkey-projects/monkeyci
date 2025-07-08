@@ -263,7 +263,9 @@
                :tag))))
 
   (testing "adds configured encrypted ssh keys"
-    (let [{st :storage :as rt} (trt/test-runtime)
+    (let [{st :storage :as rt} (-> (trt/test-runtime)
+                                   (trt/set-encrypter (constantly "encrypted"))
+                                   (trt/set-decrypter (constantly "decrypted")))
           [cid rid] (repeatedly st/new-id)
           repo {:id rid
                 :org-id cid}
@@ -272,13 +274,14 @@
       (is (st/sid? (st/save-org st {:id cid
                                          :repos {rid repo}})))
       (is (st/sid? (st/save-ssh-keys st cid [ssh-key])))
-      (is (= [ssh-key]
+      (is (= ["public-key"]
              (-> (h/->req rt)
                  (assoc-in [:parameters :path] {:org-id cid
                                                 :repo-id rid})
                  (sut/make-build-ctx repo)
                  :git
-                 :ssh-keys)))))
+                 :ssh-keys
+                 (as-> k (map :public-key k)))))))
 
   (testing "adds main branch from repo"
     (is (= "test-branch"
@@ -464,17 +467,20 @@
                     (assoc :start-time 100
                            :end-time 200
                            :org-id (:org-id repo)
-                           :repo-id (:id repo)))
-          make-req (fn [runner params]
-                     (-> {:storage st
-                          :runner runner}
+                           :repo-id (:id repo)
+                           :git {:url "http://test"
+                                 :ref "refs/heads/main"}))
+          make-req (fn [params]
+                     (-> (trt/test-runtime)
+                         (trt/set-storage st)
+                         (trt/set-encrypter (constantly "encrypted"))
+                         (trt/set-decrypter (constantly "decrypted"))
                          (h/->req)
                          (assoc :parameters params)))]
       (is (some? (st/save-build st build)))
       (is (some? (st/save-repo st repo)))
 
-      (let [r (-> (make-req (constantly "ok")
-                            {:path (select-keys build [:org-id :repo-id :build-id])})
+      (let [r (-> (make-req {:path (select-keys build [:org-id :repo-id :build-id])})
                   (sut/retry-build))
             bid (-> r :body :id)]
         (testing "returns newly created build id"
@@ -495,16 +501,14 @@
         (let [ssh-keys [{:private-key "test-priv"
                          :public-key "test-pub"}]]
           (is (some? (st/save-ssh-keys st (:org-id build) ssh-keys)))
-          (let [r (-> (make-req (constantly "ok")
-                                {:path (select-keys build [:org-id :repo-id :build-id])})
+          (let [r (-> (make-req {:path (select-keys build [:org-id :repo-id :build-id])})
                       (sut/retry-build))
                 b (-> r r/get-events first :build)]
             (is (some? b))
-            (is (= ssh-keys (-> b :git :ssh-keys))))))
+            (is (= 1 (-> b :git :ssh-keys count))))))
 
       (testing "returns 404 if build not found"
-        (is (= 404 (-> (make-req (constantly "ok")
-                                 {:path (-> build
+        (is (= 404 (-> (make-req {:path (-> build
                                             (select-keys [:org-id :repo-id])
                                             (assoc :build-id "non-existing"))})
                        (sut/retry-build)

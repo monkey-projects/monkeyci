@@ -143,7 +143,8 @@
     (let [wh (test-webhook)
           rt (-> (trt/test-runtime)
                  (trt/set-storage s)
-                 (trt/set-encrypter (constantly "encrypted")))]
+                 (trt/set-encrypter (constantly "encrypted"))
+                 (trt/set-decrypter (constantly "decrypted")))]
       
       (is (st/sid? (st/save-webhook s wh)))
       
@@ -245,17 +246,14 @@
                                             (:id wh)
                                             {:ref "test-ref"
                                              :repository {:master-branch "test-main"}})]
-            (is (= [{:id (:id ssh-key)
-                     :private-key "encrypted-key"}]
-                   (get-in r [:git :ssh-keys])))))))
+            (is (= 1 (count (get-in r [:git :ssh-keys])))))))
 
-    (testing "assigns id"
-      (h/with-memory-store s
+      (testing "assigns id"
         (let [{cid :org-id rid :repo-id :as wh} (test-webhook)]
           (is (st/sid? (st/save-webhook s wh)))
           (is (st/sid? (st/save-repo s {:org cid
                                         :id rid})))
-          (let [r (sut/create-webhook-build {:storage s}
+          (let [r (sut/create-webhook-build rt
                                             (:id wh)
                                             {:ref "test-ref"
                                              :repository {:master-branch "test-main"}})]

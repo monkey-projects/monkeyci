@@ -1,21 +1,19 @@
 (ns monkey.ci.web.github
   "Functionality specific for Github"
-  (:require [clojure.tools.logging :as log]
+  (:require [aleph.http :as http]
+            [clojure.tools.logging :as log]
             [manifold.deferred :as md]
-            [medley.core :as mc]
             [monkey.ci
              [build :as b]
-             [labels :as lbl]
              [runtime :as rt]
              [storage :as s]
-             [utils :as u]
              [version :as v]]
             [monkey.ci.web
              [auth :as auth]
              [common :as c]
              [oauth2 :as oauth2]
-             [response :as r]]
-            [aleph.http :as http]
+             [response :as r]
+             [trigger :as t]]
             [ring.util.response :as rur]))
 
 (def req->repo-sid (comp (juxt :org-id :repo-id) :path :parameters))
@@ -33,10 +31,6 @@
   "Checks if the incoming request is actually a push.  Github can also
    send other types of requests."
   (comp (partial = "push") github-event))
-
-(defn- find-ssh-keys [{st :storage} org-id repo-id]
-  (let [repo (s/find-repo st [org-id repo-id])]
-    (c/find-ssh-keys st repo)))
 
 (defn- file-changes
   "Determines file changes according to the payload commits."
@@ -66,7 +60,7 @@
                                :ref (:ref payload)
                                :commit-id commit-id))
                :changes (file-changes payload))
-        (c/prepare-triggered-build rt))))
+        (t/prepare-triggered-build rt))))
 
 (defn create-webhook-build [{st :storage :as rt} id payload]
   (if-let [details (s/find-webhook st id)]

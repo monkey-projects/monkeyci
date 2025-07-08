@@ -213,6 +213,8 @@
 
 (deftest webhook
   (let [rt (-> (trt/test-runtime)
+               (trt/set-encrypter (constantly "encrypted"))
+               (trt/set-decrypter (constantly "decrypted"))
                (assoc :config {:ssh-keys-dir "/tmp"}))
         s (:storage rt)
         vault (v/make-fixed-key-vault {})
@@ -275,9 +277,11 @@
         (let [evts (-> (sut/webhook req)
                        (r/get-events))]
           (is (= 1 (count evts)))
-          (is (= [{:id (:id ssh-key)
-                   :private-key "encrypted-key"}]
-                 (-> evts first :build (get-in [:git :ssh-keys])))))))
+          (is (= 1 (-> evts
+                       first
+                       :build
+                       (get-in [:git :ssh-keys])
+                       (count)))))))
     
     (testing "404 if webhook does not exist"
       (is (= 404 (-> rt
