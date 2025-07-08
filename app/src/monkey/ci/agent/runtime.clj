@@ -65,11 +65,11 @@
 
 (defn new-ssh-keys-fetcher [config]
   (let [client (ahmw/wrap-request http/request)]
-    (fn [[cust-id repo-id :as sid]]
+    (fn [[org-id repo-id :as sid]]
       (log/debug "Retrieving ssh keys for" sid)
       (-> {:url (format "%s/org/%s/repo/%s/ssh-keys"
                         (get-in config [:api :url])
-                        cust-id
+                        org-id
                         repo-id)
            :method :get
            :oauth-token (make-token (get-privkey config) sid)

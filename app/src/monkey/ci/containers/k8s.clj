@@ -1,7 +1,7 @@
 (ns monkey.ci.containers.k8s
   "Kubernetes implementation to run container jobs."
   (:require [clojure.java.io :as io]
-            [kubernetes-api.core :as k8s-api]
+            #_[kubernetes-api.core :as k8s-api]
             [monkey.ci
              [build :as b]
              [edn :as edn]
@@ -207,7 +207,7 @@
 
 ;;; Interceptors
 
-(defn run-k8s-actions [client]
+#_(defn run-k8s-actions [client]
   "Executes k8s actions stored in the context"
   {:name ::run-k8s-actions
    :leave (fn [ctx]
@@ -256,7 +256,7 @@
         :interceptors [state
                        (add-build build)
                        c/register-job
-                       (run-k8s-actions (get-in conf [:k8s :client]))
+                       #_(run-k8s-actions (get-in conf [:k8s :client]))
                        unwrap-result]}]]
      
      [:container/start

@@ -1,21 +1,19 @@
 (ns monkey.ci.web.github
   "Functionality specific for Github"
-  (:require [clojure.tools.logging :as log]
+  (:require [aleph.http :as http]
+            [clojure.tools.logging :as log]
             [manifold.deferred :as md]
-            [medley.core :as mc]
             [monkey.ci
              [build :as b]
-             [labels :as lbl]
              [runtime :as rt]
              [storage :as s]
-             [utils :as u]
              [version :as v]]
             [monkey.ci.web
              [auth :as auth]
              [common :as c]
              [oauth2 :as oauth2]
-             [response :as r]]
-            [aleph.http :as http]
+             [response :as r]
+             [trigger :as t]]
             [ring.util.response :as rur]))
 
 (def req->repo-sid (comp (juxt :org-id :repo-id) :path :parameters))
@@ -33,10 +31,6 @@
   "Checks if the incoming request is actually a push.  Github can also
    send other types of requests."
   (comp (partial = "push") github-event))
-
-(defn- find-ssh-keys [{st :storage} org-id repo-id]
-  (let [repo (s/find-repo st [org-id repo-id])]
-    (c/find-ssh-keys st repo)))
 
 (defn- file-changes
   "Determines file changes according to the payload commits."
@@ -56,23 +50,17 @@
   [{st :storage :as rt} {:keys [org-id repo-id] :as init-build} payload]
   (let [{:keys [clone-url ssh-url private]} (:repository payload)
         commit-id (get-in payload [:head-commit :id])
-        ssh-keys (find-ssh-keys rt org-id repo-id)
         main-branch (some-fn :master-branch :default-branch)]
     (-> init-build
-        (assoc :id (s/new-id)
-               :git (-> payload
+        (assoc :git (-> payload
                         :head-commit
                         (select-keys [:message :author])
                         (assoc :url (if private ssh-url clone-url)
                                :main-branch (main-branch (:repository payload))
                                :ref (:ref payload)
-                               :commit-id commit-id)
-                        (mc/assoc-some :ssh-keys ssh-keys))
-               ;; Do not use the commit timestamp, because when triggered from a tag
-               ;; this is still the time of the last commit, not of the tag creation.
-               :start-time (u/now)
-               :status :pending
-               :changes (file-changes payload)))))
+                               :commit-id commit-id))
+               :changes (file-changes payload))
+        (t/prepare-triggered-build rt))))
 
 (defn create-webhook-build [{st :storage :as rt} id payload]
   (if-let [details (s/find-webhook st id)]

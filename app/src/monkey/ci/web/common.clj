@@ -2,16 +2,10 @@
   (:require [camel-snake-kebab.core :as csk]
             [clojure.string :as cs]
             [clojure.tools.logging :as log]
-            [manifold.deferred :as md]
-            [muuntaja.core :as mc]
             [monkey.ci
-             [build :as b]
              [labels :as lbl]
-             [protocols :as p]
-             [runtime :as rt]
-             [storage :as st]
-             [vault :as v]]
-            [monkey.ci.events.core :as ec]
+             [storage :as st]]
+            [muuntaja.core :as mc]
             [reitit.ring :as ring]
             [ring.util.response :as rur]
             [schema.core :as s]))
@@ -256,31 +250,3 @@
 
 (defn new-build-id [idx]
   (str "build-" idx))
-
-(defn crypto-iv
-  "Looks up crypto initialization vector for the org associated with the
-   request.  If no crypto record is found, one is generated."
-  ([st cust-id]
-     (if-let [crypto (st/find-crypto st cust-id)]
-       (:iv crypto)
-       (let [iv (v/generate-iv)]
-         (log/debug "No crypto record found for org" cust-id ", generating a new one")
-         (when (st/save-crypto st {:org-id cust-id
-                                   :iv iv})
-           iv))))
-  ([req]
-   (let [cust-id (org-id req)
-         st (req->storage req)]
-     (crypto-iv st cust-id))))
-
-(defn find-ssh-keys
-  "Finds ssh keys for the given repo, and if the vault is specified, also decrypts them."
-  ([st repo]
-   (let [cust-id (:org-id repo)]
-     (->> (st/find-ssh-keys st cust-id)
-          (lbl/filter-by-label repo))))
-  ([st vault repo]
-   (let [cust-id (:org-id repo)
-         iv (crypto-iv st cust-id)]
-     (->> (find-ssh-keys st repo)
-          (map #(update % :private-key (partial p/decrypt vault iv)))))))

@@ -3,18 +3,20 @@
             [buddy.core.nonce :as nonce]
             [com.stuartsierra.component :as co]
             [monkey.ci
+             [cuid :as cuid]
              [protocols :as p]
              [utils :as u]
              [vault :as sut]]
             [monkey.oci.vault :as v]))
 
 (deftest oci-vault
-  (let [config {:compartment-id "test-compartment"
+  (let [config {:type :oci
+                :compartment-id "test-compartment"
                 :vault-id "test-vault"
                 :key-id "test-key"
                 :secret-name "test-secret"}
         iv (sut/generate-iv)
-        vault (sut/make-oci-vault config)]
+        vault (sut/make-vault config)]
     (is (satisfies? p/Vault vault) "is a vault")
     (is (some? iv))
 
@@ -48,7 +50,8 @@
                             (throw (ex-info "Invalid arguments" opts))))
                         v/create-secret
                         (fn [_ opts]
-                          (if (and (= config (select-keys opts (keys config)))
+                          (if (and (= (dissoc config :type)
+                                      (select-keys opts (keys config)))
                                    (= enc-key (get-in opts [:secret-content :content])))
                             {:id "new-secret-id"}
                             (throw (ex-info "Invalid secret details" opts))))]
@@ -65,3 +68,15 @@
             enc (p/encrypt vault iv txt)]
         (is (string? enc))
         (is (= txt (p/decrypt vault iv enc)))))))
+
+(deftest cuid->iv
+  (testing "generates iv from cuid"
+    (is (= 16 (count (sut/cuid->iv (cuid/random-cuid))))))
+
+  (testing "takes last 6 bits"
+    (is (->> (repeat cuid/cuid-length 0x40)
+             (byte-array)
+             (String.)
+             (sut/cuid->iv)
+             (seq)
+             (every? zero?)))))

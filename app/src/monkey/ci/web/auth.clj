@@ -197,7 +197,7 @@
 (defn sysadmin? [user]
   (some-> user :type name (= role-sysadmin)))
 
-(defn- check-cust-authorization!
+(defn- check-org-authorization!
   "Checks if the request identity grants access to the org specified in 
    the parameters path."
   [req]
@@ -214,7 +214,7 @@
    access to the given org."
   [h]
   (fn [req]
-    (check-cust-authorization! req)
+    (check-org-authorization! req)
     (h req)))
 
 (defn sysadmin-authorization

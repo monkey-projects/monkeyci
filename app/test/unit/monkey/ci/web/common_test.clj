@@ -1,6 +1,6 @@
 (ns monkey.ci.web.common-test
-  (:require [clojure.test :refer [deftest testing is]]
-            [clj-commons.byte-streams :as bs]
+  (:require [clj-commons.byte-streams :as bs]
+            [clojure.test :refer [deftest is testing]]
             [monkey.ci.web.common :as sut]))
 
 (deftest parse-body
@@ -26,3 +26,4 @@
              :uri "/v1/customer/test-cust"
              :headers {"host" "test:1234"}}
             "/customer")))))
+

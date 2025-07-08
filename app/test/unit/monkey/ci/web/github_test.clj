@@ -123,7 +123,9 @@
   (testing "file changes"
     (testing "adds file changes to build"
       (h/with-memory-store s
-        (let [b (sut/create-build {:storage s}
+        (let [b (sut/create-build (-> (trt/test-runtime)
+                                      (trt/set-storage s)
+                                      (trt/set-encrypter (constantly "encrypted")))
                                   {}
                                   {:commits
                                    [{:added ["new-file-1"]
@@ -137,92 +139,78 @@
                  (:changes b))))))))
 
 (deftest create-webhook-build
-  (testing "does not create build record for org/repo"
-    (h/with-memory-store s
-      (let [wh (test-webhook)]
-        (is (st/sid? (st/save-webhook s wh)))
-        (let [r (sut/create-webhook-build {:storage s}
+  (h/with-memory-store s
+    (let [wh (test-webhook)
+          rt (-> (trt/test-runtime)
+                 (trt/set-storage s)
+                 (trt/set-encrypter (constantly "encrypted"))
+                 (trt/set-decrypter (constantly "decrypted")))]
+      
+      (is (st/sid? (st/save-webhook s wh)))
+      
+      (testing "does not create build record for org/repo"
+        (let [r (sut/create-webhook-build rt
                                           (:id wh)
                                           {})]
           (is (some? r))
           (is (not (p/obj-exists? s (-> wh
                                         (select-keys [:org-id :repo-id])
                                         (assoc :build-id (:build-id r))
-                                        (st/build-sid)))))))))
+                                        (st/build-sid)))))))
 
-  (testing "build contains commit message"
-    (h/with-memory-store s
-      (let [wh (test-webhook)]
-        (is (st/sid? (st/save-webhook s wh)))
-        (let [r (sut/create-webhook-build {:storage s}
+      (testing "build contains commit message"
+        (let [r (sut/create-webhook-build rt
                                           (:id wh)
                                           {:head-commit {:message "test message"}})]
-          (is (= "test message" (get-in r [:git :message])))))))
+          (is (= "test message" (get-in r [:git :message])))))
 
-  (testing "adds start time as current epoch millis"
-    (h/with-memory-store s
-      (let [wh (test-webhook)]
-        (is (st/sid? (st/save-webhook s wh)))
-        (let [r (sut/create-webhook-build {:storage s}
+      (testing "adds start time as current epoch millis"
+        (let [r (sut/create-webhook-build rt
                                           (:id wh)
                                           {:head-commit {:timestamp "2023-10-10"}})]
-          (is (number? (:start-time r)))))))
-  
-  (testing "`nil` if no configured webhook found"
-    (h/with-memory-store s
-      (is (nil? (sut/create-webhook-build {:storage s}
-                                          "test-webhook"
-                                          {})))))
+          (is (number? (:start-time r)))))
+      
+      (testing "`nil` if no configured webhook found"
+        (h/with-memory-store s
+          (is (nil? (sut/create-webhook-build rt
+                                              "test-webhook"
+                                              {})))))
 
-  (testing "uses clone url for public repos"
-    (h/with-memory-store s
-      (let [wh (test-webhook)]
-        (is (st/sid? (st/save-webhook s wh)))
-        (let [r (sut/create-webhook-build {:storage s}
+      (testing "uses clone url for public repos"
+        (let [r (sut/create-webhook-build rt
                                           (:id wh)
                                           {:repository {:ssh-url "ssh-url"
                                                         :clone-url "clone-url"}})]
-          (is (= "clone-url" (get-in r [:git :url])))))))
+          (is (= "clone-url" (get-in r [:git :url])))))
 
-  (testing "uses ssh url if repo is private"
-    (h/with-memory-store s
-      (let [wh (test-webhook)]
-        (is (st/sid? (st/save-webhook s wh)))
-        (let [r (sut/create-webhook-build {:storage s}
+      (testing "uses ssh url if repo is private"
+        (let [r (sut/create-webhook-build rt
                                           (:id wh)
                                           {:repository {:ssh-url "ssh-url"
                                                         :clone-url "clone-url"
                                                         :private true}})]
-          (is (= "ssh-url" (get-in r [:git :url])))))))
+          (is (= "ssh-url" (get-in r [:git :url])))))
 
-  (testing "does not include secret key in metadata"
-    (h/with-memory-store s
-      (let [wh (assoc (test-webhook) :secret-key "very very secret!")]
-        (is (st/sid? (st/save-webhook s wh)))
-        (let [r (sut/create-webhook-build {:storage s}
-                                          (:id wh)
-                                          {:head-commit {:message "test message"
-                                                         :timestamp "2023-10-10"}})
-              id (:sid r)
-              md (st/find-build s id)]
-          (is (not (contains? md :secret-key)))))))
+      (testing "does not include secret key in metadata"
+        (let [wh (assoc (test-webhook) :secret-key "very very secret!")]
+          (is (st/sid? (st/save-webhook s wh)))
+          (let [r (sut/create-webhook-build rt
+                                            (:id wh)
+                                            {:head-commit {:message "test message"
+                                                           :timestamp "2023-10-10"}})
+                id (:sid r)
+                md (st/find-build s id)]
+            (is (not (contains? md :secret-key))))))
 
-  (testing "adds payload ref to build"
-    (h/with-memory-store s
-      (let [wh (test-webhook)]
-        (is (st/sid? (st/save-webhook s wh)))
-        (let [r (sut/create-webhook-build {:storage s}
+      (testing "adds payload ref to build"
+        (let [r (sut/create-webhook-build rt
                                           (:id wh)
                                           {:ref "test-ref"})]
-          (is (= "test-ref" (get-in r [:git :ref])))))))
+          (is (= "test-ref" (get-in r [:git :ref])))))
 
-  (testing "`main-branch`"
-    (h/with-memory-store s
-      (let [wh (test-webhook)]
-        (is (st/sid? (st/save-webhook s wh)))
-
+      (testing "`main-branch`"
         (testing "set from `master-branch` property"
-          (let [r (sut/create-webhook-build {:storage s}
+          (let [r (sut/create-webhook-build rt
                                             (:id wh)
                                             {:ref "test-ref"
                                              :repository {:master-branch "test-main"}})]
@@ -230,55 +218,46 @@
                    (get-in r [:git :main-branch])))))
 
         (testing "set from `default-branch` property"
-          (let [r (sut/create-webhook-build {:storage s}
+          (let [r (sut/create-webhook-build rt
                                             (:id wh)
                                             {:ref "test-ref"
                                              :repository {:default-branch "test-main"}})]
             (is (= "test-main"
-                   (get-in r [:git :main-branch]))))))))
+                   (get-in r [:git :main-branch]))))))
 
-  (testing "sets `commit-id`"
-    (h/with-memory-store s
-      (let [wh (test-webhook)]
-        (is (st/sid? (st/save-webhook s wh)))
-        (let [r (sut/create-webhook-build {:storage s}
+      (testing "sets `commit-id`"
+        (let [r (sut/create-webhook-build rt
                                           (:id wh)
                                           {:head-commit {:id "test-commit-id"}})]
           (is (= "test-commit-id"
-                 (get-in r [:git :commit-id])))))))
+                 (get-in r [:git :commit-id])))))
 
-  (testing "adds configured encrypted ssh key matching repo labels"
-    (h/with-memory-store s
-      (let [wh (test-webhook)
-            cid (:org-id wh)
-            rid (:repo-id wh)
-            ssh-key {:id "test-key"
-                     :private-key "encrypted-key"}]
-        (is (st/sid? (st/save-webhook s wh)))
-        (is (st/sid? (st/save-repo s {:org-id cid
-                                      :id rid
-                                      :labels [{:name "ssh-lbl"
-                                                :value "lbl-val"}]})))
-        (is (st/sid? (st/save-ssh-keys s cid [ssh-key])))
-        (let [r (sut/create-webhook-build {:storage s}
-                                          (:id wh)
-                                          {:ref "test-ref"
-                                           :repository {:master-branch "test-main"}})]
-          (is (= [{:id (:id ssh-key)
-                   :private-key "encrypted-key"}]
-                 (get-in r [:git :ssh-keys])))))))
+      (testing "adds configured encrypted ssh key matching repo labels"
+        (let [cid (:org-id wh)
+              rid (:repo-id wh)
+              ssh-key {:id "test-key"
+                       :private-key "encrypted-key"}]
+          (is (st/sid? (st/save-repo s {:org-id cid
+                                        :id rid
+                                        :labels [{:name "ssh-lbl"
+                                                  :value "lbl-val"}]})))
+          (is (st/sid? (st/save-ssh-keys s cid [ssh-key])))
+          (let [r (sut/create-webhook-build rt
+                                            (:id wh)
+                                            {:ref "test-ref"
+                                             :repository {:master-branch "test-main"}})]
+            (is (= 1 (count (get-in r [:git :ssh-keys])))))))
 
-  (testing "assigns id"
-    (h/with-memory-store s
-      (let [{cid :org-id rid :repo-id :as wh} (test-webhook)]
-        (is (st/sid? (st/save-webhook s wh)))
-        (is (st/sid? (st/save-repo s {:org cid
-                                      :id rid})))
-        (let [r (sut/create-webhook-build {:storage s}
-                                          (:id wh)
-                                          {:ref "test-ref"
-                                           :repository {:master-branch "test-main"}})]
-          (is (cuid/cuid? (:id r))))))))
+      (testing "assigns id"
+        (let [{cid :org-id rid :repo-id :as wh} (test-webhook)]
+          (is (st/sid? (st/save-webhook s wh)))
+          (is (st/sid? (st/save-repo s {:org cid
+                                        :id rid})))
+          (let [r (sut/create-webhook-build rt
+                                            (:id wh)
+                                            {:ref "test-ref"
+                                             :repository {:master-branch "test-main"}})]
+            (is (cuid/cuid? (:id r)))))))))
 
 (defn- with-github-user
   "Sets up fake http communication with github to return the given user"

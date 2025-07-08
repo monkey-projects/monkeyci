@@ -30,6 +30,7 @@
   (c/load-config! "local.edn")
   (c/load-config! "github/staging.edn")
   (c/load-config! "bitbucket/dev.edn")
+  (c/load-config! "scw/crypto.edn")
   (server/start-server))
 
 (defn refresh []

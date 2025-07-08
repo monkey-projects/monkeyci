@@ -1,6 +1,7 @@
 (ns monkey.ci.runtime.app
   "Functions for setting up a runtime for application (cli or server)"
-  (:require [clojure.tools.logging :as log]
+  (:require [buddy.core.codecs :as bcc]
+            [clojure.tools.logging :as log]
             [com.stuartsierra.component :as co]
             [manifold.bus :as mb]
             [monkey.ci
@@ -21,7 +22,10 @@
             [monkey.ci.reporting.print]
             [monkey.ci.runners.oci :as ro]
             [monkey.ci.runtime.common :as rc]
-            [monkey.ci.storage.sql]
+            [monkey.ci.storage.sql :as sql]
+            [monkey.ci.vault
+             [common :as vc]
+             [scw :as v-scw]]
             [monkey.ci.web
              [handler :as wh]
              [http :as http]]
@@ -58,6 +62,16 @@
   [config]
   (em/make-component (:mailman config)))
 
+(defn- new-db-pool [{conf :storage}]
+  (if (= :sql (:type conf))
+    (sql/pool-component conf)
+    {}))
+
+(defn- new-db-migrator [{conf :storage}]
+  (if (= :sql (:type conf))
+    (sql/migrations-component)
+    {}))
+
 (defn- new-storage [config]
   (if (not-empty (:storage config))
     (s/make-storage config)
@@ -87,12 +101,66 @@
 (defn- new-vault [config]
   (v/make-vault (:vault config)))
 
+(defmulti dek-utils
+  "Creates DEK functions: 
+     - `:generator`: A 0-arity function that generates new data encryption keys.  Returns both the encrypted (for storage) and unencrypted key.
+     - `decrypter`: A 1-arity function that decrypts encrypted keys."
+  :type)
+
+(defmethod dek-utils :default [_]
+  (zipmap [:generator :decrypter] (repeat (constantly nil))))
+
+(defmethod dek-utils :scw [conf]
+  (let [client (v-scw/make-client conf)]
+    {:generator (comp deref #(v-scw/generate-dek client))
+     :decrypter (comp deref #(v-scw/decrypt-dek client %))}))
+
+(defrecord Crypto [config]
+  co/Lifecycle
+  (start [this]
+    (let [{dg :generator kd :decrypter} (dek-utils config)
+          cache (or (:cache this) (atom {}))]
+      (letfn [(lookup-dek [org-id]
+                (log/debug "Looking up data encryption key for" org-id)
+                (let [enc (some-> (s/find-crypto (:storage this) org-id)
+                                  :dek)
+                      plain (kd enc)]
+                  (log/debug "Looked up encrypted key for" org-id ":" enc)
+                  (swap! cache assoc org-id {:enc enc
+                                             :key plain})
+                  (bcc/b64->bytes plain)))
+              (get-dek [org-id]
+                (or (some-> (get-in @cache [org-id :key])
+                            (bcc/b64->bytes))
+                    (lookup-dek org-id)))]
+        (assoc this
+               :dek-generator
+               (fn [org-id]
+                 (let [k (dg)]
+                   (swap! cache assoc org-id k)
+                   k))
+               :encrypter
+               (fn [v org-id cuid]
+                 (vc/encrypt (get-dek org-id) (v/cuid->iv cuid) v))
+               :decrypter
+               (fn [v org-id cuid]
+                 (vc/decrypt (get-dek org-id) (v/cuid->iv cuid) v))))))
+
+  (stop [this]
+    this))
+
+(defn new-crypto
+  "Creates functions for data encryption, such as a new data encryption key
+   generator function, which is used to create new keys as needed."
+  [conf]
+  (->Crypto (:dek conf)))
+
 (defrecord ServerRuntime [config]
   co/Lifecycle
   (start [this]
-    (assoc this
-           :jwk (get-in this [:jwk :jwk])
-           :metrics (get-in this [:metrics :registry])))
+    (-> this
+        (assoc :jwk (get-in this [:jwk :jwk])
+               :metrics (get-in this [:metrics :registry]))))
 
   (stop [this]
     this))
@@ -182,10 +250,15 @@
                    (assoc :options :queue-options)))
    :runtime   (co/using
                (new-server-runtime config)
-               [:artifacts :metrics :storage :jwk :process-reaper :vault :mailman :update-bus])
+               [:artifacts :metrics :storage :jwk :process-reaper :vault :mailman :update-bus
+                :crypto])
+   :pool      (new-db-pool config)
+   :migrator  (co/using
+               (new-db-migrator config)
+               [:pool :vault :crypto])
    :storage   (co/using
                (new-storage config)
-               [:vault])
+               [:pool])
    :jwk       (new-jwk config)
    :metrics   (new-metrics)
    :metrics-routes (co/using
@@ -193,6 +266,9 @@
                     [:metrics :mailman])
    :process-reaper (new-process-reaper config)
    :vault     (new-vault config)
+   :crypto    (co/using
+               (new-crypto config)
+               [:storage])
    :mailman   (new-mailman config)
    :queue-options (new-queue-options config)
    :mailman-routes (co/using

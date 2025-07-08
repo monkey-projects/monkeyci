@@ -11,7 +11,7 @@
               :join [[:orgs :c] [:= :c.id :p.org-id]]
               :where f}))
 
-(defn- select-params-with-values
+(defn select-params-with-values
   "Selects parameters and their values using the filter"
   [conn f]
   (let [params (select-params-with-org conn f)
@@ -19,7 +19,7 @@
                        (select-keys pv [:name :value]))
         ->params (fn [pvs]
                    (map (fn [p]
-                          (-> (select-keys p [:description :label-filters])
+                          (-> (select-keys p [:description :label-filters :dek])
                               (assoc :id (:cuid p)
                                      :org-id (:org-cuid p)
                                      :parameters (map ->param-vals (get pvs (:id p))))

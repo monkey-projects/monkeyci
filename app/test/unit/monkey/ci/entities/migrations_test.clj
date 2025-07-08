@@ -9,6 +9,7 @@
              [migrations :as sut]]
             [monkey.ci.test.helpers :as h]
             [monkey.ci.vault :as v]
+            [monkey.ci.web.crypto :as crypto]
             [ragtime
              [core :as rc]
              [next-jdbc :as rj]
@@ -159,3 +160,113 @@
 ;;       (testing "`down` deletes all records in repo-indices table"
 ;;         (is (some? ((:down mig) conn)))
 ;;         (is (empty? (ec/select-repo-indices conn nil)))))))
+
+(deftest ^:sql generate-org-deks
+  (with-migrations-up-to (comp (partial re-matches #"^.*-generate-org-deks$")
+                               rp/id)
+    conn mig
+    (is (some? mig))
+    (let [org (ec/insert-org conn (eh/gen-org))
+          crypto (ec/insert-crypto conn
+                                   {:org-id (:id org)
+                                    :iv (v/generate-iv)})
+          conn (assoc conn :crypto {:dek-generator (constantly {:enc "test-dek"
+                                                                :key "plain-key"})})]
+      (is (number? (:id org)))
+      (is (some? crypto))
+
+      (testing "`up` generates new AES key"
+        (is (some? ((:up mig) conn)))
+        (let [c (ec/select-cryptos conn [:= :org-id (:id org)])]
+          (is (every? (partial = "test-dek") (map :dek c)))))
+
+      (testing "`down` does nothing"
+        (is (nil? ((:down mig) conn)))))))
+
+(deftest ^:sql re-encrypt-params
+  (with-migrations-up-to (comp (partial re-matches #"^.*-re-encrypt-params$")
+                               rp/id)
+    conn mig
+    (is (some? mig))
+    (let [org (ec/insert-org conn (eh/gen-org))
+          pv (ec/insert-org-param conn {:org-id (:id org)})
+          crypto (ec/insert-crypto conn
+                                   {:org-id (:id org)
+                                    :iv (v/generate-iv)})
+          conn (assoc conn
+                      :crypto {:encrypter (fn [p org-id id]
+                                            (when (= "vault-decrypted" p)
+                                              "dek-encrypted"))
+                               :decrypter (fn [p org-id id]
+                                            (when (= "dek-encrypted" p)
+                                              "dek-decrypted"))}
+                      :vault (h/dummy-vault (fn [obj]
+                                              (when (= "dek-decrypted" obj)
+                                                "vault-encrypted"))
+                                            (fn [enc]
+                                              (when (= "vault-encrypted" enc)
+                                                "vault-decrypted"))))]
+      (is (number? (:id org)))
+      (is (some? crypto))
+      (is (some? pv))
+      (is (some? (ec/insert-org-param-value conn
+                                            {:params-id (:id pv)
+                                             :name "test-param"
+                                             :value "vault-encrypted"})))
+
+      (testing "`up` uses org dek to re-encrypt param values"
+        (is (some? ((:up mig) conn)))
+        (is (= "dek-encrypted"
+               (-> (ec/select-org-param-values conn nil)
+                   first
+                   :value))))
+      
+      (testing "`down` uses vault to re-encrypt param values"
+        (is (some? ((:down mig) conn)))
+        (is (= "vault-encrypted"
+               (-> (ec/select-org-param-values conn nil)
+                   first
+                   :value)))))))
+
+(deftest ^:sql re-encrypt-ssh-keys
+  (with-migrations-up-to (comp (partial re-matches #"^.*-re-encrypt-ssh-keys$")
+                               rp/id)
+      conn mig
+    (is (some? mig))
+    (let [org (ec/insert-org conn (eh/gen-org))
+          sk (ec/insert-ssh-key conn {:org-id (:id org)
+                                      :public-key "test-pubkey"
+                                      :private-key "vault-encrypted"})
+          crypto (ec/insert-crypto conn
+                                   {:org-id (:id org)
+                                    :iv (v/generate-iv)})
+          conn (assoc conn
+                      :crypto {:encrypter (fn [p org-id id]
+                                            (when (= "vault-decrypted" p)
+                                              "dek-encrypted"))
+                               :decrypter (fn [p org-id id]
+                                            (when (= "dek-encrypted" p)
+                                              "dek-decrypted"))}
+                      :vault (h/dummy-vault (fn [obj]
+                                              (when (= "dek-decrypted" obj)
+                                                "vault-encrypted"))
+                                            (fn [enc]
+                                              (when (= "vault-encrypted" enc)
+                                                "vault-decrypted"))))]
+      (is (number? (:id org)))
+      (is (some? crypto))
+      (is (some? sk))
+
+      (testing "`up` uses org dek to re-encrypt private keys"
+        (is (some? ((:up mig) conn)))
+        (is (= "dek-encrypted"
+               (-> (ec/select-ssh-keys conn nil)
+                   first
+                   :private-key))))
+      
+      (testing "`down` uses vault to re-encrypt ssh-keys"
+        (is (some? ((:down mig) conn)))
+        (is (= "vault-encrypted"
+               (-> (ec/select-ssh-keys conn nil)
+                   first
+                   :private-key)))))))

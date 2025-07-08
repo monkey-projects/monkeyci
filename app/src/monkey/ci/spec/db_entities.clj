@@ -153,8 +153,11 @@
                        (comp (partial = 16) count))
                 #(sg/fixed-byte-array 16)))
 
+;; Data encryption key
+(s/def :db/dek string?)
+
 (s/def :db/crypto
-  (s/keys :req-un [:db/org-id :db/iv]))
+  (s/keys :req-un [:db/org-id :db/iv :db/dek]))
 
 (s/def :db/password string?)
 

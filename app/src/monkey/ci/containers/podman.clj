@@ -43,7 +43,8 @@
 
 (defn- env-vars [env]
   (mapcat (fn [[k v]]
-            ["-e" (str k "=" v)])
+            ["-e" (cond-> k
+                    v (str "=" v))])
           env))
 
 (defn arch-arg [arch]
@@ -120,7 +121,13 @@
     (concat
      base-cmd
      (mounts job)
-     (env-vars (merge (mcc/env job) env))
+     ;; For security purposes, we do not specify the env values on the command
+     ;; line.  Instead, we pass only the names without values, which makes podman
+     ;; take the values from the process env instead.
+     ;; See https://docs.podman.io/en/latest/markdown/podman-run.1.html#env-e-env
+     (env-vars (merge (zipmap (keys (mcc/env job))
+                              (repeat nil))
+                      env))
      (arch job opts)
      (entrypoint job)
      [(mcc/image job)]
@@ -283,6 +290,8 @@
      :dir (job-work-dir ctx job)
      :out (log-file "out.log")
      :err (log-file "err.log")
+     ;; Pass the job env to the process.  These are then passed on to the container.
+     :env (mcc/env job)
      :exit-fn (proc/exit-fn
                (fn [{:keys [exit]}]
                  (log/info "Container job exited with code" exit)

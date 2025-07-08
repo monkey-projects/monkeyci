@@ -166,8 +166,10 @@
                            (comp (partial = 16) count))
                     #(sg/fixed-byte-array 16)))
 
+(s/def :entity/dek string?)
+
 (s/def :entity/crypto
-  (s/keys :req-un [:entity/org-id :entity/iv]))
+  (s/keys :req-un [:entity/org-id :entity/iv :entity/dek]))
 
 (s/def :entity/password string?)
 

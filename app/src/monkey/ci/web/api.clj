@@ -15,7 +15,8 @@
             [monkey.ci.web
              [auth :as auth]
              [common :as c]
-             [response :as r]]
+             [response :as r]
+             [trigger :as wt]]
             [ring.util.response :as rur]))
 
 (def body c/body)
@@ -30,6 +31,7 @@
                           :deleter st/delete-repo
                           :new-id repo-id})
 
+;; TODO Also return the full webhook url
 (c/make-entity-endpoints "webhook"
                          {:get-id (c/id-getter :webhook-id)
                           :getter (comp #(dissoc % :secret-key)
@@ -198,28 +200,18 @@
   (some-fn (as-ref :branch "heads")
            (as-ref :tag "tags")))
 
-(defn- initialize-build [build]
-  (assoc build
-         :id (st/new-id)
-         :source :api
-         :start-time (t/now)
-         :status :pending))
-
 (defn make-build-ctx
   "Creates a build object from the request for the repo"
   [{p :parameters :as req} repo]
-  (let [{st :storage :as rt} (c/req->rt req)
-        ssh-keys (c/find-ssh-keys st repo)]
-    (-> (:path p)
-        (select-keys [:org-id :repo-id])
-        (initialize-build)
-        (assoc :git (-> (:query p)
-                        (select-keys [:commit-id :branch :tag])
-                        (assoc :url (:url repo))
-                        (mc/assoc-some :ref (or (params->ref p)
-                                                (some->> (:main-branch repo) (str "refs/heads/")))
-                                       :ssh-keys ssh-keys
-                                       :main-branch (:main-branch repo)))))))
+  (-> (:path p)
+      (select-keys [:org-id :repo-id])
+      (assoc :git (-> (:query p)
+                      (select-keys [:commit-id :branch :tag])
+                      (assoc :url (:url repo))
+                      (mc/assoc-some :ref (or (params->ref p)
+                                              (some->> (:main-branch repo) (str "refs/heads/")))
+                                     :main-branch (:main-branch repo))))
+      (wt/prepare-triggered-build (c/req->rt req) repo)))
 
 (defn- build-triggered-response [build]
   (-> (rur/response (select-keys build [:id]))
@@ -245,12 +237,9 @@
         existing (st/find-build st sid)
         rt (c/req->rt req)
         repo (st/find-repo st (take 2 sid))
-        ssh-keys (c/find-ssh-keys st repo)
         build (some-> existing
                       (dissoc :start-time :end-time :script :build-id :idx)
-                      (initialize-build)
-                      (cond-> (not-empty ssh-keys)
-                        (assoc-in [:git :ssh-keys] ssh-keys)))]
+                      (wt/prepare-triggered-build rt repo))]
     (if build
       (build-triggered-response build)
       (rur/not-found {:message "Build not found"}))))
