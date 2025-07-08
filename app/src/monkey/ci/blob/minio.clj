@@ -1,7 +1,9 @@
 (ns monkey.ci.blob.minio
   "MinIO wrapper code to access S3 buckets.  These functions mainly delegate to
    the appropriate Minio classes using the async client."
-  (:require [manifold.deferred :as md])
+  (:require [babashka.fs :as fs]
+            [clojure.java.io :as io]
+            [manifold.deferred :as md])
   (:import [io.minio MinioAsyncClient Result StatObjectResponse
             ListObjectsArgs
             GetObjectArgs
@@ -61,17 +63,20 @@
    metadata can be specified.  Specify `size` if the stream size is known.
    You can also specify a `file` instead of a `stream`."
   [client bucket path {:keys [stream size content-type metadata file]}]
-  (md/chain
-   (->> (cond-> (.. (PutObjectArgs/builder)
-                    (bucket bucket)
-                    (object path))
-          stream (.stream stream (or size -1) (if size -1 (* 10 1024 1024)))
-          file (.filename file)
-          metadata (.userMetadata metadata)
-          content-type (.contentType content-type)
-          true (.build))
-        (.putObject client))
-   (put-result->map)))
+  (let [stream (or stream (io/input-stream file))
+        size (or size (when file (fs/size file)))]
+    (cond-> (md/chain
+             (->> (cond-> (.. (PutObjectArgs/builder)
+                              (bucket bucket)
+                              (object path)
+                              (stream stream (or size -1) (if size -1 (* 10 1024 1024))))
+                    metadata (.userMetadata metadata)
+                    content-type (.contentType content-type)
+                    true (.build))
+                  (.putObject client))
+             (put-result->map))
+      ;; Close when a file is specified
+      file (md/finally #(.close stream)))))
 
 (defn- stats->map [^StatObjectResponse resp]
   {:name (.object resp)

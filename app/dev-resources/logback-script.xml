@@ -5,16 +5,19 @@
       <url>http://loki.monkey-projects.be/loki/api/v1/push</url>
       <tenantId>monkeyci</tenantId>
     </http>
-    <format>
-      <label>
-	<pattern>env=dev,app=monkeyci,role=script,level=%level</pattern>
-      </label>
-      <message>
-	<pattern>l=%level h=${HOSTNAME} c=%logger{20} t=%thread | %msg %ex</pattern>
-      </message>
-    </format>
+    <labels>
+      env=dev
+      app=monkeyci
+      role=script
+      level=%level
+    </labels>
+    <message>
+      <pattern>l=%level h=${HOSTNAME} c=%logger{20} t=%thread | %msg %ex</pattern>
+    </message>
     <sortByTime>true</sortByTime>
-    <batchTimeoutMs>1000</batchTimeoutMs>
+    <batch>
+      <batchTimeoutMs>1000</batchTimeoutMs>
+    </batch>
   </appender>
 
   <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">

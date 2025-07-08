@@ -26,6 +26,7 @@
             (prepare-key [k]
               (-> (select-keys k [:private-key :public-key])
                   (update :private-key (partial re-encrypt (:id k)))))
+            ;; TODO Remove this, keys are fetched using api by runners instead
             (add-ssh [g]
               (let [k (->> (find-ssh-keys (:storage rt) repo)
                            (map prepare-key))]

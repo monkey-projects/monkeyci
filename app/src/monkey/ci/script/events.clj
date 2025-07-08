@@ -219,6 +219,7 @@
       [(-> (script-end-evt ctx :error)
            (bc/with-message "No jobs to run"))]
       (let [next-jobs (j/next-jobs (vals jobs))]
+        ;; TODO Encrypt env vars (possibly sensitive information)
         (map #(j/job-queued-evt % build-sid) next-jobs)))))
 
 (defn script-end [ctx]
@@ -230,6 +231,7 @@
   "Dispatches queued event for action or container job, depending on the type."
   [ctx]
   (letfn [(job-queued-evt [t job]
+            ;; TODO Encrypt env vars (possibly sensitive information)
             (-> (j/job-queued-evt job (build-sid ctx))
                 (assoc :type t)))]
     (let [job (get-job-from-state ctx)]
@@ -273,6 +275,7 @@
            (map #(j/job-skipped-evt (j/job-id %) (build-sid ctx)))
            (into [(script-end-evt ctx (script-status ctx))]))
       ;; Otherwise, enqueue next jobs
+      ;; TODO Encrypt env vars (possibly sensitive information)
       (map #(j/job-queued-evt % (build-sid ctx)) next-jobs))))
 
 (defn make-job-ctx

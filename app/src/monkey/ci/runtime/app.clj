@@ -119,6 +119,7 @@
   co/Lifecycle
   (start [this]
     (let [{dg :generator kd :decrypter} (dek-utils config)
+          ;; TODO Replace with real cache (using clojure.core.cache lib)
           cache (or (:cache this) (atom {}))]
       (letfn [(lookup-dek [org-id]
                 (log/debug "Looking up data encryption key for" org-id)
