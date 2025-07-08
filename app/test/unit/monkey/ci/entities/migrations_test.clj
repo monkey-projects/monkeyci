@@ -170,15 +170,16 @@
           crypto (ec/insert-crypto conn
                                    {:org-id (:id org)
                                     :iv (v/generate-iv)})
-          conn (assoc conn :crypto {:dek-generator (constantly {:enc "test-dek"
-                                                                :key "plain-key"})})]
+          conn (assoc conn :crypto {:dek-generator (fn [org-id]
+                                                     {:enc (str "test-dek for " org-id)
+                                                      :key "plain-key"})})]
       (is (number? (:id org)))
       (is (some? crypto))
 
       (testing "`up` generates new AES key"
         (is (some? ((:up mig) conn)))
         (let [c (ec/select-cryptos conn [:= :org-id (:id org)])]
-          (is (every? (partial = "test-dek") (map :dek c)))))
+          (is (every? (partial = (str "test-dek for " (:id org))) (map :dek c)))))
 
       (testing "`down` does nothing"
         (is (nil? ((:down mig) conn)))))))

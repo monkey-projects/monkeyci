@@ -222,7 +222,7 @@
        ;; Read all org and crypto records, generate DEK and write back
        (->> (ec/select-cryptos conn [:is :dek nil])
             (map (fn [o]
-                   (assoc o :dek (:enc (dg)))))
+                   (assoc o :dek (:enc (dg (:org-id o))))))
             (map (fn [o]
                    (ec/update-crypto conn o)))
             (doall))))
