@@ -56,23 +56,17 @@
   [{st :storage :as rt} {:keys [org-id repo-id] :as init-build} payload]
   (let [{:keys [clone-url ssh-url private]} (:repository payload)
         commit-id (get-in payload [:head-commit :id])
-        ssh-keys (find-ssh-keys rt org-id repo-id)
         main-branch (some-fn :master-branch :default-branch)]
     (-> init-build
-        (assoc :id (s/new-id)
-               :git (-> payload
+        (assoc :git (-> payload
                         :head-commit
                         (select-keys [:message :author])
                         (assoc :url (if private ssh-url clone-url)
                                :main-branch (main-branch (:repository payload))
                                :ref (:ref payload)
-                               :commit-id commit-id)
-                        (mc/assoc-some :ssh-keys ssh-keys))
-               ;; Do not use the commit timestamp, because when triggered from a tag
-               ;; this is still the time of the last commit, not of the tag creation.
-               :start-time (u/now)
-               :status :pending
-               :changes (file-changes payload)))))
+                               :commit-id commit-id))
+               :changes (file-changes payload))
+        (c/prepare-triggered-build rt))))
 
 (defn create-webhook-build [{st :storage :as rt} id payload]
   (if-let [details (s/find-webhook st id)]

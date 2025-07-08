@@ -194,6 +194,7 @@
                ;; TODO Changed files
                :git (cond-> {:url (:url repo)
                              :ref (git-ref body)}
+                      ;; TODO Re-encrypt using build-specific DEK
                       (not-empty ssh-keys) (assoc :ssh-keys ssh-keys)
                       true (mc/assoc-some :message (some-> (new-changes body)
                                                            :target

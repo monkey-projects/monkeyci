@@ -1,10 +1,12 @@
 (ns monkey.ci.web.crypto
   "Cryptographic functions, for encrypting/decrypting sensitive data"
-  (:require [clojure.tools.logging :as log]
+  (:require [buddy.core.codecs :as bcc]
+            [clojure.tools.logging :as log]
             [monkey.ci
              [protocols :as p]
              [storage :as st]
              [vault :as v]]
+            [monkey.ci.vault.common :as vc]
             [monkey.ci.web.common :as wc]))
 
 (defn crypto-iv
@@ -50,6 +52,13 @@
   (and (instance? byte/1 x)
        (= v/dek-size (count x))))
 
+(defn b64-dek?
+  "Checks if argument is a base64-encoded DEK"
+  [x]
+  (some-> x
+          (bcc/b64->bytes)
+          (dek?)))
+
 (def dek-generator #(from-crypto % :dek-generator))
 
 (defn generate-dek
@@ -58,26 +67,15 @@
   [req org-id]
   ((dek-generator req) org-id))
 
-#_(def dek-provider #(wc/from-rt % :dek-provider))
+(defn generate-build-dek
+  "Generates a new build-specific DEK, encrypted using the DEK of the org."
+  [rt org-id]
+  (let [dek (-> (v/generate-key)
+                (bcc/bytes->b64-str))
+        e (get-in rt [:crypto :encrypter])]
+    {:key dek
+     :enc (e dek org-id org-id)}))
 
-#_(defn get-dek
-  "Decrypts the given encrypted data encryption key using the key decrypter from the
-   request.  Returns the unencrypted key, which can be passed to `encrypt` or `decrypt`
-   along with an initialization vector (iv)."
-  [req dek]
-  ((dek-decrypter req) dek))
-
-;; (defn encrypter
-;;   "Returns an encrypter fn, using the information retrieved from the request context.
-;;    It's a multi-arity function that encrypts its argument.  The 1-arity variant loads
-;;    the iv from the crypto record, but this is deprecated.  The 2-arity variant takes
-;;    a cuid, which is used to calculate the iv."
-;;   [req]
-;;   ;; Old style, deprecated
-;;   (with-vault-and-iv req p/encrypt))
-
-;; (defn decrypter
-;;   "Similar to `encrypter`, but for decryption."
-;;   [req]
-;;   ;; Old style, deprecated
-;;   (with-vault-and-iv req p/decrypt))
+(def cuid->iv v/cuid->iv)
+(def encrypt vc/encrypt)
+(def decrypt vc/decrypt)

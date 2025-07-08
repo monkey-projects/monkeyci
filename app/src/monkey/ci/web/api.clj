@@ -219,6 +219,7 @@
                         (assoc :url (:url repo))
                         (mc/assoc-some :ref (or (params->ref p)
                                                 (some->> (:main-branch repo) (str "refs/heads/")))
+                                       ;; TODO Re-encrypt using build-specific DEK
                                        :ssh-keys ssh-keys
                                        :main-branch (:main-branch repo)))))))
 
@@ -251,6 +252,7 @@
                       (dissoc :start-time :end-time :script :build-id :idx)
                       (initialize-build)
                       (cond-> (not-empty ssh-keys)
+                        ;; TODO Re-encrypt using build-specific DEK
                         (assoc-in [:git :ssh-keys] ssh-keys)))]
     (if build
       (build-triggered-response build)
