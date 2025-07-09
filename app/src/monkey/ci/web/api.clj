@@ -205,7 +205,8 @@
   [{p :parameters :as req} repo]
   (-> (:path p)
       (select-keys [:org-id :repo-id])
-      (assoc :git (-> (:query p)
+      (assoc :source :api
+             :git (-> (:query p)
                       (select-keys [:commit-id :branch :tag])
                       (assoc :url (:url repo))
                       (mc/assoc-some :ref (or (params->ref p)

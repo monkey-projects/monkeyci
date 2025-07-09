@@ -297,7 +297,14 @@
                (h/->req)
                (sut/make-build-ctx {:main-branch "main"})
                :git
-               :ref)))))
+               :ref))))
+
+  (testing "marks `:api` source"
+    (is (= :api
+           (-> (trt/test-runtime)
+               (h/->req)
+               (sut/make-build-ctx {:main-branch "main"})
+               :source)))))
 
 (deftest update-user
   (testing "updates user in storage"
