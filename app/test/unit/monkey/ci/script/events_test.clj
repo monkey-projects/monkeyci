@@ -55,7 +55,9 @@
                          (enter))))
           (is (= {:build ::test-build
                   :archs ::archs}
-                 @job-ctx)))))))
+                 @job-ctx)))))
+
+    (testing "encrypts container env vars using build data encryption key")))
 
 (deftest add-job-ctx
   (let [{:keys [enter] :as i} sut/add-job-ctx

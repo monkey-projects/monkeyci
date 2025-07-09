@@ -77,6 +77,7 @@
 (s/def :build/checkout-dir path?)
 (s/def :build/status build-states)
 (s/def :build/workspace string?)
+(s/def :build/dek string?)
 
 ;; GIT configuration
 (s/def :git/url ::c/url)
@@ -104,5 +105,5 @@
   (-> (s/keys :req-un [:build/org-id :build/repo-id :build/build-id :build/sid
                        :build/source]
               :opt-un [:build/git :build/cleanup? :build/webhook-id :build/script :build/checkout-dir
-                       :build/changes :build/workspace :build/status ::c/timeout])
+                       :build/changes :build/workspace :build/status ::c/timeout :build/dek])
       (s/merge ::generic-entity)))
