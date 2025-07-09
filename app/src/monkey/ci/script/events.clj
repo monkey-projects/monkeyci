@@ -96,6 +96,7 @@
    :enter (fn [ctx]
             (let [job-ctx (select-keys (get-initial-job-ctx ctx) [:build :api :archs])]
               (log/debug "Loading script jobs using context" job-ctx)
+              ;; TODO Encrypt container env vars (possibly sensitive information)
               (->> (s/load-jobs (get-build ctx) job-ctx)
                    (group-by j/job-id)
                    (mc/map-vals first)

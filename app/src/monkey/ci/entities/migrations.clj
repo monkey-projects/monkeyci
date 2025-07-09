@@ -621,7 +621,7 @@
      job-col
      [:event [:varchar 30] [:not nil]]
      [:time :timestamp]
-     [:details :text]
+     [:details :mediumtext]
      fk-job]
     [(col-idx :job-events :job-id)])
 

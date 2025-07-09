@@ -85,6 +85,12 @@
           (is (contains-subseq? r ["-e" "VAR1"]))
           (is (contains-subseq? r ["-e" "VAR2"]))))
 
+      (testing "passes reserved env vars explicitly"
+        (let [r (-> base-conf
+                    (assoc-in [:job :container/env] {"DOCKER_CONFIG" "config-value"})
+                    (sut/build-cmd-args))]
+          (is (contains-subseq? r ["-e" "DOCKER_CONFIG=config-value"]))))
+
       (testing "passes entrypoint as json if specified"
         (let [r (-> base-conf
                     (assoc-in [:job :container/entrypoint] ["test-ep"])
@@ -409,7 +415,16 @@
                        :image "debian"
                        :container/env {"test-key" "test-val"}}}}
                (sut/prepare-child-cmd)
-               :env)))))
+               :extra-env))))
+
+  (testing "does not pass special podman env vars"
+    (is (empty?
+         (-> {:event
+              {:job {:id "env-job"
+                     :image "debian"
+                     :container/env {"DOCKER_CONFIG" "test-val"}}}}
+             (sut/prepare-child-cmd)
+             :extra-env)))))
 
 (deftest count-jobs
   (testing "zero when state is empty"

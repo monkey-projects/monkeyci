@@ -74,7 +74,7 @@
                     content-type (.contentType content-type)
                     true (.build))
                   (.putObject client))
-             (put-result->map))
+             put-result->map)
       ;; Close when a file is specified
       file (md/finally #(.close stream)))))
 

@@ -7,6 +7,7 @@
             [clojure.java.io :as io]
             [clojure.string :as cs]
             [clojure.tools.logging :as log]
+            [medley.core :as mc]
             [monkey.ci
              [artifacts :as art]
              [build :as b]
@@ -23,6 +24,31 @@
             [monkey.ci.events.mailman.interceptors :as emi]))
 
 ;;; Process commandline configuration
+
+(def reserved-vars
+  "List of reserved env vars, used by podman that can override its behaviour.  When a
+   job specifies one of these vars, they should be explicitly passed on the commandline
+   and not as process env vars (which would be a potential security breach)."
+  #{"CONTAINERS_CONF"
+    "CONTAINERS_REGISTRIES_CONF"
+    "CONTAINERS_REGISTRIES_CONF_DIR"
+    "CONTAINERS_STORAGE_CONF"
+    "CONTAINER_CONNECTION"
+    "CONTAINER_HOST"
+    "CONTAINER_SSHKEY"
+    "DBUS_SESSION_BUS_ADDRESS"
+    "DOCKER_CONFIG"
+    "STORAGE_DRIVER"
+    "STORAGE_OPTS"
+    "TMPDIR"
+    "XDG_CONFIG_HOME"
+    "XDG_DATA_HOME"
+    "XDG_RUNTIME_DIR"})
+
+(defn- reserved? [var]
+  (or (reserved-vars var)
+      ;; Also exclude all env vars that start with this
+      (cs/starts-with? var "PODMAN_")))
 
 (defn- make-script-cmd [script sd]
   (->> (range (count script))
@@ -46,6 +72,11 @@
             ["-e" (cond-> k
                     v (str "=" v))])
           env))
+
+(defn- strip-reserved-env [env]
+  (->> env
+       (mc/map-kv-vals (fn [k v]
+                         (when (reserved? k) v)))))
 
 (defn arch-arg [arch]
   (str (name arch) "64"))
@@ -125,8 +156,8 @@
      ;; line.  Instead, we pass only the names without values, which makes podman
      ;; take the values from the process env instead.
      ;; See https://docs.podman.io/en/latest/markdown/podman-run.1.html#env-e-env
-     (env-vars (merge (zipmap (keys (mcc/env job))
-                              (repeat nil))
+     ;; Only reserved env vars are passed entirely, otherwise execution may break.
+     (env-vars (merge (strip-reserved-env (mcc/env job))
                       env))
      (arch job opts)
      (entrypoint job)
@@ -291,7 +322,8 @@
      :out (log-file "out.log")
      :err (log-file "err.log")
      ;; Pass the job env to the process.  These are then passed on to the container.
-     :env (mcc/env job)
+     :extra-env (->> (mcc/env job)
+                     (mc/filter-keys (complement reserved?)))
      :exit-fn (proc/exit-fn
                (fn [{:keys [exit]}]
                  (log/info "Container job exited with code" exit)
