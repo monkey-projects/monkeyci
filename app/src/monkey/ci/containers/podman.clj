@@ -291,7 +291,7 @@
      :out (log-file "out.log")
      :err (log-file "err.log")
      ;; Pass the job env to the process.  These are then passed on to the container.
-     :env (mcc/env job)
+     :extra-env (mcc/env job)
      :exit-fn (proc/exit-fn
                (fn [{:keys [exit]}]
                  (log/info "Container job exited with code" exit)

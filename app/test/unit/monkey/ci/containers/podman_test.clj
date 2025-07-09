@@ -409,7 +409,7 @@
                        :image "debian"
                        :container/env {"test-key" "test-val"}}}}
                (sut/prepare-child-cmd)
-               :env)))))
+               :extra-env)))))
 
 (deftest count-jobs
   (testing "zero when state is empty"
