@@ -1,9 +1,14 @@
 (ns monkey.ci.agent.runtime-test
-  (:require [clojure.test :refer [deftest testing is]]
+  (:require [buddy.core.keys :as bck]
+            [buddy.sign.jwt :as jwt]
+            [clojure.test :refer [deftest testing is]]
             [com.stuartsierra.component :as co]
             [monkey.ci.agent.runtime :as sut]
             [monkey.ci.build.api-server :as bas]
-            [monkey.ci.protocols :as p]
+            [monkey.ci
+             [protocols :as p]
+             [sid :as sid]]
+            [monkey.ci.web.auth :as auth]
             [monkey.ci.test
              [aleph-test :as ta]
              [config :as tc]
@@ -74,16 +79,36 @@
           (is (= "http://test-api" (:url req))))))))
 
 (deftest ssh-keys-fetcher
-  (testing "retrieves from global api for repo"
-    (ta/with-fake-http
-        ["http://test-api/org/test-cust/repo/test-repo/ssh-keys"
-         (fn [req]
-           {:status 200
-            :body (pr-str ["test-key"])})]
-      (let [sid ["test-cust" "test-repo" "test-build"]
-            fetcher (sut/new-ssh-keys-fetcher {:api {:url "http://test-api"}
-                                               :jwk {:priv (h/generate-private-key)}})]
-        (is (= ["test-key"] (fetcher sid)))))))
+  (let [sid ["test-cust" "test-repo" "test-build"]
+        kp (auth/generate-keypair)
+        conf {:api {:url "http://test-api"}
+              :jwk {:priv (.getPrivate kp)}}
+        pubkey (.getPublic kp)]
+    (testing "retrieves from global api for repo"
+      (ta/with-fake-http
+          ["http://test-api/org/test-cust/repo/test-repo/ssh-keys"
+           (fn [req]
+             {:status 200
+              :body (pr-str ["test-key"])})]
+        (let [fetcher (sut/new-ssh-keys-fetcher conf)]
+          (is (= ["test-key"] (fetcher sid))))))
+
+    (testing "passes valid token for build"
+      (ta/with-fake-http
+          ["http://test-api/org/test-cust/repo/test-repo/ssh-keys"
+           (fn [req]
+             (let [token (get-in req [:headers "authorization"])]
+               {:status 200
+                :body (pr-str [token])}))]
+        (let [fetcher (sut/new-ssh-keys-fetcher conf)
+              token (->> (fetcher sid)
+                         (first)
+                         (re-matches #"^Bearer (.*)$")
+                         (second))]
+          (is (string? token))
+          (is (= sid (-> (jwt/unsign token pubkey {:alg :rs256})
+                         :sub
+                         (sid/parse-sid)))))))))
 
 (deftest build-key-decripter
   (testing "decrypts from global api"

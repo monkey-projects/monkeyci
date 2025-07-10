@@ -73,18 +73,19 @@
   (let [client (ahmw/wrap-request http/request)
         maker (api-with-token-maker config)]
     (fn [[org-id repo-id :as sid]]
-      (log/debug "Retrieving ssh keys for" sid)
-      (-> {:url (format "%s/org/%s/repo/%s/ssh-keys"
-                        (get-in config [:api :url])
-                        org-id
-                        repo-id)
-           :method :get
-           :oauth-token (maker sid)
-           :accept "application/edn"}
-          (client)
-          (deref)
-          :body
-          (edn/edn->)))))
+      (let [api (maker sid)]
+        (log/debug "Retrieving ssh keys for" sid)
+        (-> {:url (format "%s/org/%s/repo/%s/ssh-keys"
+                          (:url api)
+                          org-id
+                          repo-id)
+             :method :get
+             :oauth-token (:token api)
+             :accept "application/edn"}
+            (client)
+            (deref)
+            :body
+            (edn/edn->))))))
 
 (defn new-build-key-decrypter
   "Build key decrypter, to decrypt the build data encryption key, which is then
