@@ -55,14 +55,19 @@
   (or (get-in conf [:api :private-key])
       (get-in conf [:jwk :priv])))
 
-(defrecord ApiBuildParams [api-config pk]
+(defn- api-with-token-maker [config]
+  (fn [build]
+    (assoc (:api config) :token (make-token (get-privkey config) (b/sid build)))))
+
+(defrecord ApiBuildParams [api-maker]
   p/BuildParams
   (get-build-params [this build]
-    (bas/get-params-from-api (assoc api-config :token (make-token pk (b/sid build))) build)))
+    (bas/get-params-from-api (api-maker build) build)))
 
 (defn new-params [{:keys [api] :as config}]
-  (->ApiBuildParams api (get-privkey config)))
+  (->ApiBuildParams (api-with-token-maker config)))
 
+;; TODO Move this implementation to api-server ns
 (defn new-ssh-keys-fetcher [config]
   (let [client (ahmw/wrap-request http/request)]
     (fn [[org-id repo-id :as sid]]
@@ -78,6 +83,11 @@
           (deref)
           :body
           (edn/edn->)))))
+
+(defn new-key-decrypter [config]
+  (let [maker (api-with-token-maker config)]
+    (fn [build key]
+      (bas/decrypt-key-from-api (maker build) (first (b/sid build)) key))))
 
 (defmulti make-container-routes :type)
 
@@ -166,7 +176,8 @@
      :container-routes (co/using
                         (new-container-routes conf)
                         [:mailman :artifacts :cache :workspace :api-server])
-     :metrics (mc/make-metrics))))
+     :metrics (mc/make-metrics)
+     :key-decrypter (new-key-decrypter conf))))
 
 (defn- max-jobs-reached? [{:keys [state config]}]
   (let [c (c-podman/count-jobs @state)

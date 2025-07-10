@@ -10,7 +10,8 @@
             [monkey.ci.test
              [aleph-test :as at]
              [api-server :as tas]
-             [helpers :as h]]
+             [helpers :as h]
+             [runtime :as trt]]
             [ring.mock.request :as mock]))
 
 (def test-config (tas/test-config))
@@ -119,6 +120,21 @@
                                             build)
                    deref)))))))
 
+(deftest decrypt-key-from-api
+  (testing "invokes endpoint on general api"
+    (let [org (h/gen-org)]
+      (at/with-fake-http [{:request-url
+                           (format "http://test-api/org/%s/crypto/decrypt-key" (:id org))
+                           :request-method :post}
+                          {:status 200
+                           :body (pr-str "decrypted-key")
+                           :headers {"Content-Type" "application/edn"}}]
+        (is (= "decrypted-key"
+               @(sut/decrypt-key-from-api {:url "http://test-api"
+                                           :token "test-token"}
+                                          (:id org)
+                                          "encrypted-key")))))))
+
 (deftest download-workspace
   (testing "returns 204 no content if no workspace"
     (is (= 204 (-> {:workspace (h/fake-blob-store)}
@@ -225,7 +241,8 @@
   (let [token (sut/generate-token)
         config (-> test-config
                    (assoc :token token
-                          :build {:sid ["test-org" "test-repo" "test-build"]}))
+                          :build {:org-id "test-org"
+                                  :sid ["test-org" "test-repo" "test-build"]}))
         app (sut/make-app config)
         auth (fn [req]
                (mock/header req "Authorization" (str "Bearer " token)))]
@@ -292,4 +309,22 @@
           (is (= 200 (-> (mock/request :get (str "/cache/" cache-id))
                          (auth)
                          (app)
-                         :status))))))))
+                         :status))))))
+
+    (testing "`/decrypt-key`"
+      (testing "`POST` decrypts given key"
+        (let [app (-> config
+                      (assoc :key-decrypter
+                             (fn [build _]
+                               (if (= "test-org" (:org-id build))
+                                 "decrypted-key"
+                                 (str "invalid build: " build))))
+                      (sut/make-app))
+              r (-> (mock/request :post "/decrypt-key")
+                    (mock/body (pr-str "encrypted-key"))
+                    (mock/content-type "application/edn")
+                    (auth)
+                    (app))]
+          (is (= 200 (:status r)))
+          (is (= "decrypted-key"
+                 (:body r))))))))

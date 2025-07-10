@@ -53,7 +53,10 @@
       (is (some? (:metrics sys))))
 
     (testing "provides poll loop"
-      (is (some? (:poll-loop sys))))))
+      (is (some? (:poll-loop sys))))
+
+    (testing "provides key decrypter"
+      (is (fn? (:key-decrypter sys))))))
 
 (deftest params
   (let [params (sut/new-params {:api {:url "http://test-api"}
@@ -81,6 +84,19 @@
             fetcher (sut/new-ssh-keys-fetcher {:api {:url "http://test-api"}
                                                :jwk {:priv (h/generate-private-key)}})]
         (is (= ["test-key"] (fetcher sid)))))))
+
+(deftest key-decripter
+  (testing "decrypts from global api"
+    (ta/with-fake-http
+        ["http://test-api/org/test-org/crypto/decrypt-key"
+         (fn [req]
+           {:status 200
+            :body (pr-str "decrypted-key")})]
+      (let [build (-> (h/gen-build)
+                      (assoc :org-id "test-org"))
+            d (sut/new-key-decrypter {:api {:url "http://test-api"}
+                                      :jwk {:priv (h/generate-private-key)}})]
+        (is (= "decrypted-key" @(d build "enc-key")))))))
 
 (deftest poll-loop
   (let [conf {:poll-loop
