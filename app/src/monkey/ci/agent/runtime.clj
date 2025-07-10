@@ -57,7 +57,6 @@
 
 (defn- api-with-token-maker [config]
   (fn [sid]
-    (log/debug "Creating build token for sid" sid)
     (assoc (:api config) :token (make-token (get-privkey config) sid))))
 
 (defrecord ApiBuildParams [api-maker]

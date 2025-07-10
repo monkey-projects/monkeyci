@@ -284,7 +284,7 @@
    {:post
     {:handler decrypt-key
      :parameters {:body s/Str}
-     :responses {200 s/Str}
+     :responses {200 {}}
      :produces edn}}])
 
 (def routes [""

@@ -129,6 +129,7 @@
 (deftest decrypt-key
   (testing "invokes key decryption endpoint on client"
     (let [m (fn [req]
-              (when (= "/decrypt-key" (:path req))
+              (when (and (= "/decrypt-key" (:path req))
+                         (= :post (:request-method req)))
                 (md/success-deferred {:body "decrypted key"})))]
       (is (= "decrypted key" (sut/decrypt-key m "encrypted-key"))))))

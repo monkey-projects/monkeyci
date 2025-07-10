@@ -130,5 +130,6 @@
      [client enc-dek]
      @(md/chain
        (client {:path "/decrypt-key"
+                :request-method :post
                 :body enc-dek})
        :body))))
