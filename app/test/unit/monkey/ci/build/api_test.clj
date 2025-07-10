@@ -50,7 +50,7 @@
                                       [{:name "key"
                                         :value "value"}]})))
           rt {:api {:client m}
-              :build {:sid ["test-cust" "test-repo" "test-build"]}}]
+              :build {:sid ["test-org" "test-repo" "test-build"]}}]
       (is (= {"key" "value"} (sut/build-params rt))))))
 
 (deftest download-artifact
@@ -60,7 +60,7 @@
                        (:path req))
                 (md/success-deferred {:body "test artifact contents"})))
           rt {:api {:client m}
-              :build {:sid ["test-cust" "test-repo" "test-build"]}}]
+              :build {:sid ["test-org" "test-repo" "test-build"]}}]
       (is (= "test artifact contents"
              (sut/download-artifact rt "test-artifact"))))))
 
@@ -127,4 +127,8 @@
             (is (nil? (ms/close! s)))))))))
 
 (deftest decrypt-key
-  (testing "invokes key decryption endpoint on client"))
+  (testing "invokes key decryption endpoint on client"
+    (let [m (fn [req]
+              (when (= "/decrypt-key" (:path req))
+                (md/success-deferred {:body "decrypted key"})))]
+      (is (= "decrypted key" (sut/decrypt-key m "encrypted-key"))))))

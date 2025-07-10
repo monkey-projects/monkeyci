@@ -1,5 +1,6 @@
 (ns monkey.ci.script.events-test
-  (:require [clojure.spec.alpha :as spec]
+  (:require [buddy.core.codecs :as bcc]
+            [clojure.spec.alpha :as spec]
             [clojure.test :refer [deftest is testing]]
             [manifold.deferred :as md]
             [medley.core :as mc]
@@ -10,8 +11,10 @@
             [monkey.ci.events.mailman :as em]
             [monkey.ci.events.mailman.interceptors :as emi]
             [monkey.ci
+             [cuid :as cuid]
              [extensions :as ext]
-             [jobs :as j]]
+             [jobs :as j]
+             [vault :as v]]
             [monkey.ci.script
              [core :as sc]
              [events :as sut]]
@@ -20,6 +23,7 @@
              [extensions :as te]
              [helpers :as h]
              [mailman :as tm]]
+            [monkey.ci.vault.common :as vc]
             [monkey.mailman.core :as mmc]))
 
 (defn- jobs->map [jobs]
@@ -57,7 +61,26 @@
                   :archs ::archs}
                  @job-ctx)))))
 
-    (testing "encrypts container env vars using build data encryption key")))
+    (testing "encrypts container env vars using build data encryption key"
+      (let [org-id (cuid/random-cuid)
+            build {:dek "encrypted-key"
+                   :org-id org-id}
+            dek (v/generate-key)
+            init-ctx {:build build}]
+        (with-redefs [sc/load-jobs (fn [_ ctx]
+                                     [(bc/container-job
+                                       "job-with-env"
+                                       {:container/env {"env-var" "secret-value"}})])]
+          (let [res (-> {}
+                         (sut/set-initial-job-ctx init-ctx)
+                         (sut/set-build build)
+                         (sut/set-api-client
+                          (constantly (md/success-deferred {:body (bcc/bytes->b64-str dek)})))
+                         (enter))]
+            (is (= (vc/encrypt dek (v/cuid->iv org-id) "secret-value")
+                   (-> res
+                       (sut/get-jobs)
+                       (get-in ["job-with-env" :container/env "env-var"]))))))))))
 
 (deftest add-job-ctx
   (let [{:keys [enter] :as i} sut/add-job-ctx
