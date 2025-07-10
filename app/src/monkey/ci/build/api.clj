@@ -121,3 +121,14 @@
                 src)
     {:bus eb
      :close close-fn}))
+
+(def decrypt-key
+  "Given an encrypted data encryption key, decrypts it by sending a decryption
+   request to the build api server."
+  (memoize
+   (fn 
+     [client enc-dek]
+     @(md/chain
+       (client {:path "/decrypt-key"
+                :body enc-dek})
+       :body))))

@@ -183,3 +183,10 @@
            (sut/sid {:org-id ::test-cust
                      :repo-id ::test-repo
                      :build-id ::test-build})))))
+
+(deftest org-id
+  (testing "`:org-id` from build"
+    (is (= "test-org" (sut/org-id {:org-id "test-org"}))))
+
+  (testing "first from sid"
+    (is (= "test-org" (sut/org-id {:sid ["test-org"]})))))

@@ -115,9 +115,12 @@
 (defn- build-jobs []
   (let [jobs (rf/subscribe [:build/jobs])]
     (println "Jobs:" (str @jobs))
-    (if (empty? @jobs)
+    (cond
+      (nil? @jobs)
+      [:p "Waiting for the build jobs to be loaded..."]
+      (empty? @jobs)
       [:p "This build does not contain any jobs."]
-      [jobs-table @jobs])))
+      :else [jobs-table @jobs])))
 
 (defn- current-overview []
   (let [build (rf/subscribe [:build/current])]

@@ -1,22 +1,20 @@
 (ns monkey.ci.build.api-test
-  (:require
-   [clojure.java.io :as io]
-   [clojure.test :refer [deftest is testing]]
-   [manifold.bus :as bus]
-   [manifold.deferred :as md]
-   [manifold.stream :as ms]
-   [martian.core :as mc]
-   [monkey.ci.build.api :as sut]
-   [monkey.ci.build.api-server :as server]
-   [monkey.ci.events.mailman :as em]
-   [monkey.ci.events.mailman.build-api :as emba]
-   [monkey.ci.protocols :as p]
-   [monkey.ci.test.api-server :as tas]
-   [monkey.ci.test.helpers :as h]
-   [monkey.ci.test.mailman :as tm]
-   [monkey.mailman.core :as mmc])
-  (:import
-   (java.io PipedInputStream PipedOutputStream PrintWriter)))
+  (:require [clojure.java.io :as io]
+            [clojure.test :refer [deftest is testing]]
+            [manifold
+             [bus :as bus]
+             [deferred :as md]
+             [stream :as ms]]
+            [monkey.ci.build
+             [api :as sut]
+             [api-server :as server]]
+            [monkey.ci.events.mailman.build-api :as emba]
+            [monkey.ci.test
+             [api-server :as tas]
+             [helpers :as h]
+             [mailman :as tm]]
+            [monkey.mailman.core :as mmc])
+  (:import (java.io PipedInputStream PipedOutputStream PrintWriter)))
 
 (deftest api-client
   (let [config (tas/test-config)
@@ -52,7 +50,7 @@
                                       [{:name "key"
                                         :value "value"}]})))
           rt {:api {:client m}
-              :build {:sid ["test-cust" "test-repo" "test-build"]}}]
+              :build {:sid ["test-org" "test-repo" "test-build"]}}]
       (is (= {"key" "value"} (sut/build-params rt))))))
 
 (deftest download-artifact
@@ -62,7 +60,7 @@
                        (:path req))
                 (md/success-deferred {:body "test artifact contents"})))
           rt {:api {:client m}
-              :build {:sid ["test-cust" "test-repo" "test-build"]}}]
+              :build {:sid ["test-org" "test-repo" "test-build"]}}]
       (is (= "test artifact contents"
              (sut/download-artifact rt "test-artifact"))))))
 
@@ -127,3 +125,10 @@
             (post-event evt)
             (is (= evt (-> s (ms/take!) (deref 1000 :timeout))))
             (is (nil? (ms/close! s)))))))))
+
+(deftest decrypt-key
+  (testing "invokes key decryption endpoint on client"
+    (let [m (fn [req]
+              (when (= "/decrypt-key" (:path req))
+                (md/success-deferred {:body "decrypted key"})))]
+      (is (= "decrypted key" (sut/decrypt-key m "encrypted-key"))))))

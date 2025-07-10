@@ -21,6 +21,7 @@
              [http :as wh]
              [middleware :as wm]]
             [monkey.ci.web.api
+             [crypto :as crypto-api]
              [org :as org-api]
              [invoice :as inv-api]
              [join-request :as jr-api]
@@ -338,6 +339,13 @@
             :parameters
             {:path {:invoice-id Id}}}}]]])
 
+(def crypto-routes
+  ["/crypto"
+   [["/decrypt-key"
+     {:post {:handler crypto-api/decrypt-key
+             :parameters
+             {:body {:enc s/Str}}}}]]])
+
 (def org-routes
   ["/org"
    {:middleware [:org-check]}
@@ -359,7 +367,8 @@
                     stats-routes
                     credit-routes
                     org-webhook-routes
-                    invoice-routes]})])
+                    invoice-routes
+                    crypto-routes]})])
 
 (def github-routes
   ["/github"
