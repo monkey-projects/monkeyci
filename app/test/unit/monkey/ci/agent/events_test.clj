@@ -228,7 +228,8 @@
 
 (deftest generate-script-config
   (testing "builds script config"
-    (let [build (h/gen-build)
+    (let [build (-> (h/gen-build)
+                    (assoc :dek "test-dek"))
           conf (-> {:event {:build build}}
                    (sut/set-config {:api-server {:port 1234}
                                     :archs [:amd]
@@ -243,7 +244,14 @@
 
       (is (= 7 (-> conf
                    (sc/build)
-                   :credit-multiplier))))))
+                   :credit-multiplier))
+          "passes credit multiplier")
+
+      (is (= "test-dek"
+             (-> conf
+                 (sc/build)
+                 :dek))
+          "passes build data encryption key"))))
 
 (deftest script-init
   (let [sid (random-sid)

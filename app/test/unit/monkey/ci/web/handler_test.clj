@@ -31,12 +31,12 @@
     (is (fn? (sut/make-app {})))))
 
 (defn- test-rt [& [opts]]
-  (-> (merge (trt/test-runtime)
-             {:config {:dev-mode true}
-              :vault (h/dummy-vault)}
-             opts)
+  (-> (trt/test-runtime)
       (trt/set-encrypter (fn [x _ _] x))
       (trt/set-decrypter (fn [x _ _] x))
+      (merge {:config {:dev-mode true}
+              :vault (h/dummy-vault)}
+       opts)
       (update :storage #(or % (st/make-memory-storage)))))
 
 (defn- make-test-app
@@ -463,11 +463,11 @@
                        :status)))))))
 
 (deftest repository-endpoints
-  (let [cust-id (st/new-id)]
+  (let [org-id (st/new-id)]
     (verify-entity-endpoints {:name "repository"
-                              :path (format "/org/%s/repo" cust-id)
+                              :path (format "/org/%s/repo" org-id)
                               :base-entity {:name "test repo"
-                                            :org-id cust-id
+                                            :org-id org-id
                                             :url "http://test-repo"
                                             :labels [{:name "app" :value "test-app"}]}
                               :updated-entity {:name "updated repo"}
@@ -478,9 +478,9 @@
       (testing "`/github`"
         (testing "`/watch` starts watching repo"
           (is (= 200 (-> (h/json-request :post
-                                         (str "/org/" cust-id "/repo/github/watch")
+                                         (str "/org/" org-id "/repo/github/watch")
                                          {:github-id 12324
-                                          :org-id cust-id
+                                          :org-id org-id
                                           :name "test-repo"
                                           :url "http://test"})
                          (test-app)
@@ -490,11 +490,11 @@
           (let [st (st/make-memory-storage)
                 app (make-test-app st)
                 repo-id (st/new-id)
-                _ (st/watch-github-repo st {:org-id cust-id
+                _ (st/watch-github-repo st {:org-id org-id
                                             :id repo-id
                                             :github-id 1234})]
             (is (= 200 (-> (mock/request :post
-                                         (format "/org/%s/repo/%s/github/unwatch" cust-id repo-id))
+                                         (format "/org/%s/repo/%s/github/unwatch" org-id repo-id))
                            (app)
                            :status))))))
 
@@ -504,8 +504,8 @@
                                                :body "{}"}]
           (testing "`/watch` starts watching bitbucket repo"
             (is (= 201 (-> (h/json-request :post
-                                           (str "/org/" cust-id "/repo/bitbucket/watch")
-                                           {:org-id cust-id
+                                           (str "/org/" org-id "/repo/bitbucket/watch")
+                                           {:org-id org-id
                                             :name "test-repo"
                                             :url "http://test"
                                             :workspace "test-ws"
@@ -519,16 +519,16 @@
                   app (make-test-app st)
                   repo-id (st/new-id)
                   wh-id (st/new-id)
-                  _ (st/save-org st {:id cust-id
+                  _ (st/save-org st {:id org-id
                                           :repos {repo-id {:id repo-id}}})
-                  _ (st/save-webhook st {:org-id cust-id
+                  _ (st/save-webhook st {:org-id org-id
                                          :repo-id repo-id
                                          :id wh-id
                                          :secret (str (random-uuid))})
                   _ (st/save-bb-webhook st {:webhook-id wh-id
                                             :bitbucket-id (str (random-uuid))})]
               (is (= 200 (-> (h/json-request :post
-                                             (format "/org/%s/repo/%s/bitbucket/unwatch" cust-id repo-id)
+                                             (format "/org/%s/repo/%s/bitbucket/unwatch" org-id repo-id)
                                              {:token "test-token"})
                              (app)
                              :status))))))))))
@@ -701,19 +701,19 @@
    :private-key)
 
   ;; In case we would want to add endpoints for single ssh keys
-  #_(let [cust-id (st/new-id)
+  #_(let [org-id (st/new-id)
           ssh-key {:private-key "test-private-key"
                    :public-key "test-public-key"
                    :description "original desc"
-                   :org-id cust-id
+                   :org-id org-id
                    :label-filters []}]
       (verify-entity-endpoints
        {:name "org ssh key"
-        :path (format "/org/%s/ssh-keys" cust-id)
+        :path (format "/org/%s/ssh-keys" org-id)
         :base-entity ssh-key
         :updated-entity {:description "updated description"}
         :creator (fn [s p]
-                   (st/save-ssh-key s (assoc p :org-id cust-id)))
+                   (st/save-ssh-key s (assoc p :org-id org-id)))
         :can-delete? true})))
 
 (defn- generate-build-sid []
@@ -1114,8 +1114,8 @@
                      :status))))))
 
 (deftest artifacts-endpoints
-  (let [[cust-id repo-id build-id :as sid] (repeatedly 3 st/new-id)
-        base-path (format "/org/%s/repo/%s/builds/%s" cust-id repo-id build-id)
+  (let [[org-id repo-id build-id :as sid] (repeatedly 3 st/new-id)
+        base-path (format "/org/%s/repo/%s/builds/%s" org-id repo-id build-id)
         art-id "test-artifact"
         artifacts (atom {(a/build-sid->artifact-path sid "test-artifact") "test.txt"})
         art-store (h/fake-blob-store artifacts)
@@ -1245,3 +1245,18 @@
                                         :password "test-pass"})
                        (app)
                        :status)))))))
+
+(deftest crypto-endpoints
+  (testing "`POST /:org-id/crypto/decrypt-key` decrypts encrypted key"
+    (let [org (h/gen-org)
+          app (-> (test-rt)
+                  (trt/set-decrypter (fn [k org-id id]
+                                       (when (= org-id id (:id org))
+                                         "decrypted-key")))
+                  (sut/make-app))
+          r (-> (h/json-request :post (format "/org/%s/crypto/decrypt-key" (:id org))
+                                {:enc "encrypted-key"})
+                (app))]
+      (is (= 200 (:status r)))
+      (is (= "decrypted-key" (-> (h/reply->json r)
+                                 :key))))))

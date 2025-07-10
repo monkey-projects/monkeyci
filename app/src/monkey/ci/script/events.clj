@@ -1,6 +1,7 @@
 (ns monkey.ci.script.events
   "Mailman event routes for scripts"
-  (:require [clojure.tools.logging :as log]
+  (:require [buddy.core.codecs :as bcc]
+            [clojure.tools.logging :as log]
             [manifold
              [deferred :as md]
              [executor :as me]]
@@ -8,14 +9,18 @@
             [monkey.ci
              [build :as b]
              [extensions :as ext]
-             [jobs :as j]]
-            [monkey.ci.build.core :as bc]
+             [jobs :as j]
+             [vault :as v]]
+            [monkey.ci.build
+             [api :as ba]
+             [core :as bc]]
             [monkey.ci.events
              [builders :as eb]
              [core :as ec]
              [mailman :as em]]
             [monkey.ci.events.mailman.interceptors :as emi]
-            [monkey.ci.script.core :as s]))
+            [monkey.ci.script.core :as s]
+            [monkey.ci.vault.common :as vc]))
 
 ;;; Context management
 
@@ -73,6 +78,8 @@
 (defn build-canceled? [ctx]
   (true? (::build-canceled (emi/get-state ctx))))
 
+(def get-api-client (comp :client :api get-initial-job-ctx))
+
 ;;; Event builders
 
 (defn- base-event
@@ -92,15 +99,27 @@
 (def load-jobs
   "Interceptor that loads jobs from the location pointed to by the script-dir 
    and adds them to the state."
-  {:name ::load-jobs
-   :enter (fn [ctx]
-            (let [job-ctx (select-keys (get-initial-job-ctx ctx) [:build :api :archs])]
-              (log/debug "Loading script jobs using context" job-ctx)
-              ;; TODO Encrypt container env vars (possibly sensitive information)
-              (->> (s/load-jobs (get-build ctx) job-ctx)
-                   (group-by j/job-id)
-                   (mc/map-vals first)
-                   (set-jobs ctx))))})
+  (letfn [(encrypt-env [encrypter job]
+            (letfn [(encrypt-val [v]
+                      (@encrypter v))]
+              (mc/update-existing job :container/env (partial mc/map-vals encrypt-val))))]
+    {:name ::load-jobs
+     :enter (fn [ctx]
+              (let [build (get-build ctx)
+                    job-ctx (select-keys (get-initial-job-ctx ctx) [:build :api :archs])
+                    encrypter (delay ; Lazy so we don't unnecessarily decrypt the dek
+                                (let [dek (-> (ba/decrypt-key (get-api-client ctx) (:dek build))
+                                              (bcc/b64->bytes))
+                                      iv (v/cuid->iv (b/org-id build))]
+                                  (log/debug "Encrypting job env vars using key:" dek)
+                                  (fn [v]
+                                    (vc/encrypt dek iv v))))]
+                (log/debug "Loading script jobs using context" job-ctx)
+                (->> (s/load-jobs (get-build ctx) job-ctx)
+                     (group-by j/job-id)
+                     ;; Encrypt container env vars (possibly sensitive information)
+                     (mc/map-vals (comp (partial encrypt-env encrypter) first))
+                     (set-jobs ctx))))}))
 
 (def add-job-ctx
   "Interceptor that adds the job context, taken from state.  An initial context should
@@ -230,13 +249,15 @@
 (defn job-queued
   "Dispatches queued event for action or container job, depending on the type."
   [ctx]
-  (letfn [(job-queued-evt [t job]
+  (letfn [(job-queued-evt [t job dek]
             (-> (j/job-queued-evt job (build-sid ctx))
-                (assoc :type t)))]
-    (let [job (get-job-from-state ctx)]
+                (assoc :type t
+                       :dek dek)))]
+    (let [job (get-job-from-state ctx)
+          dek (:dek (get-build ctx))]
       ;; Action jobs do not result in an event, instead they are executed immediately.
       (when (bc/container-job? job)
-        [(job-queued-evt :container/job-queued job)]))))
+        [(job-queued-evt :container/job-queued job dek)]))))
 
 (defn job-executed
   "Runs any extensions for the job in interceptors, then ends the job."

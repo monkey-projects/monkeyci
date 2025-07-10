@@ -16,7 +16,6 @@
 (defn test-config
   "Creates dummy test configuration for api server"
   []
-  (let [rt (trt/test-runtime)]
-    (assoc rt
-           :event-stream (ms/stream 1)
-           :params (->EmptyParams))))
+  (assoc (trt/test-runtime)
+         :event-stream (ms/stream 1)
+         :params (->EmptyParams)))

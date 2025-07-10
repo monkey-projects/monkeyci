@@ -30,6 +30,7 @@
             [monkey.ci.spec.api-server :as aspec]
             [monkey.ci.web
              [common :as c]
+             [crypto :as wc]
              [handler :as h]
              [middleware :as wm]]
             [reitit.coercion.schema]
@@ -75,6 +76,9 @@
 (def req->mailman
   (comp :mailman req->ctx))
 
+(def req->decrypter
+  (comp :key-decrypter req->ctx))
+
 (def repo-id
   (comp (juxt :org-id :repo-id) req->build))
 
@@ -89,7 +93,7 @@
                     (-> (ex-data ex)
                         ;; Read the response body in case of error
                         (mc/update-existing :body bs/to-string)))))]
-    (log/debug "Sending API request using token:" token)
+    (log/debug "Sending build API request:" (:path req))
     (-> (api-client (-> req
                         (assoc :url (str url (:path req))
                                :accept "application/edn"
@@ -103,6 +107,14 @@
 (defn get-params-from-api [api build]
   (api-request api {:path (format "/org/%s/repo/%s/param" (:org-id build) (:repo-id build))
                     :method :get}))
+
+(defn decrypt-key-from-api [api org-id enc-key]
+  (let [body (pr-str {:enc enc-key})]
+    (api-request api {:path (format "/org/%s/crypto/decrypt-key" org-id)
+                      :method :post
+                      :body body
+                      :headers {"content-type" "application/edn"
+                                "content-length" (str (count body))}})))
 
 (defn- invalid-config [& _]
   (-> (rur/response {:error "Invalid or incomplete API context configuration"})
@@ -183,7 +195,7 @@
   (fn [req]
     (let [store (req->artifacts req)
           id (get-in req [:parameters :path :artifact-id])
-          path (when id (art/artifact-archive-path (req->build req) id))]
+          path (when id (art/build-sid->artifact-path (build/sid (req->build req)) id))]
       (log/debug "Handling artifact:" id)
       (f req store path id))))
 
@@ -219,6 +231,11 @@
   (with-cache (fn [req store path _]
                 (log/debug "Sending cache to client:" path)
                 (download-stream req store path 404))))
+
+(defn decrypt-key [req]
+  (let [d (req->decrypter req)]
+    (rur/response (d (req->build req)
+                     (get-in req [:parameters :body])))))
 
 (def edn #{"application/edn"})
 
@@ -262,6 +279,14 @@
     :get {:handler download-cache
           :responses {200 {}}}}])
 
+(def crypto-routes
+  ["/decrypt-key"
+   {:post
+    {:handler decrypt-key
+     :parameters {:body s/Str}
+     :responses {200 s/Str}
+     :produces edn}}])
+
 (def routes [""
              [["/test"
                {:get (constantly (rur/response {:result "ok"}))
@@ -272,6 +297,7 @@
               workspace-routes
               artifact-routes
               cache-routes
+              crypto-routes
               ;; TODO Log uploads
               ]])
 
