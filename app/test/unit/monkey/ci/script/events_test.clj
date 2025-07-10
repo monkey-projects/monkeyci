@@ -66,7 +66,10 @@
             build {:dek "encrypted-key"
                    :org-id org-id}
             dek (v/generate-key)
-            init-ctx {:build build}]
+            init-ctx {:build build
+                      :api
+                      {:client
+                       (constantly (md/success-deferred {:body (bcc/bytes->b64-str dek)}))}}]
         (with-redefs [sc/load-jobs (fn [_ ctx]
                                      [(bc/container-job
                                        "job-with-env"
@@ -74,8 +77,6 @@
           (let [res (-> {}
                          (sut/set-initial-job-ctx init-ctx)
                          (sut/set-build build)
-                         (sut/set-api-client
-                          (constantly (md/success-deferred {:body (bcc/bytes->b64-str dek)})))
                          (enter))]
             (is (= (vc/encrypt dek (v/cuid->iv org-id) "secret-value")
                    (-> res
@@ -381,13 +382,24 @@
                (sut/set-jobs jobs)
                (sut/job-queued)))))
 
-    (testing "for container job, returns `container/job-queued` event"
-      (is (= [:container/job-queued]
-             (-> {:event
-                  {:job-id "container-job"}}
-                 (sut/set-jobs jobs)
-                 (sut/job-queued)
-                 (as-> x (map :type x))))))))
+    (testing "for container job"
+      (testing "returns `container/job-queued` event"
+        (is (= [:container/job-queued]
+               (-> {:event
+                    {:job-id "container-job"}}
+                   (sut/set-jobs jobs)
+                   (sut/job-queued)
+                   (as-> x (map :type x))))))
+
+      (testing "passes build dek"
+        (is (= "encrypted-dek"
+               (-> {:event
+                    {:job-id "container-job"}}
+                   (sut/set-jobs jobs)
+                   (sut/set-build (assoc (h/gen-build) :dek "encrypted-dek"))
+                   (sut/job-queued)
+                   (first)
+                   :dek)))))))
 
 (deftest job-executed
   (testing "returns `job/end` event"

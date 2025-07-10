@@ -17,11 +17,13 @@
              [process :as proc]
              [protocols :as p]
              [utils :as u]
+             [vault :as v]
              [workspace :as ws]]
             [monkey.ci.build.core :as bc]
             [monkey.ci.containers.common :as cc]
             [monkey.ci.events.mailman :as em]
-            [monkey.ci.events.mailman.interceptors :as emi]))
+            [monkey.ci.events.mailman.interceptors :as emi]
+            [monkey.ci.vault.common :as vc]))
 
 ;;; Process commandline configuration
 
@@ -208,6 +210,11 @@
     (cond-> (str (get-work-dir ctx))
       wd (u/abs-path wd))))
 
+(defn set-key-decrypter [ctx kd]
+  (assoc ctx ::key-decrypter kd))
+
+(def get-key-decrypter ::key-decrypter)
+
 ;;; Interceptors
 
 (defn add-job-dir
@@ -219,6 +226,11 @@
                  (apply fs/path wd)
                  (str)
                  (set-job-dir ctx)))})
+
+(defn add-key-decrypter [kd]
+  {:name ::add-key-decrypter
+   :enter (fn [ctx]
+            (set-key-decrypter ctx kd))})
 
 (defn restore-ws
   "Prepares the job working directory by restoring the files from the workspace."
@@ -300,6 +312,28 @@
             (emi/update-state ctx update :job-count (comp (partial max 0)
                                                           (fnil dec 0))))})
 
+(def decrypt-env
+  "Interceptor that decrypts the env vars for an incoming job.  The job event
+   should contain a data encryption key that is used in conjunction with the
+   org id for decryption."
+  (letfn [(decrypt [env decrypter]
+            (mc/map-vals @decrypter env))]
+    {:name ::decrypt-env
+     :enter (fn [ctx]
+              (let [sid (build-sid ctx)
+                    org-id (b/sid->org-id sid)
+                    decrypter (delay
+                                (fn [x]
+                                  ;; Get and decrypt key
+                                  (let [k ((get-key-decrypter ctx)
+                                           (get-in ctx [:event :dek])
+                                           sid)
+                                        iv (v/cuid->iv org-id)]
+                                    (vc/decrypt k iv x))))]
+                (log/debug "Decrypting env vars for job" (ctx->job-id ctx))
+                (update-in ctx [:event :job]
+                           mc/update-existing :container/env decrypt decrypter)))}))
+
 ;;; Event handlers
 
 (def container-end-evt
@@ -366,11 +400,13 @@
                        save-job
                        inc-job-count
                        (add-job-dir wd)
+                       (add-key-decrypter (:key-decrypter conf))
                        (restore-ws workspace)
                        (emi/add-mailman mailman)
                        (add-job-ctx job-ctx)
                        (cache/restore-interceptor emi/get-job-ctx)
                        (art/restore-interceptor emi/get-job-ctx)
+                       decrypt-env
                        emi/start-process]}
        {:handler (partial job-queued conf)}]]
 

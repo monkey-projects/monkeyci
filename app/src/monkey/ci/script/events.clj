@@ -78,10 +78,7 @@
 (defn build-canceled? [ctx]
   (true? (::build-canceled (emi/get-state ctx))))
 
-(defn set-api-client [ctx c]
-  (assoc ctx ::api-client c))
-
-(def get-api-client ::api-client)
+(def get-api-client (comp :client :api get-initial-job-ctx))
 
 ;;; Event builders
 
@@ -251,13 +248,15 @@
 (defn job-queued
   "Dispatches queued event for action or container job, depending on the type."
   [ctx]
-  (letfn [(job-queued-evt [t job]
+  (letfn [(job-queued-evt [t job dek]
             (-> (j/job-queued-evt job (build-sid ctx))
-                (assoc :type t)))]
-    (let [job (get-job-from-state ctx)]
+                (assoc :type t
+                       :dek dek)))]
+    (let [job (get-job-from-state ctx)
+          dek (:dek (get-build ctx))]
       ;; Action jobs do not result in an event, instead they are executed immediately.
       (when (bc/container-job? job)
-        [(job-queued-evt :container/job-queued job)]))))
+        [(job-queued-evt :container/job-queued job dek)]))))
 
 (defn job-executed
   "Runs any extensions for the job in interceptors, then ends the job."

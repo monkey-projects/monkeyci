@@ -1,11 +1,16 @@
 (ns monkey.ci.containers.podman-test
   (:require [babashka.fs :as fs]
+            [buddy.core.codecs :as bcc]
             [clojure.test :refer [deftest is testing]]
             [io.pedestal.interceptor :as i]
             [io.pedestal.interceptor.chain :as pi]
+            [monkey.ci
+             [cuid :as cuid]
+             [vault :as v]]
             [monkey.ci.containers.podman :as sut]
             [monkey.ci.events.mailman.interceptors :as emi]
             [monkey.ci.test.helpers :as h :refer [contains-subseq?]]
+            [monkey.ci.vault.common :as vc]
             [monkey.mailman.core :as mmc]))
 
 (deftest build-cmd-args
@@ -359,6 +364,29 @@
                      (leave)
                      (emi/get-state)
                      (sut/count-jobs))))))))
+
+(deftest decrypt-env
+  (let [{:keys [enter] :as i} sut/decrypt-env]
+    (is (keyword? (:name i)))
+
+    (testing "`enter` decrypts job env vars"
+      (let [[org-id :as sid] (repeatedly 3 cuid/random-cuid)
+            dek (v/generate-key)
+            v "test-secret"
+            enc-val (vc/encrypt dek (v/cuid->iv org-id) v)]
+        (is (= v
+               (-> {:event
+                    {:sid sid
+                     :dek "encrypted-dek"
+                     :job
+                     {:container/env
+                      {"test-env" enc-val}}}}
+                   (sut/set-key-decrypter (fn [k build-sid]
+                                            (when (and (= sid build-sid)
+                                                       (= "encrypted-dek" k))
+                                              dek)))
+                   (enter)
+                   (get-in [:event :job :container/env "test-env"]))))))))
 
 (deftest job-queued
   (testing "returns `job/initializing` event"

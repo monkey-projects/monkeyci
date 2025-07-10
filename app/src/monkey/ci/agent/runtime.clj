@@ -56,8 +56,8 @@
       (get-in conf [:jwk :priv])))
 
 (defn- api-with-token-maker [config]
-  (fn [build]
-    (assoc (:api config) :token (make-token (get-privkey config) (b/sid build)))))
+  (fn [sid]
+    (assoc (:api config) :token (make-token (get-privkey config) sid))))
 
 (defrecord ApiBuildParams [api-maker]
   p/BuildParams
@@ -69,7 +69,8 @@
 
 ;; TODO Move this implementation to api-server ns
 (defn new-ssh-keys-fetcher [config]
-  (let [client (ahmw/wrap-request http/request)]
+  (let [client (ahmw/wrap-request http/request)
+        maker (api-with-token-maker config)]
     (fn [[org-id repo-id :as sid]]
       (log/debug "Retrieving ssh keys for" sid)
       (-> {:url (format "%s/org/%s/repo/%s/ssh-keys"
@@ -77,17 +78,30 @@
                         org-id
                         repo-id)
            :method :get
-           :oauth-token (make-token (get-privkey config) sid)
+           :oauth-token (maker sid)
            :accept "application/edn"}
           (client)
           (deref)
           :body
           (edn/edn->)))))
 
-(defn new-key-decrypter [config]
+(defn new-build-key-decrypter
+  "Build key decrypter, to decrypt the build data encryption key, which is then
+   used to encrypt container job env vars."
+  [config]
   (let [maker (api-with-token-maker config)]
-    (fn [build key]
-      (bas/decrypt-key-from-api (maker build) (first (b/sid build)) key))))
+    ;; TODO Caching
+    (fn [build enc-key]
+      (let [sid (b/sid build)]
+        (bas/decrypt-key-from-api (maker sid) (b/sid->org-id sid) enc-key)))))
+
+(defn new-container-key-decrypter
+  "Key decrypter used by container agent to decrypt job env vars."
+  [config]
+  (let [maker (api-with-token-maker config)]
+    ;; TODO Caching
+    (fn [enc-key sid]
+      (bas/decrypt-key-from-api (maker sid) (b/sid->org-id sid) enc-key))))
 
 (defmulti make-container-routes :type)
 
@@ -154,7 +168,8 @@
      :ssh-keys-fetcher (new-ssh-keys-fetcher conf)
      :api-server (co/using
                   (new-api-server conf)
-                  [:builds :artifacts :cache :workspace :mailman :event-stream :params :metrics])
+                  [:builds :artifacts :cache :workspace :mailman :event-stream :params :metrics
+                   :key-decrypter])
      :mailman (rr/new-mailman conf)
      ;; Set up separate mailman to poll only the build/queued subject
      :poll-mailman (new-poll-mailman conf)
@@ -177,7 +192,7 @@
                         (new-container-routes conf)
                         [:mailman :artifacts :cache :workspace :api-server])
      :metrics (mc/make-metrics)
-     :key-decrypter (new-key-decrypter conf))))
+     :key-decrypter (new-build-key-decrypter conf))))
 
 (defn- max-jobs-reached? [{:keys [state config]}]
   (let [c (c-podman/count-jobs @state)
@@ -207,7 +222,7 @@
      :workspace (rr/new-workspace conf)
      :container-routes (co/using
                         (new-container-routes conf)
-                        [:mailman :artifacts :cache :workspace :state])
+                        [:mailman :artifacts :cache :workspace :state :key-decrypter])
      ;; Set up separate mailman to poll only the container/job-queued subject
      :poll-mailman (new-poll-mailman conf)
      :poll-loop (co/using
@@ -216,5 +231,6 @@
                   :mailman-out :mailman
                   :routes :container-routes
                   :state :state})
+     :key-decrypter (new-container-key-decrypter conf)
      ;; Shared state between container routes and poll loop for capacity calculation
      :state (atom {}))))

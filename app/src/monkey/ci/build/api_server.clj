@@ -105,12 +105,10 @@
         (md/catch handle-error))))
 
 (defn get-params-from-api [api build]
-  ;; TODO Cache response
   (api-request api {:path (format "/org/%s/repo/%s/param" (:org-id build) (:repo-id build))
                     :method :get}))
 
 (defn decrypt-key-from-api [api org-id enc-key]
-  ;; TODO Cache response
   (let [body (pr-str {:enc enc-key})]
     (api-request api {:path (format "/org/%s/crypto/decrypt-key" org-id)
                       :method :post

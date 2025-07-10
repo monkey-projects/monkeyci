@@ -29,6 +29,7 @@
   (some-fn :sid props->sid))
 
 (def org-id (some-fn :org-id (comp first :sid)))
+(def sid->org-id first)
 
 (def build-id (some-fn :build-id (constantly "unknown-build")))
 
