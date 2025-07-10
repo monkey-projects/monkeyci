@@ -384,7 +384,7 @@
                    (sut/set-key-decrypter (fn [k build-sid]
                                             (when (and (= sid build-sid)
                                                        (= "encrypted-dek" k))
-                                              dek)))
+                                              (bcc/bytes->b64-str dek))))
                    (enter)
                    (get-in [:event :job :container/env "test-env"]))))))))
 

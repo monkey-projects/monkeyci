@@ -3,6 +3,7 @@
    it requires a socket, which is not always available.  Instead, we invoke the podman
    command as a child process and communicate with it using the standard i/o streams."
   (:require [babashka.fs :as fs]
+            [buddy.core.codecs :as bcc]
             [cheshire.core :as json]
             [clojure.java.io :as io]
             [clojure.string :as cs]
@@ -323,13 +324,15 @@
               (let [sid (build-sid ctx)
                     org-id (b/sid->org-id sid)
                     decrypter (delay
-                                (fn [x]
-                                  ;; Get and decrypt key
-                                  (let [k ((get-key-decrypter ctx)
-                                           (get-in ctx [:event :dek])
-                                           sid)
-                                        iv (v/cuid->iv org-id)]
-                                    (vc/decrypt k iv x))))]
+                                ;; Get and decrypt key
+                                (let [k ((get-key-decrypter ctx)
+                                         (get-in ctx [:event :dek])
+                                         sid)
+                                      dek (bcc/b64->bytes k)
+                                      iv (v/cuid->iv org-id)]
+                                  (log/debug "Decrypted dek:" k)
+                                  (fn [x]
+                                    (vc/decrypt dek iv x))))]
                 (log/debug "Decrypting env vars for job" (ctx->job-id ctx))
                 (update-in ctx [:event :job]
                            mc/update-existing :container/env decrypt decrypter)))}))

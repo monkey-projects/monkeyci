@@ -111,6 +111,7 @@
                                 (let [dek (-> (ba/decrypt-key (get-api-client ctx) (:dek build))
                                               (bcc/b64->bytes))
                                       iv (v/cuid->iv (b/org-id build))]
+                                  (log/debug "Encrypting job env vars using key:" dek)
                                   (fn [v]
                                     (vc/encrypt dek iv v))))]
                 (log/debug "Loading script jobs using context" job-ctx)

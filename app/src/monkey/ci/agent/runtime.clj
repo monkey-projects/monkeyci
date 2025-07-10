@@ -87,7 +87,8 @@
 
 (defn new-build-key-decrypter
   "Build key decrypter, to decrypt the build data encryption key, which is then
-   used to encrypt container job env vars."
+   used to encrypt container job env vars.  Returns the decrypted DEK, base64
+   encoded."
   [config]
   (let [maker (api-with-token-maker config)]
     ;; TODO Caching
