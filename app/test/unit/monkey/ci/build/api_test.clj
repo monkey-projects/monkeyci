@@ -134,5 +134,6 @@
     (let [m (fn [req]
               (when (and (= "/decrypt-key" (:path req))
                          (= :post (:request-method req)))
-                (md/success-deferred {:body "decrypted key"})))]
+                (md/success-deferred {:body (java.io.ByteArrayInputStream.
+                                             (.getBytes "decrypted key"))})))]
       (is (= "decrypted key" (sut/decrypt-key m "encrypted-key"))))))

@@ -116,7 +116,7 @@
         ["http://test-api/org/test-org/crypto/decrypt-key"
          (fn [req]
            {:status 200
-            :body (pr-str "decrypted-key")})]
+            :body (pr-str {:key "decrypted-key"})})]
       (let [build (-> (h/gen-build)
                       (assoc :org-id "test-org"))
             d (sut/new-build-key-decrypter
@@ -130,7 +130,7 @@
         ["http://test-api/org/test-org/crypto/decrypt-key"
          (fn [req]
            {:status 200
-            :body (pr-str "decrypted-key")})]
+            :body (pr-str {:key "decrypted-key"})})]
       (let [org-id "test-org"
             d (sut/new-container-key-decrypter
                {:api {:url "http://test-api"}

@@ -127,7 +127,7 @@
                            (format "http://test-api/org/%s/crypto/decrypt-key" (:id org))
                            :request-method :post}
                           {:status 200
-                           :body (pr-str "decrypted-key")
+                           :body (pr-str {:key "decrypted-key"})
                            :headers {"Content-Type" "application/edn"}}]
         (is (= "decrypted-key"
                @(sut/decrypt-key-from-api {:url "http://test-api"
@@ -316,9 +316,10 @@
         (let [app (-> config
                       (assoc :key-decrypter
                              (fn [build _]
-                               (if (= "test-org" (:org-id build))
-                                 "decrypted-key"
-                                 (str "invalid build: " build))))
+                               (md/success-deferred
+                                (if (= "test-org" (:org-id build))
+                                  "decrypted-key"
+                                  (str "invalid build: " build)))))
                       (sut/make-app))
               r (-> (mock/request :post "/decrypt-key")
                     (mock/body (pr-str "encrypted-key"))

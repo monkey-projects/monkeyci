@@ -93,7 +93,7 @@
                     (-> (ex-data ex)
                         ;; Read the response body in case of error
                         (mc/update-existing :body bs/to-string)))))]
-    (log/debug "Sending build API request:" (:path req))
+    (log/debug "Sending API request:" (:path req))
     (-> (api-client (-> req
                         (assoc :url (str url (:path req))
                                :accept "application/edn"
@@ -110,11 +110,12 @@
 
 (defn decrypt-key-from-api [api org-id enc-key]
   (let [body (pr-str {:enc enc-key})]
-    (api-request api {:path (format "/org/%s/crypto/decrypt-key" org-id)
-                      :method :post
-                      :body body
-                      :headers {"content-type" "application/edn"
-                                "content-length" (str (count body))}})))
+    (-> (api-request api {:path (format "/org/%s/crypto/decrypt-key" org-id)
+                          :method :post
+                          :body body
+                          :headers {"content-type" "application/edn"
+                                    "content-length" (str (count body))}})
+        (md/chain :key))))
 
 (defn- invalid-config [& _]
   (-> (rur/response {:error "Invalid or incomplete API context configuration"})
@@ -234,8 +235,10 @@
 
 (defn decrypt-key [req]
   (let [d (req->decrypter req)]
-    (rur/response (d (req->build req)
-                     (get-in req [:parameters :body])))))
+    (-> (d (req->build req)
+           (get-in req [:parameters :body]))
+        (u/maybe-deref)
+        (rur/response))))
 
 (def edn #{"application/edn"})
 

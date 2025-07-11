@@ -325,9 +325,9 @@
                     org-id (b/sid->org-id sid)
                     decrypter (delay
                                 ;; Get and decrypt key
-                                (let [k ((get-key-decrypter ctx)
-                                         (get-in ctx [:event :dek])
-                                         sid)
+                                (let [k @((get-key-decrypter ctx)
+                                          (get-in ctx [:event :dek])
+                                          sid)
                                       dek (bcc/b64->bytes k)
                                       iv (v/cuid->iv org-id)]
                                   (log/debug "Decrypted dek:" k)

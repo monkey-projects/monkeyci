@@ -69,7 +69,11 @@
             init-ctx {:build build
                       :api
                       {:client
-                       (constantly (md/success-deferred {:body (bcc/bytes->b64-str dek)}))}}]
+                       (constantly (md/success-deferred
+                                    {:body
+                                     (-> (bcc/bytes->b64-str dek)
+                                         (.getBytes)
+                                         (java.io.ByteArrayInputStream.))}))}}]
         (with-redefs [sc/load-jobs (fn [_ ctx]
                                      [(bc/container-job
                                        "job-with-env"

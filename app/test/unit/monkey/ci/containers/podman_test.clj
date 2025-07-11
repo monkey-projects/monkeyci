@@ -4,6 +4,7 @@
             [clojure.test :refer [deftest is testing]]
             [io.pedestal.interceptor :as i]
             [io.pedestal.interceptor.chain :as pi]
+            [manifold.deferred :as md]
             [monkey.ci
              [cuid :as cuid]
              [vault :as v]]
@@ -384,7 +385,8 @@
                    (sut/set-key-decrypter (fn [k build-sid]
                                             (when (and (= sid build-sid)
                                                        (= "encrypted-dek" k))
-                                              (bcc/bytes->b64-str dek))))
+                                              (md/success-deferred
+                                               (bcc/bytes->b64-str dek)))))
                    (enter)
                    (get-in [:event :job :container/env "test-env"]))))))))
 

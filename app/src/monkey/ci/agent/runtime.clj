@@ -9,7 +9,8 @@
              [build :as b]
              [cache :as c]
              [edn :as edn]
-             [protocols :as p]]
+             [protocols :as p]
+             [utils :as u]]
             [monkey.ci.agent
              [api-server :as aa]
              [events :as e]]
