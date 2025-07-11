@@ -78,20 +78,12 @@
             target)))})
      :clj [target]))
 
-(def shape
-  [:div.shape-container
-   [:div.shape.shape-bottom.zi-1
-    [:svg {:view-box "0 0 3000 1000"
-           :fill"none"
-           :xmlns "http://www.w3.org/2000/svg"}
-     [:path {:d "M0 1000V583.723L3000 0V1000H0Z"
-             :fill "#fff"}]]]])
-
 (defn default [subpanel]
   [:<>
    [header]
    [:div.bg-soft-primary-light.flex-fill
-    [:div.container.my-4
+    ;; Relative position necessary for the bg shape to work
+    [:div.container.position-relative.zi-2.my-4
      [error-boundary subpanel]]]
-   #_shape ;; FIXME Something with z-index
+   [co/bg-shape]
    [footer]])

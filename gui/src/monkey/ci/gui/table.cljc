@@ -191,7 +191,7 @@
                   {})]])
 
 (defn- render-table [columns items opts]
-  [:table.table
+  [:table.table.table-striped
    (select-keys opts [:class])
    (render-thead (:id opts) columns)
    (render-tbody columns items opts)])

@@ -42,12 +42,7 @@
        [:div.card-body
         [co/alerts [:login/alerts]]
         [login-form]]]]]]
-   [:div.shape-container
-    [:div.shape.shape-bottom.zi-1
-     [:svg {:view-box "0 0 3000 1000"
-            :fill "none"
-            :xmlns "http://www.w3.org/2000/svg"}
-      [:path {:d "M0 1000V583.723L3000 0V1000H0Z" :fill "#fff"}]]]]])
+   [co/bg-shape]])
 
 (defn page []
   [:<>

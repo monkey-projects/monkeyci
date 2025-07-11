@@ -19,6 +19,7 @@
    :page/github-callback login/github-callback
    :page/bitbucket-callback login/bitbucket-callback
    :page/org org/page
+   :page/org-settings org/page-settings
    :page/org-new org/page-new
    :page/org-edit org/page-edit
    :page/org-join home/page-join

@@ -1,4 +1,5 @@
 (ns monkey.ci.gui.build
+  "Builders for the index pages, which are then rendered into html pages."
   (:require [clojure.java.io :as io]
             [hiccup2.core :as h]
             [monkey.ci.gui.template :as t]

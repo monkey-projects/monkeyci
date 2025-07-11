@@ -147,6 +147,12 @@
     {:href (r/path-for :page/add-bitbucket-repo {:org-id id})
      :title "Link an existing Bitbucket repository"}))
 
+(defn- settings-btn [id]
+  [:a.btn.btn-outline-primary
+   {:href (r/path-for :page/org-settings {:org-id id})
+    :title "Organization Settings"}
+   [:span.me-2 [co/icon :gear]] "Settings"])
+
 (defn- edit-btn [id]
   [:a.btn.btn-outline-primary
    {:href (r/path-for :page/org-edit {:org-id id})
@@ -165,12 +171,18 @@
     :title "Configure ssh keys to access private repositories"}
    [:span.me-2 [co/icon :key]] "SSH Keys"])
 
+(defn- add-repo-btn [id]
+  [:a.btn.btn-primary
+   {:href (r/path-for :page/add-repo {:org-id id})}
+   [:span.me-2 [co/icon :plus-square]] "Add Repository"])
+
 (defn- org-actions [id]
   [:<>
-   [edit-btn id]
+   [settings-btn id]
+   [add-repo-btn id]
    [watch-repo-btn id]
-   [params-btn id]
-   [ssh-keys-btn id]])
+   #_[params-btn id]
+   #_[ssh-keys-btn id]])
 
 (defn- org-header []
   (let [c (rf/subscribe [:org/info])]
@@ -273,11 +285,6 @@
     {:id :repos
      :header [:span [:span.me-2 co/repo-icon] "Repositories"]
      :contents [org-repos]}]])
-
-(defn- add-repo-btn [id]
-  [:a.btn.btn-primary
-   {:href (r/path-for :page/add-repo {:org-id id})}
-   [:span.me-2 [co/icon :plus-square]] "Add Repository"])
 
 (defn- repo-intro [id]
   [:<>
@@ -402,6 +409,12 @@
   (rf/dispatch [:bitbucket/load-repos])
   (rf/dispatch [:org/load-bb-webhooks])
   [add-repo-page nil bitbucket-repo-table])
+
+(defn page-settings
+  "Organization settings: groups all configuration pages"
+  [org]
+  (l/default
+   [:h3 "Settings go here"]))
 
 (defn- org-name-input [org]
   [:<>
