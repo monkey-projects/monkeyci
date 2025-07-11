@@ -128,8 +128,12 @@
   (memoize
    (fn 
      [client enc-dek]
-     @(md/chain
-       (client {:path "/decrypt-key"
-                :request-method :post
-                :body enc-dek})
-       :body))))
+     (let [p (pr-str enc-dek)]
+       @(md/chain
+         (client {:path "/decrypt-key"
+                  :request-method :post
+                  :body p
+                  :headers {:content-type "application/edn"
+                            :content-length (str (count p))}})
+         :body
+         slurp)))))

@@ -18,4 +18,5 @@
   []
   (assoc (trt/test-runtime)
          :event-stream (ms/stream 1)
-         :params (->EmptyParams)))
+         :params (->EmptyParams)
+         :key-decrypter (constantly "decrypted")))

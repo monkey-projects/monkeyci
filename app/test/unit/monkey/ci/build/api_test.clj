@@ -40,7 +40,10 @@
           (is (some? (mmc/post-events broker [event])))
           (is (not= :timeout (h/wait-until #(not-empty (get-posted)) 1000)))
           (is (= event (-> (first (get-posted))
-                           (select-keys (keys event))))))))))
+                           (select-keys (keys event)))))))
+
+      (testing "can decrypt key"
+        (is (= "decrypted" (sut/decrypt-key client "encrypted")))))))
 
 (deftest build-params
   (testing "invokes `params` endpoint on client"
