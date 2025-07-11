@@ -94,11 +94,12 @@
                         ;; Read the response body in case of error
                         (mc/update-existing :body bs/to-string)))))]
     (log/debug "Sending API request:" (:path req))
-    (-> (api-client (-> req
-                        (assoc :url (str url (:path req))
-                               :accept "application/edn"
-                               :oauth-token token)
-                        (dissoc :path)))
+    (-> req
+        (assoc :url (str url (:path req))
+               :accept "application/edn"
+               :oauth-token token)
+        (dissoc :path)
+        (api-client)
         (md/chain
          :body
          edn/edn->)

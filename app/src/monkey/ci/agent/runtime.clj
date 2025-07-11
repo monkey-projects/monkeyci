@@ -63,9 +63,9 @@
 (defrecord ApiBuildParams [api-maker]
   p/BuildParams
   (get-build-params [this build]
-    (bas/get-params-from-api (api-maker build) build)))
+    (bas/get-params-from-api (api-maker (b/sid build)) build)))
 
-(defn new-params [{:keys [api] :as config}]
+(defn new-params [config]
   (->ApiBuildParams (api-with-token-maker config)))
 
 ;; TODO Move this implementation to api-server ns

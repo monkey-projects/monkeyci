@@ -64,9 +64,12 @@
       (is (fn? (:key-decrypter sys))))))
 
 (deftest params
-  (let [params (sut/new-params {:api {:url "http://test-api"}
-                                :jwk {:priv (h/generate-private-key)}})
-        build {:build-id "test-build"}
+  (let [kp (auth/generate-keypair)
+        params (sut/new-params {:api {:url "http://test-api"}
+                                :jwk {:priv (.getPrivate kp)}})
+        build {:org-id "test-org"
+               :repo-id "test-repo"
+               :build-id "test-build"}
         requests (atom [])]
     (with-redefs [bas/get-params-from-api (fn [conf build]
                                             (swap! requests conj {:conf conf
@@ -74,8 +77,12 @@
                                             {})]
       (testing "generates new token per request"
         (is (some? (p/get-build-params params build)))
-        (let [req (-> @requests last :conf)]
-          (is (some? (:token req)))
+        (let [req (-> @requests last :conf)
+              token (:token req)]
+          (is (some? token))
+          (is (= "test-org/test-repo/test-build" (-> token
+                                                     (jwt/unsign (.getPublic kp) {:alg :rs256})
+                                                     :sub)))
           (is (= "http://test-api" (:url req))))))))
 
 (deftest ssh-keys-fetcher
