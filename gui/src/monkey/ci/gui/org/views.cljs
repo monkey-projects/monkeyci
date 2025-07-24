@@ -11,6 +11,7 @@
             [monkey.ci.gui.logging :as log]
             [monkey.ci.gui.repo.views :as rv]
             [monkey.ci.gui.routing :as r]
+            [monkey.ci.gui.org-settings.views :as settings]
             [monkey.ci.gui.table :as t]
             [monkey.ci.gui.tabs :as tabs]
             [monkey.ci.gui.time :as time]
@@ -147,6 +148,12 @@
     {:href (r/path-for :page/add-bitbucket-repo {:org-id id})
      :title "Link an existing Bitbucket repository"}))
 
+(defn- settings-btn [id]
+  [:a.btn.btn-outline-primary
+   {:href (r/path-for :page/org-settings {:org-id id})
+    :title "Organization Settings"}
+   [:span.me-2 [co/icon :gear]] "Settings"])
+
 (defn- edit-btn [id]
   [:a.btn.btn-outline-primary
    {:href (r/path-for :page/org-edit {:org-id id})
@@ -165,17 +172,23 @@
     :title "Configure ssh keys to access private repositories"}
    [:span.me-2 [co/icon :key]] "SSH Keys"])
 
+(defn- add-repo-btn [id]
+  [:a.btn.btn-primary
+   {:href (r/path-for :page/add-repo {:org-id id})}
+   [:span.me-2 [co/icon :plus-square]] "Add Repository"])
+
 (defn- org-actions [id]
   [:<>
-   [edit-btn id]
+   [settings-btn id]
+   [add-repo-btn id]
    [watch-repo-btn id]
-   [params-btn id]
-   [ssh-keys-btn id]])
+   #_[params-btn id]
+   #_[ssh-keys-btn id]])
 
 (defn- org-header []
   (let [c (rf/subscribe [:org/info])]
     [:div.d-flex.gap-2
-     [:h3.me-auto [org-icon] (:name @c)]
+     [co/page-title {:class :me-auto} [org-icon] (:name @c)]
      [org-actions (:id @c)]]))
 
 (defn- label-selector []
@@ -273,11 +286,6 @@
     {:id :repos
      :header [:span [:span.me-2 co/repo-icon] "Repositories"]
      :contents [org-repos]}]])
-
-(defn- add-repo-btn [id]
-  [:a.btn.btn-primary
-   {:href (r/path-for :page/add-repo {:org-id id})}
-   [:span.me-2 [co/icon :plus-square]] "Add Repository"])
 
 (defn- repo-intro [id]
   [:<>
@@ -380,7 +388,7 @@
   (let [route (rf/subscribe [:route/current])]
     (l/default
      [:<>
-      [:h3 "Add Repository to Watch"]
+      [co/page-title "Add Repository to Watch"]
       intro
       [co/alerts [:org/repo-alerts]]
       [ext-repo-filter]
@@ -417,7 +425,7 @@
   []
   (l/default
    [:<>
-    [:h3 [org-icon] "New Organization"]
+    [co/page-title [org-icon] "New Organization"]
     [:form.mb-3
      {:on-submit (f/submit-handler [:org/create])}
      [:div.mb-3
@@ -431,9 +439,10 @@
   "Edit organization page"
   [route]
   (let [org (rf/subscribe [:org/info])]
-    (l/default
+    [settings/settings-page
+     ::settings/general
      [:<>
-      [:h3 [org-icon] "Edit Organization: " (:name @org)]
+      [co/page-title [org-icon] (:name @org) ": General Settings"]
       [:form.mb-3
        {:on-submit (f/submit-handler [:org/save])}
        [:div.mb-3
@@ -441,4 +450,4 @@
        [:div
         [:button.btn.btn-primary.me-2 {:type :submit} [:span.me-2 [co/icon :save]] "Save Changes"]
         [co/cancel-btn [:route/goto :page/org (r/path-params route)]]]]
-      [co/alerts [:org/edit-alerts]]])))
+      [co/alerts [:org/edit-alerts]]]]))

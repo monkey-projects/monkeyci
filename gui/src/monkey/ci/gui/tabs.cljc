@@ -30,16 +30,27 @@
   (or (->> headers (filter :current?) first)
       (first headers)))
 
-(defn tabs
-  "Controlled tabs component.  The headers are a list of tab configs that
-   have a `:header` and `:contents`.  Current tab is indicated by `:current?`."
+(defn tabs-labels
+  "Renders tab labels, without the contents"
+  [id headers opts]
+  (let [curr (rf/subscribe [:tab/current id])]
+    (->> headers
+         (map (partial tab-header id @curr))
+         (into [:ul.nav.nav-tabs.mb-2 opts]))))
+
+(defn tabs-contents
   [id headers]
   (let [curr (rf/subscribe [:tab/current id])
         by-id (group-by header-id headers)]
+    (some->> @curr (get by-id) first :contents)))
+
+(defn tabs
+  "Controlled tabs component.  The headers are a list of tab configs that
+   have a `:header` and `:contents`.  Current tab is indicated by `:current?`."
+  [id headers & [opts]]
+  (let [curr (rf/subscribe [:tab/current id])]
     (when-not @curr
       (rf/dispatch-sync [:tab/tab-changed id (header-id (current-or-first headers))]))
     [:<>
-     (->> headers
-          (map (partial tab-header id @curr))
-          (into [:ul.nav.nav-tabs.mb-2]))
-     (some->> @curr (get by-id) first :contents)]))
+     [tabs-labels id headers opts]
+     [tabs-contents id headers]]))

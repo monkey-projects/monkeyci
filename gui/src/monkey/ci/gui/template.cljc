@@ -22,7 +22,8 @@
 (defn generic-header
   "Creates structure for a generic header, that can be used by the initial webpage as well."
   [config & [user-info]]
-  [:header.header.container
+  ;; Headers must have z-index 2 otherwise bg shape covers it up
+  [:header.header.container.zi-2
    [:div.row.border-bottom
     [:div.col-2
      [:div.mt-2 [:a {:href "/"} (logo config)]]]

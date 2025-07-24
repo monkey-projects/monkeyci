@@ -216,3 +216,14 @@
 
 (defn docs-link [page title]
   [:a {:href (templ/docs-url (str "/" page)) :target :_blank} title])
+
+(defn bg-shape []
+  [:div.shape-container
+   [:div.shape.shape-bottom.zi-1
+   [:svg {:view-box "0 0 3000 1000"
+          :fill "none"
+          :xmlns "http://www.w3.org/2000/svg"}
+    [:path {:d "M0 1000V583.723L3000 0V1000H0Z" :fill "#fff"}]]]])
+
+(defn page-title [& contents]
+  (into [:h3.text-primary] contents))
