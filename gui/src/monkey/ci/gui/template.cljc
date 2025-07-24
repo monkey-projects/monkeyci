@@ -31,7 +31,7 @@
      [:div.row
       [:div.col-9
        [:h1.display-4 "MonkeyCI"]
-       [:p.lead "Unleashing full power to build your code!"]]
+       [:p.lead.text-primary "Unleashing full power to build your code!"]]
       (when user-info
         [:div.col-3.text-end
          user-info])]]]])

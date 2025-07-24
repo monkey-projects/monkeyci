@@ -154,36 +154,16 @@
     :title "Organization Settings"}
    [:span.me-2 [co/icon :gear]] "Settings"])
 
-(defn- edit-btn [id]
-  [:a.btn.btn-outline-primary
-   {:href (r/path-for :page/org-edit {:org-id id})
-    :title "Edit Organization"}
-   [:span.me-2 [co/icon :pencil]] "Edit"])
-
-(defn- params-btn [id]
-  [:a.btn.btn-soft-primary
-   {:href (r/path-for :page/org-params {:org-id id})
-    :title "Configure build parameters"}
-   [:span.me-2 [co/icon :gear]] "Parameters"])
-
-(defn- ssh-keys-btn [id]
-  [:a.btn.btn-soft-primary
-   {:href (r/path-for :page/org-ssh-keys {:org-id id})
-    :title "Configure ssh keys to access private repositories"}
-   [:span.me-2 [co/icon :key]] "SSH Keys"])
-
 (defn- add-repo-btn [id]
   [:a.btn.btn-primary
    {:href (r/path-for :page/add-repo {:org-id id})}
    [:span.me-2 [co/icon :plus-square]] "Add Repository"])
 
 (defn- org-actions [id]
-  [:<>
+  [:div.d-flex.gap-2
    [settings-btn id]
    [add-repo-btn id]
-   [watch-repo-btn id]
-   #_[params-btn id]
-   #_[ssh-keys-btn id]])
+   [watch-repo-btn id]])
 
 (defn- org-header []
   (let [c (rf/subscribe [:org/info])]
@@ -411,14 +391,18 @@
   (rf/dispatch [:org/load-bb-webhooks])
   [add-repo-page nil bitbucket-repo-table])
 
+(defn- org-id-input [org]
+  [f/form-input {:id :id
+                 :label "Id"
+                 :value (:id org)
+                 :extra-opts {:disabled true}
+                 :help-msg "The internal id for this organization, used in API calls."}])
+
 (defn- org-name-input [org]
-  [:<>
-   [:label.form-label {:for :name} "Name"]
-   [:input#name.form-control {:aria-describedby :name-help
-                              :name :name
-                              :default-value (:name org)}]
-   [:div#name-help.form-text
-    "The organization name.  We recommend to make it as unique as possible."]])
+  [f/form-input {:id :name
+                 :label "Name"
+                 :value (:name org)
+                 :help-msg "The organization name.  We recommend to make it as unique as possible."}])
 
 (defn page-new
   "New org page"
@@ -436,7 +420,7 @@
     [co/alerts [:org/create-alerts]]]))
 
 (defn page-edit
-  "Edit organization page"
+  "Edit organization page (general settings)"
   [route]
   (let [org (rf/subscribe [:org/info])]
     [settings/settings-page
@@ -445,6 +429,8 @@
       [co/page-title [org-icon] (:name @org) ": General Settings"]
       [:form.mb-3
        {:on-submit (f/submit-handler [:org/save])}
+       [:div.mb-3
+        [org-id-input @org]]
        [:div.mb-3
         [org-name-input @org]]
        [:div

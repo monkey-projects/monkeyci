@@ -41,10 +41,10 @@
         {:url (r/path-for :page/org-ssh-keys (r/path-params (r/current db)))
          :name "SSH Keys"}))
 
-(defn- repo-edit-breadcrumb [db]
+(defn- repo-settings-breadcrumb [db]
   (conj (default-breadcrumb db)
-        {:url (r/path-for :page/repo-edit (r/path-params (r/current db)))
-         :name "Edit"}))
+        {:url (r/path-for :page/repo-settings (r/path-params (r/current db)))
+         :name "Settings"}))
 
 (defn- org-settings-breadcrumb [db]
   (conj (default-breadcrumb db)
@@ -74,7 +74,7 @@
   {:page/org-params params-breadcrumb
    :page/org-ssh-keys ssh-keys-breadcrumb
    :page/org-settings org-settings-breadcrumb
-   :page/repo-edit repo-edit-breadcrumb
+   :page/repo-settings repo-settings-breadcrumb
    :page/add-repo org-watch-repo
    :admin/credits credits-breadcrumb
    :admin/org-credits org-credits-breadcrumb})

@@ -175,7 +175,7 @@
     (settings/settings-page
      ::settings/params
      [:<>
-      [:h3 "Build Parameters"]
+      [co/page-title [co/icon-text :gear "Build Parameters"]]
       [:p
        "Parameters can be used by builds for " [:b "sensitive information"] ", or dynamically changing "
        "data, like hostnames or file paths. They obey the following rules:"]

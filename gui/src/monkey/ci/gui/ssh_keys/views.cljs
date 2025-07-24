@@ -113,7 +113,7 @@
      ::settings/ssh-keys
      [:<>
       [:div.d-flex
-       [:h3 "SSH Keys"]
+       [co/page-title [co/icon-text :key "SSH Keys"]]
        [co/reload-btn-sm [:ssh-keys/load org-id] {:class :ms-auto}]]
       [:p
        "SSH keys are used to access private repositories.  When a build is triggered from a "

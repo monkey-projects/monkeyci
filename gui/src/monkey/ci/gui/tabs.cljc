@@ -1,6 +1,7 @@
 (ns monkey.ci.gui.tabs
   "Renders bootstrap tab pages"
-  (:require [monkey.ci.gui.utils :as u]
+  (:require [monkey.ci.gui.routing :as r]
+            [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
 
 (def header-id
@@ -54,3 +55,19 @@
     [:<>
      [tabs-labels id headers opts]
      [tabs-contents id headers]]))
+
+(defn- render-header [active path {:keys [id header link]}]
+  [:li.nav-item
+   [:a.nav-link (cond-> {:href (r/path-for link path)}
+                  (= id active) (assoc :class :active))
+    header]])
+
+(defn settings-tabs
+  "Renders vertical tabs, used for setting pages.  Each tab pages has an id,
+   a header and an associated link.  The current route parameters are passed
+   to the link."
+  [tabs active]
+  (let [r (rf/subscribe [:route/current])]
+    (->> tabs
+         (map (partial render-header active (r/path-params @r)))
+         (into [:div.nav.nav-tabs.nav-vertical.nav-link-gray]))))

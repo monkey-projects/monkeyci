@@ -69,6 +69,8 @@
     ["/o/:org-id/ssh-keys" :page/org-ssh-keys]
     ["/o/:org-id/r/:repo-id" :page/repo]
     ["/o/:org-id/r/:repo-id/edit" :page/repo-edit]
+    ["/o/:org-id/r/:repo-id/settings" :page/repo-settings]
+    ["/o/:org-id/r/:repo-id/webhooks" :page/webhooks]
     ["/o/:org-id/r/:repo-id/b/:build-id" :page/build]
     ["/o/:org-id/r/:repo-id/b/:build-id/j/:job-id" :page/job]
     ["/github/callback" :page/github-callback]
