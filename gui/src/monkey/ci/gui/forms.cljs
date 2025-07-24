@@ -22,3 +22,20 @@
     (rf/dispatch (conj evt (get-form-data (if form-id
                                             (.getElementById js/document (name form-id))
                                             (.. e -target)))))))
+
+(defn form-input
+  "Renders a generic form input group, with label and optional help text."
+  [{:keys [id label value help-msg extra-opts]}]
+  (let [help-id (str id "-help")]
+    [:<>
+     [:label.form-label {:for id} label]
+     [:input.form-control (merge
+                           {:id id
+                            :name id
+                            :aria-describedby help-id
+                            :default-value value}
+                           extra-opts)]
+     (when help-msg
+       [:span.form-text
+        {:id help-id}
+        help-msg])]))

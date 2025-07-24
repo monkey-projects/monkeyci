@@ -211,7 +211,7 @@
     (let [job-id (rf/subscribe [:job/id])]
       [l/default
        [:<>
-        [:h3 "Job: " @job-id]
+        [co/page-title [co/icon-text :cpu "Job: " @job-id]]
         [:div.card
          [:div.card-body
           [job-details]

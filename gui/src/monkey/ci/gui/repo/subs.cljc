@@ -9,6 +9,7 @@
  :repo/info
  :<- [:org/info]
  (fn [c [_ repo-id]]
+   (println "repo id:" repo-id)
    ;; TODO Optimize org structure for faster lookup
    (some->> c
             :repos

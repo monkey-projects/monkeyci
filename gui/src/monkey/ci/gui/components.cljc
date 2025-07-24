@@ -22,6 +22,11 @@
 (defn icon [n]
   [:i {:class (str "bi bi-" (name n))}])
 
+(defn icon-text
+  "Displays text with an icon prefix"
+  [i & txt]
+  (into [:<> [:span.me-2 [icon i]]] txt))
+
 (defn icon-btn [i lbl evt & [opts]]
   [:button.btn.btn-primary (merge {:on-click (u/link-evt-handler evt)} opts) [:span.me-2 [icon i]] lbl])
 
@@ -137,32 +142,6 @@
   [id items]
   (->> (map-indexed (partial accordion-item id) items)
        (into [:div.accordion {:id id}])))
-
-(defn modal-dismiss-btn [lbl]
-  [:button.btn.btn-secondary {:type :button
-                              :data-bs-dismiss "modal"}
-   lbl])
-
-(defn modal
-  "Renders a modal box with a close button by default"
-  [id title contents & [footer]]
-  [:div.modal.fade
-   {:id id
-    :role :dialog
-    :tab-index -1}
-   [:div.modal-dialog
-    {:role :document}
-    [:div.modal-content
-     [:div.modal-header
-      [:div.modal-title title]
-      [:button.btn-close {:type :button
-                          :data-bs-dismiss "modal"
-                          :aria-label "Close"}]]
-     [:div.modal-body
-      contents]
-     [:div.modal-footer
-      (or footer
-          [modal-dismiss-btn "Close"])]]]])
 
 (defn date-time
   "Reformats given object as a date-time"

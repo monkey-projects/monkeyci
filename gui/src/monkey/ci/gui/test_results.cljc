@@ -4,6 +4,7 @@
             [monkey.ci.gui.charts :as charts]
             [monkey.ci.gui.colors :as colors]
             [monkey.ci.gui.components :as co]
+            [monkey.ci.gui.modals :as m]
             [monkey.ci.gui.table :as t]
             [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
@@ -31,7 +32,7 @@
 
 (defn test-details-modal []
   (let [tc (rf/subscribe [:test/selected])]
-    [co/modal
+    [m/modal
      ::test-details
      [:h3 (:test-case @tc)]
      [co/log-contents (->> (concat (:failures @tc) (:errors @tc))

@@ -154,24 +154,6 @@
     :title "Organization Settings"}
    [:span.me-2 [co/icon :gear]] "Settings"])
 
-(defn- edit-btn [id]
-  [:a.btn.btn-outline-primary
-   {:href (r/path-for :page/org-edit {:org-id id})
-    :title "Edit Organization"}
-   [:span.me-2 [co/icon :pencil]] "Edit"])
-
-(defn- params-btn [id]
-  [:a.btn.btn-soft-primary
-   {:href (r/path-for :page/org-params {:org-id id})
-    :title "Configure build parameters"}
-   [:span.me-2 [co/icon :gear]] "Parameters"])
-
-(defn- ssh-keys-btn [id]
-  [:a.btn.btn-soft-primary
-   {:href (r/path-for :page/org-ssh-keys {:org-id id})
-    :title "Configure ssh keys to access private repositories"}
-   [:span.me-2 [co/icon :key]] "SSH Keys"])
-
 (defn- add-repo-btn [id]
   [:a.btn.btn-primary
    {:href (r/path-for :page/add-repo {:org-id id})}
@@ -181,9 +163,7 @@
   [:<>
    [settings-btn id]
    [add-repo-btn id]
-   [watch-repo-btn id]
-   #_[params-btn id]
-   #_[ssh-keys-btn id]])
+   [watch-repo-btn id]])
 
 (defn- org-header []
   (let [c (rf/subscribe [:org/info])]
@@ -411,33 +391,18 @@
   (rf/dispatch [:org/load-bb-webhooks])
   [add-repo-page nil bitbucket-repo-table])
 
-(defn- form-input [{:keys [id label value help-msg extra-opts]}]
-  (let [help-id (str id "-help")]
-    [:<>
-     [:label.form-label {:for id} label]
-     [:input.form-control (merge
-                           {:id id
-                            :name id
-                            :aria-describedby help-id
-                            :default-value value}
-                           extra-opts)]
-     (when help-msg
-       [:span.form-text
-        {:id help-id}
-        help-msg])]))
-
 (defn- org-id-input [org]
-  [form-input {:id :id
-               :label "Id"
-               :value (:id org)
-               :extra-opts {:disabled true}
-               :help-msg "The internal id for this organization, used in API calls."}])
+  [f/form-input {:id :id
+                 :label "Id"
+                 :value (:id org)
+                 :extra-opts {:disabled true}
+                 :help-msg "The internal id for this organization, used in API calls."}])
 
 (defn- org-name-input [org]
-  [form-input {:id :name
-               :label "Name"
-               :value (:name org)
-               :help-msg "The organization name.  We recommend to make it as unique as possible."}])
+  [f/form-input {:id :name
+                 :label "Name"
+                 :value (:name org)
+                 :help-msg "The organization name.  We recommend to make it as unique as possible."}])
 
 (defn page-new
   "New org page"

@@ -152,7 +152,8 @@
   (let [route (rf/subscribe [:route/current])
         params (-> @route r/path-params)
         repo (rf/subscribe [:repo/info (:repo-id params)])]
-    [:h3.me-auto [:span.me-2 co/build-icon] (:name @repo) " - " (:build-id params)]))
+    [co/page-title {:class :me-auto}
+     [:span.me-2 co/build-icon] (:name @repo) " / " (:build-id params)]))
 
 (defn page [route]
   (rf/dispatch [:build/init])

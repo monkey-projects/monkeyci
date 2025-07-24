@@ -4,6 +4,7 @@
             [monkey.ci.gui.components :as co]
             [monkey.ci.gui.forms :as f]
             [monkey.ci.gui.layout :as l]
+            [monkey.ci.gui.modals :as m]
             [monkey.ci.gui.repo.events]
             [monkey.ci.gui.repo.subs]
             [monkey.ci.gui.routing :as r]
@@ -156,9 +157,10 @@
                                     :value value
                                     :on-change (u/form-evt-handler [:repo/label-value-changed lbl])}]]
              [:div.col-1
-              [:button.btn-close {:type :button
-                                  :aria-label "Remove label"
-                                  :on-click #(rf/dispatch [:repo/label-removed lbl])}]]])
+              [:button.btn-close.mt-2
+               {:type :button
+                :aria-label "Remove label"
+                :on-click #(rf/dispatch [:repo/label-removed lbl])}]]])
           (add-btn []
             [:button.btn.btn-primary
              {:on-click (u/link-evt-handler [:repo/label-add])}
@@ -178,7 +180,7 @@
 
 (defn confirm-delete-modal
   ([repo]
-   [co/modal
+   [m/modal
     delete-modal-id
     [:h4 "Confirmation"]
     [:div
@@ -191,19 +193,18 @@
        :data-bs-dismiss "modal"
        :on-click (u/link-evt-handler [:repo/delete])}
       [:span.me-2 co/delete-icon] "Yes, Delete!"]
-     [co/modal-dismiss-btn
+     [m/modal-dismiss-btn
       [:span [:span.me-2 co/cancel-icon] "Oops, No"]]]])
   ([]
    (let [repo (rf/subscribe [:repo/info])]
      (confirm-delete-modal @repo))))
 
-(defn- delete-btn []
-  (let [repo (rf/subscribe [:repo/info])
+(defn- delete-btn [repo]
+  (let [repo (rf/subscribe [:repo/info (:id repo)])
         d? (rf/subscribe [:repo/deleting?])]
     (when @repo
       ;; Ask for confirmation first
       [:div
-       [confirm-delete-modal @repo]
        [:button.btn.btn-danger
         (cond-> {:title "Delete this repository"
                  :data-bs-toggle :modal
@@ -218,38 +219,40 @@
      {:on-submit (f/submit-handler [:repo/save])}
      [:div.row
       [:div.col
+       [:h5 [co/icon-text :gear "General"]]
        [:div.mb-2
-        [:label.form-label {:for "url"} "Url"]
-        [:input.form-control
-         {:id "url"
-          :value (:url @e)
-          :on-change (u/form-evt-handler [:repo/url-changed])}]
-        [:div.form-text
-         "This is used when manually triggering a build from the UI. "
-         "Use an ssh url for private repos."]]
+        [f/form-input {:id :url
+                       :label "Url"
+                       :value (:url @e)
+                       :extra-opts
+                       {:on-change (u/form-evt-handler [:repo/url-changed])}
+                       :help-msg (str "This is used when manually triggering a build from the UI. "
+                                      "Use an ssh url for private repos.")}]]
        [:div.mb-2
-        [:label.form-label {:for "name"} "Repository name"]
-        [:input.form-control
-         {:id "name"
-          :value (:name @e)
-          :on-change (u/form-evt-handler [:repo/name-changed])}]]
+        [f/form-input {:id :name
+                       :label "Repository name"
+                       :value (:name @e)
+                       :extra-opts
+                       {:on-change (u/form-evt-handler [:repo/name-changed])}}]]
        [:div.mb-2
-        [:label.form-label {:for "main-branch"} "Main branch"]
-        [:input.form-control
-         {:id "main-branch"
-          :value (:main-branch @e)
-          :on-change (u/form-evt-handler [:repo/main-branch-changed])}]
-        [:div.form-text "Required when you want to determine the 'main branch' in the build script."]]
+        [f/form-input {:id :main-branch
+                       :label "Main branch"
+                       :value (:main-branch @e)
+                       :extra-opts
+                       {:on-change (u/form-evt-handler [:repo/main-branch-changed])}
+                       :help-msg
+                       "Required when you want to determine the 'main branch' in the build script."}]]
        [:div.mb-2
-        [:label.form-label {:for "github-id"} "Github Id"]
-        [:input.form-control
-         {:id "github-id"
-          :value (:github-id @e)
-          :read-only true
-          :disabled true}]
-        [:div.form-text "The native Github Id, registered when watching this repo."]]]
+        [f/form-input {:id :github-id
+                       :label "Github Id"
+                       :value (:github-id @e)
+                       :extra-opts
+                       {:read-only true
+                        :disabled true}
+                       :help-msg
+                       "The native Github Id, registered when watching this repo."}]]]
       [:div.col
-       [:h5 "Labels:"]
+       [:h5 [co/icon-text :tags "Labels"]]
        [:p.text-body-secondary
         "Labels are used to expose parameters and ssh keys to builds, but also to group repositories. "
         "You can assign any labels you like.  Labels are case-sensitive."]
@@ -258,7 +261,7 @@
        [:div.d-flex.gap-2
         [save-btn]
         close-btn
-        [:span.ms-auto [delete-btn]]]]]]))
+        [:span.ms-auto [delete-btn @e]]]]]]))
 
 (defn edit
   "Displays repo editing page"
@@ -267,16 +270,18 @@
   (fn []
     (let [route (rf/subscribe [:route/current])
           repo (rf/subscribe [:repo/info (get-in @route [:parameters :path :repo-id])])]
-      [l/default
-       [:<>
-        [co/page-title [:span.me-2 co/repo-icon] "Edit Repository: " (:name @repo)]
-        [:div.card
-         [:div.card-body
-          [co/alerts [:repo/edit-alerts]]
-          [edit-form
-           [co/close-btn [:route/goto :page/repo (-> @route
-                                                     (r/path-params)
-                                                     (select-keys [:repo-id :org-id]))]]]]]]])))
+      [:<>
+       [l/default
+        [:<>
+         [co/page-title [:span.me-2 co/repo-icon] (:name @repo) ": Settings"]
+         [:div.card
+          [:div.card-body
+           [co/alerts [:repo/edit-alerts]]
+           [edit-form
+            [co/close-btn [:route/goto :page/repo (-> @route
+                                                      (r/path-params)
+                                                      (select-keys [:repo-id :org-id]))]]]]]]]
+       [confirm-delete-modal @repo]])))
 
 (defn new [route]
   (l/default
