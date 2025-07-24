@@ -7,7 +7,6 @@
             [monkey.ci.gui.job.views :as job]
             [monkey.ci.gui.login.views :as login]
             [monkey.ci.gui.org.views :as org]
-            [monkey.ci.gui.org-settings.views :as settings]
             [monkey.ci.gui.params.views :as params]
             [monkey.ci.gui.repo.views :as repo]
             [monkey.ci.gui.ssh-keys.views :as ssh-keys]
@@ -30,6 +29,7 @@
    :page/add-bitbucket-repo org/add-bitbucket-repo-page
    :page/repo repo/page
    :page/repo-edit repo/edit
+   :page/repo-settings repo/settings-page
    :page/job job/page})
 
 (defn render-page [route]

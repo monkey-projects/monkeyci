@@ -160,7 +160,7 @@
    [:span.me-2 [co/icon :plus-square]] "Add Repository"])
 
 (defn- org-actions [id]
-  [:<>
+  [:div.d-flex.gap-2
    [settings-btn id]
    [add-repo-btn id]
    [watch-repo-btn id]])

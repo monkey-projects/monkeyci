@@ -7,6 +7,7 @@
             [monkey.ci.gui.modals :as m]
             [monkey.ci.gui.repo.events]
             [monkey.ci.gui.repo.subs]
+            [monkey.ci.gui.repo-settings.views :as settings]
             [monkey.ci.gui.routing :as r]
             [monkey.ci.gui.table :as table]
             [monkey.ci.gui.time :as t]
@@ -21,12 +22,12 @@
      (cond-> {:type :button
               :on-click #(rf/dispatch [:repo/show-trigger-build])}
        @show? (assoc :disabled true))
-     [:span.me-2 [co/icon :boxes]] "Trigger Build"]))
+     [:span.me-2 [co/icon :play-circle]] "Trigger Build"]))
 
 (defn- repo-settings-btn []
   (let [c (rf/subscribe [:route/current])]
     [:a.btn.btn-outline-primary
-     {:href (r/path-for :page/repo-edit (get-in @c [:parameters :path]))}
+     {:href (r/path-for :page/repo-settings (get-in @c [:parameters :path]))}
      [:span.me-2 [co/icon :gear]] "Settings"]))
 
 (defn refresh-btn [& [opts]]
@@ -36,7 +37,7 @@
    [co/icon :arrow-clockwise]])
 
 (defn build-actions []
-  [:<>
+  [:div.d-flex.gap-2
    [repo-settings-btn]
    [trigger-build-btn]])
 
@@ -261,7 +262,8 @@
        [:h5 [co/icon-text :tags "Labels"]]
        [:p.text-body-secondary
         "Labels are used to expose parameters and ssh keys to builds, but also to group repositories. "
-        "You can assign any labels you like.  Labels are case-sensitive."]
+        "You can assign any labels you like and specify the same label name more than once.  "
+        "Labels are case-sensitive."]
        [labels (:labels @e)]]
       [:div.row
        [:div.d-flex.gap-2
@@ -277,18 +279,15 @@
     (let [route (rf/subscribe [:route/current])
           repo (rf/subscribe [:repo/info (get-in @route [:parameters :path :repo-id])])]
       [:<>
-       [l/default
-        [:<>
-         [co/page-title [:span.me-2 co/repo-icon] (:name @repo) ": Settings"]
-         [:div.card
-          [:div.card-body
-           [co/alerts [:repo/edit-alerts]]
-           [edit-form
-            [co/close-btn [:route/goto :page/repo (-> @route
-                                                      (r/path-params)
-                                                      (select-keys [:repo-id :org-id]))]]]]]]]
-       ;; Ask for confirmation when deleting
-       [confirm-delete-modal @repo]])))
+       [co/page-title [:span.me-2 co/repo-icon] (:name @repo) ": Settings"]
+       [:div.card
+        [:div.card-body
+         [co/alerts [:repo/edit-alerts]]
+         [edit-form
+          [co/close-btn [:route/goto :page/repo (-> @route
+                                                    (r/path-params)
+                                                    (select-keys [:repo-id :org-id]))]]]]]
+       ])))
 
 (defn new [route]
   (rf/dispatch-sync [:repo/new])
@@ -304,3 +303,9 @@
       [co/alerts [:repo/edit-alerts]]
       [edit-form [co/cancel-btn
                   [:route/goto :page/org (r/path-params route)]]]]]]))
+
+(defn settings-page [route]
+  [:<>
+   (settings/settings-page ::settings/general [edit])
+   ;; Ask for confirmation when deleting
+   [confirm-delete-modal]])
