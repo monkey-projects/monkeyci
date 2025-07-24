@@ -108,7 +108,7 @@
       (rf/dispatch [:builds/load]))
     [:<>
      [:div.d-flex.gap-1.align-items-start
-      [:h4.me-2 [:span.me-2 co/build-icon] "Builds"]
+      [:h4.me-2.text-primary [:span.me-2 co/build-icon] "Builds"]
       [refresh-btn {:class [:me-auto]}]
       [build-actions]]
      [trigger-form repo]
@@ -130,7 +130,7 @@
           r (rf/subscribe [:repo/info repo-id])]
       [l/default
        [:<>
-        [:h3
+        [co/page-title
          [:span.me-2 co/repo-icon] 
          "Repository: " (:name @r)
          [:span.fs-6.p-1
@@ -269,7 +269,7 @@
           repo (rf/subscribe [:repo/info (get-in @route [:parameters :path :repo-id])])]
       [l/default
        [:<>
-        [:h3 [:span.me-2 co/repo-icon] "Edit Repository: " (:name @repo)]
+        [co/page-title [:span.me-2 co/repo-icon] "Edit Repository: " (:name @repo)]
         [:div.card
          [:div.card-body
           [co/alerts [:repo/edit-alerts]]
@@ -281,7 +281,7 @@
 (defn new [route]
   (l/default
    [:<>
-    [:h3 [:span.me-2 co/repo-icon] "Watch Repository"]
+    [co/page-title [:span.me-2 co/repo-icon] "Watch Repository"]
     [:p
      "Configure a new repository to be watched by " [:i "MonkeyCI"] ". After saving, "
      "the repository will show up in the list on your overview page. If a " [:b "webhook"]

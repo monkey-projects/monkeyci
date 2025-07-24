@@ -411,14 +411,33 @@
   (rf/dispatch [:org/load-bb-webhooks])
   [add-repo-page nil bitbucket-repo-table])
 
+(defn- form-input [{:keys [id label value help-msg extra-opts]}]
+  (let [help-id (str id "-help")]
+    [:<>
+     [:label.form-label {:for id} label]
+     [:input.form-control (merge
+                           {:id id
+                            :name id
+                            :aria-describedby help-id
+                            :default-value value}
+                           extra-opts)]
+     (when help-msg
+       [:span.form-text
+        {:id help-id}
+        help-msg])]))
+
+(defn- org-id-input [org]
+  [form-input {:id :id
+               :label "Id"
+               :value (:id org)
+               :extra-opts {:disabled true}
+               :help-msg "The internal id for this organization, used in API calls."}])
+
 (defn- org-name-input [org]
-  [:<>
-   [:label.form-label {:for :name} "Name"]
-   [:input#name.form-control {:aria-describedby :name-help
-                              :name :name
-                              :default-value (:name org)}]
-   [:div#name-help.form-text
-    "The organization name.  We recommend to make it as unique as possible."]])
+  [form-input {:id :name
+               :label "Name"
+               :value (:name org)
+               :help-msg "The organization name.  We recommend to make it as unique as possible."}])
 
 (defn page-new
   "New org page"
@@ -436,7 +455,7 @@
     [co/alerts [:org/create-alerts]]]))
 
 (defn page-edit
-  "Edit organization page"
+  "Edit organization page (general settings)"
   [route]
   (let [org (rf/subscribe [:org/info])]
     [settings/settings-page
@@ -445,6 +464,8 @@
       [co/page-title [org-icon] (:name @org) ": General Settings"]
       [:form.mb-3
        {:on-submit (f/submit-handler [:org/save])}
+       [:div.mb-3
+        [org-id-input @org]]
        [:div.mb-3
         [org-name-input @org]]
        [:div
