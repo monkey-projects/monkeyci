@@ -21,13 +21,13 @@
      (cond-> {:type :button
               :on-click #(rf/dispatch [:repo/show-trigger-build])}
        @show? (assoc :disabled true))
-     [:span.me-1 [co/icon :boxes]] "Trigger Build"]))
+     [:span.me-2 [co/icon :boxes]] "Trigger Build"]))
 
-(defn- edit-repo-btn []
+(defn- repo-settings-btn []
   (let [c (rf/subscribe [:route/current])]
-    [:a.btn.btn-soft-primary
+    [:a.btn.btn-outline-primary
      {:href (r/path-for :page/repo-edit (get-in @c [:parameters :path]))}
-     [:span.me-1 [co/icon :pencil-fill]] "Edit"]))
+     [:span.me-2 [co/icon :gear]] "Settings"]))
 
 (defn refresh-btn [& [opts]]
   [:button.btn.btn-outline-primary.btn-icon.btn-sm
@@ -37,7 +37,7 @@
 
 (defn build-actions []
   [:<>
-   [edit-repo-btn]
+   [repo-settings-btn]
    [trigger-build-btn]])
 
 (defn- trigger-type []
@@ -149,13 +149,17 @@
             [:div.row.mb-2
              {:key (str idx)}
              [:div.col-5
-              [:input.form-control {:placeholder "Label name"
-                                    :value name
-                                    :on-change (u/form-evt-handler [:repo/label-name-changed lbl])}]]
+              [:input.form-control
+               {:placeholder "Label name"
+                :value name
+                :on-change (u/form-evt-handler [:repo/label-name-changed lbl])
+                :maxlength 100}]]
              [:div.col-6
-              [:input.form-control {:placeholder "Label value"
-                                    :value value
-                                    :on-change (u/form-evt-handler [:repo/label-value-changed lbl])}]]
+              [:input.form-control
+               {:placeholder "Label value"
+                :value value
+                :on-change (u/form-evt-handler [:repo/label-value-changed lbl])
+                :maxlength 100}]]
              [:div.col-1
               [:button.btn-close.mt-2
                {:type :button
@@ -203,7 +207,6 @@
   (let [repo (rf/subscribe [:repo/info (:id repo)])
         d? (rf/subscribe [:repo/deleting?])]
     (when @repo
-      ;; Ask for confirmation first
       [:div
        [:button.btn.btn-danger
         (cond-> {:title "Delete this repository"
@@ -225,7 +228,8 @@
                        :label "Url"
                        :value (:url @e)
                        :extra-opts
-                       {:on-change (u/form-evt-handler [:repo/url-changed])}
+                       {:on-change (u/form-evt-handler [:repo/url-changed])
+                        :maxlength 300}
                        :help-msg (str "This is used when manually triggering a build from the UI. "
                                       "Use an ssh url for private repos.")}]]
        [:div.mb-2
@@ -233,13 +237,15 @@
                        :label "Repository name"
                        :value (:name @e)
                        :extra-opts
-                       {:on-change (u/form-evt-handler [:repo/name-changed])}}]]
+                       {:on-change (u/form-evt-handler [:repo/name-changed])
+                        :maxlength 200}}]]
        [:div.mb-2
         [f/form-input {:id :main-branch
                        :label "Main branch"
                        :value (:main-branch @e)
                        :extra-opts
-                       {:on-change (u/form-evt-handler [:repo/main-branch-changed])}
+                       {:on-change (u/form-evt-handler [:repo/main-branch-changed])
+                        :maxlength 100}
                        :help-msg
                        "Required when you want to determine the 'main branch' in the build script."}]]
        [:div.mb-2
@@ -281,9 +287,11 @@
             [co/close-btn [:route/goto :page/repo (-> @route
                                                       (r/path-params)
                                                       (select-keys [:repo-id :org-id]))]]]]]]]
+       ;; Ask for confirmation when deleting
        [confirm-delete-modal @repo]])))
 
 (defn new [route]
+  (rf/dispatch-sync [:repo/new])
   (l/default
    [:<>
     [co/page-title [:span.me-2 co/repo-icon] "Watch Repository"]

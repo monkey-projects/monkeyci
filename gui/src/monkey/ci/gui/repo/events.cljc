@@ -264,3 +264,8 @@
        (db/set-edit-alerts
         [{:type :danger
           :message (str "Unable to delete repository: " (u/error-msg err))}]))))
+
+(rf/reg-event-db
+ :repo/new
+ (fn [db _]
+   (db/set-editing db {})))

@@ -476,3 +476,9 @@
     (is (= :danger (-> (db/edit-alerts @app-db)
                        first
                        :type)))))
+
+(deftest repo-new
+  (testing "clears editing repo"
+    (is (some? (reset! app-db (db/set-editing {} {:id ::editing-repo}))))
+    (rf/dispatch-sync [:repo/new])
+    (is (empty? (db/editing @app-db)))))

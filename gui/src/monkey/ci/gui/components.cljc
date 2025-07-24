@@ -47,7 +47,7 @@
   [icon :boxes])
 
 (def build-icon
-  [icon :gear])
+  [icon :wrench])
 
 (def delete-icon
   [icon :trash])

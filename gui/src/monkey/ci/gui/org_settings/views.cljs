@@ -40,6 +40,5 @@
   (l/default
    [:div.row
     [settings-tabs id]
-    [settings-content content]]
-   #_[co/close-btn [:route/goto :page/org (r/path-params route)]]))
+    [settings-content content]]))
 
