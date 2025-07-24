@@ -11,6 +11,7 @@
             [monkey.ci.gui.logging :as log]
             [monkey.ci.gui.repo.views :as rv]
             [monkey.ci.gui.routing :as r]
+            [monkey.ci.gui.org-settings.views :as settings]
             [monkey.ci.gui.table :as t]
             [monkey.ci.gui.tabs :as tabs]
             [monkey.ci.gui.time :as time]
@@ -187,7 +188,7 @@
 (defn- org-header []
   (let [c (rf/subscribe [:org/info])]
     [:div.d-flex.gap-2
-     [:h3.me-auto [org-icon] (:name @c)]
+     [co/page-title {:class :me-auto} [org-icon] (:name @c)]
      [org-actions (:id @c)]]))
 
 (defn- label-selector []
@@ -387,7 +388,7 @@
   (let [route (rf/subscribe [:route/current])]
     (l/default
      [:<>
-      [:h3 "Add Repository to Watch"]
+      [co/page-title "Add Repository to Watch"]
       intro
       [co/alerts [:org/repo-alerts]]
       [ext-repo-filter]
@@ -410,12 +411,6 @@
   (rf/dispatch [:org/load-bb-webhooks])
   [add-repo-page nil bitbucket-repo-table])
 
-(defn page-settings
-  "Organization settings: groups all configuration pages"
-  [org]
-  (l/default
-   [:h3 "Settings go here"]))
-
 (defn- org-name-input [org]
   [:<>
    [:label.form-label {:for :name} "Name"]
@@ -430,7 +425,7 @@
   []
   (l/default
    [:<>
-    [:h3 [org-icon] "New Organization"]
+    [co/page-title [org-icon] "New Organization"]
     [:form.mb-3
      {:on-submit (f/submit-handler [:org/create])}
      [:div.mb-3
@@ -444,9 +439,10 @@
   "Edit organization page"
   [route]
   (let [org (rf/subscribe [:org/info])]
-    (l/default
+    [settings/settings-page
+     ::settings/general
      [:<>
-      [:h3 [org-icon] "Edit Organization: " (:name @org)]
+      [co/page-title [org-icon] (:name @org) ": General Settings"]
       [:form.mb-3
        {:on-submit (f/submit-handler [:org/save])}
        [:div.mb-3
@@ -454,4 +450,4 @@
        [:div
         [:button.btn.btn-primary.me-2 {:type :submit} [:span.me-2 [co/icon :save]] "Save Changes"]
         [co/cancel-btn [:route/goto :page/org (r/path-params route)]]]]
-      [co/alerts [:org/edit-alerts]]])))
+      [co/alerts [:org/edit-alerts]]]]))

@@ -3,10 +3,11 @@
   (:require [monkey.ci.gui.logging :as log]
             [monkey.ci.gui.routing :as r]
             [monkey.ci.gui.build.views :as build]
-            [monkey.ci.gui.org.views :as org]
             [monkey.ci.gui.home.views :as home]
             [monkey.ci.gui.job.views :as job]
             [monkey.ci.gui.login.views :as login]
+            [monkey.ci.gui.org.views :as org]
+            [monkey.ci.gui.org-settings.views :as settings]
             [monkey.ci.gui.params.views :as params]
             [monkey.ci.gui.repo.views :as repo]
             [monkey.ci.gui.ssh-keys.views :as ssh-keys]
@@ -19,9 +20,8 @@
    :page/github-callback login/github-callback
    :page/bitbucket-callback login/bitbucket-callback
    :page/org org/page
-   :page/org-settings org/page-settings
+   :page/org-settings org/page-edit
    :page/org-new org/page-new
-   :page/org-edit org/page-edit
    :page/org-join home/page-join
    :page/org-params params/page
    :page/org-ssh-keys ssh-keys/page

@@ -61,11 +61,10 @@
                :name :page/org-new}]
     ["/o/:org-id" {:conflicting true
                    :name :page/org}]
-    ["/o/:org-id/settings" :page/org-settings]
     ["/o/:org-id/add-repo" :page/add-repo]
     ["/o/:org-id/add-repo/github" :page/add-github-repo]
     ["/o/:org-id/add-repo/bitbucket" :page/add-bitbucket-repo]
-    ["/o/:org-id/edit" :page/org-edit]
+    ["/o/:org-id/settings" :page/org-settings]
     ["/o/:org-id/params" :page/org-params]
     ["/o/:org-id/ssh-keys" :page/org-ssh-keys]
     ["/o/:org-id/r/:repo-id" :page/repo]

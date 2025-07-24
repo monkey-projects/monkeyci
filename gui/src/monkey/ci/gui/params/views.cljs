@@ -2,8 +2,8 @@
   (:require [monkey.ci.gui.components :as co]
             [monkey.ci.gui.org.events]
             [monkey.ci.gui.labels :as lbl]
-            [monkey.ci.gui.layout :as l]
             [monkey.ci.gui.logging :as log]
+            [monkey.ci.gui.org-settings.views :as settings]
             [monkey.ci.gui.params.events :as e]
             [monkey.ci.gui.params.subs]
             [monkey.ci.gui.routing :as r]
@@ -172,7 +172,8 @@
   (let [id (-> route (r/path-params) :org-id)]
     (rf/dispatch [:org/maybe-load id])
     (rf/dispatch [:params/load id])
-    (l/default
+    (settings/settings-page
+     ::settings/params
      [:<>
       [:h3 "Build Parameters"]
       [:p

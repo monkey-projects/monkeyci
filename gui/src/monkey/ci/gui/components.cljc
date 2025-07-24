@@ -224,3 +224,6 @@
           :fill "none"
           :xmlns "http://www.w3.org/2000/svg"}
     [:path {:d "M0 1000V583.723L3000 0V1000H0Z" :fill "#fff"}]]]])
+
+(defn page-title [& contents]
+  (into [:h3.text-primary] contents))

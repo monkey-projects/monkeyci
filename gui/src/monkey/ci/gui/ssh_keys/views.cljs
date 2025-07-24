@@ -2,6 +2,7 @@
   (:require [monkey.ci.gui.components :as co]
             [monkey.ci.gui.layout :as l]
             [monkey.ci.gui.labels :as lbl]
+            [monkey.ci.gui.org-settings.views :as settings]
             [monkey.ci.gui.routing :as r]
             [monkey.ci.gui.ssh-keys.events :as e]
             [monkey.ci.gui.ssh-keys.subs]
@@ -108,7 +109,8 @@
 (defn page [route]
   (let [org-id (:org-id (r/path-params route))]
     (rf/dispatch [:ssh-keys/initialize org-id])
-    (l/default
+    (settings/settings-page
+     ::settings/ssh-keys
      [:<>
       [:div.d-flex
        [:h3 "SSH Keys"]
