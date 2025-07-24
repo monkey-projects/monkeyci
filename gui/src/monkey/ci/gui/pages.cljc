@@ -10,6 +10,7 @@
             [monkey.ci.gui.params.views :as params]
             [monkey.ci.gui.repo.views :as repo]
             [monkey.ci.gui.ssh-keys.views :as ssh-keys]
+            [monkey.ci.gui.webhooks.views :as webhooks]
             [re-frame.core :as rf]))
 
 (def pages
@@ -30,7 +31,8 @@
    :page/repo repo/page
    :page/repo-edit repo/edit
    :page/repo-settings repo/settings-page
-   :page/job job/page})
+   :page/job job/page
+   :page/webhooks webhooks/page})
 
 (defn render-page [route]
   (log/debug "Rendering page for route:" (str (r/route-name route)))

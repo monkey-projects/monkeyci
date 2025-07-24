@@ -5,7 +5,10 @@
 (def tab-headers
   [{:id ::general
     :header "General"
-    :link :repo/edit}])
+    :link :page/repo-settings}
+   {:id ::webhooks
+    :header "Webhooks"
+    :link :page/webhooks}])
 
 (defn settings-tabs [active]
   [:div.col-md-2

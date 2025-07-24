@@ -286,8 +286,7 @@
          [edit-form
           [co/close-btn [:route/goto :page/repo (-> @route
                                                     (r/path-params)
-                                                    (select-keys [:repo-id :org-id]))]]]]]
-       ])))
+                                                    (select-keys [:repo-id :org-id]))]]]]]])))
 
 (defn new [route]
   (rf/dispatch-sync [:repo/new])
@@ -307,5 +306,6 @@
 (defn settings-page [route]
   [:<>
    (settings/settings-page ::settings/general [edit])
-   ;; Ask for confirmation when deleting
+   ;; Ask for confirmation when deleting.  This must be as high as possible on
+   ;; the DOM tree to avoid other components interfering with the backdrop.
    [confirm-delete-modal]])
