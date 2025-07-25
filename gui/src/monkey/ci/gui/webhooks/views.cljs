@@ -1,6 +1,7 @@
 (ns monkey.ci.gui.webhooks.views
   "Repository webhooks editing page"
   (:require [monkey.ci.gui.alerts :as a]
+            [monkey.ci.gui.clipboard :as cl]
             [monkey.ci.gui.components :as co]
             [monkey.ci.gui.forms :as f]
             [monkey.ci.gui.martian :as m]
@@ -13,6 +14,9 @@
             [re-frame.core :as rf]))
 
 (def delete-modal-id ::delete-wh-confirm)
+
+(defn- webhook-url [wh]
+  (m/api-url (str "/webhooks/" (:id wh))))
 
 (defn confirm-delete-modal
   []
@@ -32,19 +36,22 @@
      [:span [:span.me-2 co/cancel-icon] "Oops, No"]]]])
 
 (defn- copy-url-btn [wh]
-  ;; TODO
-  )
+  [:button.btn.btn-outline-primary.btn-icon.btn-sm
+   {:title "Copy the webhook url to clipboard"}
+   [cl/clipboard-copy (webhook-url wh) nil]])
 
 (defn- delete-btn [{:keys [id]}]
-  [:button.btn.btn-danger.btn-icon.btn-sm
-   {:id (str "delete-btn-" id)
-    :title "Delete this webhook"
-    :data-bs-toggle :modal
-    :data-bs-target (u/->dom-id delete-modal-id)
-    :data-bs-wh-id id
-    ;; Store the webhook id, so we know which one to delete in the modal
-    :on-click (u/link-evt-handler [:webhooks/delete-confirm id])}
-   co/delete-icon])
+  (let [d? (rf/subscribe [:webhooks/deleting? id])]
+    [:button.btn.btn-danger.btn-icon.btn-sm
+     (cond-> {:id (str "delete-btn-" id)
+              :title "Delete this webhook"
+              :data-bs-toggle :modal
+              :data-bs-target (u/->dom-id delete-modal-id)
+              :data-bs-wh-id id
+              ;; Store the webhook id, so we know which one to delete in the modal
+              :on-click (u/link-evt-handler [:webhooks/delete-confirm id])}
+       @d? (assoc :disabled true))
+     co/delete-icon]))
 
 (defn- webhook-actions [wh]
   [:div.d-flex.gap-2
@@ -78,7 +85,7 @@
           [f/form-input
            {:id :url
             :label "Url"
-            :value (m/api-url (str "/webhooks/" (:id @e)))
+            :value (webhook-url @e)
             :extra-opts {:disabled true}
             :help-msg
             "The url that will receive the POST request."}]]

@@ -42,3 +42,11 @@
    #(db/set-new % ::new)
    ::new
    nil))
+
+(deftest webhooks-deleting?
+  (let [id (str (random-uuid))]
+    (h/verify-sub
+     [:webhooks/deleting? id]
+     #(db/set-deleting % id)
+     true
+     false)))
