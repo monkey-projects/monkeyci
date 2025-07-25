@@ -170,3 +170,9 @@
 
 (def user-load-orgs-failed
   (error-msg "Could not retrieve linked organizations"))
+
+(def webhooks-load-failed
+  (error-msg "Could not retrieve repository webhooks"))
+
+(def webhooks-new-failed
+  (error-msg "Failed to create new webhook"))

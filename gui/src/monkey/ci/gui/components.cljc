@@ -28,7 +28,8 @@
   (into [:<> [:span.me-2 [icon i]]] txt))
 
 (defn icon-btn [i lbl evt & [opts]]
-  [:button.btn.btn-primary (merge {:on-click (u/link-evt-handler evt)} opts) [:span.me-2 [icon i]] lbl])
+  [:button.btn.btn-primary
+   (merge {:on-click (u/link-evt-handler evt)} opts) [:span.me-2 [icon i]] lbl])
 
 (defn icon-btn-sm [i evt & [opts]]
   [:button.btn.btn-primary.btn-icon.btn-sm
