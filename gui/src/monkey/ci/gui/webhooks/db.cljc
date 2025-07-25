@@ -18,6 +18,9 @@
 (defn get-alerts [db]
   (l/get-alerts db id))
 
+(defn reset-alerts [db]
+  (l/reset-alerts db id))
+
 (defn loading? [db]
   (l/loading? db id))
 

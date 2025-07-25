@@ -42,7 +42,9 @@
                              (select-keys [:org-id :repo-id]))}
                [:webhooks/new--success]
                [:webhooks/new--failed]]
-    :db (db/set-creating db)}))
+    :db (-> db
+            (db/set-creating)
+            (db/reset-alerts))}))
 
 (rf/reg-event-db
  :webhooks/new--success
@@ -78,7 +80,9 @@
                  {:webhook-id id}
                  [:webhooks/delete--success id]
                  [:webhooks/delete--failed id]]
-      :db (db/set-deleting db id)})))
+      :db (-> db
+              (db/set-deleting id)
+              (db/reset-alerts))})))
 
 (rf/reg-event-db
  :webhooks/delete--success

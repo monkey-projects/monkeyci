@@ -65,7 +65,9 @@
 (deftest webhooks-new
   (rft/run-test-sync
    (let [c (h/catch-fx :martian.re-frame/request)]
-     (h/set-repo-path! "test-org" "test-repo")
+     (is (some? (reset! app-db (-> {}
+                                   (h/set-repo-path "test-org" "test-repo")
+                                   (db/set-alerts [{:type :info :message "old alert"}])))))
      (h/initialize-martian {:create-webhook {:body {:id "test-wh"}
                                              :error-code :no-error}})
      (rf/dispatch [:webhooks/new])
@@ -81,7 +83,10 @@
               (-> @c first (nth 3) :webhook))))
 
      (testing "marks creating"
-       (is (true? (db/creating? @app-db)))))))
+       (is (true? (db/creating? @app-db))))
+
+     (testing "clears alerts"
+       (is (empty? (db/get-alerts @app-db)))))))
 
 (deftest webhooks-new--success
   (is (nil? (db/get-new @app-db)))
@@ -125,7 +130,9 @@
    (let [c (h/catch-fx :martian.re-frame/request)]
      (is (some? (reset! app-db (-> {}
                                    (h/set-repo-path "test-org" "test-repo")
-                                   (db/set-delete-curr "test-wh")))))
+                                   (db/set-delete-curr "test-wh")
+                                   (db/set-alerts [{:type :info
+                                                    :message "test alert"}])))))
      (h/initialize-martian {:delete-webhook {:body {}
                                              :error-code :no-error}})
      (rf/dispatch [:webhooks/delete])
@@ -140,7 +147,10 @@
               (-> @c first (nth 3) :webhook-id))))
 
      (testing "marks deleting"
-       (is (true? (db/deleting? @app-db "test-wh")))))))
+       (is (true? (db/deleting? @app-db "test-wh"))))
+
+     (testing "clears alerts"
+       (is (empty? (db/get-alerts @app-db)))))))
 
 (deftest webhooks-delete--success
   (let [id (random-uuid)]
