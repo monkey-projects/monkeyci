@@ -9,7 +9,15 @@
  (fn [{:keys [db]} _]
    (lo/on-initialize
     db db/id
-    {:init-events [[:webhooks/load]]})))
+    {:init-events [[:webhooks/load]]
+     :leave-event [:webhooks/leave]})))
+
+(rf/reg-event-db
+ :webhooks/leave
+ (fn [db _]
+   (-> db
+       (lo/reset-initialized db/id)
+       (db/set-webhooks nil))))
 
 (rf/reg-event-fx
  :webhooks/load

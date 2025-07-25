@@ -16,7 +16,8 @@
 (def delete-modal-id ::delete-wh-confirm)
 
 (defn- webhook-url [wh]
-  (m/api-url (str "/webhooks/" (:id wh))))
+  ;; TODO Also allow for bitbucket urls
+  (m/api-url (str "/webhook/github/" (:id wh))))
 
 (defn confirm-delete-modal
   []
