@@ -21,22 +21,13 @@
 
 (def body c/body)
 
-(def repo-id c/gen-repo-display-id)
-
-(c/make-entity-endpoints "repo"
-                         ;; The repo is part of the org, so combine the ids
-                         {:get-id (c/id-getter (juxt :org-id :repo-id))
-                          :getter st/find-repo
-                          :saver st/save-repo
-                          :deleter st/delete-repo
-                          :new-id repo-id})
-
 ;; TODO Also return the full webhook url
 (c/make-entity-endpoints "webhook"
                          {:get-id (c/id-getter :webhook-id)
                           :getter (comp #(dissoc % :secret-key)
                                         st/find-webhook)
-                          :saver st/save-webhook})
+                          :saver st/save-webhook
+                          :deleter st/delete-webhook})
 
 (c/make-entity-endpoints "user"
                          {:get-id (c/id-getter (juxt :user-type :type-id))

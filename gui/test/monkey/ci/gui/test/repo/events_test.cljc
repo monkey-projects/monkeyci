@@ -14,21 +14,12 @@
 
 (use-fixtures :each f/reset-db)
 
-(defn- set-repo-path [db org repo]
-  (r/set-current db {:parameters
-                     {:path 
-                      {:org-id org
-                       :repo-id repo}}}))
-
-(defn- set-repo-path! [org repo]
-  (swap! app-db set-repo-path org repo))
-
 (defn- test-repo-path!
   "Generate random ids for org, repo and build, and sets the current
    route to the generated path.  Returns the generated ids."
   []
   (let [[org repo _ :as r] (repeatedly 3 random-uuid)]
-    (set-repo-path! org repo)
+    (h/set-repo-path! org repo)
     r))
 
 (deftest repo-init
@@ -90,7 +81,7 @@
   (testing "fetches builds from backend"
     (rft/run-test-sync
      (let [c (h/catch-fx :martian.re-frame/request)]
-       (set-repo-path! "test-org" "test-repo")
+       (h/set-repo-path! "test-org" "test-repo")
        (h/initialize-martian {:get-builds {:body [{:id "test-build"}]
                                            :error-code :no-error}})
        (rf/dispatch [:builds/load])
@@ -183,7 +174,7 @@
   (testing "invokes build trigger endpoint with params"
     (rft/run-test-sync
      (let [c (h/catch-fx :martian.re-frame/request)]
-       (is (some? (set-repo-path! "test-org" "test-repo")))
+       (is (some? (h/set-repo-path! "test-org" "test-repo")))
        (h/initialize-martian {:trigger-build {:body {:build-id "test-build"}
                                               :error-code :no-error}})
        (rf/dispatch [:repo/trigger-build {:trigger-type ["branch"]
@@ -445,7 +436,7 @@
                :repos [repo]}
          e (h/catch-fx :route/goto)]
      (is (some? (reset! app-db (-> {}
-                                   (set-repo-path (:id org) (:id repo))
+                                   (h/set-repo-path (:id org) (:id repo))
                                    (cdb/set-org org)
                                    (db/mark-deleting)))))
      (rf/dispatch [:repo/delete--success])
@@ -465,7 +456,7 @@
        (is (= 1 (count @e)))))))
 
 (deftest repo-delete--failed
-  (is (some? (set-repo-path! "test-org" "test-repo")))
+  (is (some? (h/set-repo-path! "test-org" "test-repo")))
   (is (some? (swap! app-db db/mark-deleting)))
   (rf/dispatch-sync [:repo/delete--failed])
   

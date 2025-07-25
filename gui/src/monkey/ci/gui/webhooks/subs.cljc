@@ -4,3 +4,7 @@
             [re-frame.core :as rf]))
 
 (u/db-sub :repo/webhooks db/get-webhooks)
+(u/db-sub :webhooks/alerts db/get-alerts)
+(u/db-sub :webhooks/loading? db/loading?)
+(u/db-sub :webhooks/new db/get-new)
+(u/db-sub :webhooks/deleting? db/deleting?)

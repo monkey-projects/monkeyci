@@ -170,3 +170,15 @@
 
 (def user-load-orgs-failed
   (error-msg "Could not retrieve linked organizations"))
+
+(def webhooks-load-failed
+  (error-msg "Could not retrieve repository webhooks"))
+
+(def webhooks-new-failed
+  (error-msg "Failed to create new webhook"))
+
+(def webhook-delete-success
+  (alert-msg :success #(str "Webhook " % " has been deleted.")))
+
+(def webhooks-delete-failed
+  (error-msg "Failed to delete webhook"))

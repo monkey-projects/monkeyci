@@ -531,14 +531,30 @@
                                              (format "/org/%s/repo/%s/bitbucket/unwatch" org-id repo-id)
                                              {:token "test-token"})
                              (app)
-                             :status))))))))))
+                             :status))))))))
+
+    (testing "`GET /webhooks`"
+      (let [st (st/make-memory-storage)
+            app (make-test-app st)
+            {:keys [repo-id] :as repo} (-> (h/gen-repo)
+                                           (assoc :org-id org-id))]
+        (is (some? (st/save-repo st repo)))
+        (let [r (-> (mock/request :get (format "/org/%s/repo/%s/webhooks" org-id repo-id))
+                    (app))]
+
+          (testing "returns status 200"
+            (is (= 200 (:status r))))
+          
+          (testing "lists webhooks for repo"
+            (is (some? (:body r)))))))))
 
 (deftest webhook-endpoints
   (verify-entity-endpoints {:name "webhook"
                             :base-entity {:org-id "test-cust"
                                           :repo-id "test-repo"}
                             :updated-entity {:repo-id "updated-repo"}
-                            :creator st/save-webhook}))
+                            :creator st/save-webhook
+                            :can-delete? true}))
 
 (deftest user-endpoints
   (testing "/user"

@@ -26,6 +26,7 @@
              [invoice :as inv-api]
              [join-request :as jr-api]
              [params :as param-api]
+             [repo :as repo-api]
              [ssh-keys :as ssh-api]]
             [reitit.coercion.schema]
             [reitit.ring :as ring]
@@ -146,6 +147,7 @@
           {:creator api/create-webhook
            :updater api/update-webhook
            :getter  api/get-webhook
+           :deleter api/delete-webhook
            :new-schema NewWebhook
            :update-schema UpdateWebhook
            :id-key :webhook-id})
@@ -190,19 +192,22 @@
             :parameters {:body Parameters}}
       :delete {:handler param-api/delete-param}}]]])
 
-(def repo-parameter-routes
-  ["/param" {:get {:handler param-api/get-repo-params}}])
-
 (def org-ssh-keys-routes
   ["/ssh-keys" {:get {:handler ssh-api/get-org-ssh-keys}
                 :put {:handler ssh-api/update-ssh-keys
                       :parameters {:body [SshKeys]}}}])
 
+(def repo-parameter-routes
+  ["/param" {:get {:handler param-api/get-repo-params}}])
+
 (def repo-ssh-keys-routes
   ["/ssh-keys" {:get {:handler ssh-api/get-repo-ssh-keys}}])
 
+(def repo-webhook-routes
+  ["/webhooks" {:get {:handler repo-api/list-webhooks}}])
+
 (def log-routes
-  ["/logs" ; Deprecated, use loki instead
+  ["/logs"                              ; Deprecated, use loki instead
    [[""
      {:get {:handler api/list-build-logs}}]
     ["/download"
@@ -261,15 +266,16 @@
 (def repo-routes
   ["/repo"
    (-> (c/generic-routes
-        {:creator api/create-repo
-         :updater api/update-repo
-         :getter  api/get-repo
-         :deleter api/delete-repo
+        {:creator repo-api/create-repo
+         :updater repo-api/update-repo
+         :getter  repo-api/get-repo
+         :deleter repo-api/delete-repo
          :new-schema NewRepo
          :update-schema UpdateRepo
          :id-key :repo-id
          :child-routes [repo-parameter-routes
                         repo-ssh-keys-routes
+                        repo-webhook-routes
                         build-routes
                         unwatch-routes]})
        (conj watch-routes))])

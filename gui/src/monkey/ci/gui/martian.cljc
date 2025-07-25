@@ -32,6 +32,9 @@
 (def user-schema
   {:user-id s/Str})
 
+(def webhook-schema
+  {:webhook-id s/Str})
+
 ;; TODO Use the same source as backend for this
 (s/defschema NewOrg
   {:name s/Str})
@@ -96,6 +99,10 @@
   {:amount s/Int
    :valid-from s/Int
    (s/optional-key :valid-until) s/Int})
+
+(s/defschema NewWebhook
+  {:org-id s/Str
+   :repo-id s/Str})
 
 (def Date #"\d{4}-\d{2}-\d{2}")
 
@@ -280,6 +287,24 @@
      :method :delete
      :path-parts repo-path
      :path-schema repo-schema})
+
+   (api-route
+    {:route-name :get-repo-webhooks
+     :method :get
+     :path-parts (conj repo-path "/webhooks")
+     :path-schema repo-schema})
+
+   (api-route
+    {:route-name :create-webhook
+     :method :post
+     :path-parts ["/webhook"]
+     :body-schema {:webhook NewWebhook}})
+
+   (api-route
+    {:route-name :delete-webhook
+     :method :delete
+     :path-parts ["/webhook/" :webhook-id]
+     :path-schema webhook-schema})
 
    (api-route
     {:route-name :get-builds

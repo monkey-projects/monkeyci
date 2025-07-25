@@ -3,6 +3,7 @@
             [martian.core :as martian]
             [martian.test :as mt]
             [monkey.ci.gui.martian :as mm]
+            [monkey.ci.gui.routing :as r]
             [re-frame.core :as rf]
             [re-frame.db :refer [app-db]]))
 
@@ -36,3 +37,12 @@
       (testing "returns expected value"
         (is (some? (reset! app-db (setter {}))))
         (is (= exp-val @s))))))
+
+(defn set-repo-path [db org repo]
+  (r/set-current db {:parameters
+                     {:path 
+                      {:org-id org
+                       :repo-id repo}}}))
+
+(defn set-repo-path! [org repo]
+  (swap! app-db set-repo-path org repo))
