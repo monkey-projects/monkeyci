@@ -15,5 +15,8 @@
                           :new-id repo-id})
 
 (defn list-webhooks [req]
-  ;; TODO
-  (rur/response []))
+  (-> (c/req->storage req)
+      (st/find-webhooks-for-repo (c/repo-sid req))
+      ;; Do not return the secret key, it should remain secret
+      (as-> m (map #(dissoc % :secret-key) m))
+      (rur/response)))
