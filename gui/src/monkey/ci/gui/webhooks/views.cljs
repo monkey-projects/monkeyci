@@ -7,6 +7,7 @@
             [monkey.ci.gui.martian :as m]
             [monkey.ci.gui.modals :as modals]
             [monkey.ci.gui.repo-settings.views :as settings]
+            [monkey.ci.gui.routing :as r]
             [monkey.ci.gui.table :as t]
             [monkey.ci.gui.utils :as u]
             [monkey.ci.gui.webhooks.events :as e]
@@ -121,8 +122,9 @@
       [:i "MonkeyCI."]  " See the " [co/docs-link "articles/triggers" "webhook documentation"]
       " for details."]
      [new-result]
-     [:div.card
+     [:div.card.mb-3
       [:div.card-body
        [a/component [:webhooks/alerts]]
-       [webhooks-table]]]])
+       [webhooks-table]]]
+     [co/close-btn [:route/goto :page/repo (r/path-params route)]]])
    [confirm-delete-modal]])
