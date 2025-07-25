@@ -49,6 +49,7 @@
  (fn [db [_ {:keys [body]}]]
    (-> db
        (db/set-new body)
+       (db/update-webhooks conj body)
        (db/reset-creating))))
 
 (rf/reg-event-db
@@ -62,3 +63,38 @@
  :webhooks/close-new
  (fn [db _]
    (db/reset-new db)))
+
+(rf/reg-event-db
+ :webhooks/delete-confirm
+ (fn [db [_ id]]
+   (db/set-delete-curr db id)))
+
+(rf/reg-event-fx
+ :webhooks/delete
+ (fn [{:keys [db]} _]
+   (let [id (db/get-delete-curr db)]
+     {:dispatch [:secure-request
+                 :delete-webhook
+                 {:webhook-id id}
+                 [:webhooks/delete--success id]
+                 [:webhooks/delete--failed id]]
+      :db (db/set-deleting db id)})))
+
+(rf/reg-event-db
+ :webhooks/delete--success
+ (fn [db [_ id]]
+   (letfn [(remove-wh [wh]
+             (remove (fn [w]
+                       (= (:id w) id))
+                     wh))]
+     (-> db
+         (db/reset-deleting id)
+         (db/set-alerts [(a/webhook-delete-success id)])
+         (db/update-webhooks remove-wh)))))
+
+(rf/reg-event-db
+ :webhooks/delete--failed
+ (fn [db [_ id err]]
+   (-> db
+       (lo/on-failure db/id a/webhooks-delete-failed err)
+       (db/reset-deleting id))))

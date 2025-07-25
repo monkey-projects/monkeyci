@@ -91,6 +91,9 @@
   (testing "sets new webhook in db"
     (is (= ::created (db/get-new @app-db))))
 
+  (testing "adds to list of webhooks"
+    (is (= [::created] (db/get-webhooks @app-db))))
+
   (testing "unmarks creating"
     (is (not (db/creating? @app-db)))))
 
@@ -111,3 +114,62 @@
     (is (some? (reset! app-db (db/set-new {} ::new))))
     (rf/dispatch-sync [:webhooks/close-new])
     (is (nil? (db/get-new @app-db)))))
+
+(deftest webhooks-delete-confirm
+  (testing "sets current delete id in db"
+    (rf/dispatch-sync [:webhooks/delete-confirm "test-wh"])
+    (is (= "test-wh" (db/get-delete-curr @app-db)))))
+
+(deftest webhooks-delete
+  (rft/run-test-sync
+   (let [c (h/catch-fx :martian.re-frame/request)]
+     (is (some? (reset! app-db (-> {}
+                                   (h/set-repo-path "test-org" "test-repo")
+                                   (db/set-delete-curr "test-wh")))))
+     (h/initialize-martian {:delete-webhook {:body {}
+                                             :error-code :no-error}})
+     (rf/dispatch [:webhooks/delete])
+
+     (testing "invokes `delete-webhook` endpoint"
+       (is (= 1 (count @c)))
+       (is (= :delete-webhook
+              (-> @c first (nth 2)))))
+
+     (testing "passes webhook id in path"
+       (is (= "test-wh"
+              (-> @c first (nth 3) :webhook-id))))
+
+     (testing "marks deleting"
+       (is (true? (db/deleting? @app-db "test-wh")))))))
+
+(deftest webhooks-delete--success
+  (let [id (random-uuid)]
+    (is (some? (reset! app-db (-> {}
+                                  (db/set-deleting id)
+                                  (db/set-webhooks [{:id ::other}
+                                                    {:id id}])))))
+    (rf/dispatch-sync [:webhooks/delete--success id])
+    
+    (testing "removes from list of webhooks"
+      (is (= [{:id ::other}] (db/get-webhooks @app-db))))
+
+    (testing "sets alert message"
+      (is (= [:success]
+             (->> (db/get-alerts @app-db)
+                  (map :type)))))
+    
+    (testing "unmarks deleting"
+      (is (not (db/deleting? @app-db id))))))
+
+(deftest webhooks-delete--failed
+  (let [id (random-uuid)]
+    (is (some? (reset! app-db (db/set-deleting {} id))))
+    (rf/dispatch-sync [:webhooks/delete--failed id {:error-message "test error"}])
+    
+    (testing "sets error message"
+      (is (= [:danger]
+             (->> (db/get-alerts @app-db)
+                  (map :type)))))
+    
+    (testing "unmarks deleting"
+      (is (not (db/deleting? @app-db id))))))

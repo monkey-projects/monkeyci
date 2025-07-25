@@ -9,6 +9,9 @@
 (defn set-webhooks [db w]
   (l/set-value db id w))
 
+(defn update-webhooks [db f & args]
+  (apply l/update-value db id f args))
+
 (defn set-alerts [db a]
   (l/set-alerts db id a))
 
@@ -36,3 +39,23 @@
 
 (defn reset-creating [db]
   (dissoc db ::creating?))
+
+(defn deleting? [db id]
+  (contains? (::deleting? db) id))
+
+(defn set-deleting [db id]
+  (update db ::deleting? (fnil conj #{}) id))
+
+(defn reset-deleting [db id]
+  (update db ::deleting? (fnil disj #{}) id))
+
+(def get-delete-curr
+  "Retrieves the id of the webhook that is currently being deleted (that is displaying
+   the modal)."
+  ::delete-curr)
+
+(defn set-delete-curr [db id]
+  (assoc db ::delete-curr id))
+
+(defn reset-delete-curr [db id]
+  (dissoc db ::delete-curr))

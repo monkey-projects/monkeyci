@@ -32,6 +32,9 @@
 (def user-schema
   {:user-id s/Str})
 
+(def webhook-schema
+  {:webhook-id s/Str})
+
 ;; TODO Use the same source as backend for this
 (s/defschema NewOrg
   {:name s/Str})
@@ -296,6 +299,12 @@
      :method :post
      :path-parts ["/webhook"]
      :body-schema {:webhook NewWebhook}})
+
+   (api-route
+    {:route-name :delete-webhook
+     :method :delete
+     :path-parts ["/webhook/" :webhook-id]
+     :path-schema webhook-schema})
 
    (api-route
     {:route-name :get-builds

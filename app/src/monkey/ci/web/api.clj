@@ -26,7 +26,8 @@
                          {:get-id (c/id-getter :webhook-id)
                           :getter (comp #(dissoc % :secret-key)
                                         st/find-webhook)
-                          :saver st/save-webhook})
+                          :saver st/save-webhook
+                          :deleter st/delete-webhook})
 
 (c/make-entity-endpoints "user"
                          {:get-id (c/id-getter (juxt :user-type :type-id))

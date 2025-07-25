@@ -553,7 +553,8 @@
                             :base-entity {:org-id "test-cust"
                                           :repo-id "test-repo"}
                             :updated-entity {:repo-id "updated-repo"}
-                            :creator st/save-webhook}))
+                            :creator st/save-webhook
+                            :can-delete? true}))
 
 (deftest user-endpoints
   (testing "/user"

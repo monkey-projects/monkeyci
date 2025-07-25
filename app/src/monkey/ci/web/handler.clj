@@ -147,6 +147,7 @@
           {:creator api/create-webhook
            :updater api/update-webhook
            :getter  api/get-webhook
+           :deleter api/delete-webhook
            :new-schema NewWebhook
            :update-schema UpdateWebhook
            :id-key :webhook-id})
