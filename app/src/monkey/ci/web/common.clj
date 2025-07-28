@@ -4,7 +4,8 @@
             [clojure.tools.logging :as log]
             [monkey.ci
              [labels :as lbl]
-             [storage :as st]]
+             [storage :as st]
+             [time :as t]]
             [muuntaja.core :as mc]
             [reitit.ring :as ring]
             [ring.util.response :as rur]
@@ -250,3 +251,6 @@
 
 (defn new-build-id [idx]
   (str "build-" idx))
+
+(defn set-wh-invocation-time [st wh]
+  (st/save-webhook st (assoc wh :last-inv-time (t/now))))

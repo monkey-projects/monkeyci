@@ -27,14 +27,18 @@
       (throw (ex-info "Invalid event payload" {:event evt})))))
 
 (deftest create-webhook
-  (testing "assigns secret key"
-    (let [{st :storage :as rt} (trt/test-runtime)
-          r (-> rt
-                (h/->req)
-                (h/with-body {:org-id "test-org"})
-                (sut/create-webhook))]
-      (is (= 201 (:status r)))
-      (is (string? (get-in r [:body :secret-key]))))))
+  (let [{st :storage :as rt} (trt/test-runtime)
+        r (-> rt
+              (h/->req)
+              (h/with-body {:org-id "test-org"})
+              (sut/create-webhook))]
+    (is (= 201 (:status r)))
+
+    (testing "assigns secret key"
+      (is (string? (get-in r [:body :secret-key]))))
+
+    (testing "assigns creation time"
+      (is (number? (get-in r [:body :creation-time]))))))
 
 (deftest get-webhook
   (testing "does not return the secret key"

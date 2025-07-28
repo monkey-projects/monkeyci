@@ -199,6 +199,7 @@
         wh (st/find-webhook st webhook-id)]
     (if wh
       (let [build (make-build req wh)]
+        (c/set-wh-invocation-time st wh)
         (-> (rur/response (select-keys build [:id]))
             (r/add-event (b/build-triggered-evt build))
             (rur/status 202)))

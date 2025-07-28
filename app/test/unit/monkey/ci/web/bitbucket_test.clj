@@ -263,7 +263,11 @@
           (is (= "refs/heads/main" (:ref git)))))
 
       (testing "does not create build in storage"
-        (is (nil? (st/find-build s [(:id org) (:id repo) (get-in resp [:body :build-id])])))))
+        (is (nil? (st/find-build s [(:id org) (:id repo) (get-in resp [:body :build-id])]))))
+
+      (testing "sets last invocation time on webhook"
+        (is (number? (-> (st/find-webhook s (:id wh))
+                         :last-inv-time)))))
 
     (testing "adds configured encrypted ssh key matching repo labels"
       (let [iv (v/generate-iv)

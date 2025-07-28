@@ -38,7 +38,11 @@
         (is (some? (:sid evt))))
 
       (testing "does not store build in db yet"
-        (is (nil? (st/find-build st (:sid evt)))))))
+        (is (nil? (st/find-build st (:sid evt)))))
+
+      (testing "sets last invocation time"
+        (let [upd (st/find-webhook st "test-hook")]
+          (is (number? (:last-inv-time upd)))))))
 
   (testing "ignores non-push events"
     (let [req (-> (trt/test-runtime)

@@ -634,7 +634,19 @@
 
    (generate-org-deks 45)
    (re-encrypt-params 46)
-   (re-encrypt-ssh-keys 47)])
+   (re-encrypt-ssh-keys 47)
+
+   (migration
+    (mig-id 48 :add-webhook-timestamps)
+    ;; h2 only allows adding or dropping one column at a time
+    [{:alter-table :webhooks
+      :add-column [:creation-time :timestamp]}
+     {:alter-table :webhooks
+      :add-column [:last-inv-time :timestamp]}]
+    [{:alter-table :webhooks
+      :drop-column :creation-time}
+     {:alter-table :webhooks
+      :drop-column :last-inv-time}])])
 
 (defn prepare-migrations
   "Prepares all migrations by formatting to sql, creates a ragtime migration object from it."

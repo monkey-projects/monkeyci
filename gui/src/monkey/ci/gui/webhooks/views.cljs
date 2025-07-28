@@ -87,9 +87,9 @@
     [{:label "Id"
       :value :id}
      {:label "Created at"
-      :value :creation-time}
+      :value (comp co/date-time :creation-time)}
      {:label "Last invocation"
-      :value :last-invocation}
+      :value (comp co/date-time :last-invocation)}
      {:label "Actions"
       :value webhook-actions}]
     :loading

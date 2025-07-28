@@ -187,19 +187,6 @@
 (defn by-display-id [id]
   [:= :display-id id])
 
-;;; Basic entities
-
-(defentity org)
-;; Provided for compatibility purposes
-(def ^:deprecated insert-customer insert-org)
-(def ^:deprecated update-customer update-org)
-(def ^:deprecated delete-customers delete-orgs)
-(def ^:deprecated select-customers select-orgs)
-
-(defentity repo)
-(defentity webhook)
-(defentity user)
-
 (defprotocol EpochConvertable
   (->epoch [x]))
 
@@ -264,6 +251,36 @@
 (defn- copy-prop [prop [r e]]
   [(assoc r prop (prop e)) e])
 
+;;; Basic entities
+
+(defentity org)
+;; Provided for compatibility purposes
+(def ^:deprecated insert-customer insert-org)
+(def ^:deprecated update-customer update-org)
+(def ^:deprecated delete-customers delete-orgs)
+(def ^:deprecated select-customers select-orgs)
+
+(defentity repo)
+
+(def creation-time->int (partial time->int :creation-time))
+(def int->creation-time (partial int->time :creation-time))
+(def last-inv-time->int (partial time->int :last-inv-time))
+(def int->last-inv-time (partial int->time :last-inv-time))
+
+(def prepare-webhook (comp int->creation-time int->last-inv-time))
+(def convert-webhook (comp (partial copy-prop :creation-time)
+                           (partial copy-prop :last-inv-time)))
+(def convert-webhook-select (comp creation-time->int last-inv-time->int))
+
+(defentity webhook
+  {:before-insert prepare-webhook
+   :after-insert  convert-webhook
+   :before-update prepare-webhook
+   :after-update  convert-webhook
+   :after-select  convert-webhook-select})
+
+(defentity user)
+
 (def git->edn (partial prop->edn :git))
 (def edn->git (partial edn->prop :git))
 (def git->build (partial copy-prop :git))
@@ -272,11 +289,12 @@
 (def convert-build (comp str->source git->build convert-timed))
 (def convert-build-select (comp str->source edn->git convert-timed))
 
-(defentity build {:before-insert prepare-build
-                  :after-insert  convert-build
-                  :before-update prepare-build
-                  :after-update  convert-build
-                  :after-select  convert-build-select})
+(defentity build
+  {:before-insert prepare-build
+   :after-insert  convert-build
+   :before-update prepare-build
+   :after-update  convert-build
+   :after-select  convert-build-select})
 
 (def details->edn (partial prop->edn :details))
 (def edn->details (partial edn->prop :details))

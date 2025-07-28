@@ -63,8 +63,12 @@
               :opt-un [:job/status :db/credit-multiplier])
       (s/merge :db/timed)))
 
+(s/def :webhook/creation-time ts?)
+(s/def :webhook/last-inv-time ts?)
+
 (s/def :db/webhook
-  (-> (s/keys :req-un [:build/repo-id :github/secret])
+  (-> (s/keys :req-un [:build/repo-id :github/secret]
+              :opt-un [:webhook/creation-time :webhook/last-inv-time])
       (s/merge :db/common)))
 
 (s/def :db/ssh-key

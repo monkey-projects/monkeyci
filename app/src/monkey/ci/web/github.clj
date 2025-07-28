@@ -7,6 +7,7 @@
              [build :as b]
              [runtime :as rt]
              [storage :as s]
+             [time :as time]
              [version :as v]]
             [monkey.ci.web
              [auth :as auth]
@@ -64,13 +65,15 @@
 
 (defn create-webhook-build [{st :storage :as rt} id payload]
   (if-let [details (s/find-webhook st id)]
-    (create-build
-     rt
-     (-> details
-         (select-keys [:org-id :repo-id])
-         (assoc :webhook-id id
-                :source :github-webhook))
-     payload)
+    (do
+      (c/set-wh-invocation-time st details)
+      (create-build
+       rt
+       (-> details
+           (select-keys [:org-id :repo-id])
+           (assoc :webhook-id id
+                  :source :github-webhook))
+       payload))
     (log/warn "No webhook configuration found for" id)))
 
 (defn create-app-build

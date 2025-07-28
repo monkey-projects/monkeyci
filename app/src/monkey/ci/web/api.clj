@@ -21,7 +21,6 @@
 
 (def body c/body)
 
-;; TODO Also return the full webhook url
 (c/make-entity-endpoints "webhook"
                          {:get-id (c/id-getter :webhook-id)
                           :getter (comp #(dissoc % :secret-key)
@@ -42,14 +41,16 @@
     (rur/response (st/list-user-orgs st user-id))))
 
 ;; Override webhook creation
-(defn- assign-webhook-secret
+(defn- assign-new-webhook-props
   "Updates the request body to assign a secret key, which is used to
    validate the request."
   [req]
-  (assoc-in req [:parameters :body :secret-key] (auth/generate-secret-key)))
+  (update-in req [:parameters :body] assoc
+             :secret-key (auth/generate-secret-key)
+             :creation-time (t/now)))
 
 (def create-webhook (comp (c/entity-creator st/save-webhook c/default-id)
-                          assign-webhook-secret))
+                          assign-new-webhook-props))
 
 (def org-id c/org-id)
 

@@ -71,8 +71,12 @@
 
 (s/def :entity/secret-key string?)
 
+(s/def :webhook/creation-time ts?)
+(s/def :webhook/last-inv-time ts?)
+
 (s/def :entity/webhook
-  (-> (s/keys :req-un [:entity/org-id :entity/repo-id :entity/secret-key])
+  (-> (s/keys :req-un [:entity/org-id :entity/repo-id :entity/secret-key]
+              :opt-un [:webhook/creation-time :webhook/last-inv-time])
       (s/merge :entity/common)))
 
 (s/def :label-filter/label string?)
