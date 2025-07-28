@@ -212,9 +212,11 @@
 
 (defn- insert-webhook [conn wh]
   (if-let [repo-id (select-repo-id-by-sid conn [(:org-id wh) (:repo-id wh)])]
-    (let [we {:cuid (:id wh)
-              :repo-id repo-id
-              :secret (:secret-key wh)}]
+    (let [we (-> wh
+                 (dissoc :id :repo-id :org-id :secret-key)
+                 (assoc :cuid (:id wh)
+                        :repo-id repo-id
+                        :secret (:secret-key wh)))]
       (ec/insert-webhook conn we))
     (throw (ex-info "Repository does not exist" wh))))
 

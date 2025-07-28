@@ -223,7 +223,9 @@
             wh (-> (h/gen-webhook)
                    (assoc :org-id (:id org)
                           :repo-id (:id repo)
-                          :secret-key (auth/generate-secret-key)))]
+                          :secret-key (auth/generate-secret-key)
+                          :creation-time 100
+                          :last-inv-time 200))]
         (is (some? (st/save-org s (assoc-in org [:repos (:id repo)] repo))))
         
         (testing "can create and retrieve"
