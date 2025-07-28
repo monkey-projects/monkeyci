@@ -156,31 +156,40 @@
                  :value))))))
 
 (deftest create-param
-  (testing "encrypts values"
-    (let [org-id "test-org"
-          {st :storage :as rt} (-> (trt/test-runtime)
-                                   (trt/set-encrypter (fn [_ _ cuid]
-                                                        (str "encrypted with " cuid))))
-          
-          req (-> rt
-                  (h/->req)
-                  (assoc :parameters
-                         {:path
-                          {:org-id org-id}
-                          :body
-                          {:parameters [{:name "test-param"
-                                         :value "test-val"}]}}))
-          resp (sut/create-param req)]
-      (is (some? resp))
+  (let [org-id "test-org"
+        {st :storage :as rt} (-> (trt/test-runtime)
+                                 (trt/set-encrypter (fn [_ _ cuid]
+                                                      (str "encrypted with " cuid))))
+        
+        req (-> rt
+                (h/->req)
+                (assoc :parameters
+                       {:path
+                        {:org-id org-id}
+                        :body
+                        {:parameters [{:name "test-param"
+                                       :value "test-val"}]}}))
+        resp (sut/create-param req)]
+    (testing "returns 201 created response"
+      (is (= 201 (:status resp))))
+
+    (testing "saves encrypted value"
       (is (= (str "encrypted with " (-> resp :body :id))
              (-> (st/find-params st org-id)
                  first
                  :parameters
                  first
-                 :value))))))
+                 :value))))
+
+    (testing "returns unencrypted value in body"
+      (is (= "test-val" (-> resp
+                            :body
+                            :parameters
+                            first
+                            :value))))))
 
 (deftest update-params
-  (testing "with id, encrypts values"
+  (testing "with id"
     (let [org-id "test-org"
           id "test-params-id"
           {st :storage :as rt} (-> (trt/test-runtime)
@@ -195,14 +204,27 @@
                           :body
                           [{:id id
                             :parameters [{:name "test-param"
-                                          :value "test-val"}]}]}))]
-      (is (some? (sut/update-params req)))
-      (is (= (str "encrypted with " id)
-             (-> (st/find-params st org-id)
-                 first
-                 :parameters
-                 first
-                 :value)))))
+                                          :value "test-val"}]}]}))
+          resp (sut/update-params req)]
+      (testing "returns 200 ok status"
+        (is (= 200 (:status resp))))
+
+      (testing "encrypts values"
+        (is (= (str "encrypted with " id)
+               (-> (st/find-params st org-id)
+                   first
+                   :parameters
+                   first
+                   :value))))
+
+      (testing "returns unencrypted values"
+        (is (= "test-val"
+               (-> resp
+                   :body
+                   first
+                   :parameters
+                   first
+                   :value))))))
 
   (testing "without id, encrypts values"
     (let [org-id "test-org"

@@ -5,7 +5,8 @@
              [storage :as st]]
             [monkey.ci.web
              [common :as c]
-             [crypto :as cr]]))
+             [crypto :as cr]]
+            [ring.util.response :as rur]))
 
 (defn- req->param-id [req]
   (get-in req [:parameters :path :param-id]))
@@ -20,21 +21,6 @@
        (update-in req [:parameters :body :parameters] encrypt-vals))))
   ([req]
    (encrypt-one req (req->param-id req))))
-
-(defn- encrypt-all [req]
-  (let [encrypter (cr/encrypter req)]
-    (letfn [(encrypt-vals [params-id p]
-              (map (fn [v]
-                     (update v :value #(encrypter % (c/org-id req) params-id)))
-                   p))
-            (encrypt-params [b]
-              (map (fn [{:keys [id] :as p}]
-                     (let [id (or id (cuid/random-cuid))]
-                       (-> p
-                           (assoc :id id)
-                           (update :parameters (partial encrypt-vals id)))))
-                   b))]
-      (update-in req [:parameters :body] encrypt-params))))
 
 (defn- decrypt
   "Decryps all parameter values using the vault from the request"
@@ -72,17 +58,26 @@
                                                    st/find-param))]
     (getter req)))
 
+(defn- replace-values
+  "Replace param values with the unencrypted values from input"
+  [resp req]
+  (assoc-in resp [:body :parameters] (-> req (c/body) :parameters)))
+
 (defn create-param [req]
   (let [id (cuid/random-cuid)
         ec (c/entity-creator st/save-param (constantly id))]
     (-> req
         (encrypt-one id)
         (assign-org-id)
-        (ec))))
+        (ec)
+        (replace-values req))))
 
-(def update-param 
-  (comp (c/entity-updater get-param-id st/find-param st/save-param)
-        encrypt-one))
+(defn update-param [req]
+  (let [upd (c/entity-updater get-param-id st/find-param st/save-param)]
+    (-> req
+        (encrypt-one)
+        (upd)
+        (replace-values req))))
 
 (defn get-repo-params
   "Retrieves the parameters that are available for the given repository.  This depends
@@ -90,6 +85,25 @@
   [req]
   (c/get-for-repo-by-label (comp (partial decrypt req) st/find-params) (mapcat :parameters) req))
 
-(def update-params
-  (comp (partial c/update-for-org st/save-params)
-        encrypt-all))
+(defn update-params [req]
+  (let [encrypter (cr/encrypter req)]
+    (letfn [(encrypt-vals [params-id p]
+              (map (fn [v]
+                     (update v :value #(encrypter % (c/org-id req) params-id)))
+                   p))
+            (encrypt-params [b]
+              (map (fn [{:keys [id] :as p}]
+                     (let [id (or id (cuid/random-cuid))]
+                       [p (-> p
+                              (assoc :id id)
+                              (update :parameters (partial encrypt-vals id)))]))
+                   b))]
+      (let [enc (encrypt-params (get-in req [:parameters :body]))]
+        (when (->> enc
+                   (map second)
+                   (st/save-params (c/req->storage req) (c/org-id req)))
+          (->> enc
+               (map (fn [[o e]]
+                      ;; Replace encrypted params with unencrypted values for return
+                      (merge e (select-keys o [:parameters]))))
+               (rur/response)))))))
