@@ -218,7 +218,8 @@
         [:span.me-2 co/delete-icon] "Delete"]])))
 
 (defn- github-url? [{:keys [url]}]
-  (cs/includes? url "github.com"))
+  (when url
+    (cs/includes? url "github.com")))
 
 (defn- edit-form [close-btn]
   (let [e (rf/subscribe [:repo/editing])

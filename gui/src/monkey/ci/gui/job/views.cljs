@@ -209,12 +209,15 @@
   (let [uid (e/route->id route)]
     (rf/dispatch [:job/init uid])
     (let [job-id (rf/subscribe [:job/id])]
-      [l/default
-       [:<>
-        [co/page-title [co/icon-text :cpu "Job: " @job-id]]
-        [:div.card
-         [:div.card-body
-          [job-details]
-          [co/alerts [:job/alerts]]
-          [load-details-tabs]]]
-        [return-link]]])))
+      [:<>
+       [l/default
+        [:<>
+         [co/page-title [co/icon-text :cpu "Job: " @job-id]]
+         [:div.card
+          [:div.card-body
+           [job-details]
+           [co/alerts [:job/alerts]]
+           [load-details-tabs]]]
+         [return-link]]]
+       ;; Put modals as high as possible on the dom tree to avoid interference
+       [tr/test-details-modal]])))

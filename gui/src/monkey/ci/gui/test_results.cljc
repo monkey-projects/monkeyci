@@ -52,17 +52,15 @@
               (rf/dispatch [:test/select tc])
               #?(:cljs (-> (js/bootstrap.Modal. (u/->dom-id ::test-details))
                            (.show)))))]
-    [:<>
-     [test-details-modal]
-     [t/paged-table {:id id
-                     :items-sub tr-sub
-                     :columns [{:label "Test case"
-                                :value :test-case}
-                               {:label "Result"
-                                :value result-val}
-                               {:label "Elapsed"
-                                :value #(str (:time %) "s")}]
-                     :on-row-click show-test-details}]]))
+    [t/paged-table {:id id
+                    :items-sub tr-sub
+                    :columns [{:label "Test case"
+                               :value :test-case}
+                              {:label "Result"
+                               :value result-val}
+                              {:label "Elapsed"
+                               :value #(str (:time %) "s")}]
+                    :on-row-click show-test-details}]))
 
 (def all-suites "$all$")
 
