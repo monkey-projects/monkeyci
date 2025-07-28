@@ -383,15 +383,24 @@
 (defn add-github-repo-page []
   (rf/dispatch [:github/load-repos])
   [add-repo-page
-   [:p "In order to be able to watch a Github repository, the "
+   [:p
+    "A watched repository notifies " [:i "MonkeyCI"] " on every push "
+    [:b "without having to install a webhook. "]
+    "In order to be able to watch a Github repository, the "
     [:a {:href "https://github.com/apps/monkeyci-app"} "MonkeyCI Github app needs to be configured"]
-    " on your organization."]
+    " on your organization. See the " [co/docs-link "articles/platforms" "documentation"]
+    " for more details."]
    github-repo-table])
 
 (defn add-bitbucket-repo-page []
   (rf/dispatch [:bitbucket/load-repos])
   (rf/dispatch [:org/load-bb-webhooks])
-  [add-repo-page nil bitbucket-repo-table])
+  [add-repo-page
+   [:p
+    "When watching a Bitbucket repository, " [:i "MonkeyCI"] " automatically installs a "
+    "webhook. Unwatching it, removes the webhook. You can also do this manually. " 
+    "See the " [co/docs-link "articles/platforms" "documentation"] " for more details."]
+   bitbucket-repo-table])
 
 (defn- org-id-input [org]
   [f/form-input {:id :id

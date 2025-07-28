@@ -217,8 +217,12 @@
           @d? (assoc :disabled true))
         [:span.me-2 co/delete-icon] "Delete"]])))
 
+(defn- github-url? [{:keys [url]}]
+  (cs/includes? url "github.com"))
+
 (defn- edit-form [close-btn]
-  (let [e (rf/subscribe [:repo/editing])]
+  (let [e (rf/subscribe [:repo/editing])
+        gh? (github-url? @e)]
     [:form
      {:on-submit (f/submit-handler [:repo/save])}
      [:div.row
@@ -254,8 +258,9 @@
                        :label "Github Id"
                        :value (:github-id @e)
                        :extra-opts
-                       {:read-only true
-                        :disabled true}
+                       {:read-only (not gh?)
+                        :disabled (not gh?)
+                        :maxlength 20}
                        :help-msg
                        "The native Github Id, registered when watching this repo."}]]]
       [:div.col
@@ -283,10 +288,10 @@
        [:div.card
         [:div.card-body
          [co/alerts [:repo/edit-alerts]]
-         [edit-form
-          [co/close-btn [:route/goto :page/repo (-> @route
-                                                    (r/path-params)
-                                                    (select-keys [:repo-id :org-id]))]]]]]])))
+         [edit-form [co/close-btn
+                     [:route/goto :page/repo (-> @route
+                                                 (r/path-params)
+                                                 (select-keys [:repo-id :org-id]))]]]]]])))
 
 (defn new [route]
   (rf/dispatch-sync [:repo/new])

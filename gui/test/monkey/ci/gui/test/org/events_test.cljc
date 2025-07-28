@@ -211,11 +211,20 @@
        (is (= "https://test-url" (-> @c first (nth 3) :repo :url)))))))
 
 (deftest repo-watch--success
-  (testing "adds repo to org"
-    (is (some? (reset! app-db (db/set-org {} {:repos []}))))
-    (rf/dispatch-sync [:repo/watch--success {:body {:id "test-repo"}}])
-    (is (= {:repos [{:id "test-repo"}]}
-           (lo/get-value @app-db db/org)))))
+  (rf-test/run-test-sync
+   (let [c (h/catch-fx :route/goto)
+         repo {:org-id "test-org"
+               :id "test-repo"}]
+     (testing "adds repo to org"
+       (is (some? (reset! app-db (db/set-org {} {:repos []}))))
+       (rf/dispatch [:repo/watch--success {:body repo}])
+       (is (= {:repos [repo]}
+              (lo/get-value @app-db db/org))))
+
+     (testing "redirects to repo edit page"
+       (is (= 1 (count @c)))
+       (is (= (r/path-for :page/repo-settings {:repo-id "test-repo" :org-id "test-org"})
+              (first @c)))))))
 
 (deftest repo-watch--failed
   (testing "sets error alert"

@@ -138,10 +138,12 @@
                  [:repo/watch--success]
                  [:repo/watch--failed]]})))
 
-(rf/reg-event-db
+(rf/reg-event-fx
  :repo/watch--success
- (fn [db [_ {:keys [body]}]]
-   (db/update-org db update :repos conj body)))
+ (fn [{:keys [db]} [_ {:keys [body]}]]
+   {:db (db/update-org db update :repos conj body)
+    :dispatch [:route/goto :page/repo-settings {:repo-id (:id body)
+                                                :org-id (:org-id body)}]}))
 
 (rf/reg-event-db
  :repo/watch--failed
