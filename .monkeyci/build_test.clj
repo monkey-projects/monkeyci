@@ -62,35 +62,13 @@
                  :script
                  second))))))
 
-(deftest deploy
-  (mt/with-build-params {"github-token" "test-token"}
-    (testing "creates job if on main branch and code has changed"
-      (let [ctx (-> mt/test-ctx
-                    (mt/with-git-ref "refs/heads/main")
-                    (mt/with-changes (mt/modified ["app/deps.edn"])))]
-        (is (some? (sut/deploy ctx)))))
+(deftest scw-image
+  (testing "`nil` if checker returns `false`"
+    (is (nil? (sut/scw-image {:checker (constantly false)} mt/test-ctx))))
 
-    (testing "does not create job if on main branch but no code has changed"
-      (let [ctx (-> mt/test-ctx
-                    (mt/with-git-ref "refs/heads/main"))]
-        (is (nil? (sut/deploy ctx)))))  
-
-    (testing "does not create job if not on main branch"
-      (let [ctx (-> mt/test-ctx
-                    (mt/with-git-ref "refs/heads/other"))]
-        (is (nil? (sut/deploy ctx)))))
-
-    (testing "does not create job if releasing"
-      (let [ctx (-> mt/test-ctx
-                    (mt/with-git-ref "refs/tags/0.1.0"))]
-        (is (nil? (sut/deploy ctx))))))
-
-  (testing "does not create job when no token provided"
-    (mt/with-build-params {}
-      (let [ctx (-> mt/test-ctx
-                    (mt/with-git-ref "refs/heads/main")
-                    (mt/with-changes (mt/modified ["app/deps.edn"])))]
-        (is (nil? (sut/deploy ctx)))))))
+  (testing "returns action job"
+    (is (bc/action-job? (sut/scw-image {:checker (constantly true)}
+                                       mt/test-ctx)))))
 
 (deftest build-gui-image
   (mt/with-build-params {}

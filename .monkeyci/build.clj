@@ -11,7 +11,6 @@
             [monkey.ci.ext.junit]
             [monkey.ci.plugin
              [github :as gh]
-             [infra :as infra]
              [kaniko :as kaniko]
              [pushover :as po]]))
 
@@ -268,32 +267,30 @@
                                          (gen-idx ctx :admin)]))
         (assoc :save-artifacts [gui-release-artifact]))))
 
-(defn deploy
-  "Job that auto-deploys the image to staging by pushing the new image tag to infra repo."
-  [ctx]
-  (let [images (->> (zipmap ["monkeyci-api" "monkeyci-gui" "monkeyci-admin"]
-                            ((juxt publish-app? publish-gui? publish-gui?) ctx))
-                    (filter (comp true? second))
-                    (map (fn [[img _]]
-                           [img (image-version ctx)]))
-                    (into {}))
-        token (get (api/build-params ctx) "github-token")]
-    (when (and (should-publish? ctx)
-               (not (release? ctx))
-               (not-empty images)
-               token)
-      (-> (m/action-job
-           "deploy"
-           (fn [ctx]
-             ;; Patch the kustomization file
-             (if (infra/patch+commit! (infra/make-client token)
-                                      :staging ; Only staging for now
-                                      images)
-               m/success
-               (-> m/failure (m/with-message "Unable to patch version in infra repo")))))
-          (m/depends-on (->> [(when (publish-app? ctx) "app-img-manifest")
-                              (when (publish-gui? ctx) "gui-img-manifest")]
-                             (remove nil?)))))))
+(defn scw-image
+  "Generates a job that patches the scw-images repo in order to build a new
+   Scaleway-specific image, using the version associated with this build."
+  [{:keys [dir dep checker]} ctx]
+  (when (checker ctx)
+    (let [v (image-version ctx)]
+      (-> (gh/patch-job {:job-id (str "scw-image-" dir)
+                         :org "monkey-projects"
+                         :repo "scw-images"
+                         :branch "main"
+                         :path (str dir "/VERSION")
+                         :patcher (constantly v)
+                         :commit-msg (str "Image for " dir ", " v)})
+          (m/depends-on [dep])))))
+
+(def api-scw-img
+  (partial scw-image {:dir "api"
+                      :dep "monkeyci-api"
+                      :checker publish-app?}))
+
+(def gui-scw-img
+  (partial scw-image {:dir "gui"
+                      :dep "monkeyci-gui"
+                      :checker publish-gui?}))
 
 (defn notify [ctx]
   (when (release? ctx)
@@ -325,5 +322,8 @@
    build-app-image
    build-gui-image
    
-   deploy
+   ;; Scaleway images
+   api-scw-img
+   gui-scw-img
+   
    notify])
