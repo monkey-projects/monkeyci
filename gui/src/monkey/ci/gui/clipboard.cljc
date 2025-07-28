@@ -21,6 +21,11 @@
        -clipboard
        (writeText val))))
 
+(defn copy-handler
+  "Creates an event handler that when invoked, copies `v` into the clipboard."
+  [v]
+  (u/link-evt-handler [::clipboard-copy v]))
+
 (defn clipboard-copy
   "Renders an icon that, when clicked, copies the specified value into
    the clipboard.  The value is stored in the db, and whenever the value
@@ -29,7 +34,7 @@
   [v desc]
   (let [c (rf/subscribe [::current])]
     [:a {:href "#"
-         :on-click (u/link-evt-handler [::clipboard-copy v])
+         :on-click (copy-handler v)
          ;; TODO Use bootstrap tooltips
          :title desc}
      [co/icon (if (= v @c)

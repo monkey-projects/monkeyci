@@ -16,9 +16,12 @@
 
 (def delete-modal-id ::delete-wh-confirm)
 
-(defn- webhook-url [wh]
+(defn- webhook-url [type wh]
   ;; TODO Also allow for bitbucket urls
-  (m/api-url (str "/webhook/github/" (:id wh))))
+  (m/api-url (str "/webhook/" (name type) "/" (:id wh))))
+
+(def github-url (partial webhook-url :github))
+(def bitbucket-url (partial webhook-url :bitbucket))
 
 (defn confirm-delete-modal
   []
@@ -37,10 +40,26 @@
     [modals/modal-dismiss-btn
      [:span [:span.me-2 co/cancel-icon] "Oops, No"]]]])
 
-(defn- copy-url-btn [wh]
-  [:button.btn.btn-outline-primary.btn-icon.btn-sm
-   {:title "Copy the webhook url to clipboard"}
-   [cl/clipboard-copy (webhook-url wh) nil]])
+(defn- copy-url-dropdown [wh]
+  [:ul.dropdown-menu
+   [:li
+    [:a.dropdown-item
+     {:href "#"
+      :on-click (cl/copy-handler (github-url wh))}
+     "Copy GitHub url"]
+    [:a.dropdown-item
+     {:href "#"
+      :on-click (cl/copy-handler (bitbucket-url wh))}
+     "Copy BitBucket url"]]])
+
+(defn- copy-url-btn [{:keys [id] :as wh}]
+  [:div.btn-group
+   [:button.btn.btn-outline-primary.btn-icon.btn-sm.dropdown-toggle
+    {:title "Copy the webhook url to clipboard"
+     :type :button
+     :data-bs-toggle :dropdown}
+    [:span.ms-1 [co/icon :clipboard]]]
+   [copy-url-dropdown wh]])
 
 (defn- delete-btn [{:keys [id]}]
   (let [d? (rf/subscribe [:webhooks/deleting? id])]
@@ -84,13 +103,22 @@
         [:form
          [:h5 "Webhook Created"]
          [:div.mb-3
-          [f/form-input
-           {:id :url
-            :label "Url"
-            :value (webhook-url @e)
-            :extra-opts {:disabled true}
-            :help-msg
-            "The url that will receive the POST request."}]]
+          [:label.form-label {:for :id} "Id"]
+          [:div.input-group
+           [:input.form-control
+            {:id :id
+             :name :id
+             :aria-describedby :id-help
+             :default-value (:id @e)
+             :disabled true}]
+           [:button.btn.btn-primary.btn-icon.dropdown-toggle
+            {:title "Copy the webhook url to clipboard"
+             :type :button
+             :data-bs-toggle :dropdown}
+            [:span.ms-2 [co/icon :clipboard]]]
+           [copy-url-dropdown @e]]
+          [:span.form-text {:id :id-help}
+           "The unique webhook id, used to construct the url."]]
          [:div.mb-3
           [f/form-input
            {:id :secret-key
@@ -99,7 +127,7 @@
             :extra-opts {:disabled true}
             :help-msg
             (str "The secret key that should be passed in for HMAC verification. "
-                 "Copy this an keep it secure, because you won't be able to retrieve it again.")}]]
+                 "Copy this and keep it secure, because you won't be able to retrieve it again.")}]]
          [co/close-btn [:webhooks/close-new]]]]])))
 
 (defn new-webhook-btn []
