@@ -11,22 +11,22 @@
             [monkey.ci.template.components :as tc]
             [re-frame.core :as rf]))
 
-(defn- create-cust-btn []
+(defn- create-org-btn []
   [:a.btn.btn-primary
    {:href (r/path-for :page/org-new)}
    [:span.me-2 [co/icon :plus-square]] "Create New Organization"])
 
-(defn- join-cust-btn []
+(defn- join-org-btn []
   [:a.btn.btn-primary
    {:href (r/path-for :page/org-join)}
    [:span.me-2 [co/icon :arrow-right-square]] "Join Organization"])
 
-(defn- cust-item [{:keys [id name owner?]}]
+(defn- org-item [{:keys [id name owner?]}]
   [:div.card
    {:style {:width "20em"}
     :on-click #(rf/dispatch [:route/goto :page/org {:org-id id}])}
    [:div.card-header {:style {:font-size "5em"}}
-    co/org-icon]
+    [:a {:href (r/path-for :page/org {:org-id id})} co/org-icon]]
    [:div.card-body
     [:div.card-title
      [:h5
@@ -35,12 +35,12 @@
        (when owner?
          [:span.badge.text-bg-success.ms-2 "owner"])]]]]])
 
-(defn- linked-orgs [cust]
+(defn- linked-orgs [org]
   [:div
-   (->> (map cust-item cust)
+   (->> (map org-item org)
         (into [:div.d-flex.gap-3.mb-3]))
    [:p "You can join any number of organizations, as long as an organization administrator approves your request."]
-   [join-cust-btn]])
+   [join-org-btn]])
 
 ;; TODO Configure centrally somewhere
 (def free-credits 1000)
@@ -52,8 +52,8 @@
     " or "
     [:a {:href (r/path-for :page/org-join)} "request to join an existing one"] "."]
    [:div.mb-2
-    [:span.me-2 [create-cust-btn]]
-    [join-cust-btn]]
+    [:span.me-2 [create-org-btn]]
+    [join-org-btn]]
    [:p
     "You can create one organization per user account." [:b.mx-1 "Creating an organization is free,"]
     "a credit card is not required.  Each organization gets" [:b.mx-1 free-credits " free credits"]
@@ -70,7 +70,9 @@
     (when @c
       [:<>
        [:h3 [:span.me-2 co/overview-icon] "Your Linked Organizations"]
-       [:p [:b "Welcome! "] "This screen shows all organizations linked to your user account."]
+       [:p
+        [:b "Welcome! "] "This screen shows all " [co/docs-link "categories/orgs" "organizations"]
+        " linked to your user account."]
        (if (empty? @c)
          [no-orgs]
          [linked-orgs @c])])))
@@ -121,7 +123,7 @@
     :disabled disabled?}
    [:span.me-2 [co/icon :arrow-right-square]] "Join"])
 
-(defn- join-actions [{:keys [status] :as cust}]
+(defn- join-actions [{:keys [status] :as org}]
   (case status
     :joined
     [:span.badge.text-bg-success
@@ -131,7 +133,7 @@
     [:span.badge.text-bg-warning
      {:title "Sending request to join"}
      "pending"]
-    [join-btn cust (= :joining status)]))
+    [join-btn org (= :joining status)]))
 
 (defn orgs-table []
   (letfn [(org-name [{:keys [id name joined?]}]

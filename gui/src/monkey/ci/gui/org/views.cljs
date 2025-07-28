@@ -238,7 +238,9 @@
         [with-recent-reload id "No recent builds found for this organization."]
         [:<>
          (if @loaded?
-           [with-recent-reload id "Recent builds for all repositories."]
+           [with-recent-reload id
+            [:<> "Recent " [co/docs-link "articles/builds" "builds"] " for all "
+             [co/docs-link "articles/repos" "repositories."]]]
            [:p "Loading recent builds for all repositories..."])
          [:div.card
           [:div.card-body

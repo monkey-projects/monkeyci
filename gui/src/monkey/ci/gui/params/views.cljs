@@ -177,7 +177,8 @@
      [:<>
       [co/page-title [co/icon-text :gear "Build Parameters"]]
       [:p
-       "Parameters can be used by builds for " [:b "sensitive information"] ", or dynamically changing "
+       [co/docs-link "articles/params" "Parameters"] " can be used by builds for "
+       [:b "sensitive information"] ", or dynamically changing "
        "data, like hostnames or file paths. They obey the following rules:"]
       [:ul
        [:li "Parameters are grouped in " [:b "parameter sets"] "."]

@@ -284,12 +284,12 @@
 
 (def api-scw-img
   (partial scw-image {:dir "api"
-                      :dep "monkeyci-api"
+                      :dep "app-img-manifest"
                       :checker publish-app?}))
 
 (def gui-scw-img
   (partial scw-image {:dir "gui"
-                      :dep "monkeyci-gui"
+                      :dep "gui-img-manifest"
                       :checker publish-gui?}))
 
 (defn notify [ctx]

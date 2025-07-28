@@ -116,7 +116,7 @@
        [co/page-title [co/icon-text :key "SSH Keys"]]
        [co/reload-btn-sm [:ssh-keys/load org-id] {:class :ms-auto}]]
       [:p
-       "SSH keys are used to access private repositories.  When a build is triggered from a "
+       [co/docs-link "articles/ssh-keys" "SSH keys"] " are used to access private repositories.  When a build is triggered from a "
        "private repo, any SSH keys that are" [:b.mx-1 "configured on the organization with matching labels"]
        "are exposed to the build script."]
       [:p
