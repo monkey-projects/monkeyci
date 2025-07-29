@@ -221,9 +221,29 @@
   (when url
     (cs/includes? url "github.com")))
 
+(defn- github-id-input [r]
+  (let [gh? (github-url? r)]
+    [:<>
+     [:label.form-label {:for :github-id} "Github Id"]
+     [:div.input-group
+      [:input.form-control
+       {:id :github-id
+        :name :github-id
+        :default-value (:github-id r)
+        :read-only (not gh?)
+        :disabled (not gh?)
+        :maxlength 20}]
+      [:button.btn.btn-primary.btn-icon
+       {:title "Stop watching this repo"
+        :type :button
+        :disabled (nil? (:github-id r))
+        :on-click (u/link-evt-handler [:repo/unwatch-github {:monkeyci/repo r}])}
+       [co/icon :eye-slash]]]
+     [:span.form-text {:id :github-id-help}
+      "The native Github Id, registered when watching this repo."]]))
+
 (defn- edit-form [close-btn]
-  (let [e (rf/subscribe [:repo/editing])
-        gh? (github-url? @e)]
+  (let [e (rf/subscribe [:repo/editing])]
     [:form
      {:on-submit (f/submit-handler [:repo/save])}
      [:div.row
@@ -255,19 +275,11 @@
                        :help-msg
                        "Required when you want to determine the 'main branch' in the build script."}]]
        [:div.mb-2
-        [f/form-input {:id :github-id
-                       :label "Github Id"
-                       :value (:github-id @e)
-                       :extra-opts
-                       {:read-only (not gh?)
-                        :disabled (not gh?)
-                        :maxlength 20}
-                       :help-msg
-                       "The native Github Id, registered when watching this repo."}]]]
+        [github-id-input @e]]]
       [:div.col
        [:h5 [co/icon-text :tags "Labels"]]
        [:p.text-body-secondary
-        "Labels are used to expose parameters and ssh keys to builds, but also to group repositories. "
+        [co/docs-link "articles/labels" "Labels"] " are used to expose parameters and ssh keys to builds, but also to group repositories. "
         "You can assign any labels you like and specify the same label name more than once.  "
         "Labels are case-sensitive."]
        [labels (:labels @e)]]

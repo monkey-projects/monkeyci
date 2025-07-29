@@ -17,7 +17,8 @@
 
 (defn user-avatar [{:keys [avatar-url] :as u}]
   (when avatar-url
-    [:img.img-thumbnail.img-fluid {:width "50px" :src avatar-url :alt "Avatar"}]))
+    [:span.avatar.avatar-sm.avatar-circle
+     [:img.avatar-img {:src avatar-url :alt "Avatar"}]]))
 
 (defn icon [n]
   [:i {:class (str "bi bi-" (name n))}])

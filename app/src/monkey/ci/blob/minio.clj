@@ -9,12 +9,26 @@
             GetObjectArgs
             PutObjectArgs
             StatObjectArgs]
-           [io.minio.messages Item]))
+           [io.minio.messages Item]
+           [java.util.concurrent TimeUnit]
+           [okhttp3 OkHttpClient$Builder]))
+
+(defn- make-http-client []
+  (.. (OkHttpClient$Builder.)
+      (connectTimeout 10 TimeUnit/SECONDS)
+      (readTimeout 10 TimeUnit/SECONDS)
+      (writeTimeout 10 TimeUnit/SECONDS)
+      ;; Retry, this may fix the error
+      (retryOnConnectionFailure true)
+      (build)))
 
 (defn make-client [url access-key secret]
   (.. (MinioAsyncClient/builder)
       (endpoint url)
       (credentials access-key secret)
+      ;; Override http client to retry on connection failure, which may circumvent
+      ;; the "\n not found" error
+      (httpClient (make-http-client))
       (build)))
 
 (defn- item->map [^Item item]
