@@ -253,3 +253,11 @@
 (def source
   "Returns the trigger source (e.g. `api`)"
   (comp :source :build))
+
+(def api-trigger?
+  "True if the build has been triggered via api (i.e. typically manually by a human)"
+  (comp (partial = :api) source))
+
+(def manual?
+  "Alias for `api-trigger?`"
+  api-trigger?)
