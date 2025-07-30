@@ -267,30 +267,32 @@
                                          (gen-idx ctx :admin)]))
         (assoc :save-artifacts [gui-release-artifact]))))
 
-(defn scw-image
+(defn scw-images
   "Generates a job that patches the scw-images repo in order to build a new
    Scaleway-specific image, using the version associated with this build."
-  [{:keys [dir dep checker]} ctx]
-  (when (checker ctx)
-    (let [v (image-version ctx)]
-      (-> (gh/patch-job {:job-id (str "scw-image-" dir)
+  [ctx]
+  (let [v (image-version ctx)
+        patches (->> [{:dir "api"
+                       :dep "app-img-manifest"
+                       :checker publish-app?}
+                      {:dir "gui"
+                       :dep "gui-img-manifest"
+                       :checker publish-gui?}]
+                     (filter (fn [{:keys [checker]}]
+                               (checker ctx)))
+                     (map (fn [{:keys [dir dep]}]
+                            {:dep dep
+                             :path (str dir "/VERSION")
+                             :patcher (constantly v)})))]
+    (when (not-empty patches)
+      (-> (gh/patch-job {:job-id "scw-images"
                          :org "monkey-projects"
                          :repo "scw-images"
                          :branch "main"
-                         :path (str dir "/VERSION")
-                         :patcher (constantly v)
-                         :commit-msg (str "Image for " dir ", " v)})
-          (m/depends-on [dep])))))
-
-(def api-scw-img
-  (partial scw-image {:dir "api"
-                      :dep "app-img-manifest"
-                      :checker publish-app?}))
-
-(def gui-scw-img
-  (partial scw-image {:dir "gui"
-                      :dep "gui-img-manifest"
-                      :checker publish-gui?}))
+                         :patches (map #(dissoc % :dep) patches)
+                         ;; TODO More meaningful message
+                         :commit-msg (str "Updated images for " v)})
+          (m/depends-on (map :dep patches))))))
 
 (defn notify [ctx]
   (when (release? ctx)
@@ -323,7 +325,6 @@
    build-gui-image
    
    ;; Scaleway images
-   api-scw-img
-   gui-scw-img
+   scw-images
    
    notify])

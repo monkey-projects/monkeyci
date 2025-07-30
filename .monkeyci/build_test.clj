@@ -62,13 +62,14 @@
                  :script
                  second))))))
 
-(deftest scw-image
-  (testing "`nil` if checker returns `false`"
-    (is (nil? (sut/scw-image {:checker (constantly false)} mt/test-ctx))))
+(deftest scw-images
+  (testing "`nil` if no images published"
+    (is (nil? (sut/scw-images mt/test-ctx))))
 
   (testing "returns action job"
-    (is (bc/action-job? (sut/scw-image {:checker (constantly true)}
-                                       mt/test-ctx)))))
+    (is (bc/action-job? (-> mt/test-ctx
+                            (mt/with-git-ref "refs/tags/0.1.0")
+                            (sut/scw-images))))))
 
 (deftest build-gui-image
   (mt/with-build-params {}
