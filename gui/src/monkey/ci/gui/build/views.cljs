@@ -33,30 +33,29 @@
   [{:keys [credits] :as build}]
   (letfn [(item [k v]
             [:div.row
-             [:div.col-4.offset-1 [:b k]]
-             [:div.col-7 v]])]
+             [:div.col-3.offset-1 [:b k]]
+             [:div.col-8 v]])]
     [:<>
      (item "Start time" (t/reformat (:start-time build)))
      (item [:span {:title "Total time that has passed between build start and end"} "Elapsed"]
            [:span {:title (t/reformat (:end-time build))} [co/build-elapsed build]])
      (item "Git ref" (get-in build [:git :ref]))
-     (when (number? credits)
-       (item [:span {:title "Consumed amount of credits"} "Credits"] credits))
      (when-let [msg (or (:message build) (get-in build [:script :message]))]
-       [:div.row
-        [:div.col-md-4.offset-1 [:b "Message"]]
-        [:div.col-md-7 msg]])
+       (item "Message" msg))
      (when-let [msg (get-in build [:git :message])]
-       [:div.row
-        [:div.col-md-4.offset-1 [:b "Commit message"]]
-        [:div.col-md-7 msg]])]))
+       (item "Commite message" msg))]))
+
+(defn- credits-badge [{:keys [credits] :as b}]
+  (when-not (u/running? b)
+    [:span.badge.bg-info [:h2.mx-4.text-white credits] "credits"]))
 
 (defn overview [build]
   (when build
     [:div.d-flex.align-items-center.gap-4
      [build-status build]
      [:div.flex-grow-1
-      [build-details build]]]))
+      [build-details build]]
+     [credits-badge build]]))
 
 (defn- build-path [route]
   (let [p (r/path-params route)
