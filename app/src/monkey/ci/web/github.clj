@@ -128,7 +128,8 @@
 
 (defn watch-repo
   "Adds the repository to the watch list for github webhooks.  If the repo
-   does not exist, it will be created."
+   does not exist, it will be created.  Essentially, this creates a new
+   repo with the github id set, so it can be watched."
   [req]
   (let [st (c/req->storage req)
         repo (get-in req [:parameters :body])

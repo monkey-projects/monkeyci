@@ -100,7 +100,6 @@
 (rf/reg-event-fx
  :repo/watch-github
  (fn [{:keys [db]} [_ repo]]
-   (log/debug "Watching repo:" repo)
    (let [org-id (r/org-id db)]
      {:dispatch [:secure-request
                  :watch-github-repo

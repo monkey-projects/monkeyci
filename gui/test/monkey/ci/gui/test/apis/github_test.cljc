@@ -4,11 +4,14 @@
             [day8.re-frame.test :as rf-test]
             [monkey.ci.gui.apis.github :as sut]
             [monkey.ci.gui.login.db :as ldb]
+            [monkey.ci.gui.test.fixtures :as f]
             [monkey.ci.gui.test.helpers :as h]
             [re-frame.core :as rf]
             [re-frame.db :refer [app-db]]))
 
-(deftest customer-load-github-repos
+(use-fixtures :each f/reset-db)
+
+(deftest org-load-github-repos
   (testing "invokes repos and orgs url from github user"
     (let [e (h/catch-fx :http-xhrio)]
       (rf-test/run-test-sync
@@ -27,7 +30,7 @@
          (is (= 1 (count a)))
          (is (= :info (-> a first :type))))))))
 
-(deftest customer-load-github-repos--success
+(deftest org-load-github-repos--success
   (testing "sets repos in db"
     (rf/dispatch-sync [:github/load-repos--success [{:id "test-repo"}]])
     (is (= 1 (count (sut/repos @app-db)))))
@@ -38,7 +41,7 @@
         (is (= 1 (count a)))
         (is (= :success (-> a first :type))))))
 
-(deftest customer-load-github-repos--failed
+(deftest org-load-github-repos--failed
   (testing "sets error alert"
     (rf/dispatch-sync [:github/load-repos--failed {:message "test error"}])
       (let [a (sut/alerts @app-db)]
@@ -70,6 +73,36 @@
      (let [e (h/catch-fx :route/goto)]
        (rf/dispatch [::sut/load-orgs--failed {:status 401}])
        (is (= ["/login"] @e))))))
+
+(deftest parse-github-url
+  (testing "`nil` if empty url"
+    (is (nil? (sut/parse-github-url nil)))
+    (is (nil? (sut/parse-github-url ""))))
+
+  (testing "returns owner and repo for valid http url"
+    (is (= {:owner "test-owner"
+            :repo "test-repo"}
+           (sut/parse-github-url "https://github.com/test-owner/test-repo")))
+    (is (= {:owner "test-owner"
+            :repo "test-repo"}
+           (sut/parse-github-url "https://github.com/test-owner/test-repo.git"))))
+
+  (testing "returns owner and repo for valid ssh url"
+    (is (= {:owner "test-owner"
+            :repo "test-repo"}
+           (sut/parse-github-url "git@github.com/test-owner/test-repo.git")))))
+
+(deftest get-repo
+  (testing "invokes get repo endpoint from github"
+    (let [e (h/catch-fx :http-xhrio)]
+      (rf/dispatch-sync [:github/get-repo "https://github.com/test/repo"])
+      (is (= 1 (count @e)))
+      (is (= "https://api.github.com/repos/test/repo" (-> @e first :uri))))))
+
+(deftest get-repo--success
+  (testing "sets repo details in db"
+    (rf/dispatch-sync [:github/get-repo--success ::result])
+    (is (= ::result (sut/get-repo @app-db)))))
 
 (deftest alerts
   (let [s (rf/subscribe [:github/alerts])]

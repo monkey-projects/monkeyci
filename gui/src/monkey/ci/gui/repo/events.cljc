@@ -1,5 +1,6 @@
 (ns monkey.ci.gui.repo.events
   (:require [monkey.ci.gui.alerts :as a]
+            [monkey.ci.gui.apis.github]
             [monkey.ci.gui.org.db :as cdb]
             [monkey.ci.gui.loader :as lo]
             [monkey.ci.gui.repo.db :as db]
@@ -29,11 +30,11 @@
 (rf/reg-event-fx
  :repo/load
  ;; Since repos are part of the org, this actually loads the org.
- (fn [{:keys [db]} [_ cust-id]]
+ (fn [{:keys [db]} [_ org-id]]
    (let [existing (cdb/org db)]
      (cond-> {:db (db/set-builds db nil)}
        (not existing)
-       (assoc :dispatch [:org/load cust-id])))))
+       (assoc :dispatch [:org/load org-id])))))
 
 (rf/reg-event-fx
  :builds/load
@@ -129,10 +130,10 @@
 (rf/reg-event-fx
  :repo/load+edit
  (fn [{:keys [db]} _]
-   (let [cust-id (r/org-id db)]
+   (let [org-id (r/org-id db)]
      {:dispatch [:secure-request
                  :get-org
-                 {:org-id cust-id}
+                 {:org-id org-id}
                  [:repo/load+edit--success]
                  [:repo/load+edit--failed]]
       :db (-> db
@@ -142,12 +143,13 @@
 (rf/reg-event-fx
  :repo/load+edit--success
  (fn [{:keys [db]} [_ resp]]
-   (let [repo-id (r/repo-id db)]
+   (let [repo-id (r/repo-id db)
+         match (->> (:body resp)
+                    :repos
+                    (filter (comp (partial = repo-id) :id))
+                    (first))]
      {:dispatch [:org/load--success resp]
-      :db (db/set-editing db (->> (:body resp)
-                                  :repos
-                                  (filter (comp (partial = repo-id) :id))
-                                  (first)))})))
+      :db (db/set-editing db (assoc match :new-github-id (str (:github-id match))))})))
 
 (rf/reg-event-db
  :repo/load+edit--failed
@@ -171,6 +173,11 @@
    (assoc-in db [db/editing :url] v)))
 
 (rf/reg-event-db
+ :repo/github-id-changed
+ (fn [db [_ v]]
+   (assoc-in db [db/editing :new-github-id] v)))
+
+(rf/reg-event-db
  :repo/label-add
  (fn [db _]
    (db/update-labels db (fnil conj []) {:name "New label" :value "New value"})))
@@ -190,6 +197,12 @@
  (fn [db [_ lbl new-name]]
    (db/update-label db lbl assoc :value new-name)))
 
+(defn- parse-github-id [repo]
+  (let [id (:new-github-id repo)]
+    (-> repo
+        (dissoc :new-github-id)
+        (assoc :github-id (some-> id u/parse-int)))))
+
 (rf/reg-event-fx
  :repo/save
  (fn [{:keys [db]} _]
@@ -202,7 +215,8 @@
                  (-> params
                      (assoc :repo (-> (db/editing db)
                                       (assoc :id (:repo-id params)
-                                             :org-id (:org-id params)))))
+                                             :org-id (:org-id params))
+                                      (parse-github-id))))
                  [:repo/save--success new?]
                  [:repo/save--failed new?]]
       :db (-> db
@@ -239,8 +253,8 @@
                [:repo/delete--failed]]
     :db (db/mark-deleting db)}))
 
-(defn- remove-repo [cust repo-id]
-  (update cust :repos (partial remove (comp (partial = repo-id) :id))))
+(defn- remove-repo [org repo-id]
+  (update org :repos (partial remove (comp (partial = repo-id) :id))))
 
 (rf/reg-event-fx
  :repo/delete--success
@@ -269,3 +283,22 @@
  :repo/new
  (fn [db _]
    (db/set-editing db {})))
+
+(rf/reg-event-fx
+ :repo/lookup-github-id
+ (fn [{:keys [db]} _]
+   {:dispatch [:github/get-repo
+               (:url (db/editing db))
+               [:repo/lookup-github-id--success]
+               [:repo/lookup-github-id--failed]]}))
+
+(rf/reg-event-db
+ :repo/lookup-github-id--success
+ (fn [db [_ {:keys [id]}]]
+   (db/update-editing db assoc :new-github-id (str id))))
+
+(rf/reg-event-fx
+ :repo/lookup-github-id--failed
+ (u/req-error-handler-db
+  (fn [db [_ err]]
+    (db/set-edit-alerts db [(a/repo-lookup-github-id-failed err)]))))

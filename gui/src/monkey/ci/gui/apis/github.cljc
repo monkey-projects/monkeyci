@@ -28,6 +28,12 @@
 (defn set-repos [db r]
   (assoc db repos r))
 
+(def repo ::repo)
+(def get-repo repo)
+
+(defn set-repo [db r]
+  (assoc db repo r))
+
 (def alerts ::alerts)
 
 (defn set-alerts [db a]
@@ -99,6 +105,37 @@
  (u/req-error-handler-db
   (fn [db [_ err]]
     (set-alerts db [(a/org-github-repos-failed err)]))))
+
+(defn parse-github-url
+  "Parses the github url, returns owner and repo"
+  [url]
+  (some->> url
+           (re-matches
+            #"^(https://|git@)github.com/([^/]+)/([^/\.]+)(\.git)?$")
+           (drop 2)
+           (zipmap [:owner :repo])))
+
+(rf/reg-event-fx
+ :github/get-repo
+ (fn [{:keys [db]} [_ github-url on-success on-failure]]
+   (if-let [r (parse-github-url github-url)]
+     {:http-xhrio (api-request
+                   db
+                   {:method :get
+                    :path (str "/repos/" (:owner r) "/" (:repo r))
+                    :on-success (or on-success [:github/get-repo--success])
+                    :on-failure (or on-failure [:github/get-repo--failed])})}
+     {:dispatch (into on-failure {:message "Invalid github url" :url github-url})})))
+
+(rf/reg-event-db
+ :github/get-repo--success
+ (fn [db [_ res]]
+   (set-repo db res)))
+
+(rf/reg-event-db
+ :github/get-repo--failed
+ (fn [db _]
+   (set-repo db nil)))
 
 (u/db-sub :github/alerts alerts)
 (u/db-sub :github/repos repos)

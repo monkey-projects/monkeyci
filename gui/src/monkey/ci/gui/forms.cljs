@@ -33,7 +33,9 @@
                            {:id id
                             :name id
                             :aria-describedby help-id
-                            :default-value value}
+                            (if (contains? extra-opts :on-change)
+                              :value
+                              :default-value) value}
                            extra-opts)]
      (when help-msg
        [:span.form-text
