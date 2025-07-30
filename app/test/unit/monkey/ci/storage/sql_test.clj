@@ -237,6 +237,13 @@
         (testing "can find by repo"
           (is (= [wh] (st/find-webhooks-for-repo s [(:id org) (:id repo)]))))
 
+        (testing "saves last invocation time on update"
+          (let [upd (assoc wh :last-inv-time (t/now))]
+            (is (sid/sid? (st/save-webhook s upd)))
+            (is (= (:last-inv-time upd)
+                   (-> (st/find-webhook s (:id upd))
+                       :last-inv-time)))))        
+
         (testing "can delete"
           (is (true? (st/delete-webhook s (:id wh))))
           (is (nil? (st/find-webhook s (:id wh)))))))))

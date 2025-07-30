@@ -210,23 +210,26 @@
 (defn- global-sid->cuid [sid]
   (nth sid 2))
 
-(defn- insert-webhook [conn wh]
-  (if-let [repo-id (select-repo-id-by-sid conn [(:org-id wh) (:repo-id wh)])]
-    (let [we (-> wh
-                 (dissoc :id :repo-id :org-id :secret-key)
-                 (assoc :cuid (:id wh)
-                        :repo-id repo-id
-                        :secret (:secret-key wh)))]
-      (ec/insert-webhook conn we))
-    (throw (ex-info "Repository does not exist" wh))))
+(defn- webhook->db [wh repo-id]
+  (-> wh
+      (dissoc :id :repo-id :org-id :secret-key)
+      (assoc :cuid (:id wh)
+             :repo-id repo-id
+             :secret (:secret-key wh))))
 
-(defn- update-webhook [conn wh existing])
+(defn- insert-webhook [conn wh repo-id]
+  (ec/insert-webhook conn (webhook->db wh repo-id)))
+
+(defn- update-webhook [conn wh existing repo-id]
+  (ec/update-webhook conn (merge existing (webhook->db wh repo-id))))
 
 (defn- upsert-webhook [conn wh]
   (spec/valid? :entity/webhook wh)
-  (if-let [existing (ec/select-webhook conn (ec/by-cuid (:id wh)))]
-    (update-webhook conn wh existing)
-    (insert-webhook conn wh)))
+  (if-let [repo-id (select-repo-id-by-sid conn [(:org-id wh) (:repo-id wh)])]
+    (if-let [existing (ec/select-webhook conn (ec/by-cuid (:id wh)))]
+      (update-webhook conn wh existing repo-id)
+      (insert-webhook conn wh repo-id))
+    (throw (ex-info "Repository does not exist" wh))))
 
 (defn- select-webhook [conn cuid]
   (-> (ewh/select-webhooks-as-entity conn (ewh/by-cuid cuid))
