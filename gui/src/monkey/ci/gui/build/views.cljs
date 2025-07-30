@@ -28,6 +28,11 @@
       [:h3 (cs/capitalize (name status))]
       [:p (get status-desc status "Unknown")]]]))
 
+(defn- git-ref [{:keys [ref commit-url]}]
+  (if commit-url
+    [:a {:href commit-url :target :_blank} [:span.me-1 ref] [co/icon :box-arrow-up-right]]
+    ref))
+
 (defn build-details
   "Displays the build details by looking it up in the list of repo builds."
   [{:keys [credits] :as build}]
@@ -39,11 +44,11 @@
      (item "Start time" (t/reformat (:start-time build)))
      (item [:span {:title "Total time that has passed between build start and end"} "Elapsed"]
            [:span {:title (t/reformat (:end-time build))} [co/build-elapsed build]])
-     (item "Git ref" (get-in build [:git :ref]))
+     (item "Git ref" [git-ref (:git build)])
      (when-let [msg (or (:message build) (get-in build [:script :message]))]
        (item "Message" msg))
      (when-let [msg (get-in build [:git :message])]
-       (item "Commite message" msg))]))
+       (item "Commit message" msg))]))
 
 (defn- credits-badge [{:keys [credits] :as b}]
   (when-not (u/running? b)

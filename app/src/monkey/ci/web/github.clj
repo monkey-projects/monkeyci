@@ -59,7 +59,8 @@
                         (assoc :url (if private ssh-url clone-url)
                                :main-branch (main-branch (:repository payload))
                                :ref (:ref payload)
-                               :commit-id commit-id))
+                               :commit-id commit-id
+                               :commit-url (get-in payload [:head-commit :url])))
                :changes (file-changes payload))
         (t/prepare-triggered-build rt))))
 

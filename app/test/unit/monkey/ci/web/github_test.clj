@@ -125,22 +125,27 @@
 
 (deftest create-build
   (testing "file changes"
-    (testing "adds file changes to build"
-      (h/with-memory-store s
-        (let [b (sut/create-build (-> (trt/test-runtime)
-                                      (trt/set-storage s)
-                                      (trt/set-encrypter (constantly "encrypted")))
-                                  {}
-                                  {:commits
-                                   [{:added ["new-file-1"]
-                                     :removed ["removed-file-1"]}
-                                    {:added ["new-file-2"]
-                                     :modified ["modified-file-1"]}]})]
+    (h/with-memory-store s
+      (let [b (sut/create-build (-> (trt/test-runtime)
+                                    (trt/set-storage s)
+                                    (trt/set-encrypter (constantly "encrypted")))
+                                {}
+                                {:commits
+                                 [{:added ["new-file-1"]
+                                   :removed ["removed-file-1"]}
+                                  {:added ["new-file-2"]
+                                   :modified ["modified-file-1"]}]
+                                 :head-commit
+                                 {:url "http://commit-url"}})]
+        (testing "adds file changes to build"
           (is (= {:added    #{"new-file-1"
                               "new-file-2"}
                   :removed  #{"removed-file-1"}
                   :modified #{"modified-file-1"}}
-                 (:changes b))))))))
+                 (:changes b))))
+
+        (testing "sets commit url"
+          (is (= "http://commit-url" (get-in b [:git :commit-url]))))))))
 
 (deftest create-webhook-build
   (h/with-memory-store s
