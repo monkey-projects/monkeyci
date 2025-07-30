@@ -85,7 +85,7 @@
      {:value (:label lf)
       :on-change (u/form-evt-handler [:labels/label-changed id or-idx and-idx])}]]
    [:div.col-auto "="]
-   [:div.col-6
+   [:div.col-5
     [:input.form-control.mb-1
      {:value (:value lf)
       :on-change (u/form-evt-handler [:labels/value-changed id or-idx and-idx])}]]
