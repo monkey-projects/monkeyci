@@ -116,6 +116,7 @@
              :type :button
              :data-bs-toggle :dropdown}
             [:span.ms-2 [co/icon :clipboard]]]
+           ;; TODO If we can determine the type from the repo url, don't show dropdown
            [copy-url-dropdown @e]]
           [:span.form-text {:id :id-help}
            "The unique webhook id, used to construct the url."]]

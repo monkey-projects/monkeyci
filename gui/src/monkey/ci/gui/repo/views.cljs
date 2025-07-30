@@ -229,18 +229,27 @@
       [:input.form-control
        {:id :github-id
         :name :github-id
-        :default-value (:github-id r)
+        :value (:new-github-id r)
         :read-only (not gh?)
         :disabled (not gh?)
-        :maxlength 20}]
-      [:button.btn.btn-primary.btn-icon
-       {:title "Stop watching this repo"
-        :type :button
-        :disabled (nil? (:github-id r))
-        :on-click (u/link-evt-handler [:repo/unwatch-github {:monkeyci/repo r}])}
-       [co/icon :eye-slash]]]
+        :maxlength 20
+        :on-change (u/form-evt-handler [:repo/github-id-changed])}]
+      (if (nil? (:github-id r))
+        [:button.btn.btn-icon
+         {:class :btn-primary
+          :title "Look up the Github id for this repo"
+          :type :button
+          :on-click (u/link-evt-handler [:repo/lookup-github-id {:monkeyci/repo r}])}
+         [co/icon :eye]]
+        ;; Only allow unwatching if the original repo had an id
+        [:button.btn.btn-icon
+         {:class :btn-danger
+          :title "Stop watching this repo"
+          :type :button
+          :on-click (u/link-evt-handler [:repo/unwatch-github {:monkeyci/repo r}])}
+         [co/icon :eye-slash]])]
      [:span.form-text {:id :github-id-help}
-      "The native Github Id, registered when watching this repo."]]))
+      "If you have installed the Github MonkeyCI app, the native id is used for watching the repo."]]))
 
 (defn- edit-form [close-btn]
   (let [e (rf/subscribe [:repo/editing])]

@@ -12,6 +12,8 @@
             [re-frame.core :as rf]
             [re-frame.db :refer [app-db]]))
 
+(rf/clear-subscription-cache!)
+
 (use-fixtures :each f/reset-db)
 
 (defn- test-repo-path!
@@ -229,7 +231,8 @@
   (rft/run-test-sync
    (let [[_ repo-id] (test-repo-path!)
          repo {:id repo-id
-               :name "test repo"}
+               :name "test repo"
+               :github-id 1234}
          org {:repos [repo]}]
 
      (rf/dispatch [:repo/load+edit--success {:body org}])
@@ -238,7 +241,13 @@
        (is (= org (lo/get-value @app-db cdb/org))))
      
      (testing "sets repo for editing"
-       (is (= repo (db/editing @app-db)))))))
+       (is (= repo (-> (db/editing @app-db)
+                       (select-keys (keys repo))))))
+
+     (testing "sets new github id"
+       (is (= "1234" (-> @app-db
+                         (db/editing)
+                         :new-github-id)))))))
 
 (deftest repo-load+edit--failed
   (testing "sets error alert"
@@ -296,6 +305,11 @@
     (rf/dispatch-sync [:repo/url-changed "new url"])
     (is (= "new url" (:url (db/editing @app-db))))))
 
+(deftest repo-github-id-changed
+  (testing "updates editing github id"
+    (rf/dispatch-sync [:repo/github-id-changed "1234"])
+    (is (= "1234" (:new-github-id (db/editing @app-db))))))
+
 (deftest repo-save
   (rft/run-test-sync
    (let [c (h/catch-fx :martian.re-frame/request)
@@ -304,7 +318,8 @@
 
      (testing "existing repo"
        (swap! app-db #(-> %
-                          (db/set-editing {:name "updated repo name"})
+                          (db/set-editing {:name "updated repo name"
+                                           :new-github-id "5678"})
                           (db/set-edit-alerts [{:type :warning}])))
 
        (is (not-empty (r/path-params (r/current @app-db))))
@@ -315,15 +330,21 @@
          (is (= 1 (count @c)))
          (is (= :update-repo (-> @c first (nth 2)))))
 
-       (testing "adds org and repo id to body"
-         (let [args (-> @c first (nth 3) :repo)]
-           (is (map? args))
-           (is (= org-id (:org-id args)))
-           (is (= repo-id (:id args)))))
+       (let [args (-> @c first (nth 3))]
+         (is (map? args))
 
-       (testing "adds org and repo id to params"
-         (let [args (-> @c first (nth 3))]
-           (is (map? args))
+         (testing "body"
+           (let [body (:repo args)]
+             (is (map? body))
+             
+             (testing "adds org and repo id to body"
+               (is (= org-id (:org-id body)))
+               (is (= repo-id (:id body))))
+             
+             (testing "sets github id"
+               (is (= 5678 (:github-id body))))))
+
+         (testing "adds org and repo id to params"
            (is (= org-id (:org-id args)))
            (is (= repo-id (:repo-id args)))))
 
@@ -473,3 +494,23 @@
     (is (some? (reset! app-db (db/set-editing {} {:id ::editing-repo}))))
     (rf/dispatch-sync [:repo/new])
     (is (empty? (db/editing @app-db)))))
+
+(deftest repo-lookup-github-id
+  (rft/run-test-sync
+   (let [e (h/catch-fx :http-xhrio)]
+     (testing "fetches github repo"
+       (rf/dispatch [:repo/url-changed "https://github.com/test-org/test-repo"])
+       (rf/dispatch [:repo/lookup-github-id])
+       (is (= 1 (count @e)))))))
+
+(deftest repo-lookup-github-id--success
+  (testing "sets editing id in repo"
+    (rf/dispatch-sync [:repo/lookup-github-id--success {:id 3456}])
+    (is (= "3456" (:new-github-id (db/editing @app-db))))))
+
+(deftest repo-lookup-github-id--failed
+  (testing "sets edit alert"
+    (rf/dispatch-sync [:repo/lookup-github-id--failed {:status 500
+                                                       :body {:message "test error"}}])
+    (is (= [:danger] (->> (db/edit-alerts @app-db)
+                          (map :type))))))

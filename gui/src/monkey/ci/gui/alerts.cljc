@@ -73,6 +73,9 @@
 (def repo-unwatch-failed
   (error-msg "Failed to unwatch repo"))
 
+(def repo-lookup-github-id-failed
+  (error-msg "Failed to retrieve repo details from Github"))
+
 (def builds-load-failed
   (error-msg "Failed to load builds"))
 

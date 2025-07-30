@@ -20,6 +20,7 @@
       (writeTimeout 10 TimeUnit/SECONDS)
       ;; Retry, this may fix the error
       (retryOnConnectionFailure true)
+      ;; If not fixed, check if overriding the connection pool may work
       (build)))
 
 (defn make-client [url access-key secret]
