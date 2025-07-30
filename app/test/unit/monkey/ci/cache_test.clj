@@ -49,15 +49,22 @@
         {:keys [enter] :as i} (sut/restore-interceptor ::job-ctx)]
     (is (keyword? (:name i)))
     
-    (testing "`enter` restores caches for job using repository"
-      (let [r (-> {::job-ctx {:job job
+    (testing "`enter`"
+      (testing "restores caches for job using repository"
+        (let [r (-> {::job-ctx {:job job
+                                :checkout-dir "/tmp"
+                                :cache cache}}
+                    (enter)
+                    (sut/get-restored)
+                    first)]
+          (is (= "/tmp/test.txt" (:dest r)))
+          (is (cs/ends-with? (:src r) "test/test-cache.tgz"))))
+
+      (testing "should not fail when restore fails"
+        (let [ctx {::job-ctx {:job job
                               :checkout-dir "/tmp"
-                              :cache cache}}
-                  (enter)
-                  (sut/get-restored)
-                  first)]
-        (is (= "/tmp/test.txt" (:dest r)))
-        (is (cs/ends-with? (:src r) "test/test-cache.tgz"))))))
+                              :cache "invalid"}}]
+          (is (= ctx (enter ctx))))))))
 
 (deftest save-interceptor
   (let [blob (tb/test-store)
@@ -69,14 +76,21 @@
         {:keys [enter] :as i} (sut/save-interceptor ::job-ctx)]
     (is (keyword? (:name i)))
     
-    (testing "`enter` saves caches for job using repository"
-      (is (= 1 
-             (-> {::job-ctx {:job job
-                             :cache cache
-                             :checkout-dir "/tmp"}}
-                 (enter)
-                 (sut/get-saved)
-                 (count))))
-      (is (= "/tmp/test/path" (-> (tb/stored blob)
-                                  (get "test/test-cache.tgz")
-                                  :file))))))
+    (testing "`enter`"
+      (testing "saves caches for job using repository"
+        (is (= 1 
+               (-> {::job-ctx {:job job
+                               :cache cache
+                               :checkout-dir "/tmp"}}
+                   (enter)
+                   (sut/get-saved)
+                   (count))))
+        (is (= "/tmp/test/path" (-> (tb/stored blob)
+                                    (get "test/test-cache.tgz")
+                                    :file))))
+
+      (testing "caches should not be cause for failure"
+        (let [ctx {::key ::value
+                   ::job-ctx {:job job
+                              :cache "invalid"}}]
+          (is (= ctx (enter ctx))))))))

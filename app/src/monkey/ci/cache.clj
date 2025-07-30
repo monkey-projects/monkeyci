@@ -70,12 +70,17 @@
   [get-job-ctx]
   {:name ::restore-caches
    :enter (fn [ctx]
-            (->> (get-job-ctx ctx)
-                 (restore-caches)
-                 ;; Note that this will block the event processing while the operation continues
-                 ;; so we may consider switching to async handling.
-                 (deref)
-                 (set-restored ctx)))})
+            (try
+              (->> (get-job-ctx ctx)
+                   (restore-caches)
+                   ;; Note that this will block the event processing while the operation continues
+                   ;; so we may consider switching to async handling.
+                   (deref)
+                  (set-restored ctx))
+              (catch Exception ex
+                ;; Caches should not cause builds to fail, so just log any errors
+                (log/warn "Failed to restore cache" ex)
+                ctx)))})
 
 (def get-saved ::saved)
 
@@ -89,9 +94,15 @@
   [get-job-ctx]
   {:name ::save-caches
    :enter (fn [ctx]
-            (->> (get-job-ctx ctx)
-                 (save-caches)
-                 ;; Note that this will block the event processing while the operation continues
-                 ;; so we may consider switching to async handling.
-                 (deref)
-                 (set-saved ctx)))})
+            (try
+              (->> (get-job-ctx ctx)
+                   (save-caches)
+                   ;; Note that this will block the event processing while the operation continues
+                   ;; so we may consider switching to async handling.
+                   (deref)
+                   (set-saved ctx))
+              (catch Exception ex
+                ;; Caches should not be cause for failure, so if saving the cache
+                ;; fails, just continue but log it.
+                (log/warn "Failed to save cache" ex)
+                ctx)))})
