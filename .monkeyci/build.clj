@@ -1,7 +1,7 @@
 ;; Build script for Monkey-ci itself
 (ns build
-  (:require [amazonica.aws.s3 :as s3]
-            [babashka.fs :as fs]
+  (:require [babashka.fs :as fs]
+            [clojure.java.io :as io]
             [clojure.string :as cs]
             [medley.core :as mc]
             [monkey.ci.build
@@ -12,7 +12,8 @@
             [monkey.ci.plugin
              [github :as gh]
              [kaniko :as kaniko]
-             [pushover :as po]]))
+             [pushover :as po]])
+  (:import [io.minio MinioClient PutObjectArgs]))
 
 (def tag-regex #"^refs/tags/(\d+\.\d+\.\d+(\.\d+)?$)")
 
@@ -129,6 +130,28 @@
                   (m/save-artifacts uberjar-artifact))
         v (m/env {"MONKEYCI_VERSION" v})))))
 
+(defn make-s3-client [url access-key secret]
+  (.. (MinioClient/builder)
+      (endpoint url)
+      (credentials access-key secret)
+      (build)))
+
+(defn put-object-args [bucket dest stream size]
+  (.. (PutObjectArgs/builder)
+      (bucket bucket)
+      (object dest)
+      (stream stream size -1)
+      ;; Make jar publicly available
+      (headers {"x-amz-acl" "public-read"})
+      (build)))
+
+(defn put-s3-object
+  "Uploads the file `f` to given bucket destination"
+  [client bucket dest f]
+  (with-open [s (io/input-stream f)]
+    (let [args (put-object-args bucket dest s (fs/size f))]
+      (.putObject client args))))
+
 (defn upload-uberjar
   "Job that uploads the uberjar to configured s3 bucket.  From there it 
    will be downloaded by Ansible scripts."
@@ -141,13 +164,12 @@
                  url (get params "s3-url")
                  access-key (get params "s3-access-key")
                  secret-key (get params "s3-secret-key")
+                 client (make-s3-client url access-key secret-key)
                  bucket (get params "s3-bucket")]
-             (if (some? (s3/put-object {:endpoint url
-                                        :access-key access-key
-                                        :secret-key secret-key}
-                                       {:bucket-name bucket
-                                        :key (format "monkeyci/%s.jar" (image-version ctx))
-                                        :file (m/in-work ctx (:path uberjar-artifact))}))
+             (if (some? (put-s3-object client
+                                       bucket
+                                       (format "monkeyci/%s.jar" (image-version ctx))
+                                       (m/in-work ctx (:path uberjar-artifact))))
                m/success
                m/failure))))
         (m/depends-on ["app-uberjar"])

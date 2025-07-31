@@ -1,6 +1,5 @@
 (ns build-test
   (:require [clojure.test :refer [deftest testing is]]
-            [amazonica.aws.s3 :as s3]
             [babashka.fs :as fs]
             [build :as sut]
             [monkey.ci.build
@@ -108,24 +107,26 @@
                              "s3-bucket" "test-bucket"
                              "s3-access-key" "test-access"
                              "s3-secret-key" "test-secret"}
-        (let [inv (atom nil)]
-          (with-redefs [s3/put-object (fn [opts dest]
-                                        (reset! inv {:opts opts
-                                                     :dest dest}))]
+        (let [inv (atom nil)
+              client (atom nil)]
+          (with-redefs [sut/make-s3-client (fn [& args]
+                                             (reset! client args))
+                        sut/put-s3-object (fn [client & args]
+                                            (reset! inv args))]
             (testing "puts object to s3 bucket using params"
               (is (bc/success? (mt/execute-job job (-> mt/test-ctx
                                                        (mt/with-git-ref "refs/tags/1.2.3")))))
               (is (some? @inv))
-              (is (= {:endpoint "http://test-url"
-                      :access-key "test-access"
-                      :secret-key "test-secret"}
-                     (:opts @inv))))
+              (is (= ["http://test-url"
+                      "test-access"
+                      "test-secret"]
+                     @client)))
 
             (testing "adds version to file"
-              (is (= {:bucket-name "test-bucket"
-                      :key "monkeyci/release-1.2.3.jar"
-                      :file "app/target/monkeyci-standalone.jar"}
-                     (:dest @inv))))))))))
+              (is (= ["test-bucket"
+                      "monkeyci/release-1.2.3.jar"
+                      "app/target/monkeyci-standalone.jar"]
+                     @inv)))))))))
 
 (deftest jobs
   (mt/with-build-params {}

@@ -219,7 +219,7 @@
   build-params)
 
 (defn bash
-  "Creates an action job that executes given command in a bash script"
+  "Creates an action job that executes given commands in a bash script" 
   [id & cmds]
   (action-job id (apply bs/bash cmds)))
 
