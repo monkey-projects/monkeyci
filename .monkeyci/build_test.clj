@@ -137,6 +137,19 @@
                 (sut/prepare-install-script))]
       (is (cs/includes? r "VERSION=0.16.4")))))
 
+(deftest upload-install-script
+  (testing "`nil` if no release"
+    (is (nil? (sut/upload-install-script mt/test-ctx)))
+    (is (nil? (-> mt/test-ctx
+                  (mt/with-git-ref "refs/heads/main")
+                  (mt/with-changes (mt/modified ["app/deps.edn"]))
+                  (sut/upload-install-script)))))
+
+  (testing "action job on release"
+    (is (b/action-job? (-> mt/test-ctx
+                           (mt/with-git-ref "refs/tags/0.1.2")
+                           (sut/upload-install-script))))))
+
 (deftest jobs
   (mt/with-build-params {}
     (testing "with release tag"
