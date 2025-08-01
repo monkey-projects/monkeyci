@@ -141,16 +141,32 @@
       (bucket bucket)
       (object dest)
       (stream stream size -1)
-      ;; Make jar publicly available
+      ;; Make file publicly available
       (headers {"x-amz-acl" "public-read"})
       (build)))
 
 (defn put-s3-object
   "Uploads the file `f` to given bucket destination"
-  [client bucket dest f]
-  (with-open [s (io/input-stream f)]
-    (let [args (put-object-args bucket dest s (fs/size f))]
+  [client bucket dest stream size]
+  (with-open [s stream]
+    (let [args (put-object-args bucket dest s size)]
       (.putObject client args))))
+
+(defn put-s3-file
+  "Uploads the file `f` to given bucket destination"
+  [client bucket dest f]
+  (put-s3-object client bucket dest (io/input-stream f) (fs/size f)))
+
+(defn- upload-to-bucket [ctx do-put]
+  (let [params (api/build-params ctx)
+        url (get params "s3-url")
+        access-key (get params "s3-access-key")
+        secret-key (get params "s3-secret-key")
+        client (make-s3-client url access-key secret-key)
+        bucket (get params "s3-bucket")]
+    (if (some? (do-put client bucket))
+      m/success
+      m/failure)))
 
 (defn upload-uberjar
   "Job that uploads the uberjar to configured s3 bucket.  From there it 
@@ -160,20 +176,34 @@
     (-> (m/action-job
          "upload-uberjar"
          (fn [ctx]
-           (let [params (api/build-params ctx)
-                 url (get params "s3-url")
-                 access-key (get params "s3-access-key")
-                 secret-key (get params "s3-secret-key")
-                 client (make-s3-client url access-key secret-key)
-                 bucket (get params "s3-bucket")]
-             (if (some? (put-s3-object client
-                                       bucket
-                                       (format "monkeyci/%s.jar" (image-version ctx))
-                                       (m/in-work ctx (:path uberjar-artifact))))
-               m/success
-               m/failure))))
+           (upload-to-bucket
+            ctx
+            #(put-s3-file %1 %2
+                          (format "monkeyci/%s.jar" (image-version ctx))
+                          (m/in-work ctx (:path uberjar-artifact))))))
         (m/depends-on ["app-uberjar"])
         (m/restore-artifacts [(as-dir uberjar-artifact)]))))
+
+(defn prepare-install-script
+  "Prepares the cli install script by replacing the version.  Returns the
+   script contents."
+  [ctx]
+  (cs/replace (slurp (m/in-work ctx "app/dev-resources/install-cli.sh"))
+              "{{version}}" (tag-version ctx)))
+
+(defn upload-install-script [ctx]
+  (when (publish-app? ctx)
+    (-> (m/action-job
+         "upload-install-script"
+         (fn [ctx]
+           (let [script (prepare-install-script ctx)]
+             (upload-to-bucket
+              ctx
+              #(put-s3-object %1 %2
+                              "install-cli.sh"
+                              (java.io.ByteArrayInputStream. (.getBytes script))
+                              (count script))))))
+        (m/depends-on ["upload-uberjar"]))))
 
 (def img-base "rg.fr-par.scw.cloud/monkeyci")
 (def app-img (str img-base "/monkeyci-api"))
@@ -337,6 +367,7 @@
            
    app-uberjar
    upload-uberjar
+   upload-install-script
    publish-app
    publish-test-lib
    github-release

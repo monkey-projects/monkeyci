@@ -61,7 +61,7 @@
            (build))
        (.getObject client)))
 
-(defn- headers->map [h]
+(defn headers->map [h]
   (->> h
        (map (fn [p]
               [(.getFirst p) (.getSecond p)]))

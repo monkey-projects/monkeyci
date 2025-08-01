@@ -153,7 +153,7 @@
                          (rur/status 204)
                          (rur/response res)))]
       (->response (if (md/deferred? res)
-                    @res ; Deref otherwise cors middleware fails
+                    @res       ; Deref otherwise cors middleware fails
                     res)))
     (rur/not-found nil)))
 

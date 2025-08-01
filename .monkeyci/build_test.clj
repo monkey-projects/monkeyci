@@ -2,6 +2,7 @@
   (:require [clojure.test :refer [deftest testing is]]
             [babashka.fs :as fs]
             [build :as sut]
+            [clojure.string :as cs]
             [monkey.ci.build
              [core :as bc]
              [v2 :as b]]
@@ -111,8 +112,8 @@
               client (atom nil)]
           (with-redefs [sut/make-s3-client (fn [& args]
                                              (reset! client args))
-                        sut/put-s3-object (fn [client & args]
-                                            (reset! inv args))]
+                        sut/put-s3-file (fn [client & args]
+                                          (reset! inv args))]
             (testing "puts object to s3 bucket using params"
               (is (bc/success? (mt/execute-job job (-> mt/test-ctx
                                                        (mt/with-git-ref "refs/tags/1.2.3")))))
@@ -127,6 +128,14 @@
                       "monkeyci/release-1.2.3.jar"
                       "app/target/monkeyci-standalone.jar"]
                      @inv)))))))))
+
+(deftest prepare-install-script
+  (testing "reads install script and replaces version"
+    (let [r (-> mt/test-ctx
+                (mt/with-git-ref "refs/tags/0.16.4")
+                (assoc-in [:job :work-dir] "..")
+                (sut/prepare-install-script))]
+      (is (cs/includes? r "VERSION=0.16.4")))))
 
 (deftest jobs
   (mt/with-build-params {}

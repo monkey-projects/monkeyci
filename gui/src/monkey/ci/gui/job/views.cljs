@@ -57,8 +57,9 @@
        (let [msg (or (:message job) (get-in job [:result :message]))]
          (when-not (empty? msg)
            [:div.row
-            [:div.col-2 "Message: "]
-            [:div.col-10.text-truncate msg]]))]]))
+            [:div.col-2 "Message:"]
+            ;; TODO Truncate, but allow user to expand
+            [:div.col-10 msg]]))]]))
   ([]
    (job-details @(rf/subscribe [:job/current]))))
 
@@ -68,7 +69,6 @@
           last))
 
 (defn- show-log [lbl contents]
-  (println "Showing log:" contents)
   (->>
    (concat
     [(co/->html (co/colored (str lbl ":") 95))

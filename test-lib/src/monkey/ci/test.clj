@@ -83,6 +83,11 @@
   [ctx]
   (with-checkout-dir ctx (str (fs/create-temp-dir))))
 
+(defn with-job-dir
+  "Sets the given directory as the job work dir in the context"
+  [ctx dir]
+  (assoc-in ctx [:job :work-dir] dir))
+
 (defn with-build-id
   "Sets build id in the context"
   [ctx id]
