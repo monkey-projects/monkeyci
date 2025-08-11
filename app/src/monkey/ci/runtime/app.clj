@@ -18,7 +18,8 @@
              [jms :as emj]]
             [monkey.ci.metrics
              [core :as m]
-             [events :as me]]
+             [events :as me]
+             [otlp :as mo]]
             [monkey.ci.reporting.print]
             [monkey.ci.runners.oci :as ro]
             [monkey.ci.runtime.common :as rc]
@@ -234,6 +235,24 @@
 (defn- new-server-runner [config]
   (make-server-runner config))
 
+(defrecord OtlpClient [config metrics]
+  co/Lifecycle
+  (start [this]
+    (log/info "Pushing metrics to OpenTelemetry endpoint:" (:url config))
+    (assoc this :client (mo/make-client (:url config)
+                                        (:registry metrics)
+                                        config)))
+
+  (stop [{:keys [client] :as this}]
+    (when client
+      (.close client))
+    (dissoc this :client)))
+
+(defn new-otlp-client [{:keys [otlp]}]
+  (if (not-empty otlp)
+    (->OtlpClient otlp nil)
+    {}))
+
 (defn make-server-system
   "Creates a component system that can be used to start an application server."
   [config]
@@ -279,7 +298,10 @@
    :update-routes (co/using
                    (new-update-routes)
                    [:mailman :update-bus])
-   :update-bus (mb/event-bus)))
+   :update-bus (mb/event-bus)
+   :otlp (co/using
+          (new-otlp-client config)
+          [:metrics])))
 
 (defn with-server-system [config f]
   (rc/with-system (make-server-system config) f))

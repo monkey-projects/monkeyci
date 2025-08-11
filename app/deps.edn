@@ -42,6 +42,7 @@
         commons-io/commons-io {:mvn/version "2.19.0"}
         io.minio/minio {:mvn/version "8.5.17"}
         io.prometheus/prometheus-metrics-core {:mvn/version "1.3.10"}
+        io.prometheus/prometheus-metrics-exporter-opentelemetry {:mvn/version "1.3.10"}
         io.prometheus/prometheus-metrics-exporter-pushgateway {:mvn/version "1.3.10"}
         io.prometheus/prometheus-metrics-instrumentation-jvm {:mvn/version "1.3.10"}
         io.prometheus/prometheus-metrics-tracer-initializer {:mvn/version "1.3.10"}

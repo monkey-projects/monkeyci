@@ -1,7 +1,7 @@
-(ns monkey.ci.prometheus-test
+(ns monkey.ci.metrics.prometheus-test
   (:require [clojure.test :refer [deftest testing is]]
             [clojure.string :as cs]
-            [monkey.ci.prometheus :as sut]))
+            [monkey.ci.metrics.prometheus :as sut]))
 
 (deftest make-registry
   (testing "creates a new Prometheus registry"

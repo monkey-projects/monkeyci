@@ -10,7 +10,6 @@
              [blob :as blob]
              [build :as b]
              [git :as git]
-             [prometheus :as prom]
              [protocols :as p]
              [utils :as u]
              [workspace :as ws]]
@@ -20,7 +19,9 @@
             [monkey.ci.events.mailman
              [interceptors :as emi]
              [jms :as emj]]
-            [monkey.ci.metrics.core :as m]
+            [monkey.ci.metrics
+             [core :as m]
+             [prometheus :as prom]]
             [monkey.ci.runners.controller :as rco]
             [monkey.ci.runtime.common :as rc]
             [monkey.mailman.core :as mmc]))
