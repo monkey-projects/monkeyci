@@ -60,8 +60,8 @@
           [:p "Login using your existing account from one of these tools."]
           [login-form]
           [:p.mt-3.small "By logging in or signing up, you are agreeing to our "
-           [:a {:href (t/site-url "/terms-of-use")} "terms of use"] " and our "
-           [:a {:href (t/site-url "/privacy-policy")} "privacy policy."]]]]]]]]]
+           [:a {:href (t/site-url "/terms-of-use") :target :_blank} "terms of use"] " and our "
+           [:a {:href (t/site-url "/privacy-policy") :target :_blank} "privacy policy."]]]]]]]]]
    [l/footer]])
 
 (defn- callback-page [req evt]
