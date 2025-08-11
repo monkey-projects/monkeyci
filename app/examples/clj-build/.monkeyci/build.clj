@@ -1,12 +1,10 @@
 (ns build
-  (:require [monkey.ci.build.core :as c]))
+  (:require [monkey.ci.api :as m]))
 
 (def run-tests
-  {:name "unit-tests"
-   :container/image "docker.io/clojure:tools-deps-bookworm-slim"
-   :script ["clojure -Sdeps '{:mvn/local-repo \"m2\"}' -X:test"]
-   :caches [{:id "maven-cache"
-             :path "m2"}]})
+  (-> (m/container-job "unit-tests")
+      (m/image "docker.io/clojure:tools-deps-bookworm-slim")
+      (m/script ["clojure -Sdeps '{:mvn/local-repo \"m2\"}' -X:test"])
+      (m/caches (m/cache "maven-cache" "m2"))))
 
-(c/defpipeline test-all
-  [run-tests])
+[run-tests]
