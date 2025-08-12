@@ -192,7 +192,7 @@
               "{{version}}" (tag-version ctx)))
 
 (defn upload-install-script [ctx]
-  (when (publish-app? ctx)
+  (when (release? ctx)
     (-> (m/action-job
          "upload-install-script"
          (fn [ctx]

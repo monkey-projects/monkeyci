@@ -4,7 +4,7 @@
             [com.stuartsierra.component :as co]
             [medley.core :as mc]
             [monkey.ci.common.preds :as cp]
-            [monkey.ci.prometheus :as prom]
+            [monkey.ci.metrics.prometheus :as prom]
             [taoensso.telemere :as t]))
 
 (defn make-registry []

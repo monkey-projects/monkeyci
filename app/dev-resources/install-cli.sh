@@ -11,7 +11,7 @@ wget -O $DEST_DIR/monkeyci.jar $SRC_URL
 echo "Installing executable script..."
 cat << 'EOF' > $BIN_DIR/monkeyci
 #!/bin/sh
-java -jar $HOME/.monkeyci/monkeyci.jar $*
+java --sun-misc-unsafe-memory-access=allow -jar $HOME/.monkeyci/monkeyci.jar $*
 EOF
 chmod a+x $BIN_DIR/monkeyci
 echo "Installation successful, run 'monkeyci --help' for more."

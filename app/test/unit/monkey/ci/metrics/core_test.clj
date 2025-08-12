@@ -3,8 +3,9 @@
              [string :as cs]
              [test :refer [deftest is testing]]]
             [com.stuartsierra.component :as co]
-            [monkey.ci.metrics.core :as sut]
-            [monkey.ci.prometheus :as prom]
+            [monkey.ci.metrics
+             [core :as sut]
+             [prometheus :as prom]]
             [monkey.ci.test.helpers :as h]
             [taoensso.telemere :as t]))
 

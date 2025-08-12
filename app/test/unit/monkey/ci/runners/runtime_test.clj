@@ -5,8 +5,9 @@
             [manifold.stream :as ms]
             [monkey.ci.containers.oci :as c-oci]
             [monkey.ci.events.mailman :as em]
-            [monkey.ci.metrics.core :as m]
-            [monkey.ci.prometheus :as prom]
+            [monkey.ci.metrics
+             [core :as m]
+             [prometheus :as prom]]
             [monkey.ci.runners.runtime :as sut]
             [monkey.ci.spec.runner :as sr]
             [monkey.ci.test

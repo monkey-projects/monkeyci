@@ -1,8 +1,9 @@
 (ns monkey.ci.metrics.events-test
   (:require [clojure.string :as cs]
             [clojure.test :refer [deftest testing is]]
-            [monkey.ci.metrics.events :as sut]
-            [monkey.ci.prometheus :as prom]
+            [monkey.ci.metrics
+             [events :as sut]
+             [prometheus :as prom]]
             [monkey.mailman.core :as mmc]))
 
 (deftest evt-counter
