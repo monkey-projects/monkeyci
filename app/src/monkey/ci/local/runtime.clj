@@ -18,7 +18,8 @@
             [monkey.ci.events.mailman :as em]
             [monkey.ci.local
              [config :as lc]
-             [events :as le]]
+             [events :as le]
+             [print :as lp]]
             [monkey.ci.runners.runtime :as rr]
             [monkey.ci.runtime.common :as rc]
             [monkey.mailman.core :as mmc]))
@@ -35,6 +36,11 @@
             (-> (:config c)
                 (lc/set-api (:api-config c))
                 (le/make-routes (:mailman c))))]
+    (em/map->RouteComponent {:config conf :make-routes make-routes})))
+
+(defn- new-print-routes [conf]
+  (letfn [(make-routes [_]
+            (lp/make-routes {:printer lp/console-printer}))]
     (em/map->RouteComponent {:config conf :make-routes make-routes})))
 
 (defn- new-podman-routes [conf]
@@ -113,6 +119,9 @@
    :routes       (co/using
                   (new-routes conf)
                   [:mailman :api-config])
+   :print-routes (co/using
+                  (new-print-routes conf)
+                  [:mailman])
    :podman       (co/using
                   (new-podman-routes conf)
                   [:mailman :artifacts :cache :workspace :build])
