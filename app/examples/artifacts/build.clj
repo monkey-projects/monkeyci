@@ -1,36 +1,43 @@
 (ns artifacts.build
   "Example script to demonstrate the use of caches"
   (:require [babashka.fs :as fs]
-            [monkey.ci.build
-             [core :as bc]
-             [shell :as s]]))
+            [monkey.ci.api :as m]))
 
 (def artifact-file "artifact.txt")
 
-(def create-artifact
-  {:name "create-artifact"
-   :action (fn [ctx]
-             (spit (s/in-work ctx artifact-file) "This is a test artifact"))
-   :save-artifacts [{:id "example-artifact"
-                     :path artifact-file}]})
+(def artifact
+  (m/artifact "example-artifact" artifact-file))
 
-(defn cleanup [ctx]
-  (fs/delete-if-exists (s/in-work ctx artifact-file))
-  bc/success)
+(def create-artifact
+  (-> (m/action-job
+       "create-artifact"
+       (fn [ctx]
+         (spit (m/in-work ctx artifact-file) "This is a test artifact")))
+      (m/save-artfiacts artifact)))
 
 (def use-artifact
-  {:name "use-artifact"
-   :action (fn [ctx]
-             (let [f (s/in-work ctx artifact-file)]
-               (if (fs/exists? f)
-                 (do
-                   (slurp f)
-                   bc/success)
-                 (assoc bc/failure :message "Artifact file not found"))))
-   :restore-artifacts [{:id "example-artifact"
-                        :path artifact-file}]})
+  (-> (m/action-job
+       "use-artifact"
+       (fn [ctx]
+         (let [f (m/in-work ctx artifact-file)]
+           (if (fs/exists? f)
+             (do
+               (slurp f)
+               m/success)
+             (assoc m/failure :message "Artifact file not found")))))
+      (m/restore-artifats (m/artifact artifact))
+      (m/depends-on "create-artifact")))
 
-(bc/defpipeline artifact-build
-  [create-artifact
-   cleanup
-   use-artifact])
+(def cleanup
+  (-> (m/action-job
+       "cleanup"
+       (fn [ctx]
+         (fs/delete-if-exists (m/in-work ctx artifact-file))
+         m/success))
+      (m/depends-on "use-artifact")))
+
+;; Order in which you define them here does not matter, it's the dependencies
+;; that determine execution order.
+[create-artifact
+ cleanup
+ use-artifact]

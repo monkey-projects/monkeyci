@@ -1,9 +1,12 @@
 ;; Basic Clojure build script
-(require '[monkey.ci.build.core :as core])
-(require '[monkey.ci.build.shell :as shell])
+(ns build
+  (:require [monkey.ci.api :as m]))
 
-;; Pipeline with a single step that just prints a message to stdout
-(core/pipeline
- {:name "test pipeline"
-  :steps [(shell/bash "echo \"Hi, I'm a simple build script!\"")
-          (shell/bash "echo" "And I'm another part of that script")]})
+;; Jobs that just print messages to stdout
+[(m/action-job
+  "first"
+  (m/bash "echo \"Hi, I'm a simple build script!\""))
+ (m/action-job
+  "second"
+  (m/bash "echo" "And I'm another part of that script"))]
+

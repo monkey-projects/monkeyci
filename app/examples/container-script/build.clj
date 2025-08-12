@@ -1,6 +1,6 @@
 (ns build
   ;; Basic build script that uses Docker
-  (:require [monkey.ci.build.v2 :as m]))
+  (:require [monkey.ci.api :as m]))
 
 [(-> (m/container-job "first-container")
      (m/image "debian:latest")
