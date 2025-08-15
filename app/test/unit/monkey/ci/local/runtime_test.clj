@@ -53,6 +53,9 @@
       (testing "has mailman routes"
         (is (some? (:routes sys))))
 
+      (testing "has print routes"
+        (is (some? (:print-routes sys))))
+
       (testing "has podman routes"
         (is (some? (:podman sys))))
 

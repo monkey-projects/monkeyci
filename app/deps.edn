@@ -109,7 +109,8 @@
   
   :run
   ;; clj -M:run
-  {:main-opts ["-m" "monkey.ci.core"]}
+  {:main-opts ["-m" "monkey.ci.core"]
+   :jvm-opts ["--sun-misc-unsafe-memory-access=allow"]}
 
   :dispatcher
   ;; clj -M:dispatcher
