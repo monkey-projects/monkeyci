@@ -34,6 +34,7 @@
   (h/with-tmp-dir dir
     (let [sys (-> {}
                   (lc/set-work-dir dir)
+                  (lc/set-build {:dek ::test-dek})
                   (sut/make-system))]
       (testing "has mailman"
         (is (some? (:mailman sys))))
@@ -66,7 +67,12 @@
         (is (some? (:event-pipe sys))))
 
       (testing "when container build"
-        (testing "has workspace")))))
+        (testing "has workspace"))
+
+      (testing "has key decrypter"
+        (let [kd (:key-decrypter sys)]
+          (is (fn? kd))
+          (is (= ::test-dek @(kd ::enc-key ::test-sid))))))))
 
 (deftest event-pipe
   (let [broker (em/make-component {:type :manifold})
