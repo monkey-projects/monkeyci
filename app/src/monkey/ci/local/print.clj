@@ -1,10 +1,16 @@
 (ns monkey.ci.local.print
   "Event handlers to print build progress to console"
-  (:require [java-time.api :as jt]
+  (:require [clansi :as cl]
+            [clojure
+             [string :as cs]
+             [walk :as cw]]
+            [java-time.api :as jt]
             [manifold.stream :as ms]
             [monkey.ci
              [console :as co]
-             [version :as v]]))
+             [jobs :as j]
+             [version :as v]]
+            [monkey.ci.build.core :as bc]))
 
 (def nil-printer (constantly nil))
 
@@ -15,46 +21,82 @@
     (ms/put! s msg)
     nil))
 
+(def time-format (jt/formatter "yyyy-MM-dd HH:mm:ss.SSS"))
+
+(defn- apply-styles [msg]
+  (letfn [(style [x]
+            (if (seqable? x)
+              (let [[styles m] x]
+                (if (and (seqable? styles) (every? keyword? styles) (string? m))
+                  (apply cl/style m styles)
+                  (if (every? string? x)
+                    (apply str x)
+                    x)))
+              x))]
+    (if (string? msg)
+      msg
+      (cw/postwalk (fn [x]
+                     (if (string? x)
+                       x
+                       (style x)))
+                   msg))))
+
+(def accent [:bright :cyan])
+(def warn [:bright :yellow])
+
 (defn console-printer
   "Prints to console"
   [msgs]
   (doseq [m (remove nil? msgs)]
     ;; TODO Ansi coloring
-    (println (co/accent (str "[" (jt/format :iso-local-date-time (jt/local-date-time)) "]"))
-             (:message m))))
+    (println (cl/style (str "[" (jt/format time-format (jt/local-date-time)) "]") :green)
+             (apply-styles (:message m)))))
 
 (defn build-init [printer ctx]
   (let [b (get-in ctx [:event :build])]
-    (printer [{:message (str "Initializing build: " (:build-id b))}
+    (printer [{:message ["Initializing build: " [accent (:build-id b)]]}
               {:message (str "Source: " (:checkout-dir b))}
               {:message (str "Script dir: " (get-in b [:script :script-dir]))}])))
 
 (defn build-start [printer ctx]
-  (printer [{:message (str "Build started: " (-> ctx :event :sid last))}
-            {:message (str "Lib version: " (v/version))}]))
+  (printer [{:message ["Lib version: " [accent (v/version)]]}]))
+
+(defn- status->msg [{:keys [status] :as b}]
+  (if (bc/success? b)
+    [[:bright :green] (name status)]
+    [[:bright :red] (name status)]))
 
 (defn build-end [printer {e :event}]
-  (printer [{:message (str "Build ended: " (-> e :sid last))}
-            {:message (str "Status: " (name (:status e)))}
-            (when (:message e)
-              {:message (str "Message: " (:message e))})]))
+  (let [m (:message e)]
+    (printer (cond-> [{:message ["Build ended: " [accent (-> e :sid last)]]}
+                      {:message ["Status: " (status->msg e)]}]
+               m (concat [{:message "Message:"}
+                          {:message [warn m]}])))))
 
-(defn script-start [printer _]
-  (printer [{:message "Script started, loading and running jobs..."}]))
+(defn script-start [printer ctx]
+  (printer [{:message (->> ctx
+                           :event
+                           :jobs
+                           (map j/job-id)
+                           (cs/join ", ")
+                           (conj [accent])
+                           (conj ["Script started with jobs: "]))}]))
 
 (defn script-end [printer ctx]
-  (printer [{:message "Script ended"}
-            (when-let [m (get-in ctx [:event :message])]
-              {:message (str "Message: " m)})]))
+  (let [m (get-in ctx [:event :message])]
+    (printer (cond-> [{:message "Script ended"}]
+               m (concat [{:message "Message:"}
+                          {:message [warn m]}])))))
 
 (defn job-start [printer ctx]
-  (printer [{:message (str "Job started: " (get-in ctx [:event :job-id]))}]))
+  (printer [{:message ["Job started: " [accent (get-in ctx [:event :job-id])]]}]))
 
 (defn job-end [printer {e :event}]
-  (printer [{:message (str "Job ended: " (:job-id e))}
-            {:message (str "Status: " (name (:status e)))}
-            (when-let [o (get-in e [:result :output])]
-              {:message (str "Output: " o)})]))
+  (let [o (get-in e [:result :output])]
+    (printer (cond-> [{:message ["Job ended: " [accent (:job-id e)]]}
+                      {:message ["Status: " (status->msg e)]}]
+               o (concat [{:message "Output:"}
+                          {:message [warn o]}])))))
 
 (defn make-routes [{p :printer :as conf}]
   [[:build/initializing [{:handler (partial build-init p)}]]
