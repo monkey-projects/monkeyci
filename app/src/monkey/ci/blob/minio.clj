@@ -16,8 +16,10 @@
 (defn- make-http-client []
   (.. (OkHttpClient$Builder.)
       (connectTimeout 10 TimeUnit/SECONDS)
-      (readTimeout 10 TimeUnit/SECONDS)
-      (writeTimeout 10 TimeUnit/SECONDS)
+      ;; Set timeout high enough for large files, although 10 seconds is good enough
+      ;; for most situations.
+      (readTimeout 30 TimeUnit/SECONDS)
+      (writeTimeout 30 TimeUnit/SECONDS)
       ;; Retry, this may fix the error
       (retryOnConnectionFailure true)
       ;; If not fixed, check if overriding the connection pool may work
