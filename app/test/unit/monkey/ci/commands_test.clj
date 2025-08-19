@@ -21,7 +21,9 @@
              [config :as tc]
              [helpers :as h]
              [mailman :as tm]]
-            [monkey.ci.web.http :as wh]))
+            [monkey.ci.web
+             [crypto :as wc]
+             [http :as wh]]))
 
 (deftest run-build-local
   (testing "creates event broker and posts `build/pending` event"
@@ -34,20 +36,23 @@
         (is (= :build/pending (:type evt)))
         (is (some? (:build evt))))))
 
-  (testing "passes `workdir` as checkout dir and `dir` as script dir"
-    (let [broker (tm/test-component)]
-      (is (md/deferred? (sut/run-build-local {:mailman broker
-                                              :args {:workdir "/test/dir"
-                                                     :dir ".script"}})))
-      (let [build (-> broker
-                      :broker
-                      (tm/get-posted)
-                      first
-                      :build)]
+  (let [broker (tm/test-component)]
+    (is (md/deferred? (sut/run-build-local {:mailman broker
+                                            :args {:workdir "/test/dir"
+                                                   :dir ".script"}})))
+    (let [build (-> broker
+                    :broker
+                    (tm/get-posted)
+                    first
+                    :build)]
+      (testing "passes `workdir` as checkout dir and `dir` as script dir"
         (is (= "/test/dir" (:checkout-dir build)))
         (is (= ".script" (-> build
                              :script
-                             :script-dir)))))))
+                             :script-dir))))
+
+      (testing "creates local data encryption key for build"
+        (is (wc/b64-dek? (:dek build)))))))
 
 (deftest parse-params
   (testing "empty when empty input"

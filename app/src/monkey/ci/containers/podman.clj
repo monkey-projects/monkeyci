@@ -372,8 +372,8 @@
 
 (defn job-queued [conf ctx]
   (let [{:keys [job-id sid]} (:event ctx)]
-    ;; Podman runs locally, so no credits consumed
-    [(j/job-initializing-evt job-id sid (:credit-multiplier conf))]))
+    [(-> (j/job-initializing-evt job-id sid (:credit-multiplier conf))
+         (assoc :local-dir (get-job-dir ctx)))]))
 
 (defn job-init [ctx]
   (let [{:keys [job-id sid]} (:event ctx)]
@@ -411,7 +411,8 @@
                        (art/restore-interceptor emi/get-job-ctx)
                        decrypt-env
                        emi/start-process]}
-       {:handler (partial job-queued conf)}]]
+       {:handler (partial job-queued conf)
+        :interceptors [(add-job-dir wd)]}]]
 
      [:job/initializing
       ;; TODO Start polling for events from events.edn

@@ -4,6 +4,7 @@
             [clojure
              [string :as cs]
              [walk :as cw]]
+            [clojure.tools.logging :as log]
             [java-time.api :as jt]
             [manifold.stream :as ms]
             [monkey.ci
@@ -88,6 +89,10 @@
                m (concat [{:message "Message:"}
                           {:message [warn m]}])))))
 
+(defn job-init [printer ctx]
+  (when-let [dir (get-in ctx [:event :local-dir])]
+    (printer [{:message (str "Local work dir: " dir)}])))
+
 (defn job-start [printer ctx]
   (printer [{:message ["Job started: " [accent (get-in ctx [:event :job-id])]]}]))
 
@@ -95,6 +100,7 @@
   (let [o (get-in e [:result :output])]
     (printer (cond-> [{:message ["Job ended: " [accent (:job-id e)]]}
                       {:message ["Status: " (status->msg e)]}]
+               (bc/failed? e) (conj {:message "Check the local work dir for job logs."})
                o (concat [{:message "Output:"}
                           {:message [warn o]}])))))
 
@@ -104,5 +110,6 @@
    [:build/end          [{:handler (partial build-end p)}]]
    [:script/start       [{:handler (partial script-start p)}]]
    [:script/end         [{:handler (partial script-end p)}]]
+   [:job/initializing   [{:handler (partial job-init p)}]]
    [:job/start          [{:handler (partial job-start p)}]]
    [:job/end            [{:handler (partial job-end p)}]]])

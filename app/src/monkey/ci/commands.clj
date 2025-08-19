@@ -2,6 +2,7 @@
   "Event handlers for commands"
   (:require [aleph.http :as http]
             [babashka.fs :as fs]
+            [buddy.core.codecs :as codecs]
             [cheshire.core :as json]
             [clj-commons.byte-streams :as bs]
             [clojure.string :as cs]
@@ -17,7 +18,8 @@
              [process :as proc]
              [runtime :as rt]
              [spec :as spec]
-             [utils :as u]]
+             [utils :as u]
+             [vault :as v]]
             [monkey.ci.events
              [core :as ec]
              [mailman :as em]]
@@ -58,7 +60,8 @@
                                          cwd)
                        :org-id "local-cust"
                        :repo-id "local-repo"
-                       :build-id (b/local-build-id)}
+                       :build-id (b/local-build-id)
+                       :dek (codecs/bytes->b64-str (v/generate-key))}
                 dir (b/set-script-dir dir))
         conf (-> (select-keys config [:mailman :lib-coords :log-config]) ; Allow override for testing
                  (lc/set-work-dir wd)

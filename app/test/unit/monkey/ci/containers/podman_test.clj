@@ -404,7 +404,15 @@
            (-> {:credit-multiplier ::cm}
                (sut/job-queued {:event {:type :job/queued}})
                first
-               :credit-multiplier)))))
+               :credit-multiplier))))
+
+  (testing "adds local work dir"
+    (let [job-dir "/tmp/job/dir"]
+      (is (= job-dir
+             (-> {}
+                 (sut/job-queued (sut/set-job-dir {} job-dir))
+                 first
+                 :local-dir))))))
 
 (deftest job-init
   (testing "returns `job/start` event"

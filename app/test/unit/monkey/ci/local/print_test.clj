@@ -11,6 +11,7 @@
                :build/end
                :script/start
                :script/end
+               :job/initializing
                :job/start
                :job/end]
           r (->> (sut/make-routes {})

@@ -47,7 +47,7 @@
   (letfn [(make-routes [{:keys [config build] :as c}]
             (let [sid (b/sid build)]
               (log/debug "Creating local podman routes for build" build)
-              (-> (select-keys c [:mailman :artifacts :cache :workspace])
+              (-> (select-keys c [:mailman :artifacts :cache :workspace :key-decrypter])
                   (update :artifacts a/make-blob-repository sid)
                   (update :cache c/make-blob-repository sid)
                   (assoc :work-dir (lc/get-jobs-dir config))
@@ -124,7 +124,7 @@
                   [:mailman])
    :podman       (co/using
                   (new-podman-routes conf)
-                  [:mailman :artifacts :cache :workspace :build])
+                  [:mailman :artifacts :cache :workspace :build :key-decrypter])
    :artifacts    (new-artifacts conf)
    :cache        (new-cache conf)
    :workspace    (copy-store conf)
@@ -132,11 +132,13 @@
    :api-config   (rr/new-api-config {})
    :api-server   (co/using
                   (new-api-server)
-                  [:api-config :artifacts :cache :params :build :event-stream :mailman])
+                  [:api-config :artifacts :cache :params :build :event-stream :mailman
+                   :key-decrypter])
    :event-stream (new-event-stream)
    :event-pipe   (co/using
                   (new-event-pipe)
-                  [:event-stream :mailman])))
+                  [:event-stream :mailman])
+   :key-decrypter (constantly (md/success-deferred (:dek (lc/get-build conf))))))
 
 (defn start-and-post
   "Starts component system and posts an event to the event broker to trigger
