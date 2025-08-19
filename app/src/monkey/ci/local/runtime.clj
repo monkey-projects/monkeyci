@@ -132,12 +132,13 @@
    :api-config   (rr/new-api-config {})
    :api-server   (co/using
                   (new-api-server)
-                  [:api-config :artifacts :cache :params :build :event-stream :mailman])
+                  [:api-config :artifacts :cache :params :build :event-stream :mailman
+                   :key-decrypter])
    :event-stream (new-event-stream)
    :event-pipe   (co/using
                   (new-event-pipe)
                   [:event-stream :mailman])
-   :key-decrypter (constantly (atom (:dek (lc/get-build conf))))))
+   :key-decrypter (constantly (md/success-deferred (:dek (lc/get-build conf))))))
 
 (defn start-and-post
   "Starts component system and posts an event to the event broker to trigger

@@ -326,7 +326,8 @@
    (ring/router
     routes
     {:data {:middleware (concat [[security-middleware (:token opts)]
-                                 [build-middleware (:build opts)]]
+                                 [build-middleware (:build opts)]
+                                 wm/log-request]
                                 wm/default-middleware)
             :muuntaja (c/make-muuntaja)
             :coercion reitit.coercion.schema/coercion

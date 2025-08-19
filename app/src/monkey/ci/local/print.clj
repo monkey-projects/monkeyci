@@ -90,7 +90,8 @@
                           {:message [warn m]}])))))
 
 (defn job-init [printer ctx]
-  (printer [{:message (str "Local work dir: " (get-in ctx [:event :local-dir]))}]))
+  (when-let [dir (get-in ctx [:event :local-dir])]
+    (printer [{:message (str "Local work dir: " dir)}])))
 
 (defn job-start [printer ctx]
   (printer [{:message ["Job started: " [accent (get-in ctx [:event :job-id])]]}]))
