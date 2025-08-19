@@ -205,6 +205,7 @@
                       (mc/assoc-some :ref (or (params->ref p)
                                               (some->> (:main-branch repo) (str "refs/heads/")))
                                      :main-branch (:main-branch repo))))
+      (mc/assoc-some :params (get-in p [:body :params]))
       (wt/prepare-triggered-build (c/req->rt req) repo)))
 
 (defn- build-triggered-response [build]

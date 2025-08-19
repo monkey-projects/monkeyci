@@ -412,7 +412,14 @@
            {:body {:tag "test-tag"}}
            (fn [{:keys [build]}]
              (is (= "refs/tags/test-tag"
-                    (-> build :git :ref)))))))
+                    (-> build :git :ref))))))
+
+        (testing "passes params to build"
+          (verify-trigger
+           {:body {:params {"test-param" "test-value"}}}
+           (fn [{:keys [build]}]
+             (is (= {"test-param" "test-value"}
+                    (:params build)))))))
 
       (testing "with query params"
         (testing "adds commit id"
