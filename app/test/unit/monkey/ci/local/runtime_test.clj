@@ -72,7 +72,21 @@
       (testing "has key decrypter"
         (let [kd (:key-decrypter sys)]
           (is (fn? kd))
-          (is (= ::test-dek @(kd ::enc-key ::test-sid))))))))
+          (is (= ::test-dek @(kd ::enc-key ::test-sid))))))
+
+    (testing "after start"
+      (let [sys (-> {:mailman (tm/test-component)}
+                    (lc/set-work-dir dir)
+                    (lc/set-build {:dek ::test-dek})
+                    (sut/make-system)
+                    (co/start))]
+        (testing "podman routes"
+          (let [p (:podman sys)]
+            (is (some? p))
+            (testing "is passed key decrypter"
+              (is (some? (get p :key-decrypter))))))
+
+        (is (some? (co/stop sys)))))))
 
 (deftest event-pipe
   (let [broker (em/make-component {:type :manifold})

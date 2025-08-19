@@ -47,7 +47,7 @@
   (letfn [(make-routes [{:keys [config build] :as c}]
             (let [sid (b/sid build)]
               (log/debug "Creating local podman routes for build" build)
-              (-> (select-keys c [:mailman :artifacts :cache :workspace])
+              (-> (select-keys c [:mailman :artifacts :cache :workspace :key-decrypter])
                   (update :artifacts a/make-blob-repository sid)
                   (update :cache c/make-blob-repository sid)
                   (assoc :work-dir (lc/get-jobs-dir config))
@@ -124,7 +124,7 @@
                   [:mailman])
    :podman       (co/using
                   (new-podman-routes conf)
-                  [:mailman :artifacts :cache :workspace :build])
+                  [:mailman :artifacts :cache :workspace :build :key-decrypter])
    :artifacts    (new-artifacts conf)
    :cache        (new-cache conf)
    :workspace    (copy-store conf)
