@@ -85,9 +85,9 @@
           (testing "accepts build param files"
             (is (= ["params.yml" "params.edn"]
                    (-> (run-cli "build" "run"
-                                "--params-file" "params.yml"
-                                "--params-file" "params.edn")
-                       (get-in [:args :params-file]))))))
+                                "--param-file" "params.yml"
+                                "--param-file" "params.edn")
+                       (get-in [:args :param-file]))))))
         
         #_(testing "`watch` subcommand"
           (testing "runs `watch` command"

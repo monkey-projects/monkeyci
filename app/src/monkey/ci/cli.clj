@@ -40,7 +40,7 @@
            :type :string
            :multiple true}
           {:as "Build params file"
-           :option "params-file"
+           :option "param-file"
            :type :string
            :multiple true}]
    :runs {:command cmd/run-build-local
