@@ -80,7 +80,14 @@
           (testing "accepts multiple build params"
             (is (= ["key1=value1" "key2=value2"]
                    (-> (run-cli "build" "run" "-p" "key1=value1" "--param" "key2=value2")
-                       (get-in [:args :param]))))))
+                       (get-in [:args :param])))))
+
+          (testing "accepts build param files"
+            (is (= ["params.yml" "params.edn"]
+                   (-> (run-cli "build" "run"
+                                "--params-file" "params.yml"
+                                "--params-file" "params.edn")
+                       (get-in [:args :params-file]))))))
         
         #_(testing "`watch` subcommand"
           (testing "runs `watch` command"

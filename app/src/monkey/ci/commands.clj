@@ -5,13 +5,15 @@
             [buddy.core.codecs :as codecs]
             [cheshire.core :as json]
             [clj-commons.byte-streams :as bs]
-            [clojure.string :as cs]
+            [clj-yaml.core :as yaml]
+            [clojure.java.io :as io]
             [clojure.tools.logging :as log]
             [java-time.api :as jt]
             [manifold.deferred :as md]
             [medley.core :as mc]
             [monkey.ci
              [build :as b]
+             [edn :as edn]
              [errors :as errors]
              [jobs :as jobs]
              [pem :as pem]
@@ -47,6 +49,39 @@
                 {:name (.trim (subs l 0 idx)) :value (.trim (subs l (inc idx)))})))]
     (mapv parse params)))
 
+(def read-yaml (comp yaml/parse-string slurp))
+
+(defn- read-java-props [p]
+  (with-open [r (io/reader (fs/file p))]
+    (doto (java.util.Properties.)
+      (.load r))))
+
+(def ^:private param-readers
+  {"edn" edn/edn->
+   "json" (comp json/parse-string slurp)
+   "yaml" read-yaml
+   "yml" read-yaml
+   "properties" read-java-props})
+
+(defn- read-param-file [p]
+  (if-let [r (get param-readers (fs/extension p))]
+    (r p)
+    (throw (ex-info "Unsupported parameter file type"
+                    {:path (str p)
+                     :supported-extensions (keys param-readers)}))))
+
+(defn load-param-files
+  "Loads parameters files from cli args.  This supports edn, json, yaml and java 
+   properties, which is determined by file extension."
+  [paths]
+  (letfn [(parse-file [p]
+            (->> p
+                 (fs/file)
+                 (read-param-file)
+                 (map (fn [[k v]]
+                        {:name (name k) :value v}))))]
+    (mapcat parse-file paths)))
+
 (defn run-build-local
   "Run a build locally, normally from local source but can also be from a git checkout.
    Returns a deferred that will hold zero if the build succeeds, nonzero if it fails."
@@ -66,7 +101,8 @@
         conf (-> (select-keys config [:mailman :lib-coords :log-config]) ; Allow override for testing
                  (lc/set-work-dir wd)
                  (lc/set-build build)
-                 (lc/set-params (parse-params (get-in config [:args :param]))))]
+                 (lc/set-params (concat (parse-params (get-in config [:args :param]))
+                                        (load-param-files (get-in config [:args :param-file])))))]
     (log/info "Running local build for src:" (:checkout-dir build))
     (log/debug "Using working directory" (str wd))
     (lr/start-and-post conf (ec/make-event :build/pending
