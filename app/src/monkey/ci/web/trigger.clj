@@ -17,14 +17,15 @@
   "Prepares the git configuration for the build"
   [build rt {:keys [org-id] :as repo} dek]
   (let [d (get-in rt [:crypto :decrypter])
-        iv (crypto/cuid->iv org-id)]
+        ;; Only do this when needed
+        iv (delay (crypto/cuid->iv org-id))]
     (letfn [(set-branch [g]
               (update g :ref #(or % (some->> (:main-branch repo) (str "refs/heads/")))))
             (re-encrypt [id x]
               (-> x
                   (d org-id id)
                   ;; Re-encrypt ssh keys using DEK
-                  (as-> v (crypto/encrypt dek iv v))))
+                  (as-> v (crypto/encrypt dek @iv v))))
             (prepare-key [k]
               (-> (select-keys k [:private-key :public-key])
                   (update :private-key (partial re-encrypt (:id k)))))
@@ -41,10 +42,10 @@
    can be passed in when triggering a build using the API, and they override
    any other parameters."
   [build enc-key]
-  (let [iv (crypto/cuid->iv (:org-id build))]
+  (let [iv (delay (crypto/cuid->iv (:org-id build)))]
     (letfn [(encrypt-vals [params]
               (mc/map-vals (fn [v]
-                             (crypto/encrypt enc-key iv v))
+                             (crypto/encrypt enc-key @iv v))
                            params))]
       (mc/update-existing build :params encrypt-vals))))
 

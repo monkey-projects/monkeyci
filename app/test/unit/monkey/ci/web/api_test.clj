@@ -414,12 +414,13 @@
              (is (= "refs/tags/test-tag"
                     (-> build :git :ref))))))
 
-        (testing "passes params to build"
+        (testing "passes params to build encrypted"
           (verify-trigger
            {:body {:params {"test-param" "test-value"}}}
            (fn [{:keys [build]}]
-             (is (= {"test-param" "test-value"}
-                    (:params build)))))))
+             (let [p (get-in build [:params "test-param"])]
+               (is (string? p))
+               (is (not= "test-value" p)))))))
 
       (testing "with query params"
         (testing "adds commit id"

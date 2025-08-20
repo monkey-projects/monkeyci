@@ -216,11 +216,10 @@
 (defn trigger-build [req]
   (let [st (c/req->storage req)
         repo-sid (c/repo-sid req)
-        repo (st/find-repo st repo-sid)
-        build (make-build-ctx req repo)]
+        repo (st/find-repo st repo-sid)]
     (log/debug "Triggering build for repo sid:" repo-sid)
     (if repo
-      (build-triggered-response build)
+      (build-triggered-response (make-build-ctx req repo))
       (rur/not-found {:message "Repository does not exist"}))))
 
 (defn retry-build
