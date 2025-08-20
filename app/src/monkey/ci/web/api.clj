@@ -135,11 +135,6 @@
     (rur/response b)
     (rur/not-found nil)))
 
-(defn- as-ref [k v]
-  (fn [p]
-    (when-let [r (get-in p [:query k])]
-      (format "refs/%s/%s" v r))))
-
 (def build-sid c/build-sid)
 
 (defn- with-artifacts [req f]
@@ -187,6 +182,12 @@
     (with-artifacts req (comp get-contents
                               (partial artifact-by-id (artifact-id req))))))
 
+(defn- as-ref [k v]
+  (fn [p]
+    (when-let [r (or (get-in p [:query k])
+                     (get-in p [:body k]))]
+      (format "refs/%s/%s" v r))))
+
 (def params->ref
   "Creates a git ref from the query parameters (either branch or tag)"
   (some-fn (as-ref :branch "heads")
@@ -198,12 +199,13 @@
   (-> (:path p)
       (select-keys [:org-id :repo-id])
       (assoc :source :api
-             :git (-> (:query p)
+             :git (-> (merge (:body p) (:query p))
                       (select-keys [:commit-id :branch :tag])
                       (assoc :url (:url repo))
                       (mc/assoc-some :ref (or (params->ref p)
                                               (some->> (:main-branch repo) (str "refs/heads/")))
                                      :main-branch (:main-branch repo))))
+      (mc/assoc-some :params (get-in p [:body :params]))
       (wt/prepare-triggered-build (c/req->rt req) repo)))
 
 (defn- build-triggered-response [build]
@@ -212,14 +214,12 @@
       (rur/status 202)))
 
 (defn trigger-build [req]
-  (let [{p :parameters} req
-        st (c/req->storage req)
+  (let [st (c/req->storage req)
         repo-sid (c/repo-sid req)
-        repo (st/find-repo st repo-sid)
-        build (make-build-ctx req repo)]
+        repo (st/find-repo st repo-sid)]
     (log/debug "Triggering build for repo sid:" repo-sid)
     (if repo
-      (build-triggered-response build)
+      (build-triggered-response (make-build-ctx req repo))
       (rur/not-found {:message "Repository does not exist"}))))
 
 (defn retry-build

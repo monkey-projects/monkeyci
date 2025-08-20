@@ -38,6 +38,10 @@
            :option "param"
            :short "p"
            :type :string
+           :multiple true}
+          {:as "Build params file"
+           :option "params-file"
+           :type :string
            :multiple true}]
    :runs {:command cmd/run-build-local
           :app-mode :cli}})

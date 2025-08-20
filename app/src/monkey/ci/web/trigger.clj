@@ -1,5 +1,6 @@
 (ns monkey.ci.web.trigger
   (:require [buddy.core.codecs :as bcc]
+            [medley.core :as mc]
             [monkey.ci
              [labels :as lbl]
              [storage :as st]
@@ -15,14 +16,16 @@
 (defn- prepare-git
   "Prepares the git configuration for the build"
   [build rt {:keys [org-id] :as repo} dek]
-  (let [d (get-in rt [:crypto :decrypter])]
+  (let [d (get-in rt [:crypto :decrypter])
+        ;; Only do this when needed
+        iv (delay (crypto/cuid->iv org-id))]
     (letfn [(set-branch [g]
               (update g :ref #(or % (some->> (:main-branch repo) (str "refs/heads/")))))
             (re-encrypt [id x]
               (-> x
                   (d org-id id)
                   ;; Re-encrypt ssh keys using DEK
-                  (as-> v (crypto/encrypt dek (crypto/cuid->iv org-id) v))))
+                  (as-> v (crypto/encrypt dek @iv v))))
             (prepare-key [k]
               (-> (select-keys k [:private-key :public-key])
                   (update :private-key (partial re-encrypt (:id k)))))
@@ -34,11 +37,24 @@
                   (not-empty k) (assoc :ssh-keys k))))]
       (update build :git (comp add-ssh set-branch)))))
 
+(defn- encrypt-params
+  "Encrypts any additional build parameters specified on the build.  These
+   can be passed in when triggering a build using the API, and they override
+   any other parameters."
+  [build enc-key]
+  (let [iv (delay (crypto/cuid->iv (:org-id build)))]
+    (letfn [(encrypt-vals [params]
+              (mc/map-vals (fn [v]
+                             (crypto/encrypt enc-key @iv v))
+                           params))]
+      (mc/update-existing build :params encrypt-vals))))
+
 (defn prepare-triggered-build
   "Prepares the triggered build using the given initial build information."
   [{:keys [org-id repo-id] :as init-build} rt & [repo]]
   (let [repo (or repo (st/find-repo (:storage rt) [org-id repo-id]))
-        dek (crypto/generate-build-dek rt org-id)]
+        dek (crypto/generate-build-dek rt org-id)
+        enc-key (bcc/b64->bytes (:key dek))]
     (-> init-build
         (assoc :id (st/new-id)
                ;; Do not use the commit timestamp, because when triggered from a tag
@@ -47,4 +63,5 @@
                :status :pending
                :dek (:enc dek))
         (dissoc :message)
-        (prepare-git rt repo (bcc/b64->bytes (:key dek))))))
+        (prepare-git rt repo enc-key)
+        (encrypt-params enc-key))))

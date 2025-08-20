@@ -4,10 +4,10 @@
             [clojure.java.io :as io]
             [clojure.string :as cs]
             [medley.core :as mc]
+            [monkey.ci.api :as m]
             [monkey.ci.build
              [api :as api]
-             [core :as core]
-             [v2 :as m]]
+             [core :as core]]
             [monkey.ci.ext.junit]
             [monkey.ci.plugin
              [github :as gh]
@@ -27,7 +27,7 @@
 
 (def api-trigger?
   (comp (partial = :api)
-        core/trigger-src))
+        m/source))
 
 (def should-publish?
   (some-fn m/main-branch? release?))
@@ -61,7 +61,7 @@
 (defn tag-version
   "Extracts the version from the tag"
   [ctx]
-  (some->> (core/git-ref ctx)
+  (some->> (m/git-ref ctx)
            (re-matches tag-regex)
            (second)))
 
@@ -92,16 +92,16 @@
    (str dir "/junit.xml")))
 
 (defn coverage-artifact [dir]
-  {:id (str dir "-coverage")
-   :path (str dir "/target/coverage")})
+  (m/artifact
+   (str dir "-coverage")
+   (str dir "/target/coverage")))
 
 (defn test-app [ctx]
   (let [junit-artifact (junit-artifact "app")]
     (when (build-app? ctx)
-      ;; Disabled coverage because of spec gen errors
-      (-> (clj-container "test-app" "app" "-M:test:junit")
+      (-> (clj-container "test-app" "app" "-M:test:coverage")
           (assoc :save-artifacts [junit-artifact
-                                  #_(coverage-artifact "app")]
+                                  (coverage-artifact "app")]
                  :junit {:artifact-id (:id junit-artifact)
                          :path "junit.xml"})))))
 

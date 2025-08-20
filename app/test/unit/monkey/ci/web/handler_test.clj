@@ -792,7 +792,23 @@
                  (->> ctx
                       (trt/get-mailman)
                       (tmm/get-posted)
-                      (map :type))))))))
+                      (map :type)))))))
+
+    (testing "allows query params"
+      (with-repo
+        (fn [{:keys [app path]}]
+          (is (= 202 (-> (mock/request :post (str path "/trigger?branch=main"))
+                         (app)
+                         :status))))))
+
+    (testing "allows body"
+      (with-repo
+        (fn [{:keys [app path]}]
+          (is (= 202 (-> (h/json-request :post (str path "/trigger")
+                                         {:branch "main"
+                                          :params {"test-key" "test-value"}})
+                         (app)
+                         :status)))))))
   
   (testing "`GET /latest`"
     (with-repo

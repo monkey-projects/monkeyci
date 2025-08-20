@@ -71,6 +71,35 @@
     (is (= [{:name "key" :value "key=value"}]
            (sut/parse-params ["key=key=value"])))))
 
+(deftest load-param-files
+  (h/with-tmp-dir dir
+    (testing "reads edn file"
+      (let [p (str dir "/test-params.edn")]
+        (is (nil? (spit p (pr-str {:test-key "test-val"}))))
+        (is (= [{:name "test-key" :value "test-val"}]
+               (sut/load-param-files [p])))))
+
+    (testing "reads json file"
+      (let [p (str dir "/test-params.json")]
+        (is (nil? (spit p "{\"test-key\": \"test-val\"}")))
+        (is (= [{:name "test-key" :value "test-val"}]
+               (sut/load-param-files [p])))))
+
+    (testing "reads yaml file"
+      (let [p (str dir "/test-params.yaml")]
+        (is (nil? (spit p "test-key: test-val")))
+        (is (= [{:name "test-key" :value "test-val"}]
+               (sut/load-param-files [p])))))
+
+    (testing "reads java properties file"
+      (let [p (str dir "/test-params.properties")]
+        (is (nil? (spit p "test-key=test-val")))
+        (is (= [{:name "test-key" :value "test-val"}]
+               (sut/load-param-files [p])))))
+
+    (testing "fails on unsupported file type"
+      (is (thrown? Exception (sut/load-param-files ["test.txt"]))))))
+
 (deftest verify-build
   (testing "zero when successful"
     (is (zero? (sut/verify-build {:work-dir "examples"

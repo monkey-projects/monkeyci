@@ -101,9 +101,13 @@
 (s/def :build/changes
   (s/keys :opt-un [:changes/added :changes/removed :changes/modified]))
 
+;; Optional build parameters, override existing params
+(s/def :build/params map?)
+
 (s/def ::build
   (-> (s/keys :req-un [:build/org-id :build/repo-id :build/build-id :build/sid
                        :build/source]
               :opt-un [:build/git :build/cleanup? :build/webhook-id :build/script :build/checkout-dir
-                       :build/changes :build/workspace :build/status ::c/timeout :build/dek])
+                       :build/changes :build/workspace :build/status ::c/timeout :build/dek
+                       :build/params])
       (s/merge ::generic-entity)))

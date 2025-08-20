@@ -1,10 +1,14 @@
 (ns monkey.ci.build.api-test
-  (:require [clojure.java.io :as io]
+  (:require [buddy.core.codecs :as bcc]
+            [clojure.java.io :as io]
             [clojure.test :refer [deftest is testing]]
             [manifold
              [bus :as bus]
              [deferred :as md]
              [stream :as ms]]
+            [monkey.ci
+             [cuid :as cuid]
+             [vault :as v]]
             [monkey.ci.build
              [api :as sut]
              [api-server :as server]]
@@ -13,6 +17,7 @@
              [api-server :as tas]
              [helpers :as h]
              [mailman :as tm]]
+            [monkey.ci.web.crypto :as crypto]
             [monkey.mailman.core :as mmc])
   (:import (java.io PipedInputStream PipedOutputStream PrintWriter)))
 
@@ -45,16 +50,42 @@
       (testing "can decrypt key"
         (is (= "decrypted" (sut/decrypt-key client "encrypted")))))))
 
-(deftest build-params
-  (testing "invokes `params` endpoint on client"
+(defn- ->stream [str]
+  (java.io.ByteArrayInputStream.
+   (.getBytes str)))
+
+(deftest decrypt-key
+  (testing "invokes key decryption endpoint on client"
     (let [m (fn [req]
-              (when (= "/params" (:path req))
-                (md/success-deferred {:body
-                                      [{:name "key"
-                                        :value "value"}]})))
-          rt {:api {:client m}
-              :build {:sid ["test-org" "test-repo" "test-build"]}}]
-      (is (= {"key" "value"} (sut/build-params rt))))))
+              (when (and (= "/decrypt-key" (:path req))
+                         (= :post (:request-method req)))
+                (md/success-deferred {:body (->stream "decrypted key")})))]
+      (is (= "decrypted key" (sut/decrypt-key m "encrypted-key"))))))
+
+(deftest build-params
+  (let [dek (v/generate-key)
+        m (fn [req]
+            (cond
+              (= "/params" (:path req))
+              (md/success-deferred {:body
+                                    [{:name "key"
+                                      :value "value"}]})
+              (= "/decrypt-key" (:path req))
+              (md/success-deferred {:body (->stream (bcc/bytes->b64-str dek))})))
+        org-id (cuid/random-cuid)
+        rt {:api {:client m}
+            :build
+            {:org-id org-id
+             :sid [org-id "test-repo" "test-build"]
+             :dek "encrypted-dek"
+             :params {"extra-param" (crypto/encrypt dek (crypto/cuid->iv org-id) "extra-val")}}}
+        params (sut/build-params rt)]
+    
+    (testing "invokes `params` endpoint on client"
+      (is (= "value" (get params "key"))))
+
+    (testing "adds decrypted additional build params"
+      (is (= "extra-val" (get params "extra-param"))))))
 
 (deftest download-artifact
   (testing "invokes artifact download endpoint on client"
@@ -129,11 +160,3 @@
             (is (= evt (-> s (ms/take!) (deref 1000 :timeout))))
             (is (nil? (ms/close! s)))))))))
 
-(deftest decrypt-key
-  (testing "invokes key decryption endpoint on client"
-    (let [m (fn [req]
-              (when (and (= "/decrypt-key" (:path req))
-                         (= :post (:request-method req)))
-                (md/success-deferred {:body (java.io.ByteArrayInputStream.
-                                             (.getBytes "decrypted key"))})))]
-      (is (= "decrypted key" (sut/decrypt-key m "encrypted-key"))))))

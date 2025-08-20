@@ -242,13 +242,17 @@
   "The git ref that triggered the build"
   bc/git-ref)
 
+(def ref-regex
+  "Applies the given regex on the ref from the context, returns the matching groups."
+  bc/ref-regex)
+
 (def archs
   "Retrieves list of available container architectures from context"
   :archs)
 
 (def source
   "Returns the trigger source (e.g. `api`)"
-  (comp :source :build))
+  bc/trigger-src)
 
 (def api-trigger?
   "True if the build has been triggered via api (i.e. typically manually by a human)"

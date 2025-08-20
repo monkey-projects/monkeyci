@@ -118,6 +118,10 @@
                 (->> (s/load-jobs (get-build ctx) job-ctx)
                      (group-by j/job-id)
                      ;; Encrypt container env vars (possibly sensitive information)
+                     ;; FIXME Scripts may want to read back the env vars passed to
+                     ;; container jobs, which will be encrypted at that point.  So it
+                     ;; may be better to only encrypt them when they are sent out in
+                     ;; an event.
                      (mc/map-vals (comp (partial encrypt-env encrypter) first))
                      (set-jobs ctx))))}))
 
