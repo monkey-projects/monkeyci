@@ -415,7 +415,7 @@
         :interceptors [(add-job-dir wd)]}]]
 
      [:job/initializing
-      ;; TODO Start polling for events from events.edn
+      ;; TODO Start polling for events from events.edn?
       [{:handler job-init
         :interceptors [emi/handle-job-error
                        state

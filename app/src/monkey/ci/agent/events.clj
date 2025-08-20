@@ -81,8 +81,6 @@
 (defn generate-script-config [ctx build]
   (let [host (bas/get-ip-addr)
         conf (get-config ctx)]
-    ;; TODO Add encrypted build DEK, it will be needed by the script to encrypt
-    ;; env vars
     (-> sc/empty-config
         (sc/set-build (-> build
                           ;; Also set credit multiplier, for action jobs

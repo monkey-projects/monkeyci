@@ -40,13 +40,12 @@
                                           :label-filter
                                           [[{:label "test-lbl"
                                              :value "lbl-val"}]]}])
-          p (sut/prepare-triggered-build
-             {:org-id org-id
-              :repo-id "test-repo"
-              :message "Previous build message"
-              :git {:ref "original/ref"}}
-             rt
-             repo)]
+          build {:org-id org-id
+                 :repo-id "test-repo"
+                 :message "Previous build message"
+                 :git {:ref "original/ref"}
+                 :params {"test-param" "test-value"}}
+          p (sut/prepare-triggered-build build rt repo)]
       (testing "assigns id"
         (is (some? (:id p))))
 
@@ -77,9 +76,18 @@
                      first
                      :private-key)))))
 
+      (testing "encrypts build param values"
+        (let [raw-dek (bcc/b64->bytes @dek)
+              iv (crypto/cuid->iv org-id)]
+          (is (= (crypto/encrypt raw-dek iv "test-value")
+                 (get-in p [:params "test-param"])))
+          (is (= "test-value"
+                 (->> (get-in p [:params "test-param"])
+                      (crypto/decrypt raw-dek iv))))))      
+
       (testing "uses main branch from repo if no configured ref"
         (is (= "refs/heads/main"
-               (-> p
+               (-> build
                    (update :git dissoc :ref)
                    (sut/prepare-triggered-build rt repo)
                    (get-in [:git :ref]))))))))
