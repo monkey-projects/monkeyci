@@ -41,30 +41,51 @@
    [repo-settings-btn]
    [trigger-build-btn]])
 
-(defn- trigger-type []
-  [:select.form-select {:name :trigger-type}
+(defn- trigger-type [t]
+  [:select.form-select {:name :trigger-type
+                        :value (:trigger-type t)
+                        :on-change (u/form-evt-handler [:repo/trigger-type-changed])}
    [:option {:value :branch} "Branch"]
    [:option {:value :tag} "Tag"]
    [:option {:value :commit-id} "Commit Id"]])
 
+(defn- trigger-params []
+  [:<>
+   [:h6 "Parameters"]
+   ;; TODO Link to params screen here
+   [:p
+    "You can specify additional build parameters, which will override any parameters "
+    "configured on the organization level."]]
+  ;; TODO
+  #_[:input.form-control])
+
 (defn trigger-form [repo]
-  (let [show? (rf/subscribe [:repo/show-trigger-form?])]
+  (let [show? (rf/subscribe [:repo/show-trigger-form?])
+        tf (rf/subscribe [:repo/trigger-form])]
     (when @show?
       [:div.card.my-2
        [:div.card-body
         [:h5.card-title "Trigger Build"]
+        [:p
+         "This will create a new build using the script provided in the "
+         [:code ".monkeyci/"] " directory from the code checked out at the specified ref."]
         [:form {:on-submit (f/submit-handler [:repo/trigger-build])}
-         [:div.row.mb-3
+         [:div.row.mb-2
           [:div.col-2
            [trigger-type]]
           [:div.col-10
            [:input.form-control {:type :text
                                  :name :trigger-ref
-                                 :default-value (:main-branch @repo)}]]]
+                                 :default-value (:main-branch @repo)
+                                 :value (:trigger-ref @tf)
+                                 :on-change (u/form-evt-handler [:repo/trigger-ref-changed])}]]]
          [:div.row
-          [:div.col
-           [:button.btn.btn-primary.me-1
+          [:div.col [trigger-params @tf]]]
+         [:div.row.mt-3
+          [:div.col.d-flex.gap-2
+           [:button.btn.btn-primary
             {:type :submit}
+            [:span.me-2 [co/icon :play-circle]]
             "Trigger"]
            [co/cancel-btn [:repo/hide-trigger-build]]]]]]])))
 

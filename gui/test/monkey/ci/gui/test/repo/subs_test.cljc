@@ -85,6 +85,12 @@
       (is (some? (reset! app-db (db/set-latest-build {} ::latest))))
       (is (= ::latest @l)))))
 
+(deftest repo-trigger-form
+  (h/verify-sub [:repo/trigger-form]
+                #(db/set-trigger-form % {:trigger-type "branch"})
+                {:trigger-type "branch"}
+                nil))
+
 (deftest repo-show-trigger-form
   (let [l (rf/subscribe [:repo/show-trigger-form?])]
     (testing "exists"

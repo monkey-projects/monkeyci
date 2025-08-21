@@ -37,6 +37,14 @@
 (defn set-latest-build [db b]
   (assoc db latest-build b))
 
+(def trigger-form ::trigger-form)
+
+(defn set-trigger-form [db f]
+  (assoc db trigger-form f))
+
+(defn update-trigger-form [db f & args]
+  (apply update db trigger-form f args))
+
 (def show-trigger-form? ::show-trigger-form?)
 
 (defn set-show-trigger-form [db f]

@@ -93,6 +93,16 @@
  (fn [db _]
    (db/set-show-trigger-form db nil)))
 
+(rf/reg-event-db
+ :repo/trigger-type-changed
+ (fn [db [_ v]]
+   (db/update-trigger-form db assoc :trigger-type v)))
+
+(rf/reg-event-db
+ :repo/trigger-ref-changed
+ (fn [db [_ v]]
+   (db/update-trigger-form db assoc :trigger-ref v)))
+
 (defn- add-ref
   "Adds query params according to the trigger form input"
   [params {:keys [trigger-type trigger-ref]}]

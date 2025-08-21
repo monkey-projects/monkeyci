@@ -168,6 +168,18 @@
     (rf/dispatch-sync [:repo/hide-trigger-build])
     (is (nil? (db/show-trigger-form? @app-db)))))
 
+(deftest trigger-type-changed
+  (testing "sets trigger type in db"
+    (rf/dispatch-sync [:repo/trigger-type-changed "updated-type"])
+    (is (= "updated-type" (-> (db/trigger-form @app-db)
+                              :trigger-type)))))
+
+(deftest trigger-ref-changed
+  (testing "sets trigger ref in db"
+    (rf/dispatch-sync [:repo/trigger-ref-changed "test-branch"])
+    (is (= "test-branch" (-> (db/trigger-form @app-db)
+                             :trigger-ref)))))
+
 (deftest trigger-build
   (testing "sets `triggering` flag"
     (rf/dispatch-sync [:repo/trigger-build])

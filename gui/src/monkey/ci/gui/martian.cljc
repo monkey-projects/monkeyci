@@ -104,6 +104,12 @@
   {:org-id s/Str
    :repo-id s/Str})
 
+(s/defschema TriggerParams
+  {(s/optional-key :branch) s/Str
+   (s/optional-key :tag) s/Str
+   (s/optional-key :commit-id) s/Str
+   (s/optional-key :params) {s/Str s/Str}})
+
 (def Date #"\d{4}-\d{2}-\d{2}")
 
 (defn public-route [conf]
@@ -316,9 +322,7 @@
      :method :post
      :path-parts (into repo-path ["/builds/trigger"])
      :path-schema repo-schema
-     :query-schema {(s/optional-key :branch) s/Str
-                    (s/optional-key :tag) s/Str
-                    (s/optional-key :commit-id) s/Str}})
+     :body-schema {:trigger TriggerParams}})
 
    (api-route
     {:route-name :get-build
