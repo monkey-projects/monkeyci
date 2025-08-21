@@ -108,7 +108,7 @@
   {(s/optional-key :branch) s/Str
    (s/optional-key :tag) s/Str
    (s/optional-key :commit-id) s/Str
-   (s/optional-key :params) {s/Str s/Str}})
+   (s/optional-key :params) {s/Any s/Str}})
 
 (def Date #"\d{4}-\d{2}-\d{2}")
 

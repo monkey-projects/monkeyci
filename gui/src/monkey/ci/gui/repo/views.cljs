@@ -49,15 +49,36 @@
    [:option {:value :tag} "Tag"]
    [:option {:value :commit-id} "Commit Id"]])
 
-(defn- trigger-params []
-  [:<>
-   [:h6 "Parameters"]
-   ;; TODO Link to params screen here
-   [:p
-    "You can specify additional build parameters, which will override any parameters "
-    "configured on the organization level."]]
-  ;; TODO
-  #_[:input.form-control])
+(defn- trigger-params [t]
+  (letfn [(param-input [idx {:keys [name value]}]
+            [:div.row.mb-2
+             [:div.col-3
+              [:input.form-control
+               {:value name
+                :placeholder "Parameter name"
+                :on-change (u/form-evt-handler [:repo/trigger-param-name-changed idx])}]]
+             [:div.col-8
+              [:input.form-control
+               {:value value
+                :placeholder "Parameter value"
+                :on-change (u/form-evt-handler [:repo/trigger-param-val-changed idx])}]]
+             [:div.col-1
+              [:button.btn.btn-danger
+               {:title "Remove parameter"
+                :on-click (u/link-evt-handler [:repo/remove-trigger-param idx])}
+               [co/icon :trash]]]])]
+    [:<>
+     [:h6 "Parameters"]
+     ;; TODO Link to params screen here
+     [:p
+      "You can specify additional build parameters, which will override any parameters "
+      "configured on the organization level."]
+     (->> (:params t)
+          (map-indexed param-input)
+          (into [:<>]))
+     [:button.btn.btn-outline-primary
+      {:on-click (u/link-evt-handler [:repo/add-trigger-param])}
+      [:span.me-2 [co/icon :plus-square]] "Add Parameter"]]))
 
 (defn trigger-form [repo]
   (let [show? (rf/subscribe [:repo/show-trigger-form?])
@@ -72,7 +93,7 @@
         [:form {:on-submit (f/submit-handler [:repo/trigger-build])}
          [:div.row.mb-2
           [:div.col-2
-           [trigger-type]]
+           [trigger-type @tf]]
           [:div.col-10
            [:input.form-control {:type :text
                                  :name :trigger-ref

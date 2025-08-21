@@ -158,9 +158,29 @@
              (db/get-builds @app-db))))))
 
 (deftest show-trigger-build
+  (rf/dispatch-sync [:repo/show-trigger-build])
+  
   (testing "sets `show trigger form` flag in db"
+    (is (db/show-trigger-form? @app-db)))
+
+  (testing "initializes trigger form with single param"
+    (is (= 1 (-> (db/trigger-form @app-db)
+                 :params
+                 count))))
+
+  (testing "adds empty param"
+    (is (some? (reset! app-db (db/set-trigger-form {} {}))))
     (rf/dispatch-sync [:repo/show-trigger-build])
-    (is (db/show-trigger-form? @app-db))))
+    (is (= 1 (-> (db/trigger-form @app-db)
+                 :params
+                 count))))
+
+  (testing "keeps previous trigger form"
+    (let [orig {:trigger-ref "original"
+                :params [{:name "test param"}]}]
+      (is (some? (reset! app-db (db/set-trigger-form {} orig))))
+      (rf/dispatch-sync [:repo/show-trigger-build])
+      (is (= orig (db/trigger-form @app-db))))))
 
 (deftest hide-trigger-build
   (testing "unsets `show trigger form` flag in db"
@@ -180,6 +200,41 @@
     (is (= "test-branch" (-> (db/trigger-form @app-db)
                              :trigger-ref)))))
 
+(deftest add-trigger-param
+  (testing "adds empty param to trigger form"
+    (is (some? (reset! app-db (db/set-trigger-form {} {:params [{:name "first"}]}))))
+    (rf/dispatch-sync [:repo/add-trigger-param])
+    (let [p (:params (db/trigger-form @app-db))]
+      (is (= 2 (count p)))
+      (is (empty? (:name (last p)))))))
+
+(deftest remove-trigger-param
+  (testing "removes param at index from trigger form"
+    (is (some? (reset! app-db (db/set-trigger-form {} {:params
+                                                       [{:name "first"}
+                                                        {:name "second"}]}))))
+    (rf/dispatch-sync [:repo/remove-trigger-param 0])
+    (is (= [{:name "second"}]
+           (:params (db/trigger-form @app-db))))))
+
+(deftest trigger-param-name-changed
+  (testing "updates name for trigger param at idx"
+    (rf/dispatch-sync [:repo/trigger-param-name-changed 0 "test-name"])
+    (is (= "test-name"
+           (-> (db/trigger-form @app-db)
+               :params
+               first
+               :name)))))
+
+(deftest trigger-param-val-changed
+  (testing "updates value for trigger param at idx"
+    (rf/dispatch-sync [:repo/trigger-param-val-changed 0 "test-val"])
+    (is (= "test-val"
+           (-> (db/trigger-form @app-db)
+               :params
+               first
+               :value)))))
+
 (deftest trigger-build
   (testing "sets `triggering` flag"
     (rf/dispatch-sync [:repo/trigger-build])
@@ -188,16 +243,24 @@
   (testing "invokes build trigger endpoint with params"
     (rft/run-test-sync
      (let [c (h/catch-fx :martian.re-frame/request)]
-       (is (some? (h/set-repo-path! "test-org" "test-repo")))
+       (is (some? (reset! app-db (-> {}
+                                     (h/set-repo-path "test-org" "test-repo")
+                                     (db/set-trigger-form
+                                      {:trigger-type "branch"
+                                       :trigger-ref "main"
+                                       :params [{:name "test-param"
+                                                 :value "test-val"}
+                                                {:name ""
+                                                 :value ""}]})))))
        (h/initialize-martian {:trigger-build {:body {:build-id "test-build"}
                                               :error-code :no-error}})
-       (rf/dispatch [:repo/trigger-build {:trigger-type ["branch"]
-                                          :trigger-ref ["main"]}])
+       (rf/dispatch [:repo/trigger-build])
        
        (is (= 1 (count @c)))
        (is (= {:branch "main"
                :org-id "test-org"
-               :repo-id "test-repo"}
+               :repo-id "test-repo"
+               :params {"test-param" "test-val"}}
               (-> @c first (nth 3)))))))
 
   (testing "clears notifications"
@@ -213,7 +276,12 @@
   (testing "hides trigger form"
     (is (some? (reset! app-db (db/set-show-trigger-form {} true))))
     (rf/dispatch-sync [:repo/trigger-build--success {:body {:build-id "test-build"}}])
-    (is (not (db/show-trigger-form? @app-db)))))
+    (is (not (db/show-trigger-form? @app-db))))
+
+  (testing "clears trigger form"
+    (is (some? (reset! app-db (db/set-trigger-form {} ::original))))
+    (rf/dispatch-sync [:repo/trigger-build--success {:body {:build-id "test-build"}}])
+    (is (nil? (db/trigger-form @app-db)))))
 
 (deftest trigger-build--failed
   (testing "sets error alert"
