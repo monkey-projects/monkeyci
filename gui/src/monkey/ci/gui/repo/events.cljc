@@ -1,5 +1,6 @@
 (ns monkey.ci.gui.repo.events
-  (:require [monkey.ci.gui.alerts :as a]
+  (:require [medley.core :as mc]
+            [monkey.ci.gui.alerts :as a]
             [monkey.ci.gui.apis.github]
             [monkey.ci.gui.org.db :as cdb]
             [monkey.ci.gui.loader :as lo]
@@ -86,32 +87,80 @@
 (rf/reg-event-db
  :repo/show-trigger-build
  (fn [db _]
-   (db/set-show-trigger-form db true)))
+   (-> db
+       (db/set-show-trigger-form true)
+       (db/update-trigger-form
+        (fn [{:keys [params] :as f}]
+          (cond-> f
+            ;; Add a single empty param for input
+            (empty? params) (assoc :params [{:name "" :value ""}])))))))
 
 (rf/reg-event-db
  :repo/hide-trigger-build
  (fn [db _]
    (db/set-show-trigger-form db nil)))
 
+(rf/reg-event-db
+ :repo/trigger-type-changed
+ (fn [db [_ v]]
+   (db/update-trigger-form db assoc :trigger-type v)))
+
+(rf/reg-event-db
+ :repo/trigger-ref-changed
+ (fn [db [_ v]]
+   (db/update-trigger-form db assoc :trigger-ref v)))
+
+(rf/reg-event-db
+ :repo/add-trigger-param
+ (fn [db _]
+   (db/update-trigger-form db update :params conj {:name "" :value ""})))
+
+(rf/reg-event-db
+ :repo/remove-trigger-param
+ (fn [db [_ idx]]
+   (db/update-trigger-form db update :params (comp vec (partial mc/remove-nth idx)))))
+
+(rf/reg-event-db
+ :repo/trigger-param-name-changed
+ (fn [db [_ idx v]]
+   (db/update-trigger-param db idx assoc :name v)))
+
+(rf/reg-event-db
+ :repo/trigger-param-val-changed
+ (fn [db [_ idx v]]
+   (db/update-trigger-param db idx assoc :value v)))
+
 (defn- add-ref
   "Adds query params according to the trigger form input"
-  [params {:keys [trigger-type trigger-ref]}]
-  (let [tt (first trigger-type)
-        v (first trigger-ref)]
-    (cond-> params
-      (and tt v) (assoc (keyword tt) v))))
+  [params {tt :trigger-type v :trigger-ref}]
+  (cond-> params
+    (and tt v) (assoc (keyword tt) v)))
+
+(defn- add-build-params
+  "Adds non-empty build parameters to the request body"
+  [r {:keys [params]}]
+  (let [->e (juxt :name :value)
+        e? (partial every? empty?)]
+    (cond-> r
+      (not-empty params)
+      (assoc :params (->> params
+                          (map ->e)
+                          (remove e?)
+                          (into {}))))))
 
 (rf/reg-event-fx
  :repo/trigger-build
- (fn [{:keys [db]} [_ form-vals]]
-   (let [params (get-in db [:route/current :parameters :path])]
+ (fn [{:keys [db]} _]
+   (let [params (get-in db [:route/current :parameters :path])
+         f (db/trigger-form db)]
      {:db (-> db
               (db/set-triggering)
               (db/reset-alerts))
       :dispatch [:secure-request
                  :trigger-build
                  (-> (select-keys params [:org-id :repo-id])
-                     (add-ref form-vals))
+                     (add-ref f)
+                     (add-build-params f))
                  [:repo/trigger-build--success]
                  [:repo/trigger-build--failed]]})))
 
@@ -120,7 +169,8 @@
  (fn [db [_ {:keys [body]}]]
    (-> db
        (db/set-alerts [(a/build-trigger-success)])
-       (db/set-show-trigger-form nil))))
+       (db/set-show-trigger-form nil)
+       (db/set-trigger-form nil))))
 
 (rf/reg-event-db
  :repo/trigger-build--failed
