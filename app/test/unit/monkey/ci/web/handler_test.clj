@@ -785,7 +785,7 @@
     (testing "posts `build/triggered` event"
       (with-repo
         (fn [{:keys [app path] :as ctx}]
-          (is (= 202 (-> (mock/request :post (str path "/trigger"))
+          (is (= 202 (-> (h/json-request :post (str path "/trigger") {})
                          (app)
                          :status)))
           (is (= [:build/triggered]
@@ -797,7 +797,7 @@
     (testing "allows query params"
       (with-repo
         (fn [{:keys [app path]}]
-          (is (= 202 (-> (mock/request :post (str path "/trigger?branch=main"))
+          (is (= 202 (-> (h/json-request :post (str path "/trigger?branch=main") {})
                          (app)
                          :status))))))
 

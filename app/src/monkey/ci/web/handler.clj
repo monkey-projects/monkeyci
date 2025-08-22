@@ -137,7 +137,9 @@
   {(s/optional-key :branch) s/Str
    (s/optional-key :tag) s/Str
    (s/optional-key :commit-id) s/Str
-   (s/optional-key :params) {s/Str s/Str}})
+   ;; Accept anything as string, because some clients may send keys as keywords,
+   ;; when using edn.
+   (s/optional-key :params) {s/Any s/Str}})
 
 (def since-params
   {:query {(s/optional-key :since) s/Int
@@ -238,7 +240,7 @@
      {:post {:handler api/trigger-build
              ;; For backwards compabitility, we also allow query params
              :parameters {:query TriggerParams
-                          (s/optional-key :body) TriggerParams}}}]
+                          :body TriggerParams}}}]
     ["/latest"
      {:get {:handler api/get-latest-build}}]
     ["/:build-id"

@@ -285,7 +285,27 @@
            (-> (trt/test-runtime)
                (h/->req)
                (sut/make-build-ctx {:main-branch "main"})
-               :source)))))
+               :source))))
+
+  (testing "params"
+    (testing "are added from body and encrypted"
+      (let [p (-> (trt/test-runtime)
+                  (h/->req)
+                  (assoc-in [:parameters :body :params] {"key" "value"})
+                  (assoc-in [:parameters :path :org-id] (cuid/random-cuid))
+                  (sut/make-build-ctx {})
+                  :params)]
+        (is (= ["key"] (keys p)))
+        (is (string? (get p "key")))))
+
+    (testing "converts keywords to strings"
+      (let [p (-> (trt/test-runtime)
+                  (h/->req)
+                  (assoc-in [:parameters :body :params] {:key "value"})
+                  (assoc-in [:parameters :path :org-id] (cuid/random-cuid))
+                  (sut/make-build-ctx {})
+                  :params)]
+        (is (= ["key"] (keys p)))))))
 
 (deftest update-user
   (testing "updates user in storage"

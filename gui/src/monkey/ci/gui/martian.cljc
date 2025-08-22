@@ -108,6 +108,8 @@
   {(s/optional-key :branch) s/Str
    (s/optional-key :tag) s/Str
    (s/optional-key :commit-id) s/Str
+   ;; If we use string keys here, martian drops the parameters due to schema coercion (I think).
+   ;; But now it sends them as keywords, which results in a 400 error on client side.
    (s/optional-key :params) {s/Any s/Str}})
 
 (def Date #"\d{4}-\d{2}-\d{2}")
