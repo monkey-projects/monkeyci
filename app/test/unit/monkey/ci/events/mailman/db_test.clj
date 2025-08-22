@@ -217,6 +217,25 @@
           (is (= build (-> (leave ctx) :result :build)))
           (is (empty? (st/list-org-credit-consumptions s (:org-id build)))))))))
 
+(deftest save-runner-details
+  (h/with-memory-store s
+    (let [{:keys [enter] :as i} sut/save-runner-details]
+      (is (keyword? (:name i)))
+
+      (testing "`enter` saves runner details from event"
+        (let [details {:runner :test
+                       :prop "Arbitrary property"}
+              build (h/gen-build)
+              sid (st/build-sid build)]
+          (is (some? (st/save-build s build)))
+          (is (some? (-> {:event
+                          {:sid sid
+                           :runner-details details}}
+                         (emi/set-db s)
+                         (enter))))
+          (is (= details
+                 (st/find-runner-details s sid))))))))
+
 (deftest check-credits
   (let [build (h/gen-build)
         ctx {:event {:type :build/triggered
@@ -244,18 +263,19 @@
                                :type))))))
 
 (deftest build-initializing
-  (let [build (h/gen-build)
-        r (-> {:event {:type :build/initializing
-                       :sid (sut/build->sid build)
-                       :build {}}}
-              (sut/set-build build)
-              (sut/build-initializing))]
-    (testing "returns `build/updated` event"
-      (validate-spec ::se/event r)
-      (is (= :build/updated (:type r))))
+  (h/with-memory-store s
+    (let [build (h/gen-build)
+          r (-> {:event {:type :build/initializing
+                         :sid (sut/build->sid build)
+                         :build {}}}
+                (sut/set-build build)
+                (sut/build-initializing))]
+      (testing "returns `build/updated` event"
+        (validate-spec ::se/event r)
+        (is (= :build/updated (:type r))))
 
-    (testing "marks build as initializing"
-      (is (= :initializing (get-in r [:build :status]))))))
+      (testing "marks build as initializing"
+        (is (= :initializing (get-in r [:build :status])))))))
 
 (deftest build-start
   (let [build (h/gen-build)

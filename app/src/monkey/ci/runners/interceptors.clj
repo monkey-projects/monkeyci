@@ -11,6 +11,7 @@
    :enter (fn [ctx]
             (let [sid (get-in ctx [:event :sid])
                   details (get-details ctx)]
-              (log/debug "Saving runner details:" details)
-              (st/save-runner-details (emi/get-db ctx) sid details)
+              (when details
+                (log/debug "Saving runner details:" details)
+                (st/save-runner-details (emi/get-db ctx) sid details))
               ctx))})

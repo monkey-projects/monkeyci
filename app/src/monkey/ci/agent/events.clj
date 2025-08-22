@@ -171,10 +171,10 @@
    :leave (fn [ctx]
             (assoc ctx :result [(-> (b/build-init-evt (get-build ctx))
                                     (assoc :runner-details
-                                           (-> {:runner :agent}
-                                               (merge (-> ctx
-                                                          (get-config)
-                                                          :runner-details)))))]))})
+                                           (-> ctx
+                                               (get-config)
+                                               :runner-details
+                                               (assoc :runner :agent))))]))})
 
 (def cleanup
   "Interceptor that deletes all files from a build, after build end"

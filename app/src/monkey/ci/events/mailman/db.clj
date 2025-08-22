@@ -9,7 +9,8 @@
              [storage :as st]
              [time :as t]]
             [monkey.ci.events.mailman :as em]
-            [monkey.ci.events.mailman.interceptors :as emi]))
+            [monkey.ci.events.mailman.interceptors :as emi]
+            [monkey.ci.runners.interceptors :as ri]))
 
 (def get-db emi/get-db)
 
@@ -162,6 +163,10 @@
                                                             :consumed-at (t/now)
                                                             :credit-id (-> avail first :id)))))))
                ctx)))})
+
+(def save-runner-details
+  (ri/save-runner-details
+   (comp :runner-details :event)))
 
 ;;; Event handlers
 
