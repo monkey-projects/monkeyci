@@ -9,10 +9,7 @@
  :repo/info
  :<- [:org/info]
  (fn [c [_ repo-id]]
-   ;; TODO Optimize org structure for faster lookup
-   (some->> c
-            :repos
-            (u/find-by-id repo-id))))
+   (db/find-repo-in-org c repo-id)))
 
 (rf/reg-sub
  :repo/builds

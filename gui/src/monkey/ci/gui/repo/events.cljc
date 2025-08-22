@@ -2,7 +2,7 @@
   (:require [medley.core :as mc]
             [monkey.ci.gui.alerts :as a]
             [monkey.ci.gui.apis.github]
-            [monkey.ci.gui.org.db :as cdb]
+            [monkey.ci.gui.org.db :as odb]
             [monkey.ci.gui.loader :as lo]
             [monkey.ci.gui.repo.db :as db]
             [monkey.ci.gui.routing :as r]
@@ -32,7 +32,7 @@
  :repo/load
  ;; Since repos are part of the org, this actually loads the org.
  (fn [{:keys [db]} [_ org-id]]
-   (let [existing (cdb/org db)]
+   (let [existing (odb/org db)]
      (cond-> {:db (db/set-builds db nil)}
        (not existing)
        (assoc :dispatch [:org/load org-id])))))
@@ -84,6 +84,13 @@
    (when (for-repo? db evt)
      (handle-event db evt))))
 
+(defn- set-default-trigger-ref [f db]
+  (let [b (some-> (db/find-repo-in-org (odb/get-org db) (r/repo-id db))
+                  :main-branch)]
+    (cond-> f
+      b (assoc :trigger-type "branch"
+               :trigger-ref b))))
+
 (rf/reg-event-db
  :repo/show-trigger-build
  (fn [db _]
@@ -92,6 +99,7 @@
        (db/update-trigger-form
         (fn [{:keys [params] :as f}]
           (cond-> f
+            (empty? f) (set-default-trigger-ref db)
             ;; Add a single empty param for input
             (empty? params) (assoc :params [{:name "" :value ""}])))))))
 
@@ -277,7 +285,7 @@
  :repo/save--success
  (fn [db [_ new? {:keys [body]}]]
    (-> db
-       (cdb/replace-repo body)
+       (odb/replace-repo body)
        (db/unmark-saving)
        (db/set-edit-alerts [(if new?
                               a/repo-create-success
@@ -311,11 +319,11 @@
  (fn [{:keys [db]} _]
    (let [params (-> (r/current db) (r/path-params))
          repo-id (:repo-id params)
-         repo (u/find-by-id repo-id (:repos (cdb/get-org db)))]
+         repo (u/find-by-id repo-id (:repos (odb/get-org db)))]
      {:db (-> db
               (db/unmark-deleting)
-              (cdb/update-org remove-repo repo-id)
-              (cdb/set-alerts
+              (odb/update-org remove-repo repo-id)
+              (odb/set-alerts
                [{:type :info
                  :message (str "Repository " (:name repo) " has been deleted.")}]))
       :dispatch [:route/goto :page/org (select-keys params [:org-id])]})))

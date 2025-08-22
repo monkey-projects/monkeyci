@@ -1,6 +1,7 @@
 (ns monkey.ci.gui.repo.db
   (:require [medley.core :as mc]
-            [monkey.ci.gui.loader :as lo]))
+            [monkey.ci.gui.loader :as lo]
+            [monkey.ci.gui.utils :as u]))
 
 (def id ::repo)
 
@@ -18,6 +19,12 @@
 
 (defn set-builds [db b]
   (lo/set-value db id b))
+
+(defn find-repo-in-org [o repo-id]
+  ;; TODO Optimize org structure for faster lookup
+  (some->> o
+           :repos
+           (u/find-by-id repo-id)))
 
 (def build-uid (juxt :org-id :repo-id :build-id))
 

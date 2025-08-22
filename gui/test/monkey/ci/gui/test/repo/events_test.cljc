@@ -4,6 +4,7 @@
             [day8.re-frame.test :as rft]
             [monkey.ci.gui.org.db :as cdb]
             [monkey.ci.gui.loader :as lo]
+            [monkey.ci.gui.org.db :as odb]
             [monkey.ci.gui.repo.db :as db]
             [monkey.ci.gui.repo.events :as sut]
             [monkey.ci.gui.test.fixtures :as f]
@@ -52,7 +53,7 @@
     (rft/run-test-sync
      (let [c (h/catch-fx :martian.re-frame/request)]
        (h/initialize-martian {:get-org {:body {:name "test org"}
-                                             :error-code :no-error}})
+                                        :error-code :no-error}})
        
        (rf/dispatch [:repo/load "test-org-id"])
        (is (= 1 (count @c)))
@@ -63,7 +64,7 @@
      (let [c (h/catch-fx :martian.re-frame/request)]
        (reset! app-db (cdb/set-org {} {:name "existing org"}))
        (h/initialize-martian {:get-org {:body {:name "test org"}
-                                             :error-code :no-error}})
+                                        :error-code :no-error}})
        
        (rf/dispatch [:repo/load "test-org-id"])
        (is (empty? @c)))))
@@ -174,6 +175,22 @@
     (is (= 1 (-> (db/trigger-form @app-db)
                  :params
                  count))))
+
+  (testing "sets ref to repo main branch"
+    (is (some? (reset! app-db (-> {}
+                                  (r/set-current
+                                   {:parameters
+                                    {:path
+                                     {:repo-id "test-repo"}}})
+                                  (odb/set-org {:id "test-org"
+                                                :repos
+                                                [{:id "test-repo"
+                                                  :main-branch "test-branch"}]})
+                                  (db/set-trigger-form {})))))
+    (rf/dispatch-sync [:repo/show-trigger-build])
+    (let [f (db/trigger-form @app-db)]
+      (is (= "branch" (:trigger-type f)))
+      (is (= "test-branch" (:trigger-ref f)))))
 
   (testing "keeps previous trigger form"
     (let [orig {:trigger-ref "original"
