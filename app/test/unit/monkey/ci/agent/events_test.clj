@@ -43,19 +43,28 @@
                       :workspace ws
                       :builds builds
                       :work-dir dir
-                      :ssh-keys-fetcher (constantly nil)}
+                      :ssh-keys-fetcher (constantly nil)
+                      :runner-details {:extra-prop "extra value"}}
                      (sut/make-routes)
                      (mmc/router)
                      (mmc/replace-interceptors [fake-proc]))]
       (testing "`build/queued`"
-        (is (= [:build/initializing]
-               (->> (router {:type :build/queued
-                             :sid (b/sid build)
-                             :build build})
-                    first
-                    :result
-                    (map :type)))
-            "fires build/initializing")
+        (let [r (->> (router {:type :build/queued
+                              :sid (b/sid build)
+                              :build build})
+                      first
+                      :result)]
+          (testing "fires build/initializing"
+            (is (= [:build/initializing]
+                   (map :type r))))
+
+          (testing "provides runner details"
+            (let [{d :runner-details :as e} (first r)]
+              (is (some? d))
+              (is (= :agent (:runner d))
+                  "sets runner to agent")
+              (is (= "extra value" (:extra-prop d))
+                  "adds additional configuration properties"))))
 
         (testing "starts build container"
           (is (= 1 (count @procs))))
@@ -311,5 +320,4 @@
             (let [ctx (sut/set-config base-ctx conf)]
               (is (= ctx (leave ctx)))
               (is (not (fs/exists? wd))))))))))
-
 

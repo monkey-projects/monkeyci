@@ -9,7 +9,8 @@
              [storage :as st]
              [time :as t]]
             [monkey.ci.events.mailman :as em]
-            [monkey.ci.events.mailman.interceptors :as emi]))
+            [monkey.ci.events.mailman.interceptors :as emi]
+            [monkey.ci.runners.interceptors :as ri]))
 
 (def get-db emi/get-db)
 
@@ -163,6 +164,10 @@
                                                             :credit-id (-> avail first :id)))))))
                ctx)))})
 
+(def save-runner-details
+  (ri/save-runner-details
+   (comp :runner-details :event)))
+
 ;;; Event handlers
 
 (defn check-credits
@@ -197,6 +202,7 @@
 
 (def build-initializing
   "Updates build state to `initializing`.  Returns a consolidated `build/updated` event."
+  ;; TODO Save runner details if any
   (build-update (fn [b _] (assoc b :status :initializing))))
 
 (def build-start

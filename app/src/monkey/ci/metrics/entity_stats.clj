@@ -10,10 +10,12 @@
   "Creates a gauge that returns number of users in db"
   [st reg]
   (p/make-gauge (c/metric-id ["user" "count"]) reg
-                {:callback #(st/count-users st)}))
+                {:callback #(st/count-users st)
+                 :description "Total number of users in the database"}))
 
 (defn org-count-gauge
   "Creates a gauge that returns number of organizations in db"
   [st reg]
   (p/make-gauge (c/metric-id ["org" "count"]) reg
-                {:callback #(st/count-orgs st)}))
+                {:callback #(st/count-orgs st)
+                 :description "Total number of organizations in the database"}))

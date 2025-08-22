@@ -21,6 +21,7 @@
              [version :as v]]
             [monkey.ci.build.api-server :as bas]
             [monkey.ci.events.mailman.interceptors :as emi]
+            [monkey.ci.runners.interceptors :as ri]
             [monkey.ci.script.config :as sc]
             [monkey.ci.web.auth :as auth]
             [monkey.oci.container-instance.core :as ci]))
@@ -275,14 +276,10 @@
 (def save-runner-details
   "Interceptor that stores build runner details for oci, such as container instance ocid.
    This assumes the db is present in the context."
-  {:name ::save-runner-details
-   :enter (fn [ctx]
-            (let [sid (get-in ctx [:event :sid])
-                  details {:runner :oci
-                           :details {:instance-id (get-in (oci/get-ci-response ctx) [:body :id])}}]
-              (log/debug "Saving runner details:" details)
-              (st/save-runner-details (emi/get-db ctx) sid details)
-              ctx))})
+  (ri/save-runner-details
+   (fn [ctx]
+     {:runner :oci
+      :details {:instance-id (get-in (oci/get-ci-response ctx) [:body :id])}})))
 
 (def load-instance-id
   "Interceptor that fetches build runner instance id from the db.

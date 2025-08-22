@@ -14,6 +14,7 @@
              [mailman :as em]
              [polling :as ep]]
             [monkey.ci.events.mailman.interceptors :as emi]
+            [monkey.ci.runners.interceptors :as ri]
             [monkey.ci.script.config :as sc]
             [monkey.mailman.core :as mmc]))
 
@@ -168,7 +169,12 @@
 (def result-build-init-evt
   {:name ::result-build-init-evt
    :leave (fn [ctx]
-            (assoc ctx :result [(b/build-init-evt (get-build ctx))]))})
+            (assoc ctx :result [(-> (b/build-init-evt (get-build ctx))
+                                    (assoc :runner-details
+                                           (-> ctx
+                                               (get-config)
+                                               :runner-details
+                                               (assoc :runner :agent))))]))})
 
 (def cleanup
   "Interceptor that deletes all files from a build, after build end"
