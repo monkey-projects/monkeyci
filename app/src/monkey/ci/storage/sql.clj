@@ -201,6 +201,9 @@
   (->> (ec/select-orgs (get-conn st) [:in :cuid (distinct ids)])
        (map db->org)))
 
+(defn- count-orgs [st]
+  (ec/count-entities (get-conn st) :orgs))
+
 (defn- global-sid? [type sid]
   (= [st/global (name type)] (take 2 sid)))
 
@@ -403,6 +406,9 @@
 (defn- select-user-orgs [st id]
   (->> (eu/select-user-orgs (get-conn st) id)
        (map db->org-with-repos)))
+
+(defn- count-users [st]
+  (ec/count-entities (get-conn st) :users))
 
 (defn build? [sid]
   (and (= "builds" (first sid))
@@ -1085,7 +1091,8 @@
     :list-credit-consumptions select-org-credit-cons
     :list-credit-consumptions-since select-org-credit-cons-since
     :find-latest-builds select-latest-org-builds
-    :find-latest-n-builds select-latest-n-org-builds}
+    :find-latest-n-builds select-latest-n-org-builds
+    :count count-orgs}
    :repo
    {:list-display-ids select-repo-display-ids
     :find-next-build-idx select-next-build-idx
@@ -1093,7 +1100,8 @@
     :delete delete-repo}
    :user
    {:find select-user
-    :orgs select-user-orgs}
+    :orgs select-user-orgs
+    :count count-users}
    :join-request
    {:list-user select-user-join-requests}
    :build

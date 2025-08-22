@@ -1,7 +1,7 @@
 (ns monkey.ci.metrics.events
   "Event handlers that update metrics"
   (:require [monkey.ci.metrics
-             [core :as c]
+             [common :as c]
              [prometheus :as prom]]))
 
 (def get-counter ::counter)

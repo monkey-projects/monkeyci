@@ -130,6 +130,13 @@
        :else
        []))))
 
+(def count-orgs
+  (override-or
+   [:org :count]
+   (fn [s]
+     (-> (p/list-obj s (global-sid :orgs))
+         (count)))))
+
 (def save-repo
   "Saves the repository by updating the org it belongs to"
   (override-or
@@ -554,6 +561,13 @@
               (mapcat find-typed-users)
               (filter (comp (partial = id) :id))
               (first)))))))
+
+(def count-users
+  (override-or
+   [:user :count]
+   (fn [s]
+     (-> (p/list-obj s [global users])
+         (count)))))
 
 (def list-user-orgs
   (override-or

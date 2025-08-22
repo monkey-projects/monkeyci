@@ -21,7 +21,10 @@
         (let [r (sut/find-orgs st (->> orgs
                                             (take 2)
                                             (map :id)))]
-          (is (= (take 2 orgs) r)))))))
+          (is (= (take 2 orgs) r)))))
+
+    (testing "can count"
+      (is (= 3 (sut/count-orgs st))))))
 
 (deftest webhooks
   (testing "webhook-sid is a sid"
@@ -306,16 +309,17 @@
                :id (sut/new-id)
                :name "test user"
            :email "test@monkeyci.com"}]
-    
-    (testing "can save and find github user"
-      (h/with-memory-store st
-        (is (sid/sid? (sut/save-user st u)))
-        (is (= u (sut/find-user-by-type st [:github 1234])) "can retrieve user by github id")))
 
-    (testing "can save and find user by cuid"
-      (h/with-memory-store st
+    (h/with-memory-store st
+      (testing "can save and find github user"
         (is (sid/sid? (sut/save-user st u)))
-        (is (= u (sut/find-user st (:id u))) "can retrieve user by id")))))
+        (is (= u (sut/find-user-by-type st [:github 1234])) "can retrieve user by github id"))
+
+      (testing "can find user by cuid"
+        (is (= u (sut/find-user st (:id u))) "can retrieve user by id"))
+
+      (testing "can count"
+        (is (= 1 (sut/count-users st)))))))
 
 (deftest update-repo
   (testing "updates repo in org object"

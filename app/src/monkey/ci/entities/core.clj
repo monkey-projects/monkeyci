@@ -99,6 +99,16 @@
                         :from table
                         :where f}))
 
+(defn count-entities
+  "Counts records in a table, with an optional filter"
+  [conn table & [f]]
+  (->> (cond-> {:select [[[:count :*] :c]]
+                :from table}
+         f (assoc :where f))
+       (select conn)
+       (first)
+       :c))
+
 (defn- maybe-comp
   "Takes functions stored at `k` in the maps, and composes them left to right."
   [k & maps]

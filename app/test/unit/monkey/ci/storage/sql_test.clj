@@ -91,7 +91,10 @@
                       (map :id)
                       (set))
                  (->> (map :id r)
-                      (set)))))))))
+                      (set)))))))
+
+    (testing "can count"
+      (is (pos? (st/count-orgs s))))))
 
 (deftest ^:sql repos
   (with-storage conn s
@@ -319,7 +322,10 @@
       
       (testing "can unlink from org"
         (is (sid/sid? (st/save-user s (dissoc user :orgs))))
-        (is (empty? (-> (st/find-user s (:id user)) :orgs)))))))
+        (is (empty? (-> (st/find-user s (:id user)) :orgs))))
+
+      (testing "can count"
+        (is (= 1 (st/count-users s)))))))
 
 (deftest ^:sql builds
   (with-storage conn s
