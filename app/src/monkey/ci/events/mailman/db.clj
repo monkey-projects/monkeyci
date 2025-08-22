@@ -303,7 +303,8 @@
 
      [:build/initializing
       [{:handler build-initializing
-        :interceptors build-int}]]
+        :interceptors (conj build-int
+                            save-runner-details)}]]
 
      [:build/start
       [{:handler build-start
