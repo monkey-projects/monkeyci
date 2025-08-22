@@ -280,7 +280,9 @@
                (new-storage config)
                [:pool])
    :jwk       (new-jwk config)
-   :metrics   (new-metrics)
+   :metrics   (co/using
+               (new-metrics)
+               [:storage])
    :metrics-routes (co/using
                     (new-metrics-routes)
                     [:metrics :mailman])

@@ -140,6 +140,7 @@
 
 (def verifiers
   {"clj"  verify-clj
+   ;; TODO For non-clj, check if the jobs match spec
    "edn"  verify-edn
    "json" verify-json
    "yaml" (partial verify-yaml "yaml")

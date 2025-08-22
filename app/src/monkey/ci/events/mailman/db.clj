@@ -197,6 +197,7 @@
 
 (def build-initializing
   "Updates build state to `initializing`.  Returns a consolidated `build/updated` event."
+  ;; TODO Save runner details if any
   (build-update (fn [b _] (assoc b :status :initializing))))
 
 (def build-start
