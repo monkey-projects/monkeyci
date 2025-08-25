@@ -82,29 +82,46 @@
                         {:name (name k) :value v}))))]
     (mapcat parse-file paths)))
 
+(defn- args->checkout-dir
+  "Calculates checkout dir from cli args.  This can be either the workdir, the
+   local directory, or a temp dir (if git url is specified)."
+  [{:keys [workdir]}]
+  (let [cwd (u/cwd)]
+    (or (some->> workdir
+                 (u/abs-path cwd)
+                 (fs/canonicalize)
+                 str)
+        cwd)))
+
+(defn args->build
+  "Creates a build object from the command line args"
+  [{:keys [workdir dir git-url commit-id branch tag] :as args}]
+  ;; TODO Merge this with build/make-build-ctx?
+  (cond-> {:checkout-dir (args->checkout-dir args)
+           :org-id "local-cust"
+           :repo-id "local-repo"
+           :build-id (b/local-build-id)
+           :dek (codecs/bytes->b64-str (v/generate-key))}
+    git-url (assoc-in [:git :url] git-url)
+    commit-id (assoc-in [:git :ref] commit-id)
+    branch (assoc-in [:git :branch] branch)
+    tag (assoc-in [:git :tag] tag)
+    (and git-url workdir) (assoc-in [:git :dir] workdir)
+    dir (b/set-script-dir dir)))
+
 (defn run-build-local
   "Run a build locally, normally from local source but can also be from a git checkout.
    Returns a deferred that will hold zero if the build succeeds, nonzero if it fails."
-  [{{:keys [workdir dir]} :args :as config}]
-  (let [wd (fs/create-temp-dir) ; TODO Use subdir of current dir .monkeyci?
-        cwd (u/cwd)
-        build (cond-> {:checkout-dir (or (some->> workdir
-                                                  (u/abs-path cwd)
-                                                  (fs/canonicalize)
-                                                  str)
-                                         cwd)
-                       :org-id "local-cust"
-                       :repo-id "local-repo"
-                       :build-id (b/local-build-id)
-                       :dek (codecs/bytes->b64-str (v/generate-key))}
-                dir (b/set-script-dir dir))
+  [{:keys [args] :as config}]
+  (let [wd (fs/create-temp-dir)
+        build (args->build args)
         ;; Allow mailman override for testing
         conf (-> (select-keys config [:mailman :lib-coords :log-config :podman])
                  (lc/set-work-dir wd)
                  (lc/set-build build)
                  (lc/set-params (concat (parse-params (get-in config [:args :param]))
                                         (load-param-files (get-in config [:args :param-file])))))]
-    (log/info "Running local build for src:" (:checkout-dir build))
+    (log/info "Running local build for src at:" (:checkout-dir build))
     (log/debug "Using working directory" (str wd))
     (lr/start-and-post conf (ec/make-event :build/pending
                                            :build build))))

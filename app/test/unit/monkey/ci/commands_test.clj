@@ -3,6 +3,7 @@
             [babashka.fs :as fs]
             [clj-commons.byte-streams :as bs]
             [clojure.spec.alpha :as spec]
+            [clojure.string :as cstr]
             [clojure.test :refer [deftest is testing]]
             [manifold.deferred :as md]
             [monkey.ci
@@ -10,7 +11,8 @@
              [cuid :as cuid]
              [edn :as edn]
              [pem :as pem]
-             [process :as proc]]
+             [process :as proc]
+             [utils :as u]]
             [monkey.ci.runners.controller :as rc]
             [monkey.ci.sidecar
              [config :as cs]
@@ -53,6 +55,62 @@
 
       (testing "creates local data encryption key for build"
         (is (wc/b64-dek? (:dek build)))))))
+
+(deftest args->build
+  (testing "uses workdir as checkout dir"
+    (is (= "/test-wd"
+           (-> {:workdir "/test-wd"}
+               (sut/args->build)
+               :checkout-dir))))
+
+  (testing "when no workdir, uses current dir as checkout dir"
+    (is (= (u/cwd)
+           (-> {}
+               (sut/args->build)
+               :checkout-dir))))
+
+  (testing "contains git url"
+    (is (= "http://git-url"
+           (-> {:git-url "http://git-url"}
+               (sut/args->build)
+               :git
+               :url))))
+
+  (testing "contains commit id as ref"
+    (is (= "test-ref"
+           (-> {:commit-id "test-ref"}
+               (sut/args->build)
+               :git
+               :ref))))
+
+  (testing "contains branch"
+    (is (= "test-ref"
+           (-> {:branch "test-ref"}
+               (sut/args->build)
+               :git
+               :branch))))
+
+  (testing "contains tag"
+    (is (= "test-ref"
+           (-> {:tag "test-ref"}
+               (sut/args->build)
+               :git
+               :tag))))
+
+  (testing "sets workdir as git checkout dir"
+    (is (= "/test/wd"
+           (-> {:workdir "/test/wd"
+                :git-url "http://test-url"}
+               (sut/args->build)
+               :git
+               :dir))))
+
+  #_(testing "when running from git url, uses temp dir as checkout dir"
+      (is (cstr/starts-with?
+           (-> {:git-url "http://test-git-url"}
+               (sut/args->build)
+               :checkout-dir)
+           (System/getProperty "java.io.tmpdir")))))
 
 (deftest parse-params
   (testing "empty when empty input"
