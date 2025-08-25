@@ -48,6 +48,7 @@
             (let [sid (b/sid build)]
               (log/debug "Creating local podman routes for build" build)
               (-> (select-keys c [:mailman :artifacts :cache :workspace :key-decrypter])
+                  (merge (select-keys config [:podman]))
                   (update :artifacts a/make-blob-repository sid)
                   (update :cache c/make-blob-repository sid)
                   (assoc :work-dir (lc/get-jobs-dir config))

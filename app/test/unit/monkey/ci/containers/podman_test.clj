@@ -146,7 +146,14 @@
                       (assoc-in [:job :work-dir] "sub-dir")
                       (sut/build-cmd-args))]
           (is (contains-subseq? cmd ["-v" (str wd ":/home/monkeyci:Z")]))
-          (is (contains-subseq? cmd ["-w" "/home/monkeyci/sub-dir"])))))))
+          (is (contains-subseq? cmd ["-w" "/home/monkeyci/sub-dir"]))))
+
+      (testing "allows overriding podman cmd from opts"
+        (is (= "/usr/local/bin/podman"
+               (-> base-conf
+                   (assoc :podman-cmd "/usr/local/bin/podman")
+                   (sut/build-cmd-args)
+                   first)))))))
 
 (deftest job-work-dir
   (testing "returns context work dir"
@@ -390,6 +397,17 @@
                    (enter)
                    (get-in [:event :job :container/env "test-env"]))))))))
 
+(deftest add-podman-opts
+  (let [opts {:podman-cmd "/test/cmd"}
+        {:keys [enter] :as i} (sut/add-podman-opts opts)]
+    (is (keyword? (:name i)))
+    
+    (testing "`enter` adds podman options to context"
+      (is (= opts
+             (-> {}
+                 (enter)
+                 (sut/podman-opts)))))))
+
 (deftest job-queued
   (testing "returns `job/initializing` event"
     (is (= [:job/initializing]
@@ -442,6 +460,18 @@
                        :image "test-image"}
                  :job-id "test-job"
                  :sid ["test" "build"]}}
+               (sut/prepare-child-cmd)
+               :cmd
+               first))))
+
+  (testing "allows overriding podman cmd"
+    (is (= "/usr/local/bin/podman"
+           (-> {:event
+                {:job {:id "test-job"
+                       :image "test-image"}
+                 :job-id "test-job"
+                 :sid ["test" "build"]}}
+               (sut/set-podman-opts {:podman-cmd "/usr/local/bin/podman"})
                (sut/prepare-child-cmd)
                :cmd
                first))))

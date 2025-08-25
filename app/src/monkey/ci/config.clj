@@ -15,7 +15,7 @@
 
 (def ^:dynamic *global-config-file* "/etc/monkeyci/config.edn")
 (def ^:dynamic *home-config-file* (-> (System/getProperty "user.home")
-                                      (fs/path ".monkeyci" "config.edn")
+                                      (fs/path ".config" "monkeyci" "config.edn")
                                       (fs/canonicalize)
                                       str))
 

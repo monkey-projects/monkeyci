@@ -112,6 +112,9 @@
                       (spit (fs/file (fs/path dest (str idx))) l)))
        (doall)))
 
+(defn podman-cmd [opts]
+  (get opts :podman-cmd "/usr/bin/podman"))
+
 (defn build-cmd-args
   "Builds command line args for the podman executable"
   [{:keys [job sid] base :work-dir sd :script-dir :as opts}]
@@ -124,7 +127,7 @@
              (str (fs/path cwd jwd))
              cwd)
         start "start"
-        base-cmd (cond-> ["/usr/bin/podman" "run"
+        base-cmd (cond-> [(podman-cmd opts) "run"
                           "-t"
                           "--name" cn
                           ;; TODO This is not always available, add an auto-check
@@ -136,7 +139,9 @@
                           "-v" (vol-mnt base cwd)
                           "-v" (vol-mnt sd csd)
                           "-v" (vol-mnt (:log-dir opts) cld)
-                          "-w" wd]
+                          "-w" wd
+                          ;; TODO Allow arbitrary additional command line opts
+                          ]
                    ;; Do not delete container in dev mode
                    (not (:dev-mode opts)) (conj "--rm"))
         env {"MONKEYCI_WORK_DIR" wd
@@ -215,6 +220,13 @@
   (assoc ctx ::key-decrypter kd))
 
 (def get-key-decrypter ::key-decrypter)
+
+(def podman-opts
+  "Additional podman options"
+  ::podman-opts)
+
+(defn set-podman-opts [ctx opts]
+  (assoc ctx podman-opts opts))
 
 ;;; Interceptors
 
@@ -337,6 +349,13 @@
                 (update-in ctx [:event :job]
                            mc/update-existing :container/env decrypt decrypter)))}))
 
+(defn add-podman-opts
+  "Adds podman options to the mailman context"
+  [opts]
+  {:name ::set-podman-opts
+   :enter (fn [ctx]
+            (set-podman-opts ctx opts))})
+
 ;;; Event handlers
 
 (def container-end-evt
@@ -350,11 +369,13 @@
   (let [job (get-in ctx [:event :job])
         log-file (comp fs/file (partial fs/path (fs/create-dirs (get-log-dir ctx))))
         {:keys [job-id sid]} (:event ctx)]
-    {:cmd (build-cmd-args {:job job
-                           :sid (conj sid job-id)
-                           :work-dir (get-work-dir ctx)
-                           :log-dir (get-log-dir ctx)
-                           :script-dir (get-script-dir ctx)})
+    {:cmd (->> {:job job
+                :sid (conj sid job-id)
+                :work-dir (get-work-dir ctx)
+                :log-dir (get-log-dir ctx)
+                :script-dir (get-script-dir ctx)}
+               (merge (podman-opts ctx))
+               (build-cmd-args))
      :dir (job-work-dir ctx job)
      :out (log-file "out.log")
      :err (log-file "err.log")
@@ -395,6 +416,7 @@
         job-ctx (make-job-ctx conf)
         wd (or work-dir (str (fs/create-temp-dir)))]
     (log/info "Creating podman container routes using work dir" wd)
+    (log/debug "Additional podman options:" (:podman conf))
     [[:container/job-queued
       [{:handler prepare-child-cmd
         :interceptors [emi/handle-job-error
@@ -410,7 +432,8 @@
                        (cache/restore-interceptor emi/get-job-ctx)
                        (art/restore-interceptor emi/get-job-ctx)
                        decrypt-env
-                       emi/start-process]}
+                       emi/start-process
+                       (add-podman-opts (:podman conf))]}
        {:handler (partial job-queued conf)
         :interceptors [(add-job-dir wd)]}]]
 

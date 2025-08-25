@@ -143,6 +143,6 @@
 
 (deftest home-config-file
   (testing "is by default in the user home dir"
-    (is (= (str (System/getProperty "user.home") "/.monkeyci/config.edn")
+    (is (= (str (System/getProperty "user.home") "/.config/monkeyci/config.edn")
            sut/*home-config-file*))))
 

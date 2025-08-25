@@ -98,7 +98,8 @@
                        :build-id (b/local-build-id)
                        :dek (codecs/bytes->b64-str (v/generate-key))}
                 dir (b/set-script-dir dir))
-        conf (-> (select-keys config [:mailman :lib-coords :log-config]) ; Allow override for testing
+        ;; Allow mailman override for testing
+        conf (-> (select-keys config [:mailman :lib-coords :log-config :podman])
                  (lc/set-work-dir wd)
                  (lc/set-build build)
                  (lc/set-params (concat (parse-params (get-in config [:args :param]))
