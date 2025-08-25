@@ -80,9 +80,10 @@
 (defrecord Metrics []
   co/Lifecycle
   (start [this]
-    (assoc this :registry (-> (make-registry)
-                              (add-oci-metrics)
-                              (add-entity-metrics (:storage this)))))
+    (let [st (:storage this)]
+      (assoc this :registry (cond-> (make-registry)
+                              true (add-oci-metrics)
+                              st (add-entity-metrics st)))))
 
   (stop [this]
     (remove-signal-handlers)
