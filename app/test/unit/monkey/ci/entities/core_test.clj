@@ -65,7 +65,11 @@
 
       (testing "can update"
         (is (some? (sut/update-repo conn (assoc r :name "updated"))))
-        (is (= "updated" (:name (sut/select-repo conn (sut/by-id (:id r))))))))
+        (is (= "updated" (:name (sut/select-repo conn (sut/by-id (:id r)))))))
+
+      (testing "can mark public"
+        (is (some? (sut/update-repo conn (assoc r :public true))))
+        (is (true? (:public (sut/select-repo conn (sut/by-id (:id r))))))))
 
     (testing "throws on invalid record"
       (is (thrown? Exception (sut/insert-repo conn {:name "orgless repo"}))))))

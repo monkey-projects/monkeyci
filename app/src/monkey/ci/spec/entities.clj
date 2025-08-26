@@ -40,10 +40,11 @@
 
 (s/def :entity/org-id ::c/cuid)
 (s/def :entity/github-id int?)
+(s/def :entity/public boolean?)
 
 (s/def :entity/repo
   (s/keys :req-un [:entity/org-id :entity/name :display/id]
-          :opt-un [:git/url :git/main-branch :entity/github-id :entity/labels]))
+          :opt-un [:git/url :git/main-branch :entity/github-id :entity/labels :entity/public]))
 
 (s/def :entity/repo-id string?)
 (s/def :entity/build-id string?)

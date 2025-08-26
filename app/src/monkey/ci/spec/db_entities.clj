@@ -37,10 +37,11 @@
 
 (s/def :db/display-id string?)
 (s/def :db/org-id id?)
+(s/def :db/public boolean?)
 
 (s/def :db/repo
   (-> (s/keys :req-un [:db/display-id :db/org-id :db/name]
-              :opt-un [:git/url :git/main-branch])
+              :opt-un [:git/url :git/main-branch :b/public])
       (s/merge :db/common)))
 
 (s/def :db/repo-id id?)
