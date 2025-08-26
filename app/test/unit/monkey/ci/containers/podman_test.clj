@@ -454,7 +454,7 @@
 
 (deftest prepare-child-cmd
   (testing "executes podman"
-    (is (= "/usr/bin/podman"
+    (is (= "podman"
            (-> {:event
                 {:job {:id "test-job"
                        :image "test-image"}

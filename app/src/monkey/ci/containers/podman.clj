@@ -113,7 +113,7 @@
        (doall)))
 
 (defn podman-cmd [opts]
-  (get opts :podman-cmd "/usr/bin/podman"))
+  (get opts :podman-cmd "podman"))
 
 (defn build-cmd-args
   "Builds command line args for the podman executable"
