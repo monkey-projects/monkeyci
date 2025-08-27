@@ -325,6 +325,16 @@
                         :maxlength 100}
                        :help-msg
                        "Required when you want to determine the 'main branch' in the build script."}]]
+       [:div.mb-2.form-check.form-switch
+        [:input.form-check-input
+         {:type :checkbox
+          :role :switch
+          :value :public
+          :on-change (u/form-evt-handler [:repo/public-toggled] u/evt->checked)
+          :id :public}]
+        [:label.form-check-label
+         {:for :public}
+         "Public visibility"]]
        [:div.mb-2
         [github-id-input @e]]]
       [:div.col
