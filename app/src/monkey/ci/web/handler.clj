@@ -500,7 +500,6 @@
      ;; Disabled, results in 405 errors for some reason
      ;;:compile rc/compile-request-coercers
      :reitit.middleware/registry
-     ;; TODO Move the dev-mode checks into the runtime startup code
      (->> {:github-security
            [github/validate-security]
            :github-app-security
@@ -511,6 +510,7 @@
            [auth/org-authorization]
            :sysadmin-check
            [auth/sysadmin-authorization]}
+          ;; TODO Move the dev-mode checks into the runtime startup code
           (mc/map-vals (partial non-dev rt)))}))
   ([rt]
    (make-router rt routes)))

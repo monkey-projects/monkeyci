@@ -98,20 +98,6 @@
   {:pub (.getPublic kp)
    :priv (.getPrivate kp)})
 
-(defn ^:deprecated config->keypair
-  "Loads private and public keys from the app config, returns a map that can be
-   used in the context `:jwk`."
-  [conf]
-  (log/debug "Configured JWK:" (:jwk conf))
-  (let [m {:private-key (comp bk/str->private-key u/try-slurp)
-           :public-key (comp bk/str->public-key u/try-slurp)}
-        loaded-keys (mapv (fn [[k f]]
-                            (when-let [v (get-in conf [:jwk k])]
-                              (f v)))
-                          m)]
-    (when (every? some? loaded-keys)
-      (zipmap [:priv :pub] loaded-keys))))
-
 (defn make-jwk
   "Creates a JWK object from a public key that can be exposed for external 
    verification."
@@ -194,12 +180,43 @@
         (query-auth-to-bearer)
         (rmp/wrap-params))))
 
+(defn allowed? [r]
+  (or (nil? r) (= :granted (:permission r))))
+
+(defn denied? [r]
+  (= :denied (:permission r)))
+
+(defn auth-chain
+  "Applies the authorization chain to the request.  The chain consists of
+   functions that are applied to the request.  Each part can return a
+   non-nil value, which is interpreted as a security advise.  This can
+   be to deny, or allow the request.  If the request is denied, an 
+   authorization exception is thrown.  This system allows a large degree
+   of autonomy to each checker.  They can inspect the previous advises,
+   and modify their response accordingly."
+  [chain req]
+  (->> chain
+       (reduce (fn [r c]
+                 (->> (conj r (c r req))
+                      (remove nil?)
+                      vec))
+               [])
+       last))
+
+(defn chain-result->exception [r]
+  (when (denied? r)
+    (ex-info (or (:reason r) "You do not have access to this resource")
+             (-> r
+                 (dissoc :reason)
+                 (assoc :type :auth/unauthorized)))))
+
 (defn sysadmin? [user]
   (some-> user :type name (= role-sysadmin)))
 
 (defn- check-org-authorization!
   "Checks if the request identity grants access to the org specified in 
-   the parameters path."
+   the parameters path.  If not, an authorization exception is thrown
+   and a 403 response is returned."
   [req]
   (when-let [cid (get-in req [:parameters :path :org-id])]
     (when-not (and (ba/authenticated? req)
@@ -220,7 +237,7 @@
 (defn sysadmin-authorization
   [h]
   (fn [req]
-    (when (not= :sysadmin (-> req :identity :type keyword))
+    (when-not (sysadmin? (:identity req))
       (throw (ex-info "Only system administrators have access to this area"
                       {:type :auth/unauthorized})))
     (h req)))

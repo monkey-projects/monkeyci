@@ -150,6 +150,8 @@
   (let [loaded? (rf/subscribe [:builds/loaded?])]
     (when-not @loaded?
       (rf/dispatch [:builds/load]))
+    ;; TODO If repo is public, all users have access but they can't change
+    ;; anything.
     [:<>
      [:div.d-flex.gap-1.align-items-start
       [:h4.me-2.text-primary [:span.me-2 co/build-icon] "Builds"]
