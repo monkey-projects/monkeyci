@@ -136,6 +136,9 @@
       ;; Other records are deleted by cascading
       (pos? (ec/delete-repos conn (ec/by-id repo-id))))))
 
+(defn- count-repos [st]
+  (ec/count-entities (get-conn st) :repos))
+
 (defn- select-repo-display-ids [st org-id]
   (er/repo-display-ids (get-conn st) org-id))
 
@@ -1097,7 +1100,8 @@
    {:list-display-ids select-repo-display-ids
     :find-next-build-idx select-next-build-idx
     :find-webhooks select-repo-webhooks
-    :delete delete-repo}
+    :delete delete-repo
+    :count count-repos}
    :user
    {:find select-user
     :orgs select-user-orgs

@@ -19,3 +19,10 @@
   (p/make-gauge (c/metric-id ["org" "count"]) reg
                 {:callback #(st/count-orgs st)
                  :description "Total number of organizations in the database"}))
+
+(defn repo-count-gauge
+  "Creates a gauge that returns number of repos in db"
+  [st reg]
+  (p/make-gauge (c/metric-id ["repo" "count"]) reg
+                {:callback #(st/count-repos st)
+                 :description "Total number of repositories in the database"}))

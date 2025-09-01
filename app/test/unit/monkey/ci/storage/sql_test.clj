@@ -168,7 +168,10 @@
           (is (nil? (st/find-repo s sid)))
           (is (not (contains? (-> (st/find-org s (:id org))
                                   :repos)
-                              (:id repo)))))))))
+                              (:id repo))))))
+
+      (testing "can count"
+        (is (= 1 (st/count-repos s)))))))
 
 (deftest ^:sql watched-github-repos
   (with-storage conn s
