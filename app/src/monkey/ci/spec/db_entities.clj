@@ -41,7 +41,7 @@
 
 (s/def :db/repo
   (-> (s/keys :req-un [:db/display-id :db/org-id :db/name]
-              :opt-un [:git/url :git/main-branch :b/public])
+              :opt-un [:git/url :git/main-branch :db/public])
       (s/merge :db/common)))
 
 (s/def :db/repo-id id?)
