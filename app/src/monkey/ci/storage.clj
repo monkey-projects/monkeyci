@@ -172,8 +172,8 @@
   "Deletes repository with given sid, including all builds"
   (override-or
    [:repo :delete]
-   (fn [s [cust-id repo-id :as sid]]
-     (when (some? (update-obj s (org-sid cust-id) update :repos dissoc repo-id))
+   (fn [s [org-id repo-id :as sid]]
+     (when (some? (update-obj s (org-sid org-id) update :repos dissoc repo-id))
        ;; Delete all builds
        (->> (list-build-ids s sid)
             (map (comp sid/->sid (partial concat [builds] sid) vector))
@@ -186,6 +186,15 @@
             (map (comp (partial p/delete-obj s) webhook-sid :id))
             (doall))
        true))))
+
+(def count-repos
+  (override-or
+   [:repo :count]
+   (fn [s]
+     (->> (p/list-obj s (global-sid :orgs))
+          (map (partial find-org s))
+          (map (comp count :repos))
+          (reduce +)))))
 
 (def list-repo-display-ids
   "Lists all display ids for the repos for given org"

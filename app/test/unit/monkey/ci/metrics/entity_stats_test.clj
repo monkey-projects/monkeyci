@@ -30,3 +30,12 @@
         (is (= 0.0 (gauge-val g)))
         (is (some? (st/save-org st (h/gen-org))))
         (is (= 1.0 (gauge-val g)))))))
+
+(deftest repo-count-gauge
+  (h/with-memory-store st
+    (testing "provides number of repos in storage"
+      (let [reg (p/make-registry)
+            g (sut/repo-count-gauge st reg)]
+        (is (= 0.0 (gauge-val g)))
+        (is (some? (st/save-repo st (h/gen-repo))))
+        (is (= 1.0 (gauge-val g)))))))

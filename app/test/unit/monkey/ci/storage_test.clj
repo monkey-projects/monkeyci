@@ -359,6 +359,17 @@
       (testing "removes webhooks for repo"
         (is (empty? (sut/find-webhook st (:id wh))))))))
 
+(deftest count-repo
+  (testing "counts repos in storage"
+    (h/with-memory-store st
+      (let [[oid rid] (repeatedly sut/new-id)]
+        (is (some? (sut/save-org st {:id oid})))
+        (is (= 0 (sut/count-repos st)))
+        (is (some? (sut/save-repo st {:id rid
+                                      :org-id oid
+                                      :url "http://test-repo"})))
+        (is (= 1 (sut/count-repos st)))))))
+
 (deftest watch-github-repo
   (h/with-memory-store st
     (let [[cid rid gid] (repeatedly sut/new-id)

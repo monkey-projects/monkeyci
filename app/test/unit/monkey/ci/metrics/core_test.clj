@@ -91,6 +91,9 @@
 
       (testing "contains org count"
         (is (cs/includes? (sut/scrape (:registry co)) "monkeyci_org_count")))
+
+      (testing "contains repo count"
+        (is (cs/includes? (sut/scrape (:registry co)) "monkeyci_repo_count")))
       
       (finally
         (co/stop co)))))
