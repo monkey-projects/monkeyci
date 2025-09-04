@@ -66,13 +66,15 @@
                         :dek (:enc dek)})))
 
 (defn create-org [req]
-  ;; Remove the transaction when it's configured on all endpoints
-  (st/with-transaction (c/req->storage req) st
-    (let [creator (c/entity-creator (fn [_ org]
-                                      ;; Use trx storage
-                                      (st/save-org st org))
-                                    c/default-id)]
-      (when-let [reply (creator req)]
+  (let [creator (c/entity-creator (fn [_ org]
+                                    ;; Use trx storage
+                                    (st/save-org (c/req->storage req) org))
+                                  c/default-id)]
+    (when-let [reply (creator req)]
+      ;; Create the org outside of the transaction because we need the native
+      ;; id when using sql database, so we can't look it up.
+      ;; FIXME Rework the sql impl so we keep track of the ids of newly inserted records.
+      (st/with-transaction (c/req->storage req) st
         (let [org-id (get-in reply [:body :id])]
           (maybe-link-user req st org-id)
           (create-subscription st org-id)

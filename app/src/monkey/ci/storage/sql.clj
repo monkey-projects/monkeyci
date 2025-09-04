@@ -789,6 +789,7 @@
 (defn- upsert-crypto [conn crypto]
   (let [org (ec/select-org conn (ec/by-cuid (:org-id crypto)))
         existing (ec/select-crypto conn (ec/by-org (:id org)))]
+    (log/debug "Upserting crypto" crypto)
     (if existing
       (update-crypto conn crypto existing)
       (insert-crypto conn crypto (:id org)))))
