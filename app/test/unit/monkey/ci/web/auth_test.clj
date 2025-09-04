@@ -93,6 +93,25 @@
       (is (sut/allowed? (sut/auth-chain chain {:request-method :get})))
       (is (sut/denied? (sut/auth-chain chain {:request-method :post}))))))
 
+(deftest auth-chain-middleware
+  (let [target (constantly ::handled)
+        w (sut/auth-chain-middleware target)]
+    (testing "allows when no checkers"
+      (is (= ::handled
+             (w {}))))
+
+    (testing "denies when chain denies"
+      (is (thrown? Exception
+                   (-> {:auth-chain [(constantly {:permission :denied})]}
+                       (h/->match-data)
+                       (w)))))
+
+    (testing "allows when chain allows"
+      (is (= ::handled
+             (-> {:auth-chain [(constantly nil)]}
+                 (h/->match-data)
+                 (w)))))))
+
 (deftest chain-result->exception
   (testing "`nil` if approved"
     (is (nil? (sut/chain-result->exception nil)))

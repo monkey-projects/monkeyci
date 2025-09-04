@@ -9,6 +9,7 @@
             [medley.core :as mc]
             [monkey.ci
              [runtime :as rt]
+             [utils :as u]
              [version :as v]]
             [monkey.ci.metrics.core :as metrics]
             [monkey.ci.web
@@ -271,6 +272,9 @@
                              :parameters
                              {:body {:token s/Str}}}}]]]]])
 
+(defn- add-repo-checker [routes]
+  (u/update-nth routes 1 u/update-nth 1 assoc :auth-chain [auth/public-repo-checker]))
+
 (def repo-routes
   ["/repo"
    (-> (c/generic-routes
@@ -286,7 +290,8 @@
                         repo-webhook-routes
                         build-routes
                         unwatch-routes]})
-       (conj watch-routes))])
+       (conj watch-routes)
+       (add-repo-checker))])
 
 (s/defschema JoinRequestSchema
   {:org-id Id
@@ -362,7 +367,7 @@
 
 (def org-routes
   ["/org"
-   {:middleware [:org-check]}
+   {:auth-chain [auth/org-auth-checker]}
    (c/generic-routes
     {:creator org-api/create-org
      :updater org-api/update-org
@@ -492,7 +497,8 @@
                                      wm/default-middleware
                                      [wm/kebab-case-query
                                       wm/log-request
-                                      wm/post-events]))
+                                      wm/post-events
+                                      :auth-chain]))
             :muuntaja (c/make-muuntaja)
             :coercion reitit.coercion.schema/coercion
             ;; Wrap the runtime in a type, so reitit doesn't change the records into maps
@@ -506,8 +512,10 @@
            [github/validate-security (constantly (get-in (rt/config rt) [:github :webhook-secret]))]
            :bitbucket-security
            [bitbucket/validate-security]
-           :org-check
-           [auth/org-authorization]
+           ;; :org-check
+           ;; [auth/org-authorization]
+           :auth-chain
+           [auth/auth-chain-middleware]
            :sysadmin-check
            [auth/sysadmin-authorization]}
           ;; TODO Move the dev-mode checks into the runtime startup code

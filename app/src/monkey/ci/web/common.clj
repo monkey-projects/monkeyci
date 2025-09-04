@@ -67,10 +67,13 @@
 ;; Reitit rewrites records in the data to hashmaps, so wrap it in a type
 (deftype RuntimeWrapper [runtime])
 
+(def route-data (comp :data :reitit.core/match))
+
 (defn req->rt
   "Gets the runtime from the request"
   [req]
-  (some-> (get-in req [:reitit.core/match :data ::runtime])
+  (some-> (route-data req)
+          ::runtime
           (.runtime)))
 
 (defn from-rt

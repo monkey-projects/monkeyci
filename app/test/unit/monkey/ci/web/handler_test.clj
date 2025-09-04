@@ -463,18 +463,56 @@
                        :status)))))))
 
 (deftest repository-endpoints
-  (let [org-id (st/new-id)]
+  (let [org-id (st/new-id)
+        repo {:name "test repo"
+              :org-id org-id
+              :url "http://test-repo"
+              :labels [{:name "app" :value "test-app"}]}]
     (verify-entity-endpoints {:name "repository"
                               :path (format "/org/%s/repo" org-id)
-                              :base-entity {:name "test repo"
-                                            :org-id org-id
-                                            :url "http://test-repo"
-                                            :labels [{:name "app" :value "test-app"}]}
+                              :base-entity repo
                               :updated-entity {:name "updated repo"}
                               :creator st/save-repo
                               :can-delete? true})
+
+    (testing "public repo"
+      (h/with-memory-store st
+        (let [repo (assoc repo :public true :id "test-repo")
+              kp (auth/generate-keypair)
+              rt (test-rt {:storage st
+                           :jwk (auth/keypair->rt kp)
+                           :config {:dev-mode false}})
+              github-id 12324
+              token-info {:sub (str "github/" github-id)
+                          :role auth/role-user
+                          :exp (+ (u/now) 10000)}
+              make-token (fn [ti]
+                           (auth/sign-jwt ti (.getPrivate kp)))
+              token (make-token token-info)
+              app (sut/make-app rt)
+              path (str "/org/" org-id "/repo/" (:id repo))]
+          (is (some? (st/save-repo st repo)))
+          (is (some? (st/save-user st {:type "github"
+                                       :type-id github-id
+                                       :orgs [org-id]})))
+          
+          (testing "can be viewed"
+            (is (= 200
+                   (-> (mock/request :get path)
+                       (mock/header "authorization" (str "Bearer " token))
+                       (app)
+                       :status))))
+
+          (testing "can not be modified"
+            (is (= 403
+                   (-> (h/json-request :put
+                                       path
+                                       (assoc repo :name "updated repo"))
+                       (mock/header "authorization" (str "Bearer " token))
+                       (app)
+                       :status)))))))
     
-    (testing "`/org/:id`"
+    (testing "`/org/:id/repo`"
       (testing "`/github`"
         (testing "`/watch` starts watching repo"
           (is (= 200 (-> (h/json-request :post
@@ -520,7 +558,7 @@
                   repo-id (st/new-id)
                   wh-id (st/new-id)
                   _ (st/save-org st {:id org-id
-                                          :repos {repo-id {:id repo-id}}})
+                                     :repos {repo-id {:id repo-id}}})
                   _ (st/save-webhook st {:org-id org-id
                                          :repo-id repo-id
                                          :id wh-id

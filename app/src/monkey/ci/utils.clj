@@ -197,3 +197,6 @@
 (defn maybe-deref [x]
   (cond-> x
     (md/deferred? x) (deref)))
+
+(defn update-nth [c idx f & args]
+  (mc/replace-nth idx (apply f (nth c idx) args) c))

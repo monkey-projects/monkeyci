@@ -222,6 +222,21 @@
   (when ex
     (throw ex)))
 
+(defn auth-chain-middleware
+  "Middleware that extracts any authorization checkers from the route data
+   and applies them.  If the chain results in a request denied, a 403 response
+   is returned."
+  [h]
+  (fn [req]
+    (let [checkers (-> req
+                       (c/route-data)
+                       :auth-chain)]
+      (when-let [ex (-> checkers
+                        (auth-chain req)
+                        (chain-result->exception))]
+        (throw ex))
+      (h req))))
+
 (defn org-auth-checker
   "Checks if the user has access to the organization"
   [_ req]
@@ -243,7 +258,7 @@
         (denied "Repository is not public"
                 {:sid sid})))))
 
-(defn- check-org-authorization!
+(defn- ^:deprecated check-org-authorization!
   "Checks if the request identity grants access to the org specified in 
    the parameters path.  If not, an authorization exception is thrown
    and a 403 response is returned."
@@ -253,9 +268,11 @@
       (chain-result->exception)
       (maybe-throw)))
 
-(defn org-authorization
+(defn ^:deprecated org-authorization
   "Middleware that verifies the identity token to check if the user or build has
-   access to the given org."
+   access to the given org.
+
+   Deprecated, use the more generic `auth-chain-middleware` instead."
   [h]
   (fn [req]
     (check-org-authorization! req)
