@@ -112,6 +112,55 @@
       (testing "adds additional values to exception"
         (is (= ::value (::key (ex-data r))))))))
 
+(deftest public-repo-checker
+  (h/with-memory-store st
+    (let [org (h/gen-org)
+          priv-repo (-> (h/gen-repo)
+                        (assoc :org-id (:id org)))
+          pub-repo (-> (h/gen-repo)
+                       (assoc :org-id (:id org)
+                              :public true))
+          req (-> {:storage st}
+                  (h/->req)
+                  (assoc-in [:parameters :path :org-id] (:id org)))]
+      (is (some? (st/save-org st org)))
+      (is (some? (st/save-repo st priv-repo)))
+      (is (some? (st/save-repo st pub-repo)))
+
+      (testing "public repos"
+        (testing "allows access for `GET` requests"
+          (is (nil?
+               (sut/public-repo-checker
+                []
+                (-> req
+                    (assoc :request-method :get)
+                    (assoc-in [:parameters :path :repo-id] (:id pub-repo)))))))
+
+        (testing "allows access for `OPTIONS` requests"
+          (is (nil?
+               (sut/public-repo-checker
+                []
+                (-> req
+                    (assoc :request-method :options)
+                    (assoc-in [:parameters :path :repo-id] (:id pub-repo)))))))
+
+        (testing "does not allow access for destructive requests"
+          (is (sut/denied?
+               (sut/public-repo-checker
+                []
+                (-> req
+                    (assoc :request-method :post)
+                    (assoc-in [:parameters :path :repo-id] (:id pub-repo))))))))
+
+      (testing "does not allow access to private repos"
+        (is (sut/denied?
+             (sut/public-repo-checker
+              []
+              (assoc-in req [:parameters :path :repo-id] (:id priv-repo))))))
+
+      (testing "allows non-repo requests"
+        (is (nil? (sut/public-repo-checker [] req)))))))
+
 (deftest org-authorization
   (let [h (constantly ::ok)
         auth (sut/org-authorization h)]

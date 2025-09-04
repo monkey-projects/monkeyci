@@ -180,11 +180,19 @@
         (query-auth-to-bearer)
         (rmp/wrap-params))))
 
+(defn sysadmin? [user]
+  (some-> user :type name (= role-sysadmin)))
+
 (defn allowed? [r]
   (or (nil? r) (= :granted (:permission r))))
 
 (defn denied? [r]
   (= :denied (:permission r)))
+
+(defn- denied [reason props]
+  (assoc props
+         :permission :denied
+         :reason reason))
 
 (defn auth-chain
   "Applies the authorization chain to the request.  The chain consists of
@@ -210,21 +218,40 @@
                  (dissoc :reason)
                  (assoc :type :auth/unauthorized)))))
 
-(defn sysadmin? [user]
-  (some-> user :type name (= role-sysadmin)))
+(defn- maybe-throw [ex]
+  (when ex
+    (throw ex)))
+
+(defn org-auth-checker
+  "Checks if the user has access to the organization"
+  [_ req]
+  (when-let [oid (get-in req [:parameters :path :org-id])]
+    (when-not (and (ba/authenticated? req)
+                   (or (sysadmin? (:identity req))
+                       (contains? (get-in req [:identity :orgs]) oid)))
+      (denied "Credentials do not grant access to this org"
+              {:org-id oid}))))
+
+(defn public-repo-checker
+  "Checks if the repository that's being accessed is public, and the
+   request method is `GET`."
+  [_ req]
+  (let [sid (c/repo-sid req)]
+    (when-let [repo (st/find-repo (c/req->storage req) sid)]
+      (when-not (and (:public repo)
+                     (#{:get :options} (:request-method req)))
+        (denied "Repository is not public"
+                {:sid sid})))))
 
 (defn- check-org-authorization!
   "Checks if the request identity grants access to the org specified in 
    the parameters path.  If not, an authorization exception is thrown
    and a 403 response is returned."
   [req]
-  (when-let [cid (get-in req [:parameters :path :org-id])]
-    (when-not (and (ba/authenticated? req)
-                   (or (sysadmin? (:identity req))
-                       (contains? (get-in req [:identity :orgs]) cid)))
-      (throw (ex-info "Credentials do not grant access to this org"
-                      {:type :auth/unauthorized
-                       :org-id cid})))))
+  (-> [org-auth-checker]
+      (auth-chain req)
+      (chain-result->exception)
+      (maybe-throw)))
 
 (defn org-authorization
   "Middleware that verifies the identity token to check if the user or build has
