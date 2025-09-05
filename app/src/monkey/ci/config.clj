@@ -13,9 +13,18 @@
              [edn]
              [utils :as u]]))
 
+(defn user-home []
+  (System/getProperty "user.home"))
+
+(defn xdg-config-home []
+  (or (System/getenv "XDG_CONFIG_HOME")
+      (-> (fs/path (user-home) ".config")
+          (fs/canonicalize)
+          str)))
+
 (def ^:dynamic *global-config-file* "/etc/monkeyci/config.edn")
-(def ^:dynamic *home-config-file* (-> (System/getProperty "user.home")
-                                      (fs/path ".config" "monkeyci" "config.edn")
+(def ^:dynamic *home-config-file* (-> (xdg-config-home)
+                                      (fs/path "monkeyci" "config.edn")
                                       (fs/canonicalize)
                                       str))
 

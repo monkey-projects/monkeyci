@@ -98,20 +98,6 @@
   {:pub (.getPublic kp)
    :priv (.getPrivate kp)})
 
-(defn ^:deprecated config->keypair
-  "Loads private and public keys from the app config, returns a map that can be
-   used in the context `:jwk`."
-  [conf]
-  (log/debug "Configured JWK:" (:jwk conf))
-  (let [m {:private-key (comp bk/str->private-key u/try-slurp)
-           :public-key (comp bk/str->public-key u/try-slurp)}
-        loaded-keys (mapv (fn [[k f]]
-                            (when-let [v (get-in conf [:jwk k])]
-                              (f v)))
-                          m)]
-    (when (every? some? loaded-keys)
-      (zipmap [:priv :pub] loaded-keys))))
-
 (defn make-jwk
   "Creates a JWK object from a public key that can be exposed for external 
    verification."
@@ -197,21 +183,123 @@
 (defn sysadmin? [user]
   (some-> user :type name (= role-sysadmin)))
 
-(defn- check-org-authorization!
-  "Checks if the request identity grants access to the org specified in 
-   the parameters path."
-  [req]
-  (when-let [cid (get-in req [:parameters :path :org-id])]
-    (when-not (and (ba/authenticated? req)
-                   (or (sysadmin? (:identity req))
-                       (contains? (get-in req [:identity :orgs]) cid)))
-      (throw (ex-info "Credentials do not grant access to this org"
-                      {:type :auth/unauthorized
-                       :org-id cid})))))
+(defn allowed? [r]
+  (or (nil? r) (= :granted (:permission r))))
 
-(defn org-authorization
+(defn denied? [r]
+  (= :denied (:permission r)))
+
+(defn- denied [reason props]
+  (assoc props
+         :permission :denied
+         :reason reason))
+
+(def granted {:permission :granted})
+
+(defn auth-chain
+  "Applies the authorization chain to the request.  The chain consists of
+   functions that are applied to the request.  Each part can return a
+   non-nil value, which is interpreted as a security advise.  This can
+   be to deny, or allow the request.  If the request is denied, an 
+   authorization exception is thrown.  This system allows a large degree
+   of autonomy to each checker.  They can inspect the previous advises,
+   and modify their response accordingly."
+  [chain req]
+  (log/trace "Verifying auth chain:" chain)
+  (->> chain
+       (reduce (fn [r c]
+                 (->> (conj r (c r req))
+                      (remove nil?)
+                      vec))
+               [])
+       last))
+
+(defn chain-result->exception [r]
+  (when (denied? r)
+    (ex-info (or (:reason r) "You do not have access to this resource")
+             (-> r
+                 (dissoc :reason)
+                 (assoc :type :auth/unauthorized)))))
+
+(defn- maybe-throw [ex]
+  (when ex
+    (throw ex)))
+
+(defn auth-chain-middleware
+  "Middleware that extracts any authorization checkers from the route data
+   and applies them.  If the chain results in a request denied, a 403 response
+   is returned."
+  [h]
+  (fn [req]
+    (let [checkers (-> req
+                       (c/route-data)
+                       :auth-chain)]
+      (when-let [ex (-> checkers
+                        (auth-chain req)
+                        (chain-result->exception))]
+        (throw ex))
+      (h req))))
+
+(defn- denied-no-org-access [org-id]
+  (denied "Credentials do not grant access to this org"
+          {:org-id org-id}))
+
+(defn- org-checker [kind]
+  (fn [_ req]
+    (when-let [oid (get-in req [:parameters kind :org-id])]
+      (when-not (and (ba/authenticated? req)
+                     (or (sysadmin? (:identity req))
+                         (contains? (get-in req [:identity :orgs]) oid)))
+        (denied-no-org-access oid)))))
+
+(def org-auth-checker
+  "Checks if the user has access to the organization"
+  (org-checker :path))
+
+(def org-body-checker
+  "Checks if the user has access to the organization specified in the body"
+  (org-checker :body))
+
+(defn webhook-org-checker
+  "Verifies if the user has permissions on the webhook org"
+  [_ req]
+  (when-let [{:keys [org-id]} (st/find-webhook (c/req->storage req)
+                                               (get-in req [:parameters :path :webhook-id]))]
+    (when-not (contains? (get-in req [:identity :orgs]) org-id)
+      (denied-no-org-access org-id))))
+
+(defn public-repo-checker
+  "Checks if the repository that's being accessed is public, and the
+   request method is `GET`."
+  [_ req]
+  (let [sid (c/repo-sid req)]
+    (when-let [repo (st/find-repo (c/req->storage req) sid)]
+      (cond
+        (not (:public repo))
+        (denied "Repository is not public"
+                {:sid sid})
+        (not (#{:get :options} (:request-method req)))
+        (denied "You do not have permission to modify this repo"
+                {:sid sid})
+        :else
+        ;; Explicitly permission granted
+        granted))))
+
+(defn- ^:deprecated check-org-authorization!
+  "Checks if the request identity grants access to the org specified in 
+   the parameters path.  If not, an authorization exception is thrown
+   and a 403 response is returned."
+  [req]
+  (-> [org-auth-checker]
+      (auth-chain req)
+      (chain-result->exception)
+      (maybe-throw)))
+
+(defn ^:deprecated org-authorization
   "Middleware that verifies the identity token to check if the user or build has
-   access to the given org."
+   access to the given org.
+
+   Deprecated, use the more generic `auth-chain-middleware` instead."
   [h]
   (fn [req]
     (check-org-authorization! req)
@@ -220,7 +308,7 @@
 (defn sysadmin-authorization
   [h]
   (fn [req]
-    (when (not= :sysadmin (-> req :identity :type keyword))
+    (when-not (sysadmin? (:identity req))
       (throw (ex-info "Only system administrators have access to this area"
                       {:type :auth/unauthorized})))
     (h req)))

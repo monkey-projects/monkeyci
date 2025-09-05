@@ -9,6 +9,7 @@
             [medley.core :as mc]
             [monkey.ci
              [runtime :as rt]
+             [utils :as u]
              [version :as v]]
             [monkey.ci.metrics.core :as metrics]
             [monkey.ci.web
@@ -78,7 +79,8 @@
    :name Name
    :url s/Str
    (s/optional-key :main-branch) Id
-   (s/optional-key :labels) [Label]})
+   (s/optional-key :labels) [Label]
+   (s/optional-key :public) s/Bool})
 
 (s/defschema UpdateRepo
   (-> NewRepo
@@ -146,45 +148,44 @@
            (s/optional-key :until) s/Int}})
 
 (def webhook-routes
-  (letfn [(mark-conflicting [whr]
-            (let [r (second whr)
-                  u (assoc (second r) :conflicting true)]
-              (mc/replace-nth 1 (mc/replace-nth 1 u r) whr)))]
-    ["/webhook"
-     (-> (c/generic-routes
-          {:creator api/create-webhook
-           :updater api/update-webhook
-           :getter  api/get-webhook
-           :deleter api/delete-webhook
-           :new-schema NewWebhook
-           :update-schema UpdateWebhook
-           :id-key :webhook-id})
-         (mark-conflicting)
-         (conj ["/health"
-                {:conflicting true}
-                [["" {:get
-                      {:handler (constantly (rur/status 200))}}]]]
-               ["/github"
-                {:conflicting true}
-                [[""
-                  {:post {:handler github/app-webhook
-                          :parameters {:body s/Any}}
-                   :middleware [:github-app-security]}]
-                 ["/app"
-                  {:post {:handler github/app-webhook
-                          :parameters {:body s/Any}}
-                   :middleware [:github-app-security]}]
-                 ["/:id"
-                  {:conflicting true
-                   :post {:handler github/webhook
-                          :parameters {:path {:id Id}
-                                       :body s/Any}}
-                   :middleware [:github-security]}]]]
-               ["/bitbucket/:id"
-                {:post {:handler bitbucket/webhook
-                        :parameters {:path {:id Id}
-                                     :body s/Any}}
-                 :middleware [:bitbucket-security]}]))]))
+  ["/webhook"
+   [[""
+     {:auth-chain [auth/org-body-checker]}
+     [["" {:post {:handler    api/create-webhook
+                  :parameters {:body NewWebhook}}}]]]
+    ["/health"
+     {:conflicting true}
+     [["" {:get
+           {:handler (constantly (rur/status 200))}}]]]
+    ["/github"
+     {:conflicting true}
+     [[""
+       {:post       {:handler    github/app-webhook
+                     :parameters {:body s/Any}}
+        :middleware [:github-app-security]}]
+      ["/app"
+       {:post       {:handler    github/app-webhook
+                     :parameters {:body s/Any}}
+        :middleware [:github-app-security]}]
+      ["/:id"
+       {:conflicting true
+        :post        {:handler    github/webhook
+                      :parameters {:path {:id Id}
+                                   :body s/Any}}
+        :middleware  [:github-security]}]]]
+    ["/bitbucket/:id"
+     {:post       {:handler    bitbucket/webhook
+                   :parameters {:path {:id Id}
+                                :body s/Any}}
+      :middleware [:bitbucket-security]}]
+    ["/:webhook-id"
+     {:parameters  {:path {:webhook-id c/Id}}
+      :auth-chain  [auth/webhook-org-checker]
+      :conflicting true}
+     [["" {:get    {:handler api/get-webhook}
+           :put    {:handler    api/update-webhook
+                    :parameters {:body UpdateWebhook}}
+           :delete {:handler api/delete-webhook}}]]]]])
 
 (def org-parameter-routes
   ["/param"
@@ -201,18 +202,25 @@
       :delete {:handler param-api/delete-param}}]]])
 
 (def org-ssh-keys-routes
-  ["/ssh-keys" {:get {:handler ssh-api/get-org-ssh-keys}
-                :put {:handler ssh-api/update-ssh-keys
-                      :parameters {:body [SshKeys]}}}])
+  ["/ssh-keys"
+   {:get {:handler ssh-api/get-org-ssh-keys}
+    :put {:handler ssh-api/update-ssh-keys
+          :parameters {:body [SshKeys]}}}])
 
 (def repo-parameter-routes
-  ["/param" {:get {:handler param-api/get-repo-params}}])
+  ["/param"
+   {:auth-chain ^:replace [auth/org-auth-checker]}
+   [["" {:get {:handler param-api/get-repo-params}}]]])
 
 (def repo-ssh-keys-routes
-  ["/ssh-keys" {:get {:handler ssh-api/get-repo-ssh-keys}}])
+  ["/ssh-keys"
+   {:auth-chain ^:replace [auth/org-auth-checker]}
+   [["" {:get {:handler ssh-api/get-repo-ssh-keys}}]]])
 
 (def repo-webhook-routes
-  ["/webhooks" {:get {:handler repo-api/list-webhooks}}])
+  ["/webhooks"
+   {:auth-chain ^:replace [auth/org-auth-checker]}
+   [["" {:get {:handler repo-api/list-webhooks}}]]])
 
 (def log-routes
   ["/logs"                              ; Deprecated, use loki instead
@@ -271,21 +279,24 @@
                              {:body {:token s/Str}}}}]]]]])
 
 (def repo-routes
-  ["/repo"
-   (-> (c/generic-routes
-        {:creator repo-api/create-repo
-         :updater repo-api/update-repo
-         :getter  repo-api/get-repo
-         :deleter repo-api/delete-repo
-         :new-schema NewRepo
-         :update-schema UpdateRepo
-         :id-key :repo-id
-         :child-routes [repo-parameter-routes
-                        repo-ssh-keys-routes
-                        repo-webhook-routes
-                        build-routes
-                        unwatch-routes]})
-       (conj watch-routes))])
+  (letfn [(add-repo-checker [routes]
+            (u/update-nth routes 1 u/update-nth 1 assoc :auth-chain [auth/public-repo-checker]))]
+    ["/repo"
+     (-> (c/generic-routes
+          {:creator repo-api/create-repo
+           :updater repo-api/update-repo
+           :getter  repo-api/get-repo
+           :deleter repo-api/delete-repo
+           :new-schema NewRepo
+           :update-schema UpdateRepo
+           :id-key :repo-id
+           :child-routes [repo-parameter-routes
+                          repo-ssh-keys-routes
+                          repo-webhook-routes
+                          build-routes
+                          unwatch-routes]})
+         (conj watch-routes)
+         (add-repo-checker))]))
 
 (s/defschema JoinRequestSchema
   {:org-id Id
@@ -361,7 +372,7 @@
 
 (def org-routes
   ["/org"
-   {:middleware [:org-check]}
+   {:auth-chain [auth/org-auth-checker]}
    (c/generic-routes
     {:creator org-api/create-org
      :updater org-api/update-org
@@ -491,7 +502,8 @@
                                      wm/default-middleware
                                      [wm/kebab-case-query
                                       wm/log-request
-                                      wm/post-events]))
+                                      wm/post-events
+                                      :auth-chain]))
             :muuntaja (c/make-muuntaja)
             :coercion reitit.coercion.schema/coercion
             ;; Wrap the runtime in a type, so reitit doesn't change the records into maps
@@ -499,17 +511,17 @@
      ;; Disabled, results in 405 errors for some reason
      ;;:compile rc/compile-request-coercers
      :reitit.middleware/registry
-     ;; TODO Move the dev-mode checks into the runtime startup code
      (->> {:github-security
            [github/validate-security]
            :github-app-security
            [github/validate-security (constantly (get-in (rt/config rt) [:github :webhook-secret]))]
            :bitbucket-security
            [bitbucket/validate-security]
-           :org-check
-           [auth/org-authorization]
+           :auth-chain
+           [auth/auth-chain-middleware]
            :sysadmin-check
            [auth/sysadmin-authorization]}
+          ;; TODO Move the dev-mode checks into the runtime startup code
           (mc/map-vals (partial non-dev rt)))}))
   ([rt]
    (make-router rt routes)))

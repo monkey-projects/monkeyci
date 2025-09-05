@@ -14,10 +14,8 @@
       (fs/delete-tree d))))
 
 (defn gen-token [conf]
-  (let [keypair (auth/config->keypair conf)
-        ctx {:jwk keypair}
-        token (auth/build-token (b/sid (:build conf)))]
-    (auth/generate-jwt-from-rt ctx token)))
+  (let [token (auth/build-token (b/sid (:build conf)))]
+    (auth/generate-jwt-from-rt (select-keys conf [:jwk]) token)))
 
 (defn- add-token [conf]
   (assoc-in conf [:api :token] (gen-token conf)))

@@ -41,7 +41,6 @@
    (when (path-changed? (current db) match)
      (log/debug "Changing current route from" (clj->js (current db)) "into" (clj->js match))
      (let [handlers (on-page-leave db)]
-       (log/debug "Found" (count handlers) "leave handlers")
        (cond-> {:db (-> db
                         (assoc current match)
                         (dissoc on-page-leave))}
@@ -90,7 +89,7 @@
 (defonce router (atom main-router))
 
 (def public?
-  "Route names that are publicly accessible"
+  "Route names that are publicly accessible."
   #{:page/login :page/github-callback :page/bitbucket-callback})
 
 (defn on-route-change [match _]

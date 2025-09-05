@@ -13,31 +13,6 @@
   (testing "generates random string"
     (is (string? (sut/generate-secret-key)))))
 
-(deftest config->keypair
-  (let [test-priv "dev-resources/test/jwk/privkey.pem"
-        test-pub "dev-resources/test/jwk/pubkey.pem"]
-    
-    (testing "`nil` if no keys configured"
-      (is (nil? (sut/config->keypair {}))))
-
-    (testing "returns private and public keys as map"
-      (let [rt (-> {:jwk {:private-key test-priv
-                          :public-key test-pub}}
-                   (sut/config->keypair))]
-        (is (map? rt))
-        (is (= 2 (count rt)))
-        (is (bk/private-key? (:priv rt)))
-        (is (bk/public-key? (:pub rt)))))
-
-    (testing "reads private and public keys from string"
-      (let [rt (-> {:jwk {:private-key (slurp test-priv)
-                          :public-key (slurp test-pub)}}
-                   (sut/config->keypair))]
-        (is (map? rt))
-        (is (= 2 (count rt)))
-        (is (bk/private-key? (:priv rt)))
-        (is (bk/public-key? (:pub rt)))))))
-
 (deftest secure-ring-app
   (let [app :identity
         {st :storage :as rt} (trt/test-runtime)
@@ -94,6 +69,117 @@
                             :type-id))
             "bearer token provided")))))
 
+(deftest auth-chain
+  (testing "allows if chain is empty"
+    (is (sut/allowed? (sut/auth-chain [] {}))))
+
+  (testing "allows if all parts allow"
+    (is (sut/allowed? (sut/auth-chain [(constantly nil)] {}))))
+
+  (testing "denies if last denies"
+    (is (sut/denied? (sut/auth-chain [(constantly nil)
+                                      (constantly {:permission :denied})]
+                                     {}))))
+
+  (testing "allows if last allows"
+    (is (sut/allowed? (sut/auth-chain [(constantly {:permission :denied})
+                                       (constantly {:permission :granted})]
+                                      {}))))
+
+  (testing "passes request to checkers"
+    (let [chain [(fn [_ req]
+                   (when (= :post (:request-method req))
+                     {:permission :denied}))]]
+      (is (sut/allowed? (sut/auth-chain chain {:request-method :get})))
+      (is (sut/denied? (sut/auth-chain chain {:request-method :post}))))))
+
+(deftest auth-chain-middleware
+  (let [target (constantly ::handled)
+        w (sut/auth-chain-middleware target)]
+    (testing "allows when no checkers"
+      (is (= ::handled
+             (w {}))))
+
+    (testing "denies when chain denies"
+      (is (thrown? Exception
+                   (-> {:auth-chain [(constantly {:permission :denied})]}
+                       (h/->match-data)
+                       (w)))))
+
+    (testing "allows when chain allows"
+      (is (= ::handled
+             (-> {:auth-chain [(constantly nil)]}
+                 (h/->match-data)
+                 (w)))))))
+
+(deftest chain-result->exception
+  (testing "`nil` if approved"
+    (is (nil? (sut/chain-result->exception nil)))
+    (is (nil? (sut/chain-result->exception {:permission :granted}))))
+
+  (testing "if denied"
+    (let [r (sut/chain-result->exception {:permission :denied
+                                          :reason "For testing"
+                                          ::key ::value})]
+      (testing "sets reason as message"
+        (is (= "For testing" (ex-message r))))
+
+      (testing "sets type unauthorized"
+        (is (= :auth/unauthorized
+               (:type (ex-data r)))))
+
+      (testing "adds additional values to exception"
+        (is (= ::value (::key (ex-data r))))))))
+
+(deftest public-repo-checker
+  (h/with-memory-store st
+    (let [org (h/gen-org)
+          priv-repo (-> (h/gen-repo)
+                        (assoc :org-id (:id org)))
+          pub-repo (-> (h/gen-repo)
+                       (assoc :org-id (:id org)
+                              :public true))
+          req (-> {:storage st}
+                  (h/->req)
+                  (assoc-in [:parameters :path :org-id] (:id org)))]
+      (is (some? (st/save-org st org)))
+      (is (some? (st/save-repo st priv-repo)))
+      (is (some? (st/save-repo st pub-repo)))
+
+      (testing "public repos"
+        (testing "allows access for `GET` requests"
+          (is (sut/allowed?
+               (sut/public-repo-checker
+                []
+                (-> req
+                    (assoc :request-method :get)
+                    (assoc-in [:parameters :path :repo-id] (:id pub-repo)))))))
+
+        (testing "allows access for `OPTIONS` requests"
+          (is (sut/allowed?
+               (sut/public-repo-checker
+                []
+                (-> req
+                    (assoc :request-method :options)
+                    (assoc-in [:parameters :path :repo-id] (:id pub-repo)))))))
+
+        (testing "does not allow access for destructive requests"
+          (is (sut/denied?
+               (sut/public-repo-checker
+                []
+                (-> req
+                    (assoc :request-method :post)
+                    (assoc-in [:parameters :path :repo-id] (:id pub-repo))))))))
+
+      (testing "does not allow access to private repos"
+        (is (sut/denied?
+             (sut/public-repo-checker
+              []
+              (assoc-in req [:parameters :path :repo-id] (:id priv-repo))))))
+
+      (testing "allows non-repo requests"
+        (is (nil? (sut/public-repo-checker [] req)))))))
+
 (deftest org-authorization
   (let [h (constantly ::ok)
         auth (sut/org-authorization h)]
@@ -114,7 +200,9 @@
                            {:path
                             {:org-id "test-org"}}
                            :identity
-                           {:type :sysadmin}})))))
+                           {:type :sysadmin}}))))
+
+      (testing "if repo is public"))
 
     (testing "throws authorization error"
       (testing "if org id is not in identity"

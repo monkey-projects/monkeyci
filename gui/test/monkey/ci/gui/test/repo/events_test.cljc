@@ -402,6 +402,11 @@
     (rf/dispatch-sync [:repo/url-changed "new url"])
     (is (= "new url" (:url (db/editing @app-db))))))
 
+(deftest repo-public-toggled
+  (testing "updates editing repo public flag"
+    (rf/dispatch-sync [:repo/public-toggled true])
+    (is (true? (:public (db/editing @app-db))))))
+
 (deftest repo-github-id-changed
   (testing "updates editing github id"
     (rf/dispatch-sync [:repo/github-id-changed "1234"])

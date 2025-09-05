@@ -60,7 +60,7 @@
   "Converts the repository into an entity that can be sent to the database."
   [r org-id]
   (-> r
-      (select-keys [:name :url :main-branch :github-id])
+      (select-keys [:name :url :main-branch :github-id :public])
       (dissoc :id)
       (assoc :display-id (:id r)
              :org-id org-id)))

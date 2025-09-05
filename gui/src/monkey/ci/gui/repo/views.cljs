@@ -150,6 +150,8 @@
   (let [loaded? (rf/subscribe [:builds/loaded?])]
     (when-not @loaded?
       (rf/dispatch [:builds/load]))
+    ;; TODO If repo is public, all users have access but they can't change
+    ;; anything.
     [:<>
      [:div.d-flex.gap-1.align-items-start
       [:h4.me-2.text-primary [:span.me-2 co/build-icon] "Builds"]
@@ -325,6 +327,16 @@
                         :maxlength 100}
                        :help-msg
                        "Required when you want to determine the 'main branch' in the build script."}]]
+       [:div.mb-2.form-check.form-switch
+        [:input.form-check-input
+         {:type :checkbox
+          :role :switch
+          :value :public
+          :on-change (u/form-evt-handler [:repo/public-toggled] u/evt->checked)
+          :id :public}]
+        [:label.form-check-label
+         {:for :public}
+         "Public visibility"]]
        [:div.mb-2
         [github-id-input @e]]]
       [:div.col

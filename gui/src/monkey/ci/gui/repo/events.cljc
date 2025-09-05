@@ -218,17 +218,22 @@
 (rf/reg-event-db
  :repo/name-changed
  (fn [db [_ v]]
-   (assoc-in db [db/editing :name] v)))
+   (db/update-editing db assoc :name v)))
 
 (rf/reg-event-db
  :repo/main-branch-changed
  (fn [db [_ v]]
-   (assoc-in db [db/editing :main-branch] v)))
+   (db/update-editing db assoc :main-branch v)))
 
 (rf/reg-event-db
  :repo/url-changed
  (fn [db [_ v]]
-   (assoc-in db [db/editing :url] v)))
+   (db/update-editing db assoc :url v)))
+
+(rf/reg-event-db
+ :repo/public-toggled
+ (fn [db [_ v]]
+   (db/update-editing db assoc :public v)))
 
 (rf/reg-event-db
  :repo/github-id-changed
