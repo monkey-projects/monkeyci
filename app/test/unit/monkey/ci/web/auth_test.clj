@@ -171,11 +171,18 @@
                     (assoc :request-method :post)
                     (assoc-in [:parameters :path :repo-id] (:id pub-repo))))))))
 
-      (testing "does not allow access to private repos"
-        (is (sut/denied?
-             (sut/public-repo-checker
-              []
-              (assoc-in req [:parameters :path :repo-id] (:id priv-repo))))))
+      (testing "private repos"
+        (testing "does not allow unauthenticated access"
+          (is (sut/denied?
+               (sut/public-repo-checker
+                []
+                (assoc-in req [:parameters :path :repo-id] (:id priv-repo))))))
+
+        (testing "allows previously authenticated access"
+          (is (sut/allowed?
+               (sut/public-repo-checker
+                [sut/granted]
+                (assoc-in req [:parameters :path :repo-id] (:id priv-repo)))))))
 
       (testing "allows non-repo requests"
         (is (nil? (sut/public-repo-checker [] req)))))))
