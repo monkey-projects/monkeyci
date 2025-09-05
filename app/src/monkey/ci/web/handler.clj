@@ -148,46 +148,44 @@
            (s/optional-key :until) s/Int}})
 
 (def webhook-routes
-  ;; FIXME Security??
-  (letfn [(mark-conflicting [whr]
-            (let [r (second whr)
-                  u (assoc (second r) :conflicting true)]
-              (mc/replace-nth 1 (mc/replace-nth 1 u r) whr)))]
-    ["/webhook"
-     (-> (c/generic-routes
-          {:creator api/create-webhook
-           :updater api/update-webhook
-           :getter  api/get-webhook
-           :deleter api/delete-webhook
-           :new-schema NewWebhook
-           :update-schema UpdateWebhook
-           :id-key :webhook-id})
-         (mark-conflicting)
-         (conj ["/health"
-                {:conflicting true}
-                [["" {:get
-                      {:handler (constantly (rur/status 200))}}]]]
-               ["/github"
-                {:conflicting true}
-                [[""
-                  {:post {:handler github/app-webhook
-                          :parameters {:body s/Any}}
-                   :middleware [:github-app-security]}]
-                 ["/app"
-                  {:post {:handler github/app-webhook
-                          :parameters {:body s/Any}}
-                   :middleware [:github-app-security]}]
-                 ["/:id"
-                  {:conflicting true
-                   :post {:handler github/webhook
-                          :parameters {:path {:id Id}
-                                       :body s/Any}}
-                   :middleware [:github-security]}]]]
-               ["/bitbucket/:id"
-                {:post {:handler bitbucket/webhook
-                        :parameters {:path {:id Id}
-                                     :body s/Any}}
-                 :middleware [:bitbucket-security]}]))]))
+  ["/webhook"
+   [[""
+     {:auth-chain [auth/org-body-checker]}
+     [["" {:post {:handler    api/create-webhook
+                  :parameters {:body NewWebhook}}}]]]
+    ["/health"
+     {:conflicting true}
+     [["" {:get
+           {:handler (constantly (rur/status 200))}}]]]
+    ["/github"
+     {:conflicting true}
+     [[""
+       {:post       {:handler    github/app-webhook
+                     :parameters {:body s/Any}}
+        :middleware [:github-app-security]}]
+      ["/app"
+       {:post       {:handler    github/app-webhook
+                     :parameters {:body s/Any}}
+        :middleware [:github-app-security]}]
+      ["/:id"
+       {:conflicting true
+        :post        {:handler    github/webhook
+                      :parameters {:path {:id Id}
+                                   :body s/Any}}
+        :middleware  [:github-security]}]]]
+    ["/bitbucket/:id"
+     {:post       {:handler    bitbucket/webhook
+                   :parameters {:path {:id Id}
+                                :body s/Any}}
+      :middleware [:bitbucket-security]}]
+    ["/:webhook-id"
+     {:parameters  {:path {:webhook-id c/Id}}
+      :auth-chain  [auth/webhook-org-checker]
+      :conflicting true}
+     [["" {:get    {:handler api/get-webhook}
+           :put    {:handler    api/update-webhook
+                    :parameters {:body UpdateWebhook}}
+           :delete {:handler api/delete-webhook}}]]]]])
 
 (def org-parameter-routes
   ["/param"
@@ -280,26 +278,25 @@
                              :parameters
                              {:body {:token s/Str}}}}]]]]])
 
-(defn- add-repo-checker [routes]
-  (u/update-nth routes 1 u/update-nth 1 assoc :auth-chain [auth/public-repo-checker]))
-
 (def repo-routes
-  ["/repo"
-   (-> (c/generic-routes
-        {:creator repo-api/create-repo
-         :updater repo-api/update-repo
-         :getter  repo-api/get-repo
-         :deleter repo-api/delete-repo
-         :new-schema NewRepo
-         :update-schema UpdateRepo
-         :id-key :repo-id
-         :child-routes [repo-parameter-routes
-                        repo-ssh-keys-routes
-                        repo-webhook-routes
-                        build-routes
-                        unwatch-routes]})
-       (conj watch-routes)
-       (add-repo-checker))])
+  (letfn [(add-repo-checker [routes]
+            (u/update-nth routes 1 u/update-nth 1 assoc :auth-chain [auth/public-repo-checker]))]
+    ["/repo"
+     (-> (c/generic-routes
+          {:creator repo-api/create-repo
+           :updater repo-api/update-repo
+           :getter  repo-api/get-repo
+           :deleter repo-api/delete-repo
+           :new-schema NewRepo
+           :update-schema UpdateRepo
+           :id-key :repo-id
+           :child-routes [repo-parameter-routes
+                          repo-ssh-keys-routes
+                          repo-webhook-routes
+                          build-routes
+                          unwatch-routes]})
+         (conj watch-routes)
+         (add-repo-checker))]))
 
 (s/defschema JoinRequestSchema
   {:org-id Id
@@ -520,8 +517,6 @@
            [github/validate-security (constantly (get-in (rt/config rt) [:github :webhook-secret]))]
            :bitbucket-security
            [bitbucket/validate-security]
-           ;; :org-check
-           ;; [auth/org-authorization]
            :auth-chain
            [auth/auth-chain-middleware]
            :sysadmin-check

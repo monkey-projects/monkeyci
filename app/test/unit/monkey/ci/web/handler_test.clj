@@ -112,6 +112,35 @@
                    (test-app)
                    :status)))))
 
+(defn- secure-app-req
+  "Creates a secure app using the given storage, with a generated token.
+   Creates a random user in storage with access to the given org.
+   Invokes the request after adding the token as authorization.  Returns
+   the http response."
+  [req {:keys [org-id update-token] st :storage
+        :or {update-token identity}}]
+  (let [kp (auth/generate-keypair)
+        rt (test-rt {:storage st
+                     :jwk (auth/keypair->rt kp)
+                     :config {:dev-mode false}})
+        github-id (int (* (rand) 10000))
+        token-info {:sub (str "github/" github-id)
+                    :role auth/role-user
+                    :exp (+ (u/now) 10000)}
+        make-token (fn [ti]
+                     (auth/sign-jwt ti (.getPrivate kp)))
+        token (some-> token-info
+                      (update-token)
+                      (make-token))
+        app (sut/make-app rt)]
+    (when org-id
+      (st/save-user st {:type "github"
+                        :type-id github-id
+                        :orgs [org-id]}))
+    (cond-> req
+      token (mock/header "authorization" (str "Bearer " token))
+      true (app))))
+
 (deftest webhook-routes
   (verify-entity-endpoints {:name "webhook"
                             :base-entity {:org-id "test-cust"
@@ -120,6 +149,30 @@
                             :creator st/save-webhook
                             :can-delete? true})
 
+  (testing "when no org permissions"
+    (let [[org-id repo-id] (repeatedly st/new-id)
+          st (st/make-memory-storage)]
+        (is (some? (st/save-org st {:id org-id})))
+        
+        (testing "cannot create"
+          (is (= 403 (-> (h/json-request :post
+                                         "/webhook"
+                                         {:org-id org-id
+                                          :repo-id repo-id})
+                         (secure-app-req {:storage st
+                                          :org-id (st/new-id)})
+                         :status))))
+
+        (testing "cannot delete"
+          (let [wh-id (st/new-id)]
+            (is (some? (st/save-webhook st {:id wh-id
+                                            :org-id org-id
+                                            :repo-id repo-id})))
+            (is (= 403 (-> (mock/request :delete (str "/webhook/" wh-id))
+                           (secure-app-req {:storage st
+                                            :org-id (st/new-id)})
+                           :status)))))))
+  
   (testing "`GET /health` returns 200"
     (is (= 200 (-> (mock/request :get "/webhook/health")
                    (test-app)
@@ -242,55 +295,6 @@
         (is (= 200 (-> (mock/request :post "/webhook/bitbucket/test-hook")
                        (dev-app)
                        :status)))))))
-
-#_(defn- make-secure-app [st]
-  (let [kp (auth/generate-keypair)
-        rt (test-rt {:storage st
-                     :jwk (auth/keypair->rt kp)
-                     :config {:dev-mode false}})
-        github-id (int (* (rand) 10000))
-        token-info {:sub (str "github/" github-id)
-                    :role auth/role-user
-                    :exp (+ (u/now) 10000)}
-        make-token (fn [ti]
-                     (auth/sign-jwt ti (.getPrivate kp)))
-        app (sut/make-app rt)]
-    (when org-id
-      (st/save-user st {:type "github"
-                        :type-id github-id
-                        :orgs [org-id]}))
-    (cond-> req
-      token (mock/header "authorization" (str "Bearer " token))
-      true (app))))
-
-(defn- secure-app-req
-  "Creates a secure app using the given storage, with a generated token.
-   Creates a random user in storage with access to the given org.
-   Invokes the request after adding the token as authorization.  Returns
-   the http response."
-  [req {:keys [org-id update-token] st :storage
-        :or {update-token identity}}]
-  (let [kp (auth/generate-keypair)
-        rt (test-rt {:storage st
-                     :jwk (auth/keypair->rt kp)
-                     :config {:dev-mode false}})
-        github-id (int (* (rand) 10000))
-        token-info {:sub (str "github/" github-id)
-                    :role auth/role-user
-                    :exp (+ (u/now) 10000)}
-        make-token (fn [ti]
-                     (auth/sign-jwt ti (.getPrivate kp)))
-        token (some-> token-info
-                      (update-token)
-                      (make-token))
-        app (sut/make-app rt)]
-    (when org-id
-      (st/save-user st {:type "github"
-                        :type-id github-id
-                        :orgs [org-id]}))
-    (cond-> req
-      token (mock/header "authorization" (str "Bearer " token))
-      true (app))))
 
 (deftype TestLogRetriever [logs]
   l/LogRetriever

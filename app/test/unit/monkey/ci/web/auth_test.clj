@@ -148,7 +148,7 @@
 
       (testing "public repos"
         (testing "allows access for `GET` requests"
-          (is (nil?
+          (is (sut/allowed?
                (sut/public-repo-checker
                 []
                 (-> req
@@ -156,7 +156,7 @@
                     (assoc-in [:parameters :path :repo-id] (:id pub-repo)))))))
 
         (testing "allows access for `OPTIONS` requests"
-          (is (nil?
+          (is (sut/allowed?
                (sut/public-repo-checker
                 []
                 (-> req

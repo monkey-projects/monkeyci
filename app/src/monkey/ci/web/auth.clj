@@ -205,7 +205,7 @@
    of autonomy to each checker.  They can inspect the previous advises,
    and modify their response accordingly."
   [chain req]
-  (log/debug "Verifying auth chain:" chain)
+  (log/trace "Verifying auth chain:" chain)
   (->> chain
        (reduce (fn [r c]
                  (->> (conj r (c r req))
@@ -240,15 +240,33 @@
         (throw ex))
       (h req))))
 
-(defn org-auth-checker
+(defn- denied-no-org-access [org-id]
+  (denied "Credentials do not grant access to this org"
+          {:org-id org-id}))
+
+(defn- org-checker [kind]
+  (fn [_ req]
+    (when-let [oid (get-in req [:parameters kind :org-id])]
+      (when-not (and (ba/authenticated? req)
+                     (or (sysadmin? (:identity req))
+                         (contains? (get-in req [:identity :orgs]) oid)))
+        (denied-no-org-access oid)))))
+
+(def org-auth-checker
   "Checks if the user has access to the organization"
+  (org-checker :path))
+
+(def org-body-checker
+  "Checks if the user has access to the organization specified in the body"
+  (org-checker :body))
+
+(defn webhook-org-checker
+  "Verifies if the user has permissions on the webhook org"
   [_ req]
-  (when-let [oid (get-in req [:parameters :path :org-id])]
-    (when-not (and (ba/authenticated? req)
-                   (or (sysadmin? (:identity req))
-                       (contains? (get-in req [:identity :orgs]) oid)))
-      (denied "Credentials do not grant access to this org"
-              {:org-id oid}))))
+  (when-let [{:keys [org-id]} (st/find-webhook (c/req->storage req)
+                                               (get-in req [:parameters :path :webhook-id]))]
+    (when-not (contains? (get-in req [:identity :orgs]) org-id)
+      (denied-no-org-access org-id))))
 
 (defn public-repo-checker
   "Checks if the repository that's being accessed is public, and the
