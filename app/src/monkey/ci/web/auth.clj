@@ -263,6 +263,7 @@
 (defn webhook-org-checker
   "Verifies if the user has permissions on the webhook org"
   [_ req]
+  ;; TODO Also allow for sysadmins
   (when-let [{:keys [org-id]} (st/find-webhook (c/req->storage req)
                                                (get-in req [:parameters :path :webhook-id]))]
     (when-not (contains? (get-in req [:identity :orgs]) org-id)
@@ -284,26 +285,6 @@
         :else
         ;; Explicitly permission granted
         granted))))
-
-(defn- ^:deprecated check-org-authorization!
-  "Checks if the request identity grants access to the org specified in 
-   the parameters path.  If not, an authorization exception is thrown
-   and a 403 response is returned."
-  [req]
-  (-> [org-auth-checker]
-      (auth-chain req)
-      (chain-result->exception)
-      (maybe-throw)))
-
-(defn ^:deprecated org-authorization
-  "Middleware that verifies the identity token to check if the user or build has
-   access to the given org.
-
-   Deprecated, use the more generic `auth-chain-middleware` instead."
-  [h]
-  (fn [req]
-    (check-org-authorization! req)
-    (h req)))
 
 (defn sysadmin-authorization
   [h]

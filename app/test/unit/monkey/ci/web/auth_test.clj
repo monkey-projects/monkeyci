@@ -180,44 +180,48 @@
       (testing "allows non-repo requests"
         (is (nil? (sut/public-repo-checker [] req)))))))
 
-(deftest org-authorization
-  (let [h (constantly ::ok)
-        auth (sut/org-authorization h)]
-    (testing "invokes target"
-      (testing "if no org id in request path"
-        (is (= ::ok (auth {}))))
+(deftest org-auth-checker
+  (testing "allows"
+    (testing "if no org id in request path"
+      (is (nil? (sut/org-auth-checker [] {}))))
 
-      (testing "if identity allows access to org id"
-        (is (= ::ok (auth {:parameters
-                           {:path
-                            {:org-id "test-org"}}
-                           :identity
-                           {:orgs
-                            #{"test-org"}}}))))
+    (testing "if identity allows access to org id"
+      (is (nil? (sut/org-auth-checker
+                 []
+                 {:parameters
+                  {:path
+                   {:org-id "test-org"}}
+                  :identity
+                  {:orgs
+                   #{"test-org"}}}))))
 
-      (testing "if sysadmin token"
-        (is (= ::ok (auth {:parameters
-                           {:path
-                            {:org-id "test-org"}}
-                           :identity
-                           {:type :sysadmin}}))))
+    (testing "if sysadmin token"
+      (is (nil? (sut/org-auth-checker
+                 []
+                 {:parameters
+                  {:path
+                   {:org-id "test-org"}}
+                  :identity
+                  {:type :sysadmin}})))))
 
-      (testing "if repo is public"))
+  (testing "denies"
+    (testing "if org id is not in identity"
+      (is (sut/denied?
+           (sut/org-auth-checker
+            []
+            {:parameters
+             {:path
+              {:org-id "test-org"}}
+             :identity
+             {:orgs #{"other-org"}}}))))
 
-    (testing "throws authorization error"
-      (testing "if org id is not in identity"
-        (is (thrown? Exception
-                     (auth {:parameters
-                            {:path
-                             {:org-id "test-org"}}
-                            :identity
-                            {:orgs #{"other-org"}}}))))
-
-      (testing "if not authenticated"
-        (is (thrown? Exception
-                     (auth {:parameters
-                            {:path
-                             {:org-id "test-org"}}})))))))
+    (testing "if not authenticated"
+      (is (sut/denied?
+           (sut/org-auth-checker
+            []
+            {:parameters
+             {:path
+              {:org-id "test-org"}}}))))))
 
 (deftest sysadmin-authorization
   (let [h (constantly ::ok)
