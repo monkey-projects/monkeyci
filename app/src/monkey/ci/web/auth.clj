@@ -196,6 +196,15 @@
 
 (def granted {:permission :granted})
 
+(defn- last-allowed?
+  "Checks if the last value in the chain allows the request"
+  [chain]
+  (when-not (empty? chain)
+    (->> chain
+         (remove nil?)
+         (last)
+         (allowed?))))
+
 (defn auth-chain
   "Applies the authorization chain to the request.  The chain consists of
    functions that are applied to the request.  Each part can return a
@@ -209,9 +218,9 @@
   (->> chain
        (reduce (fn [r c]
                  (->> (conj r (c r req))
-                      (remove nil?)
                       vec))
                [])
+       (remove nil?)
        last))
 
 (defn chain-result->exception [r]
@@ -263,6 +272,7 @@
 (defn webhook-org-checker
   "Verifies if the user has permissions on the webhook org"
   [_ req]
+  ;; TODO Also allow for sysadmins
   (when-let [{:keys [org-id]} (st/find-webhook (c/req->storage req)
                                                (get-in req [:parameters :path :webhook-id]))]
     (when-not (contains? (get-in req [:identity :orgs]) org-id)
@@ -271,39 +281,21 @@
 (defn public-repo-checker
   "Checks if the repository that's being accessed is public, and the
    request method is `GET`."
-  [_ req]
-  (let [sid (c/repo-sid req)]
-    (when-let [repo (st/find-repo (c/req->storage req) sid)]
-      (cond
-        (not (:public repo))
-        (denied "Repository is not public"
-                {:sid sid})
-        (not (#{:get :options} (:request-method req)))
-        (denied "You do not have permission to modify this repo"
-                {:sid sid})
-        :else
-        ;; Explicitly permission granted
-        granted))))
-
-(defn- ^:deprecated check-org-authorization!
-  "Checks if the request identity grants access to the org specified in 
-   the parameters path.  If not, an authorization exception is thrown
-   and a 403 response is returned."
-  [req]
-  (-> [org-auth-checker]
-      (auth-chain req)
-      (chain-result->exception)
-      (maybe-throw)))
-
-(defn ^:deprecated org-authorization
-  "Middleware that verifies the identity token to check if the user or build has
-   access to the given org.
-
-   Deprecated, use the more generic `auth-chain-middleware` instead."
-  [h]
-  (fn [req]
-    (check-org-authorization! req)
-    (h req)))
+  [chain req]
+  ;; Only check if a previous chain part has not already allowed it
+  (when-not (last-allowed? chain)
+    (let [sid (c/repo-sid req)]
+      (when-let [repo (st/find-repo (c/req->storage req) sid)]
+        (cond
+          (not (:public repo))
+          (denied "Repository is not public"
+                  {:sid sid})
+          (not (#{:get :options} (:request-method req)))
+          (denied "You do not have permission to modify this repo"
+                  {:sid sid})
+          :else
+          ;; Explicitly permission granted
+          granted)))))
 
 (defn sysadmin-authorization
   [h]

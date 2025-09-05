@@ -520,26 +520,42 @@
                               :creator st/save-repo
                               :can-delete? true})
 
-    (testing "public repo"
-      (h/with-memory-store st
-        (let [repo (assoc repo :public true :id "test-repo")
-              path (str "/org/" org-id "/repo/" (:id repo))]
-          (is (some? (st/save-repo st repo)))
-          
-          (testing "can be viewed"
-            (is (= 200
-                   (-> (mock/request :get path)
-                       (secure-app-req {:storage st :org-id (st/new-id)})
-                       :status))))
+    (testing "security"
+      (testing "public repo"
+        (h/with-memory-store st
+          (let [repo (assoc repo :public true :id "test-repo")
+                path (str "/org/" org-id "/repo/" (:id repo))]
+            (is (some? (st/save-repo st repo)))
+            
+            (testing "can be viewed"
+              (is (= 200
+                     (-> (mock/request :get path)
+                         (secure-app-req {:storage st :org-id (st/new-id)})
+                         :status))))
 
-          (testing "can not be modified"
-            (is (= 403
-                   (-> (h/json-request :put
-                                       path
-                                       (assoc repo :name "updated repo"))
-                       (secure-app-req {:storage st :org-id (st/new-id)})
-                       :status)))))))
-    
+            (testing "can not be modified"
+              (is (= 403
+                     (-> (h/json-request :put
+                                         path
+                                         (assoc repo :name "updated repo"))
+                         (secure-app-req {:storage st :org-id (st/new-id)})
+                         :status)))))))
+
+      (testing "with org grant"
+        (testing "can edit repo"
+          (h/with-memory-store st
+            (let [[org-id repo-id] (repeatedly st/new-id)
+                  repo {:id repo-id
+                        :org-id org-id}]
+              (is (some? (st/save-org st {:id org-id})))
+              (is (some? (st/save-repo st repo)))
+              (is (= 200 (-> (h/json-request
+                              :put
+                              (format "/org/%s/repo/%s" org-id repo-id)
+                              (assoc repo :name "test repo" :url "http://test-url"))
+                             (secure-app-req {:storage st :org-id org-id})
+                             :status))))))))
+
     (testing "`/org/:id/repo`"
       (testing "`/github`"
         (testing "`/watch` starts watching repo"
@@ -847,11 +863,11 @@
                          :git {:message "test meta"}))
         path (repo-path sid)]
     (is (st/sid? (st/save-org st {:id (first sid)
-                                       :repos {repo-id {:id repo-id
-                                                        :name "test repo"}}})))
+                                  :repos {repo-id {:id repo-id
+                                                   :name "test repo"}}})))
     (is (st/sid? (st/save-build st build)))
     (is (st/sid? (st/save-org-credit st {:org-id (first sid)
-                                              :amount 1000})))
+                                         :amount 1000})))
     (f (assoc trt
               :sid sid
               :path path
@@ -979,7 +995,19 @@
                     l (->> (str (build-path sid) "/logs/download?path=out.txt")
                            (mock/request :get)
                            (app))]
-                (is (= 404 (:status l)))))))))))
+                (is (= 404 (:status l))))))))))
+
+  (testing "can list if access granted to org"
+    (h/with-memory-store st
+      (let [[org-id repo-id :as sid] (generate-build-sid)
+            org (-> (h/gen-org)
+                    (assoc :id org-id :repos {}))
+            repo (assoc (h/gen-repo) :id repo-id :org-id org-id)]
+        (is (some? (st/save-org st org)))
+        (is (some? (st/save-repo st repo)))
+        (is (= 200 (-> (mock/request :get (repo-path sid))
+                       (secure-app-req {:storage st :org-id org-id})
+                       :status)))))))
 
 (deftest event-stream
   (testing "`GET /org/:org-id/events` exists"
