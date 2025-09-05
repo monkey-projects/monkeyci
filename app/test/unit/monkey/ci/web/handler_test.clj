@@ -47,6 +47,49 @@
 
 (def test-app (make-test-app))
 
+(defn- verify-entity-endpoints [{:keys [path base-entity updated-entity name
+                                        creator can-update? can-delete?]
+                                 :or {can-update? true can-delete? false}}]
+  (let [st (st/make-memory-storage)
+        app (make-test-app st)
+        path (or path (str "/" name))]
+    
+    (testing (format "`%s`" path)
+      (testing (str "`POST` creates new " name)
+        (let [r (-> (h/json-request :post path base-entity)
+                    (app))]
+          (is (= 201 (:status r)))))
+
+      (testing "`/:id`"
+        (testing (format "`GET` retrieves %s info" name)
+          (let [id (st/new-id)
+                entity (assoc base-entity :id id)
+                _ (creator st entity)
+                r (-> (mock/request :get (str path "/" id))
+                      (mock/header :accept "application/json")
+                      (app))]
+            (is (= 200 (:status r)))
+            (is (= entity (h/reply->json r)))))
+
+        (when can-update?
+          (testing (str "`PUT` updates existing " name)
+            (let [id (st/new-id)
+                  _ (creator st (assoc base-entity :id id))
+                  upd (cond-> base-entity
+                        updated-entity (merge updated-entity))
+                  r (-> (h/json-request :put (str path "/" id) upd)
+                        (app))]
+              (is (= 200 (:status r))
+                  upd))))
+
+        (when can-delete?
+          (testing (str "`DELETE` deletes existing " name)
+            (let [id (st/new-id)
+                  _ (creator st (assoc base-entity :id id))
+                  r (-> (mock/request :delete (str path "/" id))
+                        (app))]
+              (is (= 204 (:status r))))))))))
+
 (deftest http-routes
   (testing "health check at `/health`"
     (is (= 200 (-> (mock/request :get "/health")
@@ -55,7 +98,7 @@
 
   (testing "version at `/version`"
     (let [r (-> (mock/request :get "/version")
-                   (test-app))]
+                (test-app))]
       (is (= 200 (:status r)))
       (is (= (v/version) (:body r)))))
 
@@ -199,49 +242,6 @@
         (is (= 200 (-> (mock/request :post "/webhook/bitbucket/test-hook")
                        (dev-app)
                        :status)))))))
-
-(defn- verify-entity-endpoints [{:keys [path base-entity updated-entity name
-                                        creator can-update? can-delete?]
-                                 :or {can-update? true can-delete? false}}]
-  (let [st (st/make-memory-storage)
-        app (make-test-app st)
-        path (or path (str "/" name))]
-    
-    (testing (format "`%s`" path)
-      (testing (str "`POST` creates new " name)
-        (let [r (-> (h/json-request :post path base-entity)
-                    (app))]
-          (is (= 201 (:status r)))))
-
-      (testing "`/:id`"
-        (testing (format "`GET` retrieves %s info" name)
-          (let [id (st/new-id)
-                entity (assoc base-entity :id id)
-                _ (creator st entity)
-                r (-> (mock/request :get (str path "/" id))
-                      (mock/header :accept "application/json")
-                      (app))]
-            (is (= 200 (:status r)))
-            (is (= entity (h/reply->json r)))))
-
-        (when can-update?
-          (testing (str "`PUT` updates existing " name)
-            (let [id (st/new-id)
-                  _ (creator st (assoc base-entity :id id))
-                  upd (cond-> base-entity
-                        updated-entity (merge updated-entity))
-                  r (-> (h/json-request :put (str path "/" id) upd)
-                        (app))]
-              (is (= 200 (:status r))
-                  upd))))
-
-        (when can-delete?
-          (testing (str "`DELETE` deletes existing " name)
-            (let [id (st/new-id)
-                  _ (creator st (assoc base-entity :id id))
-                  r (-> (mock/request :delete (str path "/" id))
-                        (app))]
-              (is (= 204 (:status r))))))))))
 
 #_(defn- make-secure-app [st]
   (let [kp (auth/generate-keypair)
