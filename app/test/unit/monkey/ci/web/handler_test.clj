@@ -70,6 +70,13 @@
                    :status)))))
 
 (deftest webhook-routes
+  (verify-entity-endpoints {:name "webhook"
+                            :base-entity {:org-id "test-cust"
+                                          :repo-id "test-repo"}
+                            :updated-entity {:repo-id "updated-repo"}
+                            :creator st/save-webhook
+                            :can-delete? true})
+
   (testing "`GET /health` returns 200"
     (is (= 200 (-> (mock/request :get "/webhook/health")
                    (test-app)
@@ -235,6 +242,55 @@
                   r (-> (mock/request :delete (str path "/" id))
                         (app))]
               (is (= 204 (:status r))))))))))
+
+#_(defn- make-secure-app [st]
+  (let [kp (auth/generate-keypair)
+        rt (test-rt {:storage st
+                     :jwk (auth/keypair->rt kp)
+                     :config {:dev-mode false}})
+        github-id (int (* (rand) 10000))
+        token-info {:sub (str "github/" github-id)
+                    :role auth/role-user
+                    :exp (+ (u/now) 10000)}
+        make-token (fn [ti]
+                     (auth/sign-jwt ti (.getPrivate kp)))
+        app (sut/make-app rt)]
+    (when org-id
+      (st/save-user st {:type "github"
+                        :type-id github-id
+                        :orgs [org-id]}))
+    (cond-> req
+      token (mock/header "authorization" (str "Bearer " token))
+      true (app))))
+
+(defn- secure-app-req
+  "Creates a secure app using the given storage, with a generated token.
+   Creates a random user in storage with access to the given org.
+   Invokes the request after adding the token as authorization.  Returns
+   the http response."
+  [req {:keys [org-id update-token] st :storage
+        :or {update-token identity}}]
+  (let [kp (auth/generate-keypair)
+        rt (test-rt {:storage st
+                     :jwk (auth/keypair->rt kp)
+                     :config {:dev-mode false}})
+        github-id (int (* (rand) 10000))
+        token-info {:sub (str "github/" github-id)
+                    :role auth/role-user
+                    :exp (+ (u/now) 10000)}
+        make-token (fn [ti]
+                     (auth/sign-jwt ti (.getPrivate kp)))
+        token (some-> token-info
+                      (update-token)
+                      (make-token))
+        app (sut/make-app rt)]
+    (when org-id
+      (st/save-user st {:type "github"
+                        :type-id github-id
+                        :orgs [org-id]}))
+    (cond-> req
+      token (mock/header "authorization" (str "Bearer " token))
+      true (app))))
 
 (deftype TestLogRetriever [logs]
   l/LogRetriever
@@ -419,47 +475,32 @@
                              :status)))))))))
 
   (h/with-memory-store st
-    (let [kp (auth/generate-keypair)
-          rt (test-rt {:storage st
-                       :jwk (auth/keypair->rt kp)
-                       :config {:dev-mode false}})
-          org-id (st/new-id)
-          github-id 6453
-          app (sut/make-app rt)
-          token-info {:sub (str "github/" github-id)
-                      :role auth/role-user
-                      :exp (+ (u/now) 10000)}
-          make-token (fn [ti]
-                       (auth/sign-jwt ti (.getPrivate kp)))
-          token (make-token token-info)
-          _ (st/save-org st {:id org-id
-                             :name "test org"})
-          _ (st/save-user st {:type "github"
-                              :type-id github-id
-                              :orgs [org-id]})]
+    (let [org-id (st/new-id)]
+      (is (some? (st/save-org st {:id org-id
+                                  :name "test org"})))
 
       (testing "ok if user has access to org"
         (is (= 200 (-> (mock/request :get (str "/org/" org-id))
-                       (mock/header "authorization" (str "Bearer " token))
-                       (app)
+                       (secure-app-req {:storage st :org-id org-id})
                        :status))))
 
       (testing "unauthorized if user does not have access to org"
         (is (= 403 (-> (mock/request :get (str "/org/" (st/new-id)))
-                       (mock/header "authorization" (str "Bearer " token))
-                       (app)
+                       (secure-app-req {:storage st :org-id org-id})
                        :status))))
       
       (testing "unauthenticated if no user credentials"
         (is (= 401 (-> (mock/request :get (str "/org/" org-id))
-                       (app)
+                       (secure-app-req {:storage st
+                                        :org-id org-id
+                                        :update-token (constantly nil)})
                        :status))))
 
       (testing "unauthenticated if token expired"
         (is (= 401 (-> (mock/request :get (str "/org/" org-id))
-                       (mock/header "authorization" (str "Bearer " (make-token
-                                                                    (assoc token-info :exp (- (u/now) 1000)))))
-                       (app)
+                       (secure-app-req {:storage st
+                                        :org-id org-id
+                                        :update-token #(assoc % :exp (- (u/now) 1000))})
                        :status)))))))
 
 (deftest repository-endpoints
@@ -478,29 +519,13 @@
     (testing "public repo"
       (h/with-memory-store st
         (let [repo (assoc repo :public true :id "test-repo")
-              kp (auth/generate-keypair)
-              rt (test-rt {:storage st
-                           :jwk (auth/keypair->rt kp)
-                           :config {:dev-mode false}})
-              github-id 12324
-              token-info {:sub (str "github/" github-id)
-                          :role auth/role-user
-                          :exp (+ (u/now) 10000)}
-              make-token (fn [ti]
-                           (auth/sign-jwt ti (.getPrivate kp)))
-              token (make-token token-info)
-              app (sut/make-app rt)
               path (str "/org/" org-id "/repo/" (:id repo))]
           (is (some? (st/save-repo st repo)))
-          (is (some? (st/save-user st {:type "github"
-                                       :type-id github-id
-                                       :orgs [org-id]})))
           
           (testing "can be viewed"
             (is (= 200
                    (-> (mock/request :get path)
-                       (mock/header "authorization" (str "Bearer " token))
-                       (app)
+                       (secure-app-req {:storage st :org-id (st/new-id)})
                        :status))))
 
           (testing "can not be modified"
@@ -508,8 +533,7 @@
                    (-> (h/json-request :put
                                        path
                                        (assoc repo :name "updated repo"))
-                       (mock/header "authorization" (str "Bearer " token))
-                       (app)
+                       (secure-app-req {:storage st :org-id (st/new-id)})
                        :status)))))))
     
     (testing "`/org/:id/repo`"
@@ -565,11 +589,12 @@
                                          :secret (str (random-uuid))})
                   _ (st/save-bb-webhook st {:webhook-id wh-id
                                             :bitbucket-id (str (random-uuid))})]
-              (is (= 200 (-> (h/json-request :post
-                                             (format "/org/%s/repo/%s/bitbucket/unwatch" org-id repo-id)
-                                             {:token "test-token"})
-                             (app)
-                             :status))))))))
+              (is (= 200
+                     (-> (h/json-request :post
+                                         (format "/org/%s/repo/%s/bitbucket/unwatch" org-id repo-id)
+                                         {:token "test-token"})
+                         (app)
+                         :status))))))))
 
     (testing "`GET /webhooks`"
       (let [st (st/make-memory-storage)
@@ -584,15 +609,16 @@
             (is (= 200 (:status r))))
           
           (testing "lists webhooks for repo"
-            (is (some? (:body r)))))))))
+            (is (some? (:body r)))))
 
-(deftest webhook-endpoints
-  (verify-entity-endpoints {:name "webhook"
-                            :base-entity {:org-id "test-cust"
-                                          :repo-id "test-repo"}
-                            :updated-entity {:repo-id "updated-repo"}
-                            :creator st/save-webhook
-                            :can-delete? true}))
+        (testing "can not be accessed for public repos"
+          (let [[org-id repo-id] (repeatedly st/new-id)]
+            (is (some? (st/save-org st {:id org-id
+                                        :repos {repo-id {:id repo-id
+                                                         :public true}}})))
+            (is (= 403 (-> (mock/request :get (format "/org/%s/repo/%s/webhooks" org-id repo-id))
+                           (secure-app-req {:storage st :org-id (st/new-id)})
+                           :status)))))))))
 
 (deftest user-endpoints
   (testing "/user"
@@ -742,7 +768,17 @@
       :updated-entity {:description "updated description"}
       :creator (fn [s p]
                  (st/save-param s (assoc p :org-id org-id)))
-      :can-delete? true})))
+      :can-delete? true}))
+
+  (h/with-memory-store st
+    (testing "can not be accessed for public repos"
+      (let [[org-id repo-id] (repeatedly st/new-id)]
+        (is (some? (st/save-org st {:id org-id
+                                    :repos {repo-id {:id repo-id
+                                                     :public true}}})))
+        (is (= 403 (-> (mock/request :get (format "/org/%s/repo/%s/param" org-id repo-id))
+                       (secure-app-req {:storage st :org-id (st/new-id)})
+                       :status)))))))
 
 (deftest ssh-keys-endpoints
   (verify-label-filter-like-endpoints
@@ -768,7 +804,17 @@
         :updated-entity {:description "updated description"}
         :creator (fn [s p]
                    (st/save-ssh-key s (assoc p :org-id org-id)))
-        :can-delete? true})))
+        :can-delete? true}))
+
+  (h/with-memory-store st
+    (testing "can not be accessed for public repos"
+      (let [[org-id repo-id] (repeatedly st/new-id)]
+        (is (some? (st/save-org st {:id org-id
+                                    :repos {repo-id {:id repo-id
+                                                     :public true}}})))
+        (is (= 403 (-> (mock/request :get (format "/org/%s/repo/%s/ssh-keys" org-id repo-id))
+                       (secure-app-req {:storage st :org-id (st/new-id)})
+                       :status)))))))
 
 (defn- generate-build-sid []
   (->> (repeatedly st/new-id)

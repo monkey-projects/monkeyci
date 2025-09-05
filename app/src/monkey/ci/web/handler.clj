@@ -148,6 +148,7 @@
            (s/optional-key :until) s/Int}})
 
 (def webhook-routes
+  ;; FIXME Security??
   (letfn [(mark-conflicting [whr]
             (let [r (second whr)
                   u (assoc (second r) :conflicting true)]
@@ -203,18 +204,25 @@
       :delete {:handler param-api/delete-param}}]]])
 
 (def org-ssh-keys-routes
-  ["/ssh-keys" {:get {:handler ssh-api/get-org-ssh-keys}
-                :put {:handler ssh-api/update-ssh-keys
-                      :parameters {:body [SshKeys]}}}])
+  ["/ssh-keys"
+   {:get {:handler ssh-api/get-org-ssh-keys}
+    :put {:handler ssh-api/update-ssh-keys
+          :parameters {:body [SshKeys]}}}])
 
 (def repo-parameter-routes
-  ["/param" {:get {:handler param-api/get-repo-params}}])
+  ["/param"
+   {:auth-chain ^:replace [auth/org-auth-checker]}
+   [["" {:get {:handler param-api/get-repo-params}}]]])
 
 (def repo-ssh-keys-routes
-  ["/ssh-keys" {:get {:handler ssh-api/get-repo-ssh-keys}}])
+  ["/ssh-keys"
+   {:auth-chain ^:replace [auth/org-auth-checker]}
+   [["" {:get {:handler ssh-api/get-repo-ssh-keys}}]]])
 
 (def repo-webhook-routes
-  ["/webhooks" {:get {:handler repo-api/list-webhooks}}])
+  ["/webhooks"
+   {:auth-chain ^:replace [auth/org-auth-checker]}
+   [["" {:get {:handler repo-api/list-webhooks}}]]])
 
 (def log-routes
   ["/logs"                              ; Deprecated, use loki instead

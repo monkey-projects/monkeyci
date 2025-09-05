@@ -194,6 +194,8 @@
          :permission :denied
          :reason reason))
 
+(def granted {:permission :granted})
+
 (defn auth-chain
   "Applies the authorization chain to the request.  The chain consists of
    functions that are applied to the request.  Each part can return a
@@ -203,6 +205,7 @@
    of autonomy to each checker.  They can inspect the previous advises,
    and modify their response accordingly."
   [chain req]
+  (log/debug "Verifying auth chain:" chain)
   (->> chain
        (reduce (fn [r c]
                  (->> (conj r (c r req))
@@ -253,10 +256,16 @@
   [_ req]
   (let [sid (c/repo-sid req)]
     (when-let [repo (st/find-repo (c/req->storage req) sid)]
-      (when-not (and (:public repo)
-                     (#{:get :options} (:request-method req)))
+      (cond
+        (not (:public repo))
         (denied "Repository is not public"
-                {:sid sid})))))
+                {:sid sid})
+        (not (#{:get :options} (:request-method req)))
+        (denied "You do not have permission to modify this repo"
+                {:sid sid})
+        :else
+        ;; Explicitly permission granted
+        granted))))
 
 (defn- ^:deprecated check-org-authorization!
   "Checks if the request identity grants access to the org specified in 
