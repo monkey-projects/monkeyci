@@ -1,5 +1,6 @@
 (ns monkey.ci.gui.login.events
-  (:require [monkey.ci.gui.apis.bitbucket :as bitbucket]
+  (:require [monkey.ci.gui.alerts :as a]
+            [monkey.ci.gui.apis.bitbucket :as bitbucket]
             [monkey.ci.gui.apis.github :as github]
             [monkey.ci.gui.local-storage :as ls]
             [monkey.ci.gui.logging :as log]
@@ -23,7 +24,7 @@
  (fn [db [_ fd]]
    (db/set-submitting db)))
 
-(rf/reg-event-db
+#_(rf/reg-event-db
  :login/authenticated
  (fn [db [_ user]]
    (-> db
@@ -107,14 +108,12 @@
    (let [rt (get-in ctx [:local-storage :refresh-token])]
      (if (and (= 401 (:status err)) rt)
        {:dispatch [:monkey.ci.gui.martian/refresh-token rt [:github/load-user]]}
-       {:db (db/set-alerts db [{:type :danger
-                                :message (str "Unable to retrieve user details from Github: " (u/error-msg err))}])}))))
+       {:db (db/set-alerts db [(a/github-load-user-failed err)])}))))
 
 (rf/reg-event-db
  :login/github-login--failed
  (fn [db [_ err]]
-   (db/set-alerts db [{:type :danger
-                       :message (str "Unable to fetch Github user token: " (u/error-msg err))}])))
+   (db/set-alerts db [(a/github-login-failed err)])))
 
 (rf/reg-event-fx
  :login/load-github-config
@@ -134,8 +133,7 @@
  :login/load-github-config--failed
  (fn [db [_ err]]
    (db/set-alerts db
-                  [{:type :danger
-                    :message (str "Unable to load Github config:" (u/error-msg err))}])))
+                  [(a/github-load-config-failed err)])))
 
 (rf/reg-event-fx
  :login/load-bitbucket-config
@@ -155,8 +153,7 @@
  :login/load-bitbucket-config--failed
  (fn [db [_ err]]
    (db/set-alerts db
-                  [{:type :danger
-                    :message (str "Unable to load BitBucket config:" (u/error-msg err))}])))
+                  [(a/bitbucket-load-config-failed err)])))
 
 (rf/reg-event-fx
  :login/bitbucket-code-received
@@ -188,7 +185,9 @@
                 (db/set-user (dissoc u :token :bitbucket-token))
                 (db/set-token (:token u))
                 (db/set-bitbucket-token bitbucket-token))
-        :local-storage [storage-token-id (select-keys u [:bitbucket-token :token])]}
+        ;; Store full user details locally, so we can retrieve them on page reload without having
+        ;; to re-authenticate.
+        :local-storage [storage-token-id u]}
        (try-load-bitbucket-user bitbucket-token))))
 
 (rf/reg-event-fx
@@ -205,14 +204,12 @@
 (rf/reg-event-db
  :bitbucket/load-user--failed
  (fn [db [_ err]]
-   (db/set-alerts db [{:type :danger
-                       :message (str "Unable to retrieve user details from Bitbucket: " (u/error-msg err))}])))
+   (db/set-alerts db [(a/bitbucket-load-user-failed err)])))
 
 (rf/reg-event-db
  :login/bitbucket-login--failed
  (fn [db [_ err]]
-   (db/set-alerts db [{:type :danger
-                       :message (str "Unable to fetch Bitbucket user token: " (u/error-msg err))}])))
+   (db/set-alerts db [(a/bitbucket-login-failed err)])))
 
 (rf/reg-event-fx
  :login/sign-off
