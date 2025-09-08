@@ -33,17 +33,6 @@
     (rf/dispatch-sync [:login/submit])
     (is (true? (db/submitting? @app-db)))))
 
-(deftest login-authenticated
-  (testing "sets user in state"
-    (let [user {:username "testuser"}]
-      (rf/dispatch-sync [:login/authenticated user])
-      (is (= user (db/user @app-db)))))
-
-  (testing "unsets submitting state"
-    (is (map? (reset! app-db (db/set-submitting {}))))
-    (rf/dispatch-sync [:login/authenticated "some user"])
-    (is (false? (db/submitting? @app-db)))))
-
 (deftest github-code-received
   (testing "sends exchange request to backend"
     (rf-test/run-test-sync

@@ -646,7 +646,14 @@
     [{:alter-table :webhooks
       :drop-column :creation-time}
      {:alter-table :webhooks
-      :drop-column :last-inv-time}])])
+      :drop-column :last-inv-time}])
+
+   (migration
+    (mig-id 49 :add-public-repo)
+    [{:alter-table :repos
+      :add-column [:public :boolean]}]
+    [{:alter-table :repos
+      :drop-column :public}])])
 
 (defn prepare-migrations
   "Prepares all migrations by formatting to sql, creates a ragtime migration object from it."

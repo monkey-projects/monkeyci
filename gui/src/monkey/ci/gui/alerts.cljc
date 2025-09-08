@@ -35,6 +35,15 @@
 (defn error-msg [msg]
   (alert-msg :danger #(str msg ": " (u/error-msg %))))
 
+(def github-load-user-failed
+  (error-msg "Unable to retrieve user details from Github"))
+
+(def github-login-failed
+  (error-msg "Unable to fetch Github user token"))
+
+(def github-load-config-failed
+  (error-msg "Unable to load Github config"))
+
 (defn org-details-failed [id]
   (error-msg (str "Could not load details for organization " id)))
 
@@ -57,6 +66,15 @@
                  "You may need to "
                  [:a.text-white {:href gh-installation-url :target :_blank}
                   [:b "configure the MonkeyCI application in Github."]]]])))
+
+(def bitbucket-load-config-failed
+  (error-msg "Unable to load Bitbucket config"))
+
+(def bitbucket-load-user-failed
+  (error-msg "Unable to retrieve user details from Bitbucket"))
+
+(def bitbucket-login-failed
+  (error-msg "Unable to fetch Bitbucket user token"))
 
 (def bitbucket-ws-failed
   (error-msg "Unable to fetch Bitbucket workspaces"))
