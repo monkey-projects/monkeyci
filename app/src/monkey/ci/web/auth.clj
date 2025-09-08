@@ -297,6 +297,15 @@
           ;; Explicitly permission granted
           granted)))))
 
+(defn deny-all
+  "Chain checker that denies all requests"
+  [_ _]
+  (denied "You do not have access" {}))
+
+(defn sysadmin-checker [_ req]
+  (when (sysadmin? (:identity req))
+    granted))
+
 (defn sysadmin-authorization
   [h]
   (fn [req]
