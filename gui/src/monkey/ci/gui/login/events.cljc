@@ -24,13 +24,6 @@
  (fn [db [_ fd]]
    (db/set-submitting db)))
 
-#_(rf/reg-event-db
- :login/authenticated
- (fn [db [_ user]]
-   (-> db
-       (db/set-user user)
-       (db/unset-submitting))))
-
 (rf/reg-event-fx
  :login/github-code-received
  (fn [{:keys [db]} [_ code]]
