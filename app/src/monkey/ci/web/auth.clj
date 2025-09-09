@@ -302,9 +302,19 @@
   [_ _]
   (denied "You do not have access" {}))
 
-(defn sysadmin-checker [_ req]
+(defn sysadmin-checker
+  "Allows sysadmins"
+  [_ req]
   (when (sysadmin? (:identity req))
     granted))
+
+(defn readonly-checker
+  "Only allows non-destructive requests"
+  [_ req]
+  (let [m (:request-method req)]
+    (if (#{:get :options :head} m)
+      granted
+      (denied "Request method not allowed" {:method m}))))
 
 (defn sysadmin-authorization
   [h]
