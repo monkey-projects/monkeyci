@@ -230,6 +230,21 @@
              {:path
               {:org-id "test-org"}}}))))))
 
+(deftest deny-all-checker
+  (testing "always denies"
+    (is (sut/denied? (sut/deny-all [] {})))))
+
+(deftest sysadmin-checker
+  (testing "allows sysadmin tokens"
+    (is (= :granted (-> (sut/sysadmin-checker
+                         []
+                         {:identity
+                          {:type :sysadmin}})
+                        :permission))))
+
+  (testing "`nil` if no sysadmin token"
+    (is (nil? (sut/sysadmin-checker [] {})))))
+
 (deftest sysadmin-authorization
   (let [h (constantly ::ok)
         auth (sut/sysadmin-authorization h)]

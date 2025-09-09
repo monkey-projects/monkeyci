@@ -672,46 +672,74 @@
       (testing "`GET /orgs` retrieves orgs for user"
         (let [user (st/find-user-by-type st (user->sid user))
               user-id (:id user)
-              cust {:id (st/new-id)
-                    :name "test org"}]
-          (is (some? (st/save-org st cust)))
-          (is (some? (st/save-user st (assoc user :orgs [(:id cust)]))))
-          (is (= [cust] (-> (mock/request :get (str "/user/" user-id "/orgs"))
-                            (app)
-                            (h/reply->json))))))
+              org {:id (st/new-id)
+                   :name "test org"}]
+          (is (some? (st/save-org st org)))
+          (is (some? (st/save-user st (assoc user :orgs [(:id org)]))))
+          (is (= [org] (-> (mock/request :get (str "/user/" user-id "/orgs"))
+                           (app)
+                           (h/reply->json))))))
 
-      (testing "/join-request"
-        (let [user (st/find-user-by-type st (user->sid user))
-              user-id (:id user)
-              cust {:id (st/new-id)
-                    :name "joining org"}
-              base-path (str "/user/" user-id "/join-request")]
+      (let [user (st/find-user-by-type st (user->sid user))
+            user-id (:id user)]
+        (testing "/join-request"
+          (let [org {:id (st/new-id)
+                     :name "joining org"}
+                base-path (str "/user/" user-id "/join-request")]
 
-          (is (some? (st/save-org st cust)))
-          
-          (testing "`POST` create new join request"
-            (let [r (-> (h/json-request :post base-path 
-                                        {:org-id (:id cust)})
-                        (app))]
-              (is (= 201 (:status r)))
-              (let [created (h/reply->json r)]
-                (is (some? (:id created)))
-                (is (= user-id (:user-id created)))
-                (is (= "pending" (:status created)) "marks created request as pending"))))
+            (is (some? (st/save-org st org)))
+            
+            (testing "`POST` create new join request"
+              (let [r (-> (h/json-request :post base-path 
+                                          {:org-id (:id org)})
+                          (app))]
+                (is (= 201 (:status r)))
+                (let [created (h/reply->json r)]
+                  (is (some? (:id created)))
+                  (is (= user-id (:user-id created)))
+                  (is (= "pending" (:status created)) "marks created request as pending"))))
 
-          (testing "`GET` lists join requests for user"
-            (let [r (-> (mock/request :get base-path)
-                        (app))]
-              (is (= 200 (:status r)))
-              (is (not-empty (h/reply->json r)))))
+            (testing "`GET` lists join requests for user"
+              (let [r (-> (mock/request :get base-path)
+                          (app))]
+                (is (= 200 (:status r)))
+                (is (not-empty (h/reply->json r)))))
 
-          (testing "`DELETE /:id` deletes join request by id"
-            (let [req (-> (st/list-user-join-requests st user-id)
-                          first)
-                  r (-> (mock/request :delete (str base-path "/" (:id req)))
-                        (app))]
-              (is (= 204 (:status r)))
-              (is (empty? (st/list-user-join-requests st user-id))))))))))
+            (testing "`DELETE /:id` deletes join request by id"
+              (let [req (-> (st/list-user-join-requests st user-id)
+                            first)
+                    r (-> (mock/request :delete (str base-path "/" (:id req)))
+                          (app))]
+                (is (= 204 (:status r)))
+                (is (empty? (st/list-user-join-requests st user-id)))))))
+
+        (testing "security"
+          (let [secure-ctx {:storage st
+                            :org-id (st/new-id)}]
+            (testing "does not allow creating new user"
+              (is (= 403 (-> (h/json-request :post "/user"
+                                             user)
+                             (secure-app-req secure-ctx)
+                             :status))))
+
+            (testing "allows retrieving users"
+              (is (= 200 (-> (mock/request
+                              :get (format "/user/%s/%d" (:type user) (:type-id user)))
+                             (secure-app-req secure-ctx)
+                             :status))))
+
+            (testing "allows retrieving user orgs"
+              (is (= 200 (-> (mock/request
+                              :get (format "/user/%s/orgs" user-id))
+                             (secure-app-req secure-ctx)
+                             :status))))
+
+            (testing "does not allow updating users"
+              (is (= 403 (-> (h/json-request
+                              :put (format "/user/%s/%d" (:type user) (:type-id user))
+                              user)
+                             (secure-app-req secure-ctx)
+                             :status))))))))))
 
 (defn- verify-label-filter-like-endpoints [path desc entity prep-match]
   (let [st (st/make-memory-storage)

@@ -1,6 +1,6 @@
 {
     "name": "monkeyci-gui",
-    "version": "0.16.10",
+    "version": "0.20.0-SNAPSHOT",
     "private": true,
     "devDependencies": {
         "highlight.js": "^10.6.0",

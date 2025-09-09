@@ -71,7 +71,7 @@
                 org.clojure/tools.namespace {:mvn/version "1.5.0"}}
    :extra-paths ["dev-resources" "env/dev"]}
 
-  :test-paths ["test/unit" "test/integration"]
+  :test-paths ["test/unit" "test/integration" "test/e2e"]
 
   ;; clj -X:test
   :test

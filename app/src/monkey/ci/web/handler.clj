@@ -439,15 +439,19 @@
 
 (def user-routes
   ["/user"
-   {:conflicting true}
+   {:conflicting true
+    ;; Deny all requests by default, except from sysadmins
+    :auth-chain [auth/deny-all auth/sysadmin-checker]}
    [[""
      {:post
       {:handler api/create-user
        :parameters {:body User}}}]
     ;; TODO Add endpoints that use the cuid instead for consistency
     ["/:user-id"
+     ;; TODO Allow from authenticated users
      {:parameters
-      {:path {:user-id s/Str}}}
+      {:path {:user-id s/Str}}
+      :auth-chain ^:replace []}
      [["/orgs"
        {:get
         {:handler api/get-user-orgs}}]
@@ -456,6 +460,8 @@
      {:parameters
       {:path {:user-type s/Str
               :type-id s/Str}}
+      ;; Allow get requests
+      :auth-chain [auth/readonly-checker]
       :get
       {:handler api/get-user}
       :put
