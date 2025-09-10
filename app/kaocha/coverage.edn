@@ -4,6 +4,11 @@
  {:kaocha/plugins ^:append [:kaocha.plugin/cloverage]
   :kaocha.plugin.junit-xml/target-file "junit.xml"
   :cloverage/opts
-  {:ns-exclude-regex [".*repl" ".*-test"]
+  {:ns-exclude-regex [".*repl" ".*-test" ".*spec.*"]
    :ns-regex ["monkey.ci.*"]
+   ;; Ignore logging calls
+   :exclude-call [clojure.tools.logging/debug
+                  clojure.tools.logging/info
+                  clojure.tools.logging/warn
+                  clojure.tools.logging/error]
    :emma-xml? true}}]
