@@ -1,4 +1,4 @@
-(ns e2e.monkey.ci.e2e.user-test
+(ns monkey.ci.e2e.user-test
   (:require [clojure.test :refer [deftest testing is]]
             [aleph.http :as http]
             [clj-commons.byte-streams :as bs]
@@ -30,7 +30,33 @@
                          (deref)
                          :status))))
 
-        (testing "should not be able to delete nonexisting user"
+        (testing "should not be able to delete user"
           (is (= 401 (-> (http/delete (c/sut-url (str "/user/" (:id b))))
                          deref
-                         :status))))))))
+                         :status)))))))
+
+  (testing "sysadmin"
+    (let [token (c/sysadmin-token)
+          r (-> {:url (c/sut-url "/user")
+                 :method :post
+                 :throw-exceptions false}
+                (c/set-body {:type "github"
+                             :type-id 2000
+                             :orgs []})
+                (c/accept-edn)
+                (c/set-token token)
+                (http/request)
+                (deref))
+          u (c/try-parse-body r)]
+      (testing "can create user"
+        (is (= 201 (:status r)))
+        (is (some? (:id u))))
+
+      (testing "can delete user"
+        (is (= 204 (-> {:url (c/sut-url (str "/user/" (:id u)))
+                        :method :delete
+                        :throw-exceptions false}
+                       (c/set-token token)
+                       (http/request)
+                       (deref)
+                       :status)))))))

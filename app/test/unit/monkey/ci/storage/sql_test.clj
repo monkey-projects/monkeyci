@@ -64,7 +64,7 @@
         (is (sid/sid? (st/save-org s org)))
         (is (sid/sid? (st/save-repo s repo)))
         (is (some? (st/find-org s (:id org))))
-        (is (true? (p/delete-obj s (st/org-sid (:id org))))
+        (is (true? (st/delete-org s (:id org)))
             "expected to delete org record")
         (is (nil? (st/find-org s (:id org)))
             "did not expect to find org after deletion")))
@@ -328,7 +328,11 @@
         (is (empty? (-> (st/find-user s (:id user)) :orgs))))
 
       (testing "can count"
-        (is (= 1 (st/count-users s)))))))
+        (is (= 1 (st/count-users s))))
+
+      (testing "can delete"
+        (is (true? (st/delete-user s (:id user))))
+        (is (= 0 (st/count-users s)))))))
 
 (deftest ^:sql builds
   (with-storage conn s

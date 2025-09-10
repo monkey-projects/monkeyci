@@ -311,7 +311,8 @@
   (verify-entity-endpoints {:name "org"
                             :base-entity {:name "test org"}
                             :updated-entity {:name "updated org"}
-                            :creator st/save-org})
+                            :creator st/save-org
+                            :can-delete? true})
 
   (testing "`GET /org` searches for org"
     (h/with-memory-store st
@@ -655,6 +656,16 @@
           (is (= 201 (:status r)))
           (is (= user (-> (st/find-user-by-type st (user->sid user))
                           (select-keys (keys user)))))))
+
+      (testing "`/:user-id`"
+        (testing "`DELETE` deletes user"
+          (let [u (h/gen-user)]
+            (is (some? (st/save-user st u)))
+            (is (= u (st/find-user st (:id u))))
+            (is (= 204 (-> (mock/request :delete (str "/user/" (:id u)))
+                           (app)
+                           :status)))
+            (is (nil? (st/find-user st (:id u)))))))
 
       (testing "`GET /:type/:id` retrieves existing user"
         (let [r (-> (mock/request :get (str "/user/github/" (:type-id user)))

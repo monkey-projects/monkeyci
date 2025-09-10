@@ -377,6 +377,7 @@
     {:creator org-api/create-org
      :updater org-api/update-org
      :getter  org-api/get-org
+     :deleter org-api/delete-org
      :searcher org-api/search-orgs
      :new-schema NewOrg
      :update-schema UpdateOrg
@@ -429,6 +430,7 @@
 
 (def user-join-request-routes
   ["/join-request"
+   ;; TODO Security
    (c/generic-routes
     {:creator jr-api/create-join-request
      :getter jr-api/get-join-request
@@ -448,12 +450,13 @@
        :parameters {:body User}}}]
     ;; TODO Add endpoints that use the cuid instead for consistency
     ["/:user-id"
-     ;; TODO Allow from authenticated users
      {:parameters
-      {:path {:user-id s/Str}}
-      :auth-chain ^:replace []}
-     [["/orgs"
-       {:get
+      {:path {:user-id s/Str}}}
+     [[""
+       {:delete {:handler api/delete-user}}]
+      ["/orgs"
+       {:auth-chain ^:replace []
+        :get
         {:handler api/get-user-orgs}}]
       user-join-request-routes]]
     ["/:user-type/:type-id"

@@ -164,6 +164,18 @@
                  (sut/search-orgs)
                  :status))))))
 
+(deftest delete-org
+  (h/with-memory-store st
+    (testing "deletes org with id from storage"
+      (let [org (h/gen-org)]
+        (is (sid/sid? (st/save-org st org)))
+        (is (= 204 (-> {:storage st}
+                       (h/->req)
+                       (assoc-in [:parameters :path :org-id] (:id org))
+                       (sut/delete-org)
+                       :status)))
+        (is (nil? (st/find-org st (:id org))))))))
+
 (deftest recent-builds
   (h/with-memory-store st
     (testing "status `404` if org does not exist"
@@ -178,7 +190,7 @@
     (testing "retrieves builds"
       (let [repo (h/gen-repo)
             org (-> (h/gen-org)
-                     (assoc :repos {(:id repo) repo}))
+                    (assoc :repos {(:id repo) repo}))
             now (jt/instant)
             old-build {:org-id (:id org)
                        :repo-id (:id repo)

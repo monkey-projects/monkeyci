@@ -102,6 +102,12 @@
 (defn find-org [s id]
   (p/read-obj s (org-sid id)))
 
+(def delete-org
+  (override-or
+   [:org :delete]
+   (fn [s id]
+     (p/delete-obj s (org-sid id)))))
+
 (def find-orgs
   "Fetches multiple orgs, without repos"
   (override-or
@@ -570,6 +576,13 @@
               (mapcat find-typed-users)
               (filter (comp (partial = id) :id))
               (first)))))))
+
+(def delete-user
+  (override-or
+   [:user :delete]
+   (fn [s id]
+     (when-let [m (find-user s id)]
+       (p/delete-obj s (user->sid m))))))
 
 (def count-users
   (override-or
