@@ -413,6 +413,9 @@
 (defn- count-users [st]
   (ec/count-entities (get-conn st) :users))
 
+(defn- delete-user [st id]
+  (pos? (ec/delete-entities (get-conn st) :users (ec/by-cuid id))))
+
 (defn build? [sid]
   (and (= "builds" (first sid))
        (= 4 (count sid))))
@@ -1106,7 +1109,8 @@
    :user
    {:find select-user
     :orgs select-user-orgs
-    :count count-users}
+    :count count-users
+    :delete delete-user}
    :join-request
    {:list-user select-user-join-requests}
    :build

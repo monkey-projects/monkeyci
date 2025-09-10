@@ -319,7 +319,11 @@
         (is (= u (sut/find-user st (:id u))) "can retrieve user by id"))
 
       (testing "can count"
-        (is (= 1 (sut/count-users st)))))))
+        (is (= 1 (sut/count-users st))))
+
+      (testing "can delete"
+        (is (true? (sut/delete-user st (:id u))))
+        (is (= 0 (sut/count-users st)))))))
 
 (deftest update-repo
   (testing "updates repo in org object"

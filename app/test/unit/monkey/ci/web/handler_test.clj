@@ -656,6 +656,16 @@
           (is (= user (-> (st/find-user-by-type st (user->sid user))
                           (select-keys (keys user)))))))
 
+      (testing "`/:user-id`"
+        (testing "`DELETE` deletes user"
+          (let [u (h/gen-user)]
+            (is (some? (st/save-user st u)))
+            (is (= u (st/find-user st (:id u))))
+            (is (= 204 (-> (mock/request :delete (str "/user/" (:id u)))
+                           (app)
+                           :status)))
+            (is (nil? (st/find-user st (:id u)))))))
+
       (testing "`GET /:type/:id` retrieves existing user"
         (let [r (-> (mock/request :get (str "/user/github/" (:type-id user)))
                     (app))]

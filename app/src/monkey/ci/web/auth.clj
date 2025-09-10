@@ -305,6 +305,7 @@
 (defn sysadmin-checker
   "Allows sysadmins"
   [_ req]
+  (log/debug "Checking if user is sysadmin:" (:identity req))
   (when (sysadmin? (:identity req))
     granted))
 

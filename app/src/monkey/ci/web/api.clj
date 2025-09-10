@@ -33,6 +33,9 @@
                           :getter st/find-user-by-type
                           :saver st/save-user})
 
+(def delete-user
+  (c/entity-deleter (c/id-getter :user-id) st/delete-user))
+
 (defn get-user-orgs
   "Retrieves all users linked to the org in the request path"
   [req]

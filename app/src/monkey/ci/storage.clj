@@ -571,6 +571,13 @@
               (filter (comp (partial = id) :id))
               (first)))))))
 
+(def delete-user
+  (override-or
+   [:user :delete]
+   (fn [s id]
+     (when-let [m (find-user s id)]
+       (p/delete-obj s (user->sid m))))))
+
 (def count-users
   (override-or
    [:user :count]
