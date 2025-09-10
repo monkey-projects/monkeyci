@@ -311,7 +311,8 @@
   (verify-entity-endpoints {:name "org"
                             :base-entity {:name "test org"}
                             :updated-entity {:name "updated org"}
-                            :creator st/save-org})
+                            :creator st/save-org
+                            :can-delete? true})
 
   (testing "`GET /org` searches for org"
     (h/with-memory-store st

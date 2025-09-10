@@ -377,6 +377,7 @@
     {:creator org-api/create-org
      :updater org-api/update-org
      :getter  org-api/get-org
+     :deleter org-api/delete-org
      :searcher org-api/search-orgs
      :new-schema NewOrg
      :update-schema UpdateOrg

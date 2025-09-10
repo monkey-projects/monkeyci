@@ -34,7 +34,8 @@
 (c/make-entity-endpoints "org"
                          {:get-id (c/id-getter :org-id)
                           :getter (comp repos->out st/find-org)
-                          :saver save-org})
+                          :saver save-org
+                          :deleter st/delete-org})
 
 (defn- maybe-link-user [req st org-id]
   (let [user (:identity req)

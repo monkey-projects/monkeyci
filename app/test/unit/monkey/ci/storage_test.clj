@@ -14,17 +14,22 @@
 
 (deftest orgs
   (h/with-memory-store st
-    (testing "can find multiple"
-      (let [orgs (repeatedly 3 h/gen-org)]
+    (let [orgs (repeatedly 3 h/gen-org)]
         (doseq [c orgs]
           (sut/save-org st c))
-        (let [r (sut/find-orgs st (->> orgs
-                                            (take 2)
-                                            (map :id)))]
-          (is (= (take 2 orgs) r)))))
+        (testing "can find multiple"
+          (let [r (sut/find-orgs st (->> orgs
+                                         (take 2)
+                                         (map :id)))]
+            (is (= (take 2 orgs) r))))
 
-    (testing "can count"
-      (is (= 3 (sut/count-orgs st))))))
+        (testing "can count"
+          (is (= 3 (sut/count-orgs st))))
+
+        (testing "can delete"
+          (let [org (first orgs)]
+            (is (true? (sut/delete-org st (:id org))))
+            (is (nil? (sut/find-org st (:id org)))))))))
 
 (deftest webhooks
   (testing "webhook-sid is a sid"

@@ -102,6 +102,12 @@
 (defn find-org [s id]
   (p/read-obj s (org-sid id)))
 
+(def delete-org
+  (override-or
+   [:org :delete]
+   (fn [s id]
+     (p/delete-obj s (org-sid id)))))
+
 (def find-orgs
   "Fetches multiple orgs, without repos"
   (override-or
