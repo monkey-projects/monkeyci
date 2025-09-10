@@ -90,6 +90,13 @@
    ;; Add this to avoid falling back to the default logger
    :jvm-opts ["-Dlogback.configurationFile=resources/logback.xml"]}
 
+  ;; clj -M:test:e2e
+  :e2e
+  {:main-opts ["-m" "kaocha.runner"
+               "-c" "kaocha/e2e.edn"]
+   ;; Add this to avoid falling back to the default logger
+   :jvm-opts ["-Dlogback.configurationFile=resources/logback.xml"]}
+  
   ;; clj -M:test:coverage
   :coverage
   {:extra-deps {lambdaisland/kaocha-cloverage {:mvn/version "1.1.89"}}
