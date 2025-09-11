@@ -13,22 +13,29 @@
 
     (let [org {:name (str "test-" (t/now))}
           token (c/user-token u)
-          reply (-> (c/request :post "/org")
-                       (c/set-token token)
-                       (c/accept-edn)
-                       (c/set-body org)
-                       (http/request)
-                       (deref))]
+          request (fn [method path & [body]]
+                    (cond-> (-> (c/request method path)
+                                (c/set-token token)
+                                (c/accept-edn))
+                      body (c/set-body body)
+                      true (-> (http/request)
+                               (deref))))
+          reply (request :post "/org" org)]
       
       (testing "can create org"
         (is (= 201 (:status reply))))
 
       (let [org (c/try-parse-body reply)]
+        (is (string? (:id org)))
+        
+        (testing "org is linked to user"
+          (is (= [(:id org)]
+                 (-> (request :get (format "/user/%s/%s" (:type u) (:type-id u)))
+                     (c/try-parse-body)
+                     :orgs))))
+
         (testing "can delete org"
-          (is (= 204 (-> (c/request :delete (str "/org/" (:id org)))
-                         (c/set-token token)
-                         (http/request)
-                         (deref)
+          (is (= 204 (-> (request :delete (str "/org/" (:id org)))
                          :status))))))
 
     (testing "cleanup"

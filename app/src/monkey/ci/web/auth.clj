@@ -297,6 +297,12 @@
           ;; Explicitly permission granted
           granted)))))
 
+(defn current-user-checker
+  "Verifies that the current user matches the one in the request path"
+  [_ req]
+  (when (= (user-id req) (get-in req [:parameters :path :user-id]))
+    granted))
+
 (defn deny-all
   "Chain checker that denies all requests"
   [_ _]

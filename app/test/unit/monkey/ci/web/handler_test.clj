@@ -117,14 +117,18 @@
    Creates a random user in storage with access to the given org.
    Invokes the request after adding the token as authorization.  Returns
    the http response."
-  [req {:keys [org-id update-token] st :storage
+  [req {:keys [org-id update-token user] st :storage
         :or {update-token identity}}]
   (let [kp (auth/generate-keypair)
         rt (test-rt {:storage st
                      :jwk (auth/keypair->rt kp)
                      :config {:dev-mode false}})
-        github-id (int (* (rand) 10000))
-        token-info {:sub (str "github/" github-id)
+        user (or user
+                 (when org-id
+                   {:type "github"
+                    :type-id (int (* (rand) 10000))
+                    :orgs [org-id]}))
+        token-info {:sub (str (:type user) "/" (:type-id user))
                     :role auth/role-user
                     :exp (+ (u/now) 10000)}
         make-token (fn [ti]
@@ -133,10 +137,8 @@
                       (update-token)
                       (make-token))
         app (sut/make-app rt)]
-    (when org-id
-      (st/save-user st {:type "github"
-                        :type-id github-id
-                        :orgs [org-id]}))
+    (when user
+      (st/save-user st user))
     (cond-> req
       token (mock/header "authorization" (str "Bearer " token))
       true (app))))
@@ -726,7 +728,8 @@
 
         (testing "security"
           (let [secure-ctx {:storage st
-                            :org-id (st/new-id)}]
+                            :org-id (st/new-id)
+                            :user user}]
             (testing "does not allow creating new user"
               (is (= 403 (-> (h/json-request :post "/user"
                                              user)
@@ -749,6 +752,16 @@
               (is (= 403 (-> (h/json-request
                               :put (format "/user/%s/%d" (:type user) (:type-id user))
                               user)
+                             (secure-app-req secure-ctx)
+                             :status))))
+
+            (testing "allows listing own join requests"
+              (is (= 200 (-> (mock/request :get (format "/user/%s/join-request" user-id))
+                             (secure-app-req secure-ctx)
+                             :status))))
+
+            (testing "does not allow listing other users' join requests"
+              (is (= 403 (-> (mock/request :get (format "/user/%s/join-request" (st/new-id)))
                              (secure-app-req secure-ctx)
                              :status))))))))))
 

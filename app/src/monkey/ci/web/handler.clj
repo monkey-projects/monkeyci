@@ -430,7 +430,7 @@
 
 (def user-join-request-routes
   ["/join-request"
-   ;; TODO Security
+   {:auth-chain [auth/current-user-checker]}
    (c/generic-routes
     {:creator jr-api/create-join-request
      :getter jr-api/get-join-request

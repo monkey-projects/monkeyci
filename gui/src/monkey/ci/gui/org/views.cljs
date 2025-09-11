@@ -278,7 +278,9 @@
    [add-repo-btn id]
    [:p.mt-2
     "A repository points to a remote git site, that contains a MonkeyCI script.  See "
-    [co/docs-link "articles/repos" "the documentation on repositories."]]])
+    [co/docs-link "articles/repos" "the documentation on repositories."] " Want to "
+    "learn how to write your first build script?  Check out "
+    [co/docs-link "categories/getting-started" "the getting started guide."]]])
 
 (defn- org-details [id]
   (let [o (rf/subscribe [:org/info])]
