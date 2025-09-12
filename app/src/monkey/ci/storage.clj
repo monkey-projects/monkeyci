@@ -96,8 +96,8 @@
 
 (def org-sid (partial global-sid :orgs))
 
-(defn save-org [s cust]
-  (p/write-obj s (org-sid (:id cust)) cust))
+(defn save-org [s org]
+  (p/write-obj s (org-sid (:id org)) org))
 
 (defn find-org [s id]
   (p/read-obj s (org-sid id)))
@@ -721,10 +721,10 @@
 (def list-org-credit-subscriptions
   (override-or
    [:org :list-credit-subscriptions]
-   (fn [st cust-id]
-     (let [sid (credit-sub-sid cust-id)]
+   (fn [st org-id]
+     (let [sid (credit-sub-sid org-id)]
        (->> (p/list-obj st sid)
-            (map (partial vector cust-id))
+            (map (partial vector org-id))
             (map (partial find-credit-subscription st)))))))
 
 (def list-active-credit-subscriptions
@@ -809,8 +809,8 @@
 (defn save-crypto [st crypto]
   (p/write-obj st (crypto-sid (:org-id crypto)) crypto))
 
-(defn find-crypto [st cust-id]
-  (p/read-obj st (crypto-sid cust-id)))
+(defn find-crypto [st org-id]
+  (p/read-obj st (crypto-sid org-id)))
 
 (def sysadmin :sysadmin)
 (defn sysadmin-sid [& parts]
@@ -898,3 +898,30 @@
           (map (comp job-event-sid (partial conj job-sid)))
           (map (partial p/read-obj st))
           (sort-by :time)))))
+
+(def init-org
+  "Creates a new organization record, with dependent records also added.
+   This is useful to perform the update atomically (e.g. in single trx)."
+  (override-or
+   [:org :init]
+   (fn [s opts]
+     (let [sid (save-org s (:org opts))
+           org-id (last sid)]
+       (when-let [uid (:user-id opts)]
+         (let [u (find-user s uid)]
+           (save-user s (update u :orgs (comp vec conj) org-id))))
+       (when-let [{:keys [amount from]} (:credits opts)]
+         (let [cs {:id (cuid/random-cuid)
+                   :org-id org-id
+                   :amount amount
+                   :valid-from from}]
+           (when (save-credit-subscription s cs)
+             (save-org-credit s {:id (cuid/random-cuid)
+                                 :org-id org-id
+                                 :amount amount
+                                 :from-time from
+                                 :type :subscription
+                                 :subscription-id (:id cs)}))))
+       (when-let [dek (:dek opts)]
+         (save-crypto s {:dek dek :org-id org-id}))
+       sid))))

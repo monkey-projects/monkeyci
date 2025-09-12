@@ -31,6 +31,44 @@
             (is (true? (sut/delete-org st (:id org))))
             (is (nil? (sut/find-org st (:id org)))))))))
 
+(deftest init-org
+  (h/with-memory-store st
+    (let [org {:id (sut/new-id)
+               :name "test org"}
+          user {:id (sut/new-id)
+                :name "testuser"
+                :type "github"
+                :type-id "1243"}]
+      (is (some? (sut/save-user st user)))
+
+      (let [res (sut/init-org st {:org org
+                                  :user-id (:id user)
+                                  :credits {:amount 1000
+                                            :from (t/now)}
+                                  :dek "test-dek"})]
+        (is (sid/sid? res))
+        
+        (testing "creates new org"
+          (is (= org (sut/find-org st (:id org)))))
+
+        (testing "links org to user"
+          (is (= [org] (sut/list-user-orgs st (:id user)))))
+
+        (testing "creates credit subscription"
+          (let [cs (sut/list-org-credit-subscriptions st (:id org))]
+            (is (= 1 (count cs)))
+            (is (= 1000 (-> cs first :amount)))))
+
+        (testing "creates starting credit"
+          (let [c (sut/list-org-credits st (:id org))]
+            (is (= 1 (count c)))
+            (is (= 1000 (-> c first :amount)))))
+
+        (testing "creates crypto with dek"
+          (let [c (sut/find-crypto st (:id org))]
+            (is (some? c))
+            (is (= "test-dek" (:dek c)))))))))
+
 (deftest webhooks
   (testing "webhook-sid is a sid"
     (is (sid/sid? (sut/webhook-sid "test-id"))))

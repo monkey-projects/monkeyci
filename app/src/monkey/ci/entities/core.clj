@@ -27,7 +27,8 @@
 
 (defn insert-entities
   "Batch inserts multiple entities at once.  The records are assumed to
-   be vectors of values."
+   be vectors of values.  Returns the input entities with their generated
+   ids added."
   [{:keys [ds sql-opts]} table cols recs]
   (let [sql (h/format {:insert-into table
                        :columns cols

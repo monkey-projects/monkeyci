@@ -96,13 +96,25 @@
     (testing "can count"
       (is (pos? (st/count-orgs s))))))
 
+#_(deftest ^:sql init-org
+  (with-storage conn s
+    (testing "creates new org")
+
+    (testing "links org to user")
+
+    (testing "creates credit subscription")
+
+    (testing "creates initial credits")
+
+    (testing "creates crypto with dek")))
+
 (deftest ^:sql repos
   (with-storage conn s
     (let [repo {:name "test repo"
                 :id "test-repo"}
           lbl (str "test-label-" (cuid/random-cuid))
           org (-> (h/gen-org)
-                   (assoc-in [:repos (:id repo)] repo))
+                  (assoc-in [:repos (:id repo)] repo))
           sid [(:id org) (:id repo)]]
       
       (testing "saved with org"
