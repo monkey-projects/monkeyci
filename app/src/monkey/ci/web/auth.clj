@@ -223,16 +223,11 @@
        (remove nil?)
        last))
 
-(defn chain-result->exception [r]
-  (when (denied? r)
-    (ex-info (or (:reason r) "You do not have access to this resource")
-             (-> r
-                 (dissoc :reason)
-                 (assoc :type :auth/unauthorized)))))
-
-(defn- maybe-throw [ex]
-  (when ex
-    (throw ex)))
+(defn chain-result->response [r req]
+  (if (ba/authenticated? req)
+    ;; TODO Allow more properties
+    (c/error-response (or (:reason r) "You do not have access to this resource") 403)
+    (c/error-response "Unauthenticated" 401)))
 
 (defn auth-chain-middleware
   "Middleware that extracts any authorization checkers from the route data
@@ -243,11 +238,10 @@
     (let [checkers (-> req
                        (c/route-data)
                        :auth-chain)]
-      (when-let [ex (-> checkers
-                        (auth-chain req)
-                        (chain-result->exception))]
-        (throw ex))
-      (h req))))
+      (let [ac (auth-chain checkers req)]
+        (if (denied? ac)
+          (chain-result->response ac req)
+          (h req))))))
 
 (defn- denied-no-org-access [org-id]
   (denied "Credentials do not grant access to this org"

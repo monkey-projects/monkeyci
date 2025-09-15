@@ -100,36 +100,26 @@
       (is (= ::handled
              (w {}))))
 
-    (testing "denies when chain denies"
-      (is (thrown? Exception
-                   (-> {:auth-chain [(constantly {:permission :denied})]}
-                       (h/->match-data)
-                       (w)))))
+    (testing "unauthorized when authenticated but chain denies"
+      (let [r (-> {:auth-chain [(constantly {:permission :denied})]}
+                  (h/->match-data)
+                  (assoc :identity {:id ::test-user})
+                  (w))]
+        (is (= 403 (:status r)))
+        (is (string? (get-in r [:body :error])))))
+
+    (testing "unauthenticated when chain denies and no authentication found"
+      (let [r (-> {:auth-chain [(constantly {:permission :denied})]}
+                  (h/->match-data)
+                  (w))]
+        (is (= 401 (:status r)))
+        (is (string? (get-in r [:body :error])))))
 
     (testing "allows when chain allows"
       (is (= ::handled
              (-> {:auth-chain [(constantly nil)]}
                  (h/->match-data)
                  (w)))))))
-
-(deftest chain-result->exception
-  (testing "`nil` if approved"
-    (is (nil? (sut/chain-result->exception nil)))
-    (is (nil? (sut/chain-result->exception {:permission :granted}))))
-
-  (testing "if denied"
-    (let [r (sut/chain-result->exception {:permission :denied
-                                          :reason "For testing"
-                                          ::key ::value})]
-      (testing "sets reason as message"
-        (is (= "For testing" (ex-message r))))
-
-      (testing "sets type unauthorized"
-        (is (= :auth/unauthorized
-               (:type (ex-data r)))))
-
-      (testing "adds additional values to exception"
-        (is (= ::value (::key (ex-data r))))))))
 
 (deftest public-repo-checker
   (h/with-memory-store st
