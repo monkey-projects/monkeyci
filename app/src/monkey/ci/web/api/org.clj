@@ -37,53 +37,16 @@
                           :saver save-org
                           :deleter st/delete-org})
 
-(defn- maybe-link-user [req st org-id]
-  (let [user (:identity req)
-        user? (every-pred :type)]
-    ;; When a user is creating the org, link them up
-    (if (user? user)
-      (st/save-user st (update user :orgs conj org-id))
-      (log/warn "No user in request, so creating org that is not linked to a user."))))
-
-(defn- create-subscription [st org-id]
-  (let [ts (t/now)
-        cs {:id (cuid/random-cuid)
-            :org-id org-id
-            :amount config/free-credits
-            :valid-from ts}]
-    (when (st/save-credit-subscription st cs)
-      (st/save-org-credit st {:id (cuid/random-cuid)
-                              :org-id org-id
-                              :subscription-id (:id cs)
-                              :type :subscription
-                              :amount (:amount cs)
-                              :from-time ts}))))
-
-(defn- create-crypto [req org-id]
-  (let [st (c/req->storage req)
-        dek (crypto/generate-dek req org-id)]
-    ;; Store the encrypted key
-    (st/save-crypto st {:org-id org-id
-                        :dek (:enc dek)})))
-
 (defn create-org [req]
-  (let [creator (c/entity-creator (fn [_ org]
-                                    ;; Use trx storage
-                                    ;; TODO Assign an id based on the name instead of cuid
-                                    (st/save-org (c/req->storage req) org))
-                                  c/default-id)]
-    (when-let [reply (creator req)]
-      ;; Create the org outside of the transaction because we need the native
-      ;; id when using sql database, so we can't look it up.
-      ;; FIXME Rework the sql impl so we keep track of the ids of newly inserted records.
-      ;; Alternatively, we would have to create a storage fn that performs these
-      ;; steps internally, which could be in a single transaction.
-      (st/with-transaction (c/req->storage req) st
-        (let [org-id (get-in reply [:body :id])]
-          (maybe-link-user req st org-id)
-          (create-subscription st org-id)
-          (create-crypto req org-id)
-          reply)))))
+  (st/with-transaction (c/req->storage req) st
+    (let [org-id (cuid/random-cuid)
+          org (assoc (c/body req) :id org-id)
+          res (st/init-org st {:org org
+                               :user-id (-> req :identity :id)
+                               :credits {:amount config/free-credits
+                                         :from (t/now)}
+                               :dek (:enc (crypto/generate-dek req org-id))})]
+      (rur/response org))))
 
 (defn search-orgs [req]
   (let [f (query-params req)]

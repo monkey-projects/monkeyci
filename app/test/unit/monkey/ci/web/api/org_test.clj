@@ -56,12 +56,14 @@
                 (h/with-body {:name "new org"})
                 (sut/create-org)
                 :body)]
+      (is (map? r))
       (is (= "new org" (:name r)))
       (is (string? (:id r)))))
 
   (let [user (-> (h/gen-user)
                  (dissoc :orgs))
         {st :storage :as rt} (trt/test-runtime)
+        _ (st/save-user st user)
         r (-> rt
               (trt/set-dek-generator (constantly {:enc "encrypted-key"
                                                   :key "plain-key"}))
