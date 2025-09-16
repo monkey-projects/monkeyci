@@ -47,7 +47,19 @@
         (is (some? repos))
         (is (not (map? repos)))
         (is (= (select-keys repo [:id :name])
-               (first repos)))))))
+               (first repos))))))
+
+  (testing "retrieves org by display-id"
+    (let [org {:id (st/new-id)
+               :name "Some org"}
+          {st :storage :as rt} (trt/test-runtime)]
+      (is (sid/sid? (st/init-org st {:org org})))
+      (let [r (-> rt
+                  (h/->req)
+                  (h/with-path-param :org-id "some-org")
+                  (sut/get-org)
+                  :body)]
+        (is (= (:id org) (:id r)))))))
 
 (deftest create-org
   (let [r (-> (trt/test-runtime)

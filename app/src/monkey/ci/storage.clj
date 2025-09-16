@@ -103,6 +103,15 @@
 (defn find-org [s id]
   (p/read-obj s (org-sid id)))
 
+(def find-org-by-display-id
+  (override-or
+   [:org :find-by-display-id]
+   (fn [s did]
+     (->> (p/list-obj s (org-sid))
+          (map (comp (partial p/read-obj s) org-sid))
+          (filter (comp (partial = did) :display-id))
+          (first)))))
+
 (def delete-org
   (override-or
    [:org :delete]

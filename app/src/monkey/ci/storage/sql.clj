@@ -178,10 +178,17 @@
     (update-org conn org existing)
     (insert-org conn org)))
 
+(defn- select-org-by-filter [conn f]
+  (some-> (ecu/org-with-repos conn f)
+          (db->org-with-repos)))
+
 (defn- select-org [conn cuid]
   (when cuid
-    (some-> (ecu/org-with-repos conn (ec/by-cuid cuid))
-            (db->org-with-repos))))
+    (select-org-by-filter conn (ec/by-cuid cuid))))
+
+(defn- select-org-by-display-id [st did]
+  (when did
+    (select-org-by-filter (get-conn st) (ec/by-display-id did))))
 
 (defn- org-exists? [conn cuid]
   (some? (ec/select-org conn (ec/by-cuid cuid))))
@@ -1099,6 +1106,7 @@
     :list-credit-consumptions-since select-org-credit-cons-since
     :find-latest-builds select-latest-org-builds
     :find-latest-n-builds select-latest-n-org-builds
+    :find-by-display-id select-org-by-display-id
     :count count-orgs}
    :repo
    {:list-display-ids select-repo-display-ids

@@ -15,21 +15,28 @@
 (deftest orgs
   (h/with-memory-store st
     (let [orgs (repeatedly 3 h/gen-org)]
-        (doseq [c orgs]
-          (sut/save-org st c))
-        (testing "can find multiple"
-          (let [r (sut/find-orgs st (->> orgs
-                                         (take 2)
-                                         (map :id)))]
-            (is (= (take 2 orgs) r))))
+      (doseq [c orgs]
+        (sut/save-org st c))
+      (testing "can find multiple"
+        (let [r (sut/find-orgs st (->> orgs
+                                       (take 2)
+                                       (map :id)))]
+          (is (= (take 2 orgs) r))))
 
-        (testing "can count"
-          (is (= 3 (sut/count-orgs st))))
+      (testing "can count"
+        (is (= 3 (sut/count-orgs st))))
 
-        (testing "can delete"
-          (let [org (first orgs)]
-            (is (true? (sut/delete-org st (:id org))))
-            (is (nil? (sut/find-org st (:id org)))))))))
+      (testing "can delete"
+        (let [org (first orgs)]
+          (is (true? (sut/delete-org st (:id org))))
+          (is (nil? (sut/find-org st (:id org)))))))
+
+    (testing "can find by display id"
+      (let [org {:id (cuid/random-cuid)
+                 :name "test org"
+                 :display-id "test-org"}]
+        (is (sid/sid? (sut/save-org st org)))
+        (is (= org (sut/find-org-by-display-id st "test-org")))))))
 
 (deftest init-org
   (h/with-memory-store st

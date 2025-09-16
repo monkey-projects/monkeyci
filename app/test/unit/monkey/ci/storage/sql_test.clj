@@ -71,7 +71,7 @@
 
     (testing "can search"
       (let [org (-> (h/gen-org)
-                     (assoc :name "test org"))]
+                    (assoc :name "test org"))]
         (is (sid/sid? (st/save-org s org)))
         
         (testing "by name"
@@ -94,7 +94,14 @@
                       (set)))))))
 
     (testing "can count"
-      (is (pos? (st/count-orgs s))))))
+      (is (pos? (st/count-orgs s))))
+
+    (testing "can find by display-id"
+      (let [org {:name "another org"
+                 :display-id "another-org"
+                 :id (cuid/random-cuid)}]
+        (is (sid/sid? (st/save-org s org)))
+        (is (= (:id org) (:id (st/find-org-by-display-id s "another-org"))))))))
 
 #_(deftest ^:sql init-org
   (with-storage conn s

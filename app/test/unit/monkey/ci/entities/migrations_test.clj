@@ -166,7 +166,8 @@
                                rp/id)
     conn mig
     (is (some? mig))
-    (let [org (ec/insert-org conn (eh/gen-org))
+    (let [org (ec/insert-org conn (-> (eh/gen-org)
+                                      (dissoc :display-id)))
           crypto (ec/insert-crypto conn
                                    {:org-id (:id org)
                                     :iv (v/generate-iv)})

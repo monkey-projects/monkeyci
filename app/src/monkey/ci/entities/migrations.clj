@@ -658,7 +658,9 @@
    (migration
     (mig-id 50 :org-display-id)
     [{:alter-table :orgs
-      :add-column [:display-id [:varchar 30]]}]
+      :add-column [:display-id [:varchar 30]]}
+     {:alter-table :orgs
+      :add-index [:unique nil :display-id]}]
     [{:alter-table :orgs
       :drop-column :display-id}])])
 
