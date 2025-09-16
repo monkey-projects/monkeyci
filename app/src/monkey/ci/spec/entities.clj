@@ -26,8 +26,10 @@
 (s/def :entity/timed
   (s/keys :opt-un [:entity/start-time :entity/end-time]))
 
+(s/def :org/display-id string?)
+
 (s/def :entity/org
-  (-> (s/keys :req-un [:entity/name])
+  (-> (s/keys :req-un [:entity/name :org/display-id])
       (s/merge :entity/common)))
 
 (s/def :label/name string?)

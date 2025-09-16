@@ -23,7 +23,7 @@
     (is (= "http://test:1234/v1"
            (sut/req->ext-uri
             {:scheme :http
-             :uri "/v1/customer/test-cust"
+             :uri "/v1/org/test-cust"
              :headers {"host" "test:1234"}}
-            "/customer")))))
+            "/org")))))
 

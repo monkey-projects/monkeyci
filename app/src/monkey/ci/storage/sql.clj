@@ -145,7 +145,7 @@
 (defn- org->db [org]
   (-> org
       (id->cuid)
-      (select-keys [:cuid :name])))
+      (select-keys [:cuid :name :display-id])))
 
 (def db->org cuid->id)
 

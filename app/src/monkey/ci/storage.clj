@@ -9,7 +9,8 @@
             [monkey.ci
              [cuid :as cuid]
              [protocols :as p]
-             [sid :as sid]]
+             [sid :as sid]
+             [utils :as u]]
             [monkey.ci.common.preds :as cp]
             [monkey.ci.storage.cached :as cached])
   (:import [java.io File PushbackReader]))
@@ -899,13 +900,23 @@
           (map (partial p/read-obj st))
           (sort-by :time)))))
 
+(defn- list-org-display-ids [s]
+  (->> (p/list-obj s (global-sid :orgs))
+       (map (partial p/read-obj s))
+       (map :display-id)
+       (remove nil?)
+       (set)))
+
 (def init-org
   "Creates a new organization record, with dependent records also added.
    This is useful to perform the update atomically (e.g. in single trx)."
   (override-or
    [:org :init]
-   (fn [s opts]
-     (let [sid (save-org s (:org opts))
+   (fn [s {:keys [org] :as opts}]
+     (let [existing? (list-org-display-ids s)
+           sid (save-org s (-> org
+                               ;; TODO Limit to max length
+                               (assoc :display-id (u/name->display-id (:name org) existing?))))
            org-id (last sid)]
        (when-let [uid (:user-id opts)]
          (let [u (find-user s uid)]

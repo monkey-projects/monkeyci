@@ -50,15 +50,18 @@
                (first repos)))))))
 
 (deftest create-org
-  (testing "returns created org with id"
-    (let [r (-> (trt/test-runtime)
-                (h/->req)
-                (h/with-body {:name "new org"})
-                (sut/create-org)
-                :body)]
+  (let [r (-> (trt/test-runtime)
+              (h/->req)
+              (h/with-body {:name "new org"})
+              (sut/create-org)
+              :body)]
+    (testing "returns created org with id"
       (is (map? r))
       (is (= "new org" (:name r)))
-      (is (string? (:id r)))))
+      (is (string? (:id r))))
+
+    (testing "assigns display id"
+      (is (= "new-org" (:display-id r)))))
 
   (let [user (-> (h/gen-user)
                  (dissoc :orgs))

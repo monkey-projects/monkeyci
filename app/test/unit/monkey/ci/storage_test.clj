@@ -47,12 +47,17 @@
                                             :from (t/now)}
                                   :dek "test-dek"})]
         (is (sid/sid? res))
-        
-        (testing "creates new org"
-          (is (= org (sut/find-org st (:id org)))))
+
+        (let [m (sut/find-org st (:id org))]
+          (testing "creates new org"
+            (is (= (:id org) (:id m))))
+
+          (testing "assigns display id"
+            (is (= "test-org" (:display-id m)))))
 
         (testing "links org to user"
-          (is (= [org] (sut/list-user-orgs st (:id user)))))
+          (is (= [(:id org)] (->> (sut/list-user-orgs st (:id user))
+                                  (map :id)))))
 
         (testing "creates credit subscription"
           (let [cs (sut/list-org-credit-subscriptions st (:id org))]

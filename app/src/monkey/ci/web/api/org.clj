@@ -46,7 +46,8 @@
                                :credits {:amount config/free-credits
                                          :from (t/now)}
                                :dek (:enc (crypto/generate-dek req org-id))})]
-      (-> (rur/response org)
+      (-> (st/find-org st (last res))
+          (rur/response)
           (rur/status 201)))))
 
 (defn search-orgs [req]
