@@ -28,7 +28,8 @@
              [protocols :as p]
              [sid :as sid]
              [spec :as spec]
-             [storage :as st]]
+             [storage :as st]
+             [utils :as u]]
             [monkey.ci.spec.db-entities]
             [monkey.ci.spec.entities]
             [next.jdbc :as jdbc]
@@ -177,6 +178,38 @@
   (if-let [existing (ec/select-org conn (ec/by-cuid (:id org)))]
     (update-org conn org existing)
     (insert-org conn org)))
+
+(defn- select-org-display-ids [conn]
+  (ecu/org-display-ids conn))
+
+(defn- init-org [st {:keys [org] :as opts}]
+  (let [conn (get-conn st)
+        existing? (select-org-display-ids conn)
+        org (ec/insert-org conn (-> org
+                                    (assoc :display-id (u/name->display-id (:name org) existing?))
+                                    (org->db)))
+        org-id (:id org)]
+    (when-let [uid (some->> (:user-id opts)
+                            (ec/by-cuid)
+                            (ec/select-users conn)
+                            first
+                            :id)]
+      (ec/insert-user-orgs conn uid [org-id]))
+    (when-let [{:keys [amount from]} (:credits opts)]
+      (let [cse {:cuid (st/new-id)
+                 :org-id org-id
+                 :amount amount
+                 :valid-from from}]
+        (when-let [cs (ec/insert-credit-subscription conn cse)]
+          (ec/insert-org-credit conn {:cuid (st/new-id)
+                                      :org-id org-id
+                                      :amount amount
+                                      :from-time from
+                                      :type :subscription
+                                      :subscription-id (:id cs)}))))
+    (when-let [dek (:dek opts)]
+      (ec/insert-crypto conn {:dek dek :org-id org-id}))
+    (st/org-sid (:cuid org))))
 
 (defn- select-org-by-filter [conn f]
   (some-> (ecu/org-with-repos conn f)
@@ -1095,7 +1128,8 @@
     :watch watch-github-repo
     :unwatch unwatch-github-repo}
    :org
-   {:search select-orgs
+   {:init init-org
+    :search select-orgs
     :find-multiple select-orgs-by-id
     :list-credits-since select-org-credits-since
     :list-credits select-org-credits

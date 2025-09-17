@@ -356,11 +356,11 @@
 
 (defn insert-user-orgs
   "Batch inserts user/org links"
-  [conn user-id cust-ids]
-  (when-not (empty? cust-ids)
+  [conn user-id org-ids]
+  (when-not (empty? org-ids)
     (insert-entities conn :user-orgs
                      [:user-id :org-id]
-                     (map (partial conj [user-id]) cust-ids))))
+                     (map (partial conj [user-id]) org-ids))))
 
 (defaggregate org-param-value)
 

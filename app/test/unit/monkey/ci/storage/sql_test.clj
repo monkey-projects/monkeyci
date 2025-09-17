@@ -103,17 +103,42 @@
         (is (sid/sid? (st/save-org s org)))
         (is (= (:id org) (:id (st/find-org-by-display-id s "another-org"))))))))
 
-#_(deftest ^:sql init-org
+(deftest ^:sql init-org
   (with-storage conn s
-    (testing "creates new org")
+    (let [org (-> (h/gen-org)
+                  (assoc :name "test org"))
+          user {:id (cuid/random-cuid)
+                :type "github"
+                :type-id "12342"}
+          _ (st/save-user s user)
+          res (st/init-org s {:org org
+                              :user-id (:id user)
+                              :credits {:amount 1000
+                                        :from (t/now)}
+                              :dek "test-dek"})]
+      
+      (testing "creates new org"
+        (is (sid/sid? res))
+        (let [m (st/find-org s (last res))]
+          (is (= (:id org) (:id m)))
+          (is (= "test-org" (:display-id m)))))
 
-    (testing "links org to user")
+      (testing "links org to user"
+        (is (= 1 (count (st/list-user-orgs s (:id user))))))
 
-    (testing "creates credit subscription")
+      (testing "creates credit subscription"
+        (let [cs (st/list-org-credit-subscriptions s (:id org))]
+          (is (= 1 (count cs)))
+          (is (= 1000M (-> cs first :amount)))))
 
-    (testing "creates initial credits")
+      (testing "creates initial credits"
+        (let [c (st/list-org-credits s (:id org))]
+          (is (= 1 (count c)))
+          (is (= 1000M (-> c first :amount)))))
 
-    (testing "creates crypto with dek")))
+      (testing "creates crypto with dek"
+        (is (= "test-dek" (-> (st/find-crypto s (:id org))
+                              :dek)))))))
 
 (deftest ^:sql repos
   (with-storage conn s
