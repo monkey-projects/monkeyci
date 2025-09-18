@@ -178,47 +178,63 @@
         (is (nil? (sut/public-repo-checker [] req)))))))
 
 (deftest org-auth-checker
-  (testing "allows"
-    (testing "if no org id in request path"
-      (is (nil? (sut/org-auth-checker [] {}))))
+  (h/with-memory-store s
+    (letfn [(req [extras]
+              (-> {:storage s}
+                  (h/->req)
+                  (merge extras)))]
+      (testing "allows"
+        (testing "if no org id in request path"
+          (is (nil? (sut/org-auth-checker [] (req {})))))
 
-    (testing "if identity allows access to org id"
-      (is (nil? (sut/org-auth-checker
-                 []
-                 {:parameters
-                  {:path
-                   {:org-id "test-org"}}
-                  :identity
-                  {:orgs
-                   #{"test-org"}}}))))
+        (testing "if identity allows access to org id"
+          (is (nil? (sut/org-auth-checker
+                     []
+                     (req {:parameters
+                           {:path
+                            {:org-id "test-org"}}
+                           :identity
+                           {:orgs
+                            #{"test-org"}}})))))
 
-    (testing "if sysadmin token"
-      (is (nil? (sut/org-auth-checker
-                 []
-                 {:parameters
-                  {:path
-                   {:org-id "test-org"}}
-                  :identity
-                  {:type :sysadmin}})))))
+        (testing "if identity allows org display id"
+          (let [org {:id (cuid/random-cuid)
+                     :display-id "test-display-id"}]
+            (is (some? (st/save-org s org)))
+            (is (nil? (->> (req {:parameters
+                                 {:path
+                                  {:org-id "test-display-id"}}
+                                 :identity
+                                 {:orgs #{(:id org)}}})
+                           (sut/org-auth-checker []))))))
 
-  (testing "denies"
-    (testing "if org id is not in identity"
-      (is (sut/denied?
-           (sut/org-auth-checker
-            []
-            {:parameters
-             {:path
-              {:org-id "test-org"}}
-             :identity
-             {:orgs #{"other-org"}}}))))
+        (testing "if sysadmin token"
+          (is (nil? (sut/org-auth-checker
+                     []
+                     (req {:parameters
+                           {:path
+                            {:org-id "test-org"}}
+                           :identity
+                           {:type :sysadmin}}))))))
 
-    (testing "if not authenticated"
-      (is (sut/denied?
-           (sut/org-auth-checker
-            []
-            {:parameters
-             {:path
-              {:org-id "test-org"}}}))))))
+      (testing "denies"
+        (testing "if org id is not in identity"
+          (is (sut/denied?
+               (sut/org-auth-checker
+                []
+                (req {:parameters
+                      {:path
+                       {:org-id "test-org"}}
+                      :identity
+                      {:orgs #{"other-org"}}})))))
+
+        (testing "if not authenticated"
+          (is (sut/denied?
+               (sut/org-auth-checker
+                []
+                (req {:parameters
+                      {:path
+                       {:org-id "test-org"}}})))))))))
 
 (deftest deny-all-checker
   (testing "always denies"

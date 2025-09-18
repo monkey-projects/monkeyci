@@ -250,9 +250,14 @@
 (defn- org-checker [kind]
   (fn [_ req]
     (when-let [oid (get-in req [:parameters kind :org-id])]
-      (when-not (and (ba/authenticated? req)
-                     (or (sysadmin? (:identity req))
-                         (contains? (get-in req [:identity :orgs]) oid)))
+      (when-not
+          (and (ba/authenticated? req)
+               (or (sysadmin? (:identity req))
+                   (contains? (get-in req [:identity :orgs])
+                              oid)
+                   ;; Should also match org display ids
+                   (contains? (get-in req [:identity :orgs])
+                              (st/find-org-id-by-display-id (c/req->storage req) oid))))
         (denied-no-org-access oid)))))
 
 (def org-auth-checker

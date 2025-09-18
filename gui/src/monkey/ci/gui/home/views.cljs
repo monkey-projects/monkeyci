@@ -21,19 +21,22 @@
    {:href (r/path-for :page/org-join)}
    [:span.me-2 [co/icon :arrow-right-square]] "Join Organization"])
 
-(defn- org-item [{:keys [id name owner?]}]
-  [:div.card
-   {:style {:width "20em"}
-    :on-click #(rf/dispatch [:route/goto :page/org {:org-id id}])}
-   [:div.card-header {:style {:font-size "5em"}}
-    [:a {:href (r/path-for :page/org {:org-id id})} co/org-icon]]
-   [:div.card-body
-    [:div.card-title
-     [:h5
-      [:a {:href (r/path-for :page/org {:org-id id})}
-       name
-       (when owner?
-         [:span.badge.text-bg-success.ms-2 "owner"])]]]]])
+(def org-id (some-fn :display-id :id))
+
+(defn- org-item [{:keys [name owner?] :as org}]
+  (let [id (org-id org)]
+    [:div.card
+     {:style {:width "20em"}
+      :on-click #(rf/dispatch [:route/goto :page/org {:org-id id}])}
+     [:div.card-header {:style {:font-size "5em"}}
+      [:a {:href (r/path-for :page/org {:org-id id})} co/org-icon]]
+     [:div.card-body
+      [:div.card-title
+       [:h5
+        [:a {:href (r/path-for :page/org {:org-id id})}
+         name
+         (when owner?
+           [:span.badge.text-bg-success.ms-2 "owner"])]]]]]))
 
 (defn- linked-orgs [org]
   [:div

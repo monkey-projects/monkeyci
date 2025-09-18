@@ -112,6 +112,14 @@
           (filter (comp (partial = did) :display-id))
           (first)))))
 
+(def find-org-id-by-display-id
+  "Optimization for fast id lookup"
+  (override-or
+   [:org :find-id-by-display-id]
+   (fn [s did]
+     (some-> (find-org-by-display-id s did)
+             :id))))
+
 (def delete-org
   (override-or
    [:org :delete]

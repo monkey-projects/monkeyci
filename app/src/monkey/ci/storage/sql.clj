@@ -223,6 +223,10 @@
   (when did
     (select-org-by-filter (get-conn st) (ec/by-display-id did))))
 
+(defn- select-org-id-by-display-id [st did]
+  (when did
+    (ecu/org-id-by-display-id (get-conn st) did)))
+
 (defn- org-exists? [conn cuid]
   (some? (ec/select-org conn (ec/by-cuid cuid))))
 
@@ -1141,6 +1145,7 @@
     :find-latest-builds select-latest-org-builds
     :find-latest-n-builds select-latest-n-org-builds
     :find-by-display-id select-org-by-display-id
+    :find-id-by-display-id select-org-id-by-display-id
     :count count-orgs}
    :repo
    {:list-display-ids select-repo-display-ids

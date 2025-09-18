@@ -96,12 +96,16 @@
     (testing "can count"
       (is (pos? (st/count-orgs s))))
 
-    (testing "can find by display-id"
-      (let [org {:name "another org"
-                 :display-id "another-org"
-                 :id (cuid/random-cuid)}]
-        (is (sid/sid? (st/save-org s org)))
-        (is (= (:id org) (:id (st/find-org-by-display-id s "another-org"))))))))
+    (let [org {:name "another org"
+               :display-id "another-org"
+               :id (cuid/random-cuid)}]
+      (is (sid/sid? (st/save-org s org)))
+      
+      (testing "can find by display-id"
+        (is (= (:id org) (:id (st/find-org-by-display-id s "another-org")))))
+
+      (testing "can find id by display id"
+        (is (= (:id org) (st/find-org-id-by-display-id s "another-org")))))))
 
 (deftest ^:sql init-org
   (with-storage conn s
