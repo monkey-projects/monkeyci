@@ -8,6 +8,7 @@
             [monkey.ci.gui.home.events]
             [monkey.ci.gui.home.subs]
             [monkey.ci.gui.template :as template]
+            [monkey.ci.gui.utils :as u]
             [monkey.ci.template.components :as tc]
             [re-frame.core :as rf]))
 
@@ -21,10 +22,8 @@
    {:href (r/path-for :page/org-join)}
    [:span.me-2 [co/icon :arrow-right-square]] "Join Organization"])
 
-(def org-id (some-fn :display-id :id))
-
 (defn- org-item [{:keys [name owner?] :as org}]
-  (let [id (org-id org)]
+  (let [id (u/org-id org)]
     [:div.card
      {:style {:width "20em"}
       :on-click #(rf/dispatch [:route/goto :page/org {:org-id id}])}

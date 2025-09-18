@@ -92,7 +92,7 @@
        [co/build-result (:status @build)]])))
 
 (defn- show-repo [c r]
-  (let [repo-path (r/path-for :page/repo {:org-id (:id c)
+  (let [repo-path (r/path-for :page/repo {:org-id (u/org-id c)
                                           :repo-id (:id r)})]
     [:div.card-body.border-top
      [:div.d-flex.flex-row.align-items-start
@@ -249,7 +249,7 @@
              :items-sub [:org/recent-builds]
              :columns (concat [{:label "Repository"
                                 :value (fn [b]
-                                         [:a {:href (r/path-for :page/repo (u/cust->org b))}
+                                         [:a {:href (r/path-for :page/repo b)}
                                           (get-in b [:repo :name])])}]
                               rv/table-columns)
              :loading {:sub [:loader/init-loading? db/recent-builds]}}]]]]))))

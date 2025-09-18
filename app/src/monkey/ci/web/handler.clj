@@ -37,6 +37,25 @@
             [ring.util.response :as rur]
             [schema.core :as s]))
 
+(defn resolve-id-from-db
+  "Tries to resolve an org cuid from its display id."
+  [req org-id]
+  (or (st/find-org-id-by-display-id (c/req->storage req) org-id)
+      org-id))
+
+(defn cached-id-resolver
+  "Org id resolver that uses an LRU cache to speed up lookups."
+  [target]
+  (let [c (cache/lru-cache-factory {} {:threshold 256})]
+    (fn [req org-id]
+      (-> (cache/through-cache c org-id (partial target req))
+          (get org-id)))))
+
+(def default-id-resolver (cached-id-resolver resolve-id-from-db))
+
+(def org-body-checker (auth/org-body-checker default-id-resolver))
+(def org-path-checker (auth/org-auth-checker default-id-resolver))
+
 (defn health [_]
   ;; TODO Make this more meaningful
   (wh/text-response "ok"))
@@ -152,7 +171,7 @@
 (def webhook-routes
   ["/webhook"
    [[""
-     {:auth-chain [auth/org-body-checker]}
+     {:auth-chain [org-body-checker]}
      [["" {:post {:handler    api/create-webhook
                   :parameters {:body NewWebhook}}}]]]
     ["/health"
@@ -211,17 +230,17 @@
 
 (def repo-parameter-routes
   ["/param"
-   {:auth-chain ^:replace [auth/org-auth-checker]}
+   {:auth-chain ^:replace [org-path-checker]}
    [["" {:get {:handler param-api/get-repo-params}}]]])
 
 (def repo-ssh-keys-routes
   ["/ssh-keys"
-   {:auth-chain ^:replace [auth/org-auth-checker]}
+   {:auth-chain ^:replace [org-path-checker]}
    [["" {:get {:handler ssh-api/get-repo-ssh-keys}}]]])
 
 (def repo-webhook-routes
   ["/webhooks"
-   {:auth-chain ^:replace [auth/org-auth-checker]}
+   {:auth-chain ^:replace [org-path-checker]}
    [["" {:get {:handler repo-api/list-webhooks}}]]])
 
 (def log-routes
@@ -374,7 +393,7 @@
 
 (def org-routes
   ["/org"
-   {:auth-chain [auth/org-auth-checker]}
+   {:auth-chain [org-path-checker]}
    (c/generic-routes
     {:creator org-api/create-org
      :updater org-api/update-org
@@ -500,18 +519,6 @@
     [wm/passthrough-middleware]
     mw))
 
-(defn resolve-id-from-db [req org-id]
-  (or (st/find-org-id-by-display-id (c/req->storage req) org-id)
-      org-id))
-
-(defn cached-id-resolver
-  "Org id resolver that uses an LRU cache to speed up lookups."
-  [target]
-  (let [c (cache/lru-cache-factory {} {:threshold 256})]
-    (fn [req org-id]
-      (-> (cache/through-cache c org-id (partial target req))
-          (get org-id)))))
-
 (defn make-router
   ([rt routes]
    (ring/router
@@ -547,7 +554,7 @@
           [auth/sysadmin-authorization]}
          ;; TODO Move the dev-mode checks into the runtime startup code
          (as-> m (mc/map-vals (partial non-dev rt) m))
-         (assoc :resolve-org-id [wm/resolve-org-id (cached-id-resolver resolve-id-from-db)]))}))
+         (assoc :resolve-org-id [wm/resolve-org-id default-id-resolver]))}))
   ([rt]
    (make-router rt routes)))
 

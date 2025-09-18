@@ -247,7 +247,7 @@
   (denied "Credentials do not grant access to this org"
           {:org-id org-id}))
 
-(defn- org-checker [kind]
+(defn- org-checker [kind id-resolver]
   (fn [_ req]
     (when-let [oid (get-in req [:parameters kind :org-id])]
       (when-not
@@ -257,16 +257,16 @@
                               oid)
                    ;; Should also match org display ids
                    (contains? (get-in req [:identity :orgs])
-                              (st/find-org-id-by-display-id (c/req->storage req) oid))))
+                              (id-resolver req oid))))
         (denied-no-org-access oid)))))
 
 (def org-auth-checker
   "Checks if the user has access to the organization"
-  (org-checker :path))
+  (partial org-checker :path))
 
 (def org-body-checker
   "Checks if the user has access to the organization specified in the body"
-  (org-checker :body))
+  (partial org-checker :body))
 
 (defn webhook-org-checker
   "Verifies if the user has permissions on the webhook org"
