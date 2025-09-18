@@ -47,18 +47,33 @@
         (is (some? repos))
         (is (not (map? repos)))
         (is (= (select-keys repo [:id :name])
-               (first repos)))))))
+               (first repos))))))
+
+  (testing "retrieves org by display-id"
+    (let [org {:id (st/new-id)
+               :name "Some org"}
+          {st :storage :as rt} (trt/test-runtime)]
+      (is (sid/sid? (st/init-org st {:org org})))
+      (let [r (-> rt
+                  (h/->req)
+                  (h/with-path-param :org-id "some-org")
+                  (sut/get-org)
+                  :body)]
+        (is (= (:id org) (:id r)))))))
 
 (deftest create-org
-  (testing "returns created org with id"
-    (let [r (-> (trt/test-runtime)
-                (h/->req)
-                (h/with-body {:name "new org"})
-                (sut/create-org)
-                :body)]
+  (let [r (-> (trt/test-runtime)
+              (h/->req)
+              (h/with-body {:name "new org"})
+              (sut/create-org)
+              :body)]
+    (testing "returns created org with id"
       (is (map? r))
       (is (= "new org" (:name r)))
-      (is (string? (:id r)))))
+      (is (string? (:id r))))
+
+    (testing "assigns display id"
+      (is (= "new-org" (:display-id r)))))
 
   (let [user (-> (h/gen-user)
                  (dissoc :orgs))

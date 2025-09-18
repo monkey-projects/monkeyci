@@ -32,3 +32,18 @@
                       :where [:= :c.cuid cuid]})
           (first)
           (assoc :org-id cuid)))
+
+(defn org-display-ids [conn]
+  (->> {:select [:o.display-id]
+        :from [[:orgs :o]]
+        :where [:<> :o.display-id nil]}
+       (ec/select conn)
+       (set)))
+
+(defn org-id-by-display-id [conn did]
+  (->> {:select [:o.cuid]
+        :from [[:orgs :o]]
+        :where [:= :o.display-id did]}
+       (ec/select conn)
+       first
+       :cuid))

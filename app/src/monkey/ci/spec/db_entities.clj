@@ -18,6 +18,7 @@
 (s/def :github/secret string?)
 (s/def :db/name (s/and string? not-empty))
 (s/def :db/description string?)
+(s/def :db/display-id string?)
 
 (s/def :db/common
   (s/keys :req-un [:db/cuid]
@@ -32,10 +33,9 @@
       (s/merge :db/common)))
 
 (s/def :db/org
-  (-> (s/keys :req-un [:db/name])
+  (-> (s/keys :req-un [:db/name :db/display-id])
       (s/merge :db/common)))
 
-(s/def :db/display-id string?)
 (s/def :db/org-id id?)
 (s/def :db/public boolean?)
 

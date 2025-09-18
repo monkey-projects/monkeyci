@@ -15,6 +15,10 @@
              [next-jdbc :as rj]
              [protocols :as rp]]))
 
+(defn- gen-org []
+  (-> (eh/gen-org)
+      (dissoc :display-id)))
+
 (deftest fk
   (testing "creates foreign key constraint with cascading"
     (is (= "CREATE TABLE test (FOREIGN KEY(src_col) REFERENCES dest_table(dest_col) ON DELETE CASCADE)"
@@ -166,7 +170,7 @@
                                rp/id)
     conn mig
     (is (some? mig))
-    (let [org (ec/insert-org conn (eh/gen-org))
+    (let [org (ec/insert-org conn (gen-org))
           crypto (ec/insert-crypto conn
                                    {:org-id (:id org)
                                     :iv (v/generate-iv)})
@@ -189,7 +193,7 @@
                                rp/id)
     conn mig
     (is (some? mig))
-    (let [org (ec/insert-org conn (eh/gen-org))
+    (let [org (ec/insert-org conn (gen-org))
           pv (ec/insert-org-param conn {:org-id (:id org)})
           crypto (ec/insert-crypto conn
                                    {:org-id (:id org)
@@ -234,7 +238,7 @@
                                rp/id)
       conn mig
     (is (some? mig))
-    (let [org (ec/insert-org conn (eh/gen-org))
+    (let [org (ec/insert-org conn (gen-org))
           sk (ec/insert-ssh-key conn {:org-id (:id org)
                                       :public-key "test-pubkey"
                                       :private-key "vault-encrypted"})

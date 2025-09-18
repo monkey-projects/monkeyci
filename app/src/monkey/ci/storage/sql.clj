@@ -28,7 +28,8 @@
              [protocols :as p]
              [sid :as sid]
              [spec :as spec]
-             [storage :as st]]
+             [storage :as st]
+             [utils :as u]]
             [monkey.ci.spec.db-entities]
             [monkey.ci.spec.entities]
             [next.jdbc :as jdbc]
@@ -145,7 +146,7 @@
 (defn- org->db [org]
   (-> org
       (id->cuid)
-      (select-keys [:cuid :name])))
+      (select-keys [:cuid :name :display-id])))
 
 (def db->org cuid->id)
 
@@ -178,10 +179,53 @@
     (update-org conn org existing)
     (insert-org conn org)))
 
+(defn- select-org-display-ids [conn]
+  (ecu/org-display-ids conn))
+
+(defn- init-org [st {:keys [org] :as opts}]
+  (let [conn (get-conn st)
+        existing? (select-org-display-ids conn)
+        org (ec/insert-org conn (-> org
+                                    (assoc :display-id (u/name->display-id (:name org) existing?))
+                                    (org->db)))
+        org-id (:id org)]
+    (when-let [uid (some->> (:user-id opts)
+                            (ec/by-cuid)
+                            (ec/select-users conn)
+                            first
+                            :id)]
+      (ec/insert-user-orgs conn uid [org-id]))
+    (when-let [{:keys [amount from]} (:credits opts)]
+      (let [cse {:cuid (st/new-id)
+                 :org-id org-id
+                 :amount amount
+                 :valid-from from}]
+        (when-let [cs (ec/insert-credit-subscription conn cse)]
+          (ec/insert-org-credit conn {:cuid (st/new-id)
+                                      :org-id org-id
+                                      :amount amount
+                                      :from-time from
+                                      :type :subscription
+                                      :subscription-id (:id cs)}))))
+    (when-let [dek (:dek opts)]
+      (ec/insert-crypto conn {:dek dek :org-id org-id}))
+    (st/org-sid (:cuid org))))
+
+(defn- select-org-by-filter [conn f]
+  (some-> (ecu/org-with-repos conn f)
+          (db->org-with-repos)))
+
 (defn- select-org [conn cuid]
   (when cuid
-    (some-> (ecu/org-with-repos conn (ec/by-cuid cuid))
-            (db->org-with-repos))))
+    (select-org-by-filter conn (ec/by-cuid cuid))))
+
+(defn- select-org-by-display-id [st did]
+  (when did
+    (select-org-by-filter (get-conn st) (ec/by-display-id did))))
+
+(defn- select-org-id-by-display-id [st did]
+  (when did
+    (ecu/org-id-by-display-id (get-conn st) did)))
 
 (defn- org-exists? [conn cuid]
   (some? (ec/select-org conn (ec/by-cuid cuid))))
@@ -1088,7 +1132,8 @@
     :watch watch-github-repo
     :unwatch unwatch-github-repo}
    :org
-   {:search select-orgs
+   {:init init-org
+    :search select-orgs
     :find-multiple select-orgs-by-id
     :list-credits-since select-org-credits-since
     :list-credits select-org-credits
@@ -1099,6 +1144,8 @@
     :list-credit-consumptions-since select-org-credit-cons-since
     :find-latest-builds select-latest-org-builds
     :find-latest-n-builds select-latest-n-org-builds
+    :find-by-display-id select-org-by-display-id
+    :find-id-by-display-id select-org-id-by-display-id
     :count count-orgs}
    :repo
    {:list-display-ids select-repo-display-ids

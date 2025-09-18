@@ -31,9 +31,15 @@
               (sequential? repos) (update :repos (partial zipmap (map :id repos)))))]
     (st/save-org st (repos->map org))))
 
+(defn- find-org
+  "Looks up an organization, either by cuid or display id"
+  [s id]
+  (or (st/find-org s id)
+      (st/find-org-by-display-id s id)))
+
 (c/make-entity-endpoints "org"
                          {:get-id (c/id-getter :org-id)
-                          :getter (comp repos->out st/find-org)
+                          :getter (comp repos->out find-org)
                           :saver save-org
                           :deleter st/delete-org})
 
@@ -46,7 +52,8 @@
                                :credits {:amount config/free-credits
                                          :from (t/now)}
                                :dek (:enc (crypto/generate-dek req org-id))})]
-      (-> (rur/response org)
+      (-> (st/find-org st (last res))
+          (rur/response)
           (rur/status 201)))))
 
 (defn search-orgs [req]

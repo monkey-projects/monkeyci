@@ -653,7 +653,16 @@
     [{:alter-table :repos
       :add-column [:public :boolean]}]
     [{:alter-table :repos
-      :drop-column :public}])])
+      :drop-column :public}])
+
+   (migration
+    (mig-id 50 :org-display-id)
+    [{:alter-table :orgs
+      :add-column [:display-id [:varchar 30]]}
+     {:alter-table :orgs
+      :add-index [:unique nil :display-id]}]
+    [{:alter-table :orgs
+      :drop-column :display-id}])])
 
 (defn prepare-migrations
   "Prepares all migrations by formatting to sql, creates a ragtime migration object from it."

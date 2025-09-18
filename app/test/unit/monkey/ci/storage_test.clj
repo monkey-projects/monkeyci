@@ -15,21 +15,28 @@
 (deftest orgs
   (h/with-memory-store st
     (let [orgs (repeatedly 3 h/gen-org)]
-        (doseq [c orgs]
-          (sut/save-org st c))
-        (testing "can find multiple"
-          (let [r (sut/find-orgs st (->> orgs
-                                         (take 2)
-                                         (map :id)))]
-            (is (= (take 2 orgs) r))))
+      (doseq [c orgs]
+        (sut/save-org st c))
+      (testing "can find multiple"
+        (let [r (sut/find-orgs st (->> orgs
+                                       (take 2)
+                                       (map :id)))]
+          (is (= (take 2 orgs) r))))
 
-        (testing "can count"
-          (is (= 3 (sut/count-orgs st))))
+      (testing "can count"
+        (is (= 3 (sut/count-orgs st))))
 
-        (testing "can delete"
-          (let [org (first orgs)]
-            (is (true? (sut/delete-org st (:id org))))
-            (is (nil? (sut/find-org st (:id org)))))))))
+      (testing "can delete"
+        (let [org (first orgs)]
+          (is (true? (sut/delete-org st (:id org))))
+          (is (nil? (sut/find-org st (:id org)))))))
+
+    (testing "can find by display id"
+      (let [org {:id (cuid/random-cuid)
+                 :name "test org"
+                 :display-id "test-org"}]
+        (is (sid/sid? (sut/save-org st org)))
+        (is (= org (sut/find-org-by-display-id st "test-org")))))))
 
 (deftest init-org
   (h/with-memory-store st
@@ -47,12 +54,17 @@
                                             :from (t/now)}
                                   :dek "test-dek"})]
         (is (sid/sid? res))
-        
-        (testing "creates new org"
-          (is (= org (sut/find-org st (:id org)))))
+
+        (let [m (sut/find-org st (:id org))]
+          (testing "creates new org"
+            (is (= (:id org) (:id m))))
+
+          (testing "assigns display id"
+            (is (= "test-org" (:display-id m)))))
 
         (testing "links org to user"
-          (is (= [org] (sut/list-user-orgs st (:id user)))))
+          (is (= [(:id org)] (->> (sut/list-user-orgs st (:id user))
+                                  (map :id)))))
 
         (testing "creates credit subscription"
           (let [cs (sut/list-org-credit-subscriptions st (:id org))]
