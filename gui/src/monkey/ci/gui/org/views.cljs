@@ -233,7 +233,8 @@
   (rf/dispatch [:org/load-recent-builds id])
   (fn [id]
     (let [loaded? (rf/subscribe [:loader/loaded? db/recent-builds])
-          recent (rf/subscribe [:org/recent-builds])]
+          recent (rf/subscribe [:org/recent-builds])
+          org-id (rf/subscribe [:route/org-id])]
       (if (and @loaded? (empty? @recent))
         [with-recent-reload id "No recent builds found for this organization."]
         [:<>
@@ -247,11 +248,13 @@
            [t/paged-table
             {:id ::recent-builds
              :items-sub [:org/recent-builds]
-             :columns (concat [{:label "Repository"
-                                :value (fn [b]
-                                         [:a {:href (r/path-for :page/repo b)}
-                                          (get-in b [:repo :name])])}]
-                              rv/table-columns)
+             :columns (concat
+                       [{:label "Repository"
+                         :value (fn [b]
+                                  [:a {:href (r/path-for :page/repo {:org-id @org-id
+                                                                     :repo-id (:repo-id b)})}
+                                   (get-in b [:repo :name])])}]
+                       rv/table-columns)
              :loading {:sub [:loader/init-loading? db/recent-builds]}}]]]]))))
 
 (defn- overview-tabs

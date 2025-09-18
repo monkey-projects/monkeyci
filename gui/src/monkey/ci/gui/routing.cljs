@@ -30,6 +30,12 @@
  (fn [db _]
    (current db)))
 
+(rf/reg-sub
+ :route/org-id
+ :<- [:route/current]
+ (fn [c _]
+   (get-in c [:parameters :path :org-id])))
+
 (def on-page-leave ::on-page-leave)
 
 (defn- path-changed? [from to]

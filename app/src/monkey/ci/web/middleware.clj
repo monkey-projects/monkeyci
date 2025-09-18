@@ -84,8 +84,18 @@
    resolver should be able to handle both situations."
   [h resolver]
   (fn [req]
-    (let [upd (update-in req [:parameters :path] mc/update-existing :org-id (partial resolver req))]
-      (h upd))))
+    (-> req
+        (mc/update-existing-in [:parameters :path :org-id] (partial resolver req))
+        (h))))
+
+(defn replace-body-org-id
+  "Since the `org-id` can be a cuid or a display id, this interceptor replaces the
+   value in the request body with the one in the path params."
+  [h]
+  (fn [req]
+    (-> req
+        (mc/update-existing-in [:parameters :body :org-id] (constantly (c/org-id req)))
+        (h))))
 
 (def default-middleware
   "Default middleware for http servers"

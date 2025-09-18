@@ -262,9 +262,9 @@
 
 (defn- parse-github-id [repo]
   (let [id (:new-github-id repo)]
-    (-> repo
-        (dissoc :new-github-id)
-        (assoc :github-id (some-> id u/parse-int)))))
+    (cond-> repo
+      true (dissoc :new-github-id)
+      (not-empty id) (assoc :github-id (some-> id u/parse-int)))))
 
 (rf/reg-event-fx
  :repo/save

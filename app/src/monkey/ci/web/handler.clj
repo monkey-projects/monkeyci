@@ -303,6 +303,7 @@
   (letfn [(add-repo-checker [routes]
             (u/update-nth routes 1 u/update-nth 1 assoc :auth-chain [auth/public-repo-checker]))]
     ["/repo"
+     {:middleware [wm/replace-body-org-id]}
      (-> (c/generic-routes
           {:creator repo-api/create-repo
            :updater repo-api/update-repo

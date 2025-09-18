@@ -27,6 +27,12 @@
       (is (not-empty (reset! app-db {:route/current :test-route})))
       (is (= :test-route @c)))))
 
+(deftest org-id-sub
+  (h/verify-sub [:route/org-id]
+                #(assoc % sut/current {:parameters {:path {:org-id "test-org"}}})
+                "test-org"
+                nil))
+
 (deftest route-changed
   (testing "sets current route to arg"
     (let [route {:path "test-match"}]
