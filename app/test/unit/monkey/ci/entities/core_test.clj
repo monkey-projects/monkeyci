@@ -445,3 +445,35 @@
       (testing "can select"
         (is (= [(assoc orig-evt :id (:id evt))]
                (sut/select-job-events conn (sut/by-id (:id evt)))))))))
+
+(deftest ^:sql user-tokens
+  (eh/with-prepared-db conn
+    (let [user (sut/insert-user conn (eh/gen-user))
+          token (-> (eh/gen-user-token)
+                    (assoc :user-id (:id user)
+                           :valid-until 100))]
+      
+      (testing "can insert"
+        (is (number? (:id (sut/insert-user-token conn token)))))
+
+      (testing "can select"
+        (is (= token
+               (-> (sut/select-user-tokens conn (sut/by-cuid (:cuid token)))
+                   first
+                   (select-keys (keys token)))))))))
+
+(deftest ^:sql org-tokens
+  (eh/with-prepared-db conn
+    (let [org (sut/insert-org conn (eh/gen-org))
+          token (-> (eh/gen-org-token)
+                    (assoc :org-id (:id org)
+                           :valid-until 100))]
+      
+      (testing "can insert"
+        (is (number? (:id (sut/insert-org-token conn token)))))
+
+      (testing "can select"
+        (is (= token
+               (-> (sut/select-org-tokens conn (sut/by-cuid (:cuid token)))
+                   first
+                   (select-keys (keys token)))))))))

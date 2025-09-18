@@ -214,3 +214,13 @@
   (s/keys :req-un [:entity/org-id :entity/repo-id :entity/build-id :entity/job-id
                    :job-evt/time :job-evt/event]
           :opt-un [:job-evt/details]))
+
+(s/def :entity/token string?)
+
+(s/def :entity/user-token
+  (-> (s/keys :req-un [:entity/token :entity/user-id])
+      (s/merge :entity/common)))
+
+(s/def :entity/org-token
+  (-> (s/keys :req-un [:entity/token :entity/org-id])
+      (s/merge :entity/common)))

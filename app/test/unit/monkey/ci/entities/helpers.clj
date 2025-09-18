@@ -121,3 +121,9 @@
 
 (defn gen-job-evt []
   (gen-spec :db/job-event))
+
+(defn gen-user-token []
+  (gen-spec :db/user-token))
+
+(defn gen-org-token []
+  (gen-spec :db/org-token))
