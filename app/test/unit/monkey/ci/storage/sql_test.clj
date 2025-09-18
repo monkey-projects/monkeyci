@@ -102,10 +102,10 @@
       (is (sid/sid? (st/save-org s org)))
       
       (testing "can find by display-id"
-        (is (= (:id org) (:id (st/find-org-by-display-id s "another-org")))))
+        (is (= (:id org) (:id (st/find-org-by-display-id s (:display-id org))))))
 
       (testing "can find id by display id"
-        (is (= (:id org) (st/find-org-id-by-display-id s "another-org")))))))
+        (is (= (:id org) (st/find-org-id-by-display-id s (:display-id org))))))))
 
 (deftest ^:sql init-org
   (with-storage conn s

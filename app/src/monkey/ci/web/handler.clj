@@ -3,12 +3,14 @@
   (:require [aleph
              [http :as aleph]
              [netty :as netty]]
+            [clojure.core.cache.wrapped :as cache]
             [clojure.tools.logging :as log]
             [com.stuartsierra.component :as co]
             [manifold.deferred :as md]
             [medley.core :as mc]
             [monkey.ci
              [runtime :as rt]
+             [storage :as st]
              [utils :as u]
              [version :as v]]
             [monkey.ci.metrics.core :as metrics]
@@ -498,6 +500,18 @@
     [wm/passthrough-middleware]
     mw))
 
+(defn resolve-id-from-db [req org-id]
+  (or (st/find-org-id-by-display-id (c/req->storage req) org-id)
+      org-id))
+
+(defn cached-id-resolver
+  "Org id resolver that uses an LRU cache to speed up lookups."
+  [target]
+  (let [c (cache/lru-cache-factory {} {:threshold 256})]
+    (fn [req org-id]
+      (-> (cache/through-cache c org-id (partial target req))
+          (get org-id)))))
+
 (defn make-router
   ([rt routes]
    (ring/router
@@ -512,6 +526,7 @@
                                      [wm/kebab-case-query
                                       wm/log-request
                                       wm/post-events
+                                      :resolve-org-id
                                       :auth-chain]))
             :muuntaja (c/make-muuntaja)
             :coercion reitit.coercion.schema/coercion
@@ -520,18 +535,19 @@
      ;; Disabled, results in 405 errors for some reason
      ;;:compile rc/compile-request-coercers
      :reitit.middleware/registry
-     (->> {:github-security
-           [github/validate-security]
-           :github-app-security
-           [github/validate-security (constantly (get-in (rt/config rt) [:github :webhook-secret]))]
-           :bitbucket-security
-           [bitbucket/validate-security]
-           :auth-chain
-           [auth/auth-chain-middleware]
-           :sysadmin-check
-           [auth/sysadmin-authorization]}
-          ;; TODO Move the dev-mode checks into the runtime startup code
-          (mc/map-vals (partial non-dev rt)))}))
+     (-> {:github-security
+          [github/validate-security]
+          :github-app-security
+          [github/validate-security (constantly (get-in (rt/config rt) [:github :webhook-secret]))]
+          :bitbucket-security
+          [bitbucket/validate-security]
+          :auth-chain
+          [auth/auth-chain-middleware]
+          :sysadmin-check
+          [auth/sysadmin-authorization]}
+         ;; TODO Move the dev-mode checks into the runtime startup code
+         (as-> m (mc/map-vals (partial non-dev rt) m))
+         (assoc :resolve-org-id [wm/resolve-org-id (cached-id-resolver resolve-id-from-db)]))}))
   ([rt]
    (make-router rt routes)))
 

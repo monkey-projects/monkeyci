@@ -587,37 +587,39 @@
         (at/with-fake-http [(constantly true) {:status 201
                                                :headers {"Content-Type" "application/json"}
                                                :body "{}"}]
-          (testing "`/watch` starts watching bitbucket repo"
-            (is (= 201 (-> (h/json-request :post
-                                           (str "/org/" org-id "/repo/bitbucket/watch")
-                                           {:org-id org-id
-                                            :name "test-repo"
-                                            :url "http://test"
-                                            :workspace "test-ws"
-                                            :repo-slug "test-repo"
-                                            :token "test-token"})
-                           (test-app)
-                           :status))))
+          (let [st (st/make-memory-storage)
+                app (make-test-app st)]
+            (is (some? (st/save-org st {:id org-id})))
+            
+            (testing "`/watch` starts watching bitbucket repo"
+              (is (= 201 (-> (h/json-request :post
+                                             (str "/org/" org-id "/repo/bitbucket/watch")
+                                             {:org-id org-id
+                                              :name "test-repo"
+                                              :url "http://test"
+                                              :workspace "test-ws"
+                                              :repo-slug "test-repo"
+                                              :token "test-token"})
+                             (app)
+                             :status))))
 
-          (testing "`/unwatch` stops watching repo"
-            (let [st (st/make-memory-storage)
-                  app (make-test-app st)
-                  repo-id (st/new-id)
-                  wh-id (st/new-id)
-                  _ (st/save-org st {:id org-id
-                                     :repos {repo-id {:id repo-id}}})
-                  _ (st/save-webhook st {:org-id org-id
-                                         :repo-id repo-id
-                                         :id wh-id
-                                         :secret (str (random-uuid))})
-                  _ (st/save-bb-webhook st {:webhook-id wh-id
-                                            :bitbucket-id (str (random-uuid))})]
-              (is (= 200
-                     (-> (h/json-request :post
-                                         (format "/org/%s/repo/%s/bitbucket/unwatch" org-id repo-id)
-                                         {:token "test-token"})
-                         (app)
-                         :status))))))))
+            (testing "`/unwatch` stops watching repo"
+              (let [repo-id (st/new-id)
+                    wh-id (st/new-id)
+                    _ (st/save-org st {:id org-id
+                                       :repos {repo-id {:id repo-id}}})
+                    _ (st/save-webhook st {:org-id org-id
+                                           :repo-id repo-id
+                                           :id wh-id
+                                           :secret (str (random-uuid))})
+                    _ (st/save-bb-webhook st {:webhook-id wh-id
+                                              :bitbucket-id (str (random-uuid))})]
+                (is (= 200
+                       (-> (h/json-request :post
+                                           (format "/org/%s/repo/%s/bitbucket/unwatch" org-id repo-id)
+                                           {:token "test-token"})
+                           (app)
+                           :status)))))))))
 
     (testing "`GET /webhooks`"
       (let [st (st/make-memory-storage)
@@ -1359,9 +1361,9 @@
   (testing "`/admin`"
     (testing "`/credits`"
       (testing "`/:org-id`"
-        (let [cust (h/gen-cust)
+        (let [org (h/gen-org)
               make-path (fn [& [path]]
-                          (cond-> (str "/admin/credits/" (:id cust))
+                          (cond-> (str "/admin/credits/" (:id org))
                             (some? path) (str path)))]
           (testing "GET `/` returns credit overview"
             (is (= 200 (-> (mock/request :get (make-path))
@@ -1460,3 +1462,32 @@
       (is (= 200 (:status r)))
       (is (= "decrypted-key" (-> (h/reply->json r)
                                  :key))))))
+
+(deftest resolve-id-from-db
+  (h/with-memory-store s
+    (let [org {:id (cuid/random-cuid)
+               :display-id "test-org"}]
+      (is (some? (st/save-org s org)))
+
+      (testing "looks up org id in storage"
+        (is (= (:id org)
+               (-> {:storage s}
+                   (h/->req)
+                   (sut/resolve-id-from-db "test-org")))))
+
+      (testing "returns original id when no match found"
+        (is (= (:id org)
+               (-> {:storage s}
+                   (h/->req)
+                   (sut/resolve-id-from-db (:id org)))))))))
+
+(deftest cached-id-resolver
+  (let [ids (atom {"original" "resolved"})
+        r (sut/cached-id-resolver (fn [_ orig]
+                                    (get @ids orig)))]
+    (testing "invokes target first time"
+      (is (= "resolved" (r {} "original"))))
+
+    (testing "retrieves from cache second time"
+      (is (some? (reset! ids {"original" "wrong"})))
+      (is (= "resolved" (r {} "original"))))))

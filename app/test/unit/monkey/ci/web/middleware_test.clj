@@ -1,12 +1,13 @@
 (ns monkey.ci.web.middleware-test
-  (:require
-   [clojure.test :refer [deftest is testing]]
-   [monkey.ci.test.helpers :as h]
-   [monkey.ci.test.mailman :as tmm]
-   [monkey.ci.test.runtime :as trt]
-   [monkey.ci.web.middleware :as sut]
-   [monkey.ci.web.response :as r]
-   [ring.util.response :as rur]))
+  (:require [clojure.test :refer [deftest is testing]]
+            [monkey.ci.test
+             [helpers :as h]
+             [mailman :as tmm]
+             [runtime :as trt]]
+            [monkey.ci.web
+             [middleware :as sut]
+             [response :as r]]
+            [ring.util.response :as rur]))
 
 (deftest post-events
   (testing "returns handler response"
@@ -26,3 +27,18 @@
       (is (empty? (r/get-events r))
           "removes processed events")
       (is (= [evt] (tmm/get-posted broker))))))
+
+(deftest resolve-org-id
+  (testing "invokes target handler"
+    (let [r (sut/resolve-org-id (constantly ::handled) ::resolver)]
+      (is (= ::handled (r {})))))
+
+  (testing "replaces org id with resolved id"
+    (let [r (sut/resolve-org-id #(get-in % [:parameters :path :org-id])
+                                (fn [req org-id]
+                                  (when (= "original-id" org-id)
+                                    "resolved-id")))]
+      (is (= "resolved-id"
+             (r {:parameters
+                 {:path
+                  {:org-id "original-id"}}}))))))
