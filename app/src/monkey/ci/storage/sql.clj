@@ -2,38 +2,31 @@
   "Storage implementation that uses an SQL database for persistence.  This namespace provides
    a layer on top of the entities namespace to perform the required queries whenever a 
    document is saved or loaded."
-  (:require [clojure.set :as cset]
-            [clojure.tools.logging :as log]
+  (:require [clojure.tools.logging :as log]
             [com.stuartsierra.component :as co]
             [medley.core :as mc]
+            [monkey.ci
+             [protocols :as p]
+             [sid :as sid]
+             [storage :as st]]
             [monkey.ci.entities
              [bb-webhook :as ebbwh]
              [build :as eb]
              [core :as ec]
              [credit-cons :as eccon]
              [credit-subs :as ecsub]
-             [org :as ecu]
-             [org-credit :as ecc]
              [invoice :as ei]
              [job :as ej]
-             [join-request :as jr]
              [migrations :as emig]
-             [param :as eparam]
-             [repo :as er]
-             [ssh-key :as essh]
-             [user :as eu]
-             [webhook :as ewh]]
-            [monkey.ci
-             [labels :as lbl]
-             [protocols :as p]
-             [sid :as sid]
-             [spec :as spec]
-             [storage :as st]
-             [utils :as u]]
-            [monkey.ci.spec.db-entities]
-            [monkey.ci.spec.entities]
+             [org :as ecu]
+             [org-credit :as ecc]
+             [user :as eu]]
             [monkey.ci.storage.sql
+             [build :as sb]
              [common :refer :all]
+             [email-registration :as ser]
+             [job :as sj]
+             [join-request :as sjr]
              [org :as so]
              [param :as sp]
              [repo :as sr]
@@ -42,7 +35,7 @@
              [webhook :as sw]]
             [next.jdbc :as jdbc]
             [next.jdbc.connection :as conn])
-  (:import com.zaxxer.hikari.HikariDataSource))
+  (:import (com.zaxxer.hikari HikariDataSource)))
 
 (defn- global-sid? [type sid]
   (= [st/global (name type)] (take 2 sid)))
@@ -73,199 +66,9 @@
   (and (= "builds" (first sid))
        (= 3 (count sid))))
 
-(defn- build->db [build]
-  (-> build
-      (select-keys [:status :start-time :end-time :idx :git :credits :source :message])
-      ;; Drop some sensitive information
-      (mc/update-existing :git dissoc :ssh-keys-dir)
-      (mc/update-existing-in [:git :ssh-keys] (partial map #(select-keys % [:id :description])))
-      (assoc :display-id (:build-id build)
-             :script-dir (get-in build [:script :script-dir]))))
-
-(defn- db->build [build]
-  (-> build
-      (select-keys [:status :start-time :end-time :idx :git :credits :source :message])
-      (ec/start-time->int)
-      (ec/end-time->int)
-      (assoc :build-id (:display-id build)
-             :script (select-keys build [:script-dir]))
-      (update :credits (fnil int 0))
-      (mc/assoc-some :org-id (:org-cuid build)
-                     :repo-id (:repo-display-id build))
-      (drop-nil)))
-
-(defn- job->db [job]
-  (-> job
-      (select-keys [:status :start-time :end-time :credit-multiplier])
-      (mc/update-existing :status (fnil identity :error))
-      (assoc :display-id (:id job)
-             :details (dissoc job :id :status :start-time :end-time))))
-
-(defn- db->job [job]
-  (-> job
-      (select-keys [:status :start-time :end-time])
-      (merge (:details job))
-      (assoc :id (:display-id job))
-      (drop-nil)))
-
-(defn- insert-build [conn build]
-  (when-let [repo-id (er/repo-for-build-sid conn (:org-id build) (:repo-id build))]
-    (let [{:keys [id] :as ins} (ec/insert-build conn (-> (build->db build)
-                                                         (assoc :repo-id repo-id)))]
-      ins)))
-
-(defn- update-build [conn build existing]
-  (ec/update-build conn (merge existing (build->db build)))  
-  build)
-
-(defn- upsert-build [conn build]
-  ;; Fetch build by org cuild and repo and build display ids
-  (if-let [existing (eb/select-build-by-sid conn (:org-id build) (:repo-id build) (:build-id build))]
-    (update-build conn build existing)
-    (insert-build conn build)))
-
-(defn- select-jobs [conn build-id]
-  (->> (ec/select-jobs conn (ec/by-build build-id))
-       (map db->job)
-       (map (fn [j] [(:id j) j]))
-       (into {})))
-
-(defn- hydrate-build
-  "Fetches jobs related to the build"
-  [conn [org-id repo-id] build]
-  (let [jobs (select-jobs conn (:id build))]
-    (cond-> (-> (db->build build)
-                (assoc :org-id org-id
-                       :repo-id repo-id)
-                (update :script drop-nil)
-                (drop-nil))
-      (not-empty jobs) (assoc-in [:script :jobs] jobs))))
-
-(defn- select-build [conn [org-id repo-id :as sid]]
-  (when-let [build (apply eb/select-build-by-sid conn sid)]
-    (hydrate-build conn sid build)))
-
-(defn- select-repo-builds
-  "Retrieves all builds and their details for given repository"
-  [st [org-id repo-id]]
-  (letfn [(add-ids [b]
-            (assoc b
-                   :org-id org-id
-                   :repo-id repo-id))]
-    ;; Fetch all build details, don't include jobs since we don't need them at this point
-    ;; and they can become a very large dataset.
-    (->> (eb/select-builds-for-repo (get-conn st) org-id repo-id)
-         (map db->build)
-         (map add-ids))))
-
-(defn build-exists? [conn sid]
-  (some? (apply eb/select-build-by-sid conn sid)))
-
-(defn- select-repo-build-ids [conn sid]
-  (apply eb/select-build-ids-for-repo conn sid))
-
-(defn- select-org-builds-since [st org-id ts]
-  (->> (eb/select-builds-for-org-since (get-conn st) org-id ts)
-       (map db->build)))
-
-(defn- select-latest-build [st [org-id repo-id]]
-  (some-> (eb/select-latest-build (get-conn st) org-id repo-id)
-          (db->build)))
-
-(defn- select-latest-org-builds [st org-id]
-  (->> (eb/select-latest-builds (get-conn st) org-id)
-       (map db->build)))
-
-(defn- select-latest-n-org-builds [st org-id n]
-  (->> (eb/select-latest-n-builds (get-conn st) org-id n)
-       (map db->build)))
-
-(defn- select-next-build-idx [st [org-id repo-id]]
-  (er/next-repo-idx (get-conn st) org-id repo-id))
-
-(defn- insert-job [conn job build-sid]
-  (when-let [build (apply eb/select-build-by-sid conn build-sid)]
-    (ec/insert-job conn (-> job
-                            (job->db)
-                            (assoc :build-id (:id build))))
-    build-sid))
-
-(defn- update-job [conn job existing]
-  (let [upd (-> existing
-                (dissoc :org-cuid :repo-display-id :build-display-id)
-                (merge (job->db job)))]
-    (when (ec/update-job conn upd)
-      ;; Return build sid
-      ((juxt :org-cuid :repo-display-id :build-display-id) existing))))
-
-(defn- upsert-job [st build-sid job]
-  (let [conn (get-conn st)]
-    (if-let [existing (ej/select-by-sid conn (concat build-sid [(:id job)]))]
-      (update-job conn job existing)
-      (insert-job conn job build-sid))))
-
-(defn- select-job [st job-sid]
-  (some-> (ej/select-by-sid (get-conn st) job-sid)
-          (db->job)))
-
 (def join-request? (partial global-sid? st/join-requests))
 
-(defn- insert-join-request [conn jr]
-  (let [user (ec/select-user conn (ec/by-cuid (:user-id jr)))
-        org (ec/select-org conn (ec/by-cuid (:org-id jr)))
-        e (-> jr
-              (id->cuid)
-              (select-keys [:cuid :status :request-msg :response-msg])
-              (update :status name)
-              (assoc :org-id (:id org)
-                     :user-id (:id user)))]
-    (ec/insert-join-request conn e)))
-
-(defn- update-join-request [conn jr existing]
-  (ec/update-join-request conn
-                          (-> (select-keys jr [:status :request-msg :response-msg])
-                              (update :status name)
-                              (as-> x (merge existing x)))))
-
-(defn- upsert-join-request [conn jr]
-  (if-let [existing (ec/select-join-request conn (ec/by-cuid (:id jr)))]
-    (update-join-request conn jr existing)
-    (insert-join-request conn jr)))
-
-(defn- select-join-request [conn cuid]
-  (jr/select-join-request-as-entity conn cuid))
-
-(defn- select-user-join-requests [st user-cuid]
-  (letfn [(db->jr [r]
-            (update r :status keyword))]
-    (->> (jr/select-user-join-requests (get-conn st) user-cuid)
-         (map db->jr))))
-
 (def email-registration? (partial global-sid? st/email-registrations))
-
-(defn- db->email-registration [reg]
-  (cuid->id reg))
-
-(defn- select-email-registration [conn cuid]
-  (some-> (ec/select-email-registration conn (ec/by-cuid cuid))
-          (db->email-registration)))
-
-(defn- select-email-registration-by-email [st email]
-  (some-> (ec/select-email-registration (get-conn st) [:= :email email])
-          (db->email-registration)))
-
-(defn- select-email-registrations [st]
-  (->> (ec/select-email-registrations (get-conn st) nil)
-       (map db->email-registration)))
-
-(defn- insert-email-registration [conn reg]
-  ;; Updates not supported
-  (ec/insert-email-registration conn (-> reg
-                                         (assoc :cuid (:id reg))
-                                         (dissoc :id))))
-
-(defn- delete-email-registration [conn cuid]
-  (ec/delete-email-registrations conn (ec/by-cuid cuid)))
 
 (def credit-subscription? (partial global-sid? st/credit-subscriptions))
 
@@ -586,7 +389,7 @@
         user?
         (su/select-user-by-type conn (drop 2 sid))
         build?
-        (select-build conn (rest sid))
+        (sb/select-build conn (rest sid))
         webhook?
         (sw/select-webhook conn (global-sid->cuid sid))
         ssh-key?
@@ -594,9 +397,9 @@
         params?
         (sp/select-params conn (second sid))
         join-request?
-        (select-join-request conn (global-sid->cuid sid))
+        (sjr/select-join-request conn (global-sid->cuid sid))
         email-registration?
-        (select-email-registration conn (global-sid->cuid sid))
+        (ser/select-email-registration conn (global-sid->cuid sid))
         credit-subscription?
         (select-credit-subscription conn (last sid))
         credit-consumption?
@@ -622,9 +425,9 @@
               user?
               (su/upsert-user conn obj)
               join-request?
-              (upsert-join-request conn obj)
+              (sjr/upsert-join-request conn obj)
               build?
-              (upsert-build conn obj)
+              (sb/upsert-build conn obj)
               webhook?
               (sw/upsert-webhook conn obj)
               ssh-key?
@@ -632,7 +435,7 @@
               params?
               (sp/upsert-params conn (last sid) obj)
               email-registration?
-              (insert-email-registration conn obj)
+              (ser/insert-email-registration conn obj)
               credit-subscription?
               (upsert-credit-subscription conn obj)
               credit-consumption?
@@ -662,7 +465,7 @@
         org?
         (so/org-exists? conn (global-sid->cuid sid))
         build?
-        (build-exists? conn (rest sid))
+        (sb/build-exists? conn (rest sid))
         nil)))
 
   (delete-obj [this sid]
@@ -672,7 +475,7 @@
          org?
          (so/delete-org conn (global-sid->cuid sid))
          email-registration?
-         (delete-email-registration conn (global-sid->cuid sid))
+         (ser/delete-email-registration conn (global-sid->cuid sid))
          webhook?
          (sw/delete-webhook conn (last sid))
          credit-subscription?
@@ -685,7 +488,7 @@
     (let [conn (get-conn this)]
       (condp sid-pred sid
         build-repo?
-        (select-repo-build-ids conn (rest sid))
+        (sb/select-repo-build-ids conn (rest sid))
         (log/warn "Unable to list objects for sid" sid))))
 
   p/Transactable
@@ -747,14 +550,14 @@
     :list-credit-subscriptions select-org-credit-subs
     :list-credit-consumptions select-org-credit-cons
     :list-credit-consumptions-since select-org-credit-cons-since
-    :find-latest-builds select-latest-org-builds
-    :find-latest-n-builds select-latest-n-org-builds
+    :find-latest-builds sb/select-latest-org-builds
+    :find-latest-n-builds sb/select-latest-n-org-builds
     :find-by-display-id so/select-org-by-display-id
     :find-id-by-display-id so/select-org-id-by-display-id
     :count so/count-orgs}
    :repo
    {:list-display-ids sr/select-repo-display-ids
-    :find-next-build-idx select-next-build-idx
+    :find-next-build-idx sb/select-next-build-idx
     :find-webhooks sw/select-repo-webhooks
     :delete sr/delete-repo
     :count sr/count-repos}
@@ -764,18 +567,18 @@
     :count su/count-users
     :delete su/delete-user}
    :join-request
-   {:list-user select-user-join-requests}
+   {:list-user sjr/select-user-join-requests}
    :build
-   {:list select-repo-builds
-    :list-since select-org-builds-since
-    :find-latest select-latest-build}
+   {:list sb/select-repo-builds
+    :list-since sb/select-org-builds-since
+    :find-latest sb/select-latest-build}
    :job
-   {:save upsert-job
-    :find select-job
+   {:save sj/upsert-job
+    :find sj/select-job
     :list-events select-job-events}
    :email-registration
-   {:list select-email-registrations
-    :find-by-email select-email-registration-by-email}
+   {:list ser/select-email-registrations
+    :find-by-email ser/select-email-registration-by-email}
    :param
    {:save sp/upsert-org-param
     :find sp/select-org-param
