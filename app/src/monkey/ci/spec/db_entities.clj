@@ -199,3 +199,15 @@
 (s/def :db/job-event
   (s/keys :req-un [:db/job-id :job-evt/time :job-evt/event]
           :opt-un [:job-evt/details]))
+
+(s/def :db/token string?)
+
+(s/def :db/user-token
+  (-> (s/keys :req-un [:db/token :db/user-id]
+              :opt-un [:db/valid-until])
+      (s/merge :db/common)))
+
+(s/def :db/org-token
+  (-> (s/keys :req-un [:db/token :db/org-id]
+              :opt-un [:db/valid-until])
+      (s/merge :db/common)))

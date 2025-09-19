@@ -953,3 +953,47 @@
        (when-let [dek (:dek opts)]
          (save-crypto s {:dek dek :org-id org-id}))
        sid))))
+
+(defn- token-sid [type & parts]
+  (into [global (name type)] parts))
+
+(defn- save-token [st type sid token]
+  (p/write-obj st (apply token-sid type sid) token))
+
+(defn find-token [st type sid]
+  (p/read-obj st (apply token-sid type sid)))
+
+(defn- list-tokens [st type owner-id]
+  (->> (p/list-obj st (token-sid type owner-id))
+       (map (partial token-sid type owner-id))
+       (map (partial p/read-obj st))))
+
+(def user-token :user-token)
+(def user-token-sid (juxt :user-id :id))
+
+(defn save-user-token [st token]
+  (save-token st user-token (user-token-sid token) token))
+
+(defn find-user-token [st sid]
+  (find-token st user-token sid))
+
+(def list-user-tokens
+  (override-or
+   [:user :list-tokens]
+   (fn [st user-id]
+     (list-tokens st user-token user-id))))
+
+(def org-token :org-token)
+(def org-token-sid (juxt :org-id :id))
+
+(defn save-org-token [st token]
+  (save-token st org-token (org-token-sid token) token))
+
+(defn find-org-token [st sid]
+  (find-token st org-token sid))
+
+(def list-org-tokens
+  (override-or
+   [:org :list-tokens]
+   (fn [st org-id]
+     (list-tokens st org-token org-id))))

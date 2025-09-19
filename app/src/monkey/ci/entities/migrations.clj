@@ -87,7 +87,7 @@
     (not no-cascade?) (conj :on-delete-cascade)))
 
 (def fk-customer (fk :customer-id :customers :id))
-(def fk-org (fk :org-id :customers :id))
+(def fk-org (fk :org-id :orgs :id))
 (def fk-repo (fk :repo-id :repos :id))
 (def fk-user (fk :user-id :users :id))
 (def fk-job (fk :job-id :jobs :id))
@@ -662,7 +662,23 @@
      {:alter-table :orgs
       :add-index [:unique nil :display-id]}]
     [{:alter-table :orgs
-      :drop-column :display-id}])])
+      :drop-column :display-id}])
+
+   (entity-table-migration
+    51 :user-tokens
+    [[:token [:varchar 30] [:not nil]]
+     user-col
+     [:valid-until :timestamp]
+     fk-user]
+    [(h/create-index [:unique :user-token-idx] [:user-tokens :token])])
+
+   (entity-table-migration
+    52 :org-tokens
+    [[:token [:varchar 30] [:not nil]]
+     org-col
+     [:valid-until :timestamp]
+     fk-org]
+    [(h/create-index [:unique :org-token-idx] [:org-tokens :token])])])
 
 (defn prepare-migrations
   "Prepares all migrations by formatting to sql, creates a ragtime migration object from it."
