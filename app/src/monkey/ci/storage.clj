@@ -968,6 +968,16 @@
        (map (partial token-sid type owner-id))
        (map (partial p/read-obj st))))
 
+(defn find-token-by-token [st type token]
+  (->> (p/list-obj st (token-sid type))
+       (map (partial token-sid type))
+       (mapcat (fn [ut]
+                 (->> (p/list-obj st ut)
+                      (map (partial conj ut)))))
+       (map (partial p/read-obj st))
+       (filter (comp (partial = token) :token))
+       first))
+
 (def user-token :user-token)
 (def user-token-sid (juxt :user-id :id))
 
@@ -976,6 +986,12 @@
 
 (defn find-user-token [st sid]
   (find-token st user-token sid))
+
+(def find-user-token-by-token
+  (override-or
+   [:user :find-token]
+   (fn [st token]
+     (find-token-by-token st user-token token))))
 
 (def list-user-tokens
   (override-or
@@ -991,6 +1007,12 @@
 
 (defn find-org-token [st sid]
   (find-token st org-token sid))
+
+(def find-org-token-by-token
+  (override-or
+   [:org :find-token]
+   (fn [st token]
+     (find-token-by-token st org-token token))))
 
 (def list-org-tokens
   (override-or

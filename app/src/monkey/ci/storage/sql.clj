@@ -24,6 +24,7 @@
             [monkey.ci.storage.sql
              [build :as sb]
              [common :refer :all]
+             [credit-cons :as scco]
              [credit-sub :as scs]
              [email-registration :as ser]
              [job :as sj]
@@ -79,50 +80,6 @@
 (def org-credit? (partial global-sid? st/org-credits))
 
 (def credit-consumption? (partial global-sid? st/credit-consumptions))
-
-(defn- credit-cons->db [cc]
-  (-> (id->cuid cc)
-      (dissoc :org-id :repo-id)))
-
-(defn- db->credit-cons [cc]
-  (mc/filter-vals some? cc))
-
-(def build-sid (juxt :org-id :repo-id :build-id))
-
-(defn- insert-credit-consumption [conn cc]
-  (let [build (apply eb/select-build-by-sid conn (build-sid cc))
-        credit (ec/select-org-credit conn (ec/by-cuid (:credit-id cc)))]
-    (when-not build
-      (throw (ex-info "Build not found" cc)))
-    (when-not credit
-      (throw (ex-info "Org credit not found" cc)))
-    (ec/insert-credit-consumption conn (assoc (credit-cons->db cc)
-                                              :build-id (:id build)
-                                              :credit-id (:id credit)))))
-
-(defn- update-credit-consumption [conn cc existing]
-  (ec/update-credit-consumption conn (merge existing
-                                            (-> (credit-cons->db cc)
-                                                (dissoc :build-id :credit-id)))))
-
-(defn- upsert-credit-consumption [conn cc]
-  ;; TODO Update available-credits table
-  (if-let [existing (ec/select-credit-consumption conn (ec/by-cuid (:id cc)))]
-    (update-credit-consumption conn cc existing)
-    (insert-credit-consumption conn cc)))
-
-(defn- select-credit-consumption [conn cuid]
-  (some->> (eccon/select-credit-cons conn (eccon/by-cuid cuid))
-           (first)
-           (db->credit-cons)))
-
-(defn- select-org-credit-cons [st org-id]
-  (->> (eccon/select-credit-cons (get-conn st) (eccon/by-org org-id))
-       (map db->credit-cons)))
-
-(defn- select-org-credit-cons-since [st org-id since]
-  (->> (eccon/select-credit-cons (get-conn st) (eccon/by-org-since org-id since))
-       (map db->credit-cons)))
 
 (def bb-webhook? (partial global-sid? st/bb-webhooks))
 
@@ -322,7 +279,7 @@
         credit-subscription?
         (scs/select-credit-subscription conn (last sid))
         credit-consumption?
-        (select-credit-consumption conn (last sid))
+        (scco/select-credit-consumption conn (last sid))
         org-credit?
         (soc/select-org-credit conn (global-sid->cuid sid))
         bb-webhook?
@@ -362,7 +319,7 @@
               credit-subscription?
               (scs/upsert-credit-subscription conn obj)
               credit-consumption?
-              (upsert-credit-consumption conn obj)
+              (scco/upsert-credit-consumption conn obj)
               org-credit?
               (soc/upsert-org-credit conn obj)
               bb-webhook?
@@ -475,8 +432,8 @@
     :get-available-credits soc/select-avail-credits-amount
     :list-available-credits soc/select-avail-credits
     :list-credit-subscriptions scs/select-org-credit-subs
-    :list-credit-consumptions select-org-credit-cons
-    :list-credit-consumptions-since select-org-credit-cons-since
+    :list-credit-consumptions scco/select-org-credit-cons
+    :list-credit-consumptions-since scco/select-org-credit-cons-since
     :find-latest-builds sb/select-latest-org-builds
     :find-latest-n-builds sb/select-latest-n-org-builds
     :find-by-display-id so/select-org-by-display-id

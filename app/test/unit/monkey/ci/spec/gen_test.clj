@@ -4,5 +4,11 @@
             [monkey.ci.spec.gen :as sut]))
 
 (deftest fixed-byte-array
-  (is (every? (comp (partial = 10) count)
-              (g/sample (sut/fixed-byte-array 10)))))
+  (testing "generates fixed size byte arrays"
+    (is (every? (comp (partial = 10) count)
+                (g/sample (sut/fixed-byte-array 10))))))
+
+(deftest fixed-string
+  (testing "generates fixed sized strings"
+    (is (every? (comp (partial = 10) count)
+                (g/sample (sut/fixed-string 10))))))

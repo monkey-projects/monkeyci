@@ -670,7 +670,10 @@
         (is (= t (sut/find-user-token st [(:user-id t) (:id t)]))))
 
       (testing "can list for user"
-        (is (= [t] (sut/list-user-tokens st (:user-id t))))))))
+        (is (= [t] (sut/list-user-tokens st (:user-id t)))))
+
+      (testing "can find by token"
+        (is (= t (sut/find-user-token-by-token st (:token t))))))))
 
 (deftest org-tokens
   (h/with-memory-store st
@@ -680,4 +683,7 @@
         (is (= t (sut/find-org-token st [(:org-id t) (:id t)]))))
 
       (testing "can list for org"
-        (is (= [t] (sut/list-org-tokens st (:org-id t))))))))
+        (is (= [t] (sut/list-org-tokens st (:org-id t)))))
+
+      (testing "can find by token"
+        (is (= t (sut/find-org-token-by-token st (:token t))))))))

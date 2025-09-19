@@ -666,7 +666,7 @@
 
    (entity-table-migration
     51 :user-tokens
-    [[:token [:varchar 30] [:not nil]]
+    [[:token [:char 64] [:not nil]]
      user-col
      [:valid-until :timestamp]
      fk-user]
@@ -674,7 +674,7 @@
 
    (entity-table-migration
     52 :org-tokens
-    [[:token [:varchar 30] [:not nil]]
+    [[:token [:char 64] [:not nil]]
      org-col
      [:valid-until :timestamp]
      fk-org]

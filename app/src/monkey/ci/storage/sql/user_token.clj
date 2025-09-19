@@ -1,6 +1,5 @@
 (ns monkey.ci.storage.sql.user-token
-  (:require [clojure.tools.logging :as log]
-            [monkey.ci.entities
+  (:require [monkey.ci.entities
              [core :as ec]
              [token :as et]]
             [monkey.ci.storage.sql.common :as sc]))

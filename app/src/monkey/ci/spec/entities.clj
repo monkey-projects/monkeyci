@@ -215,14 +215,12 @@
                    :job-evt/time :job-evt/event]
           :opt-un [:job-evt/details]))
 
-(s/def :entity/token string?)
-
 (s/def :entity/user-token
-  (-> (s/keys :req-un [:entity/token :entity/user-id]
+  (-> (s/keys :req-un [::c/token :entity/user-id]
               :opt-un [:entity/valid-until])
       (s/merge :entity/common)))
 
 (s/def :entity/org-token
-  (-> (s/keys :req-un [:entity/token :entity/org-id]
+  (-> (s/keys :req-un [::c/token :entity/org-id]
               :opt-un [:entity/valid-until])
       (s/merge :entity/common)))

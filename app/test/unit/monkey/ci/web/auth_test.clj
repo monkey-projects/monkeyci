@@ -67,7 +67,41 @@
                                     (str "Bearer " (sut/generate-jwt req (sut/sysadmin-token sid)))})
                             (sec)
                             :type-id))
-            "bearer token provided")))))
+            "bearer token provided")))
+
+    (testing "accepts user api key"
+      (let [org-id (cuid/random-cuid)
+            user (-> (h/gen-user)
+                     (assoc :orgs [org-id]))
+            token {:id (cuid/random-cuid)
+                   :user-id (:id user)
+                   :token (sut/generate-api-token)}]
+        (is (st/sid? (st/save-user st user)))
+        (is (st/sid? (st/save-user-token st token)))
+        (let [r (-> req
+                   (assoc :headers
+                          {"authorization"
+                           (str "Token " (:token token))})
+                   (sec))]
+          (is (some? r))
+          (is (= (:id token) (:id r)))
+          (is (= #{org-id} (:orgs r))))))
+
+    (testing "accepts org api key"
+      (let [org (h/gen-org)
+            token {:id (cuid/random-cuid)
+                   :org-id (:id org)
+                   :token (sut/generate-api-token)}]
+        (is (st/sid? (st/save-org st org)))
+        (is (st/sid? (st/save-org-token st token)))
+        (let [r (-> req
+                   (assoc :headers
+                          {"authorization"
+                           (str "Token " (:token token))})
+                   (sec))]
+          (is (some? r))
+          (is (= (:id token) (:id r)))
+          (is (= #{(:id org)} (:orgs r))))))))
 
 (deftest auth-chain
   (testing "allows if chain is empty"
