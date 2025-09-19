@@ -24,10 +24,12 @@
             [monkey.ci.storage.sql
              [build :as sb]
              [common :refer :all]
+             [credit-sub :as scs]
              [email-registration :as ser]
              [job :as sj]
              [join-request :as sjr]
              [org :as so]
+             [org-credit :as soc]
              [org-token :as sot]
              [param :as sp]
              [repo :as sr]
@@ -74,95 +76,7 @@
 
 (def credit-subscription? (partial global-sid? st/credit-subscriptions))
 
-(defn- credit-sub->db [cs]
-  (id->cuid cs))
-
-(defn- db->credit-sub [cs]
-  (mc/filter-vals some? cs))
-
-(defn- insert-credit-subscription [conn cs]
-  (let [org (ec/select-org conn (ec/by-cuid (:org-id cs)))]
-    (ec/insert-credit-subscription conn (assoc (credit-sub->db cs)
-                                               :org-id (:id org)))))
-
-(defn- update-credit-subscription [conn cs existing]
-  (ec/update-credit-subscription conn (merge existing
-                                             (-> (credit-sub->db cs)
-                                                 (dissoc :org-id)))))
-
-(defn- upsert-credit-subscription [conn cs]
-  (if-let [existing (ec/select-credit-subscription conn (ec/by-cuid (:id cs)))]
-    (update-credit-subscription conn cs existing)
-    (insert-credit-subscription conn cs)))
-
-(defn- delete-credit-subscription [conn cuid]
-  (ec/delete-credit-subscriptions conn (ec/by-cuid cuid)))
-
-(defn- select-credit-subscription [conn cuid]
-  (some->> (ecsub/select-credit-subs conn (ecsub/by-cuid cuid))
-           (first)
-           (db->credit-sub)))
-
-(defn- select-credit-subs [conn f]
-  (->> (ecsub/select-credit-subs conn f)
-       (map db->credit-sub)))
-
-(defn- select-org-credit-subs [st org-id]
-  (select-credit-subs (get-conn st) (ecsub/by-org org-id)))
-
-(defn- select-active-credit-subs [st at]
-  (select-credit-subs (get-conn st) (ecsub/active-at at)))
-
 (def org-credit? (partial global-sid? st/org-credits))
-
-(defn- org-credit->db [cred]
-  (id->cuid cred))
-
-(defn- db->org-credit [cred]
-  (mc/filter-vals some? cred))
-
-(defn- insert-org-credit [conn {:keys [subscription-id user-id] :as cred}]
-  (let [org (ec/select-org conn (ec/by-cuid (:org-id cred)))
-        cs   (when subscription-id
-               (or (ec/select-credit-subscription conn (ec/by-cuid subscription-id))
-                   (throw (ex-info "Subscription not found" cred))))
-        user (when user-id
-               (or (ec/select-user conn (ec/by-cuid user-id))
-                   (throw (ex-info "User not found" cred))))]
-    (ec/insert-org-credit conn (-> cred
-                                   (org-credit->db)
-                                   (assoc :org-id (:id org)
-                                          :subscription-id (:id cs)
-                                          :user-id (:id user))))))
-
-(defn- update-org-credit [conn cred existing]
-  (ec/update-org-credit conn (merge existing (select-keys cred [:amount :from-time]))))
-
-(defn- upsert-org-credit [conn cred]
-  (if-let [existing (ec/select-org-credit conn (ec/by-cuid (:id cred)))]
-    (update-org-credit conn cred existing)
-    (insert-org-credit conn cred)))
-
-(defn- select-org-credit [conn id]
-  (some->> (ecc/select-org-credits conn (ecc/by-cuid id))
-           (first)
-           (db->org-credit)))
-
-(defn- select-org-credits-since [st org-id since]
-  (->> (ecc/select-org-credits (get-conn st) (ecc/by-org-since org-id since))
-       (map db->org-credit)))
-
-(defn- select-org-credits [st org-id]
-  (->> (ecc/select-org-credits (get-conn st) (ecc/by-org org-id))
-       (map db->org-credit)))
-
-(defn- select-avail-credits-amount [st org-id]
-  ;; TODO Use the available-credits table for faster lookup
-  (ecc/select-avail-credits-amount (get-conn st) org-id))
-
-(defn- select-avail-credits [st org-id]
-  (->> (ecc/select-avail-credits (get-conn st) org-id)
-       (map db->org-credit)))
 
 (def credit-consumption? (partial global-sid? st/credit-consumptions))
 
@@ -406,11 +320,11 @@
         email-registration?
         (ser/select-email-registration conn (global-sid->cuid sid))
         credit-subscription?
-        (select-credit-subscription conn (last sid))
+        (scs/select-credit-subscription conn (last sid))
         credit-consumption?
         (select-credit-consumption conn (last sid))
         org-credit?
-        (select-org-credit conn (global-sid->cuid sid))
+        (soc/select-org-credit conn (global-sid->cuid sid))
         bb-webhook?
         (select-bb-webhook conn (last sid))
         crypto?
@@ -446,11 +360,11 @@
               email-registration?
               (ser/insert-email-registration conn obj)
               credit-subscription?
-              (upsert-credit-subscription conn obj)
+              (scs/upsert-credit-subscription conn obj)
               credit-consumption?
               (upsert-credit-consumption conn obj)
               org-credit?
-              (upsert-org-credit conn obj)
+              (soc/upsert-org-credit conn obj)
               bb-webhook?
               (upsert-bb-webhook conn obj)
               crypto?
@@ -492,7 +406,7 @@
          webhook?
          (sw/delete-webhook conn (last sid))
          credit-subscription?
-         (delete-credit-subscription conn (last sid))
+         (scs/delete-credit-subscription conn (last sid))
          queued-task?
          (delete-queued-task conn (last sid))
          (log/warn "Deleting entity" sid "is not supported")))))
@@ -556,11 +470,11 @@
    {:init so/init-org
     :search so/select-orgs
     :find-multiple so/select-orgs-by-id
-    :list-credits-since select-org-credits-since
-    :list-credits select-org-credits
-    :get-available-credits select-avail-credits-amount
-    :list-available-credits select-avail-credits
-    :list-credit-subscriptions select-org-credit-subs
+    :list-credits-since soc/select-org-credits-since
+    :list-credits soc/select-org-credits
+    :get-available-credits soc/select-avail-credits-amount
+    :list-available-credits soc/select-avail-credits
+    :list-credit-subscriptions scs/select-org-credit-subs
     :list-credit-consumptions select-org-credit-cons
     :list-credit-consumptions-since select-org-credit-cons-since
     :find-latest-builds sb/select-latest-org-builds
@@ -599,7 +513,7 @@
     :find sp/select-org-param
     :delete sp/delete-org-param}
    :credit
-   {:list-active-subscriptions select-active-credit-subs}
+   {:list-active-subscriptions scs/select-active-credit-subs}
    :bitbucket
    {:find-for-webhook select-bb-webhook-for-webhook
     :search-webhooks select-bb-webhooks-by-filter}
