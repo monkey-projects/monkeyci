@@ -285,6 +285,12 @@
 (defn gen-job-evt []
   (gen-entity :entity/job-event))
 
+(defn gen-user-token []
+  (gen-entity :entity/user-token))
+
+(defn gen-org-token []
+  (gen-entity :entity/org-token))
+
 (defn gen-build-sid []
   (repeatedly 3 cuid/random-cuid))
 

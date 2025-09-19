@@ -661,3 +661,23 @@
       (testing "can save and list for job"
         (is (sid/sid? (sut/save-job-event st evt)))
         (is (= [evt] (sut/list-job-events st job-sid)))))))
+
+(deftest user-tokens
+  (h/with-memory-store st
+    (let [t (h/gen-user-token)]
+      (testing "can save and find"
+        (is (sid/sid? (sut/save-user-token st t)))
+        (is (= t (sut/find-user-token st [(:user-id t) (:id t)]))))
+
+      (testing "can list for user"
+        (is (= [t] (sut/list-user-tokens st (:user-id t))))))))
+
+(deftest org-tokens
+  (h/with-memory-store st
+    (let [t (h/gen-org-token)]
+      (testing "can save and find"
+        (is (sid/sid? (sut/save-org-token st t)))
+        (is (= t (sut/find-org-token st [(:org-id t) (:id t)]))))
+
+      (testing "can list for org"
+        (is (= [t] (sut/list-org-tokens st (:org-id t))))))))
