@@ -931,6 +931,20 @@
         (is (sid/sid? (st/save-job-event st evt)))
         (is (= [evt] (st/list-job-events st (job->sid job))))))))
 
+(deftest ^:sql user-tokens
+  (with-storage conn st
+    (let [user (h/gen-user)
+          token (-> (h/gen-user-token)
+                    (assoc :user-id (:id user)))]
+      (is (some? (st/save-user st user)))
+
+      (testing "can save for user"
+        (is (some? (st/save-user-token st token))))
+
+      (testing "can find by id"
+        (is (= token (-> (st/find-user-token st [(:id user) (:id token)])
+                         (select-keys (keys token)))))))))
+
 (deftest pool-component
   (testing "creates sql connection pool using settings"
     (let [s (sut/pool-component {:type :sql

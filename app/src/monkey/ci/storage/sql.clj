@@ -32,6 +32,7 @@
              [repo :as sr]
              [ssh-key :as ss]
              [user :as su]
+             [user-token :as sut]
              [webhook :as sw]]
             [next.jdbc :as jdbc]
             [next.jdbc.connection :as conn])
@@ -379,6 +380,8 @@
 
 (def job-event? (partial global-sid? st/job-event))
 
+(def user-token? (partial global-sid? st/user-token))
+
 (defrecord SqlStorage [pool]
   p/Storage
   (read-obj [this sid]
@@ -415,7 +418,9 @@
         invoice?
         (select-invoice conn (last sid))
         runner-details?
-        (select-runner-details conn (runner-details-sid->build-sid sid)))))
+        (select-runner-details conn (runner-details-sid->build-sid sid))
+        user-token?
+        (sut/select-user-token conn (take-last 2 sid)))))
   
   (write-obj [this sid obj]
     (let [conn (get-conn this)]
@@ -456,6 +461,8 @@
               (upsert-queued-task conn (last sid) obj)
               job-event?
               (insert-job-event conn sid obj)
+              user-token?
+              (sut/upsert-user-token conn obj)
               (log/warn "Unrecognized sid when writing:" sid))
         sid)))
 
