@@ -28,6 +28,7 @@
              [job :as sj]
              [join-request :as sjr]
              [org :as so]
+             [org-token :as sot]
              [param :as sp]
              [repo :as sr]
              [ssh-key :as ss]
@@ -381,6 +382,7 @@
 (def job-event? (partial global-sid? st/job-event))
 
 (def user-token? (partial global-sid? st/user-token))
+(def org-token? (partial global-sid? st/org-token))
 
 (defrecord SqlStorage [pool]
   p/Storage
@@ -420,7 +422,9 @@
         runner-details?
         (select-runner-details conn (runner-details-sid->build-sid sid))
         user-token?
-        (sut/select-user-token conn (take-last 2 sid)))))
+        (sut/select-user-token conn (take-last 2 sid))
+        org-token?
+        (sot/select-org-token conn (take-last 2 sid)))))
   
   (write-obj [this sid obj]
     (let [conn (get-conn this)]
@@ -463,6 +467,8 @@
               (insert-job-event conn sid obj)
               user-token?
               (sut/upsert-user-token conn obj)
+              org-token?
+              (sot/upsert-org-token conn obj)
               (log/warn "Unrecognized sid when writing:" sid))
         sid)))
 
@@ -561,7 +567,8 @@
     :find-latest-n-builds sb/select-latest-n-org-builds
     :find-by-display-id so/select-org-by-display-id
     :find-id-by-display-id so/select-org-id-by-display-id
-    :count so/count-orgs}
+    :count so/count-orgs
+    :list-tokens sot/select-org-tokens}
    :repo
    {:list-display-ids sr/select-repo-display-ids
     :find-next-build-idx sb/select-next-build-idx
@@ -572,7 +579,8 @@
    {:find su/select-user
     :orgs su/select-user-orgs
     :count su/count-users
-    :delete su/delete-user}
+    :delete su/delete-user
+    :list-tokens sut/select-user-tokens}
    :join-request
    {:list-user sjr/select-user-join-requests}
    :build

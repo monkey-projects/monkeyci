@@ -943,7 +943,31 @@
 
       (testing "can find by id"
         (is (= token (-> (st/find-user-token st [(:id user) (:id token)])
-                         (select-keys (keys token)))))))))
+                         (select-keys (keys token))))))
+
+      (testing "can list for user"
+        (is (= [(:id token)]
+               (->> (st/list-user-tokens st (:id user))
+                    (map :id))))))))
+
+(deftest ^:sql org-tokens
+  (with-storage conn st
+    (let [org (h/gen-org)
+          token (-> (h/gen-org-token)
+                    (assoc :org-id (:id org)))]
+      (is (some? (st/save-org st org)))
+
+      (testing "can save for org"
+        (is (some? (st/save-org-token st token))))
+
+      (testing "can find by id"
+        (is (= token (-> (st/find-org-token st [(:id org) (:id token)])
+                         (select-keys (keys token))))))
+
+      (testing "can list for org"
+        (is (= [(:id token)]
+               (->> (st/list-org-tokens st (:id org))
+                    (map :id))))))))
 
 (deftest pool-component
   (testing "creates sql connection pool using settings"

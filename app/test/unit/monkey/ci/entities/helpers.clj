@@ -4,6 +4,7 @@
             [clojure.spec.gen.alpha :as gen]
             [config.core :as cc]
             [monkey.ci.entities.migrations :as m]
+            [monkey.ci.spec.db_entities]
             [monkey.ci.test.helpers :as h]
             [next.jdbc.connection :as conn])
   (:import (com.zaxxer.hikari HikariDataSource)))

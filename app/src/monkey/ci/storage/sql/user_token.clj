@@ -1,6 +1,8 @@
 (ns monkey.ci.storage.sql.user-token
   (:require [clojure.tools.logging :as log]
-            [monkey.ci.entities.core :as ec]
+            [monkey.ci.entities
+             [core :as ec]
+             [token :as et]]
             [monkey.ci.storage.sql.common :as sc]))
 
 (defn upsert-user-token [conn token]
@@ -21,3 +23,6 @@
           (sc/cuid->id)
           (assoc :user-id user-id)))
 
+(defn select-user-tokens [st user-id]
+  (->> (et/select-user-tokens (sc/get-conn st) user-id)
+       (map sc/cuid->id)))
