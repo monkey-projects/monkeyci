@@ -1463,6 +1463,12 @@
       (is (= "decrypted-key" (-> (h/reply->json r)
                                  :key))))))
 
+(deftest user-token-endpoints
+  (testing "`/user/:user-id/token`"
+    (testing "`POST` creates new token")
+
+    (testing "`DELETE` deletes token")))
+
 (deftest resolve-id-from-db
   (h/with-memory-store s
     (let [org {:id (cuid/random-cuid)

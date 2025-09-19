@@ -16,6 +16,7 @@
             [monkey.ci
              [sid :as sid]
              [storage :as st]
+             [time :as t]
              [utils :as u]]
             [monkey.ci.spec.common :as sc]
             [monkey.ci.web.common :as c]
@@ -158,17 +159,22 @@
   ;; Fallback, for backwards compatibility
   nil)
 
+(defn- api-token-expired? [{v :valid-until}]
+  (and v (> (t/now) v)))
+
 (defn- resolve-user-api-token [req token]
   (let [st (c/req->storage req)]
     (when-let [t (st/find-user-token-by-token st token)]
-      (let [u (st/find-user st (:user-id t))]
-        ;; Add the allowed organizations to the identity
-        (assoc t :orgs (set (:orgs u)))))))
+      (when-not (api-token-expired? t)
+        (let [u (st/find-user st (:user-id t))]
+          ;; Add the allowed organizations to the identity
+          (assoc t :orgs (set (:orgs u))))))))
 
 (defn- resolve-org-api-token [req token]
   (when-let [t (st/find-org-token-by-token (c/req->storage req) token)]
-    ;; Add the allowed organization id to the identity for uniformity
-    (assoc t :orgs #{(:org-id t)})))
+    (when-not (api-token-expired? t)
+      ;; Add the allowed organization id to the identity for uniformity
+      (assoc t :orgs #{(:org-id t)}))))
 
 (defn- query-auth-to-bearer
   "Middleware that puts the authorization token query param in the authorization header
