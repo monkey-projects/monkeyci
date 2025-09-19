@@ -32,224 +32,17 @@
              [utils :as u]]
             [monkey.ci.spec.db-entities]
             [monkey.ci.spec.entities]
+            [monkey.ci.storage.sql
+             [common :refer :all]
+             [org :as so]
+             [param :as sp]
+             [repo :as sr]
+             [ssh-key :as ss]
+             [user :as su]
+             [webhook :as sw]]
             [next.jdbc :as jdbc]
             [next.jdbc.connection :as conn])
   (:import com.zaxxer.hikari.HikariDataSource))
-
-(def deleted? (fnil pos? 0))
-
-(defn- drop-nil [m]
-  (mc/filter-vals some? m))
-
-(defn- get-conn [c]
-  ((:get-conn c) c))
-
-(defn- db->labels [labels]
-  (map #(select-keys % [:name :value]) labels))
-
-(defn- id->cuid [x]
-  (-> x
-      (assoc :cuid (:id x))
-      (dissoc :id)))
-
-(defn- cuid->id [x]
-  (-> x
-      (assoc :id (:cuid x))
-      (dissoc :cuid)))
-
-(defn- repo->db
-  "Converts the repository into an entity that can be sent to the database."
-  [r org-id]
-  (-> r
-      (select-keys [:name :url :main-branch :github-id :public])
-      (dissoc :id)
-      (assoc :display-id (:id r)
-             :org-id org-id)))
-
-(defn- db->repo
-  "Converts the repo entity (a db record) into a repository.  If `f` is provided,
-   it is invoked to allow some processing on the resulting object."
-  [re & [f]]
-  (cond->
-      (-> re
-          (dissoc :cuid :org-id :display-id)
-          (assoc :id (:display-id re))
-          (mc/update-existing :labels db->labels)
-          (drop-nil))
-    f (f re)))
-
-(defn- insert-repo-labels [conn labels re]
-  (when-not (empty? labels)
-    (->> labels
-         (map #(assoc % :repo-id (:id re)))
-         (ec/insert-repo-labels conn))))
-
-(defn- update-repo-labels [conn labels]
-  (doseq [l labels]
-    (ec/update-repo-label conn l)))
-
-(defn- delete-repo-labels [conn labels]
-  (when-not (empty? labels)
-    (ec/delete-repo-labels conn [:in :id (map :id labels)])))
-
-(defn- sync-repo-labels [conn labels re]
-  {:pre [(some? (:id re))]}
-  (let [ex (ec/select-repo-labels conn (ec/by-repo (:id re)))
-        {:keys [insert update delete] :as r} (lbl/reconcile-labels ex labels)]
-    (log/debug "Reconciled labels" labels "into" r)
-    (insert-repo-labels conn insert re)
-    (update-repo-labels conn update)
-    (delete-repo-labels conn delete)))
-
-(defn- insert-repo [conn re repo]
-  (let [re (ec/insert-repo conn re)]
-    (insert-repo-labels conn (:labels repo) re)
-    ;; Also create an initial repo idx record for build index calculation
-    (ec/insert-repo-idx conn {:repo-id (:id re)
-                              :next-idx 1})))
-
-(defn- update-repo [conn re repo existing]
-  (when (not= re existing)
-    (let [re (merge existing re)]
-      (ec/update-repo conn re)
-      (sync-repo-labels conn (:labels repo) re))))
-
-(defn- select-repo-id-by-sid [conn [org-id repo-id]]
-  (er/repo-for-build-sid conn org-id repo-id))
-
-(defn- upsert-repo [conn repo org-id]
-  (spec/valid? :entity/repo repo)
-  (let [re (repo->db repo org-id)]
-    (spec/valid? :db/repo re)
-    (if-let [existing (ec/select-repo conn [:and
-                                            (ec/by-org org-id)
-                                            (ec/by-display-id (:id repo))])]
-      (update-repo conn re repo existing)
-      (insert-repo conn re repo))))
-
-(defn- upsert-repos [conn {:keys [repos]} org-id]
-  (doseq [[_ r] repos]
-    (upsert-repo conn r org-id)))
-
-(defn- delete-repo [st sid]
-  (let [conn (get-conn st)]
-    (when-let [repo-id (select-repo-id-by-sid conn sid)]
-      ;; Other records are deleted by cascading
-      (pos? (ec/delete-repos conn (ec/by-id repo-id))))))
-
-(defn- count-repos [st]
-  (ec/count-entities (get-conn st) :repos))
-
-(defn- select-repo-display-ids [st org-id]
-  (er/repo-display-ids (get-conn st) org-id))
-
-(defn- org->db [org]
-  (-> org
-      (id->cuid)
-      (select-keys [:cuid :name :display-id])))
-
-(def db->org cuid->id)
-
-(defn- db->org-with-repos [c]
-  (letfn [(entities->repos [repos]
-            (reduce-kv (fn [r _ v]
-                         (assoc r (:display-id v) (db->repo v)))
-                       {}
-                       repos))]
-    (-> c
-        (db->org)
-        (mc/update-existing :repos entities->repos))))
-
-(defn- insert-org [conn org]
-  (let [org-id (:id (ec/insert-org conn (org->db org)))]
-    (upsert-repos conn org org-id)
-    org))
-
-(defn- update-org [conn org existing]
-  (let [ce (org->db org)]
-    (spec/valid? :db/org ce)
-    (when (not= ce existing)
-      (ec/update-org conn (merge existing ce)))
-    (upsert-repos conn org (:id existing))
-    org))
-
-(defn- upsert-org [conn org]
-  (spec/valid? :entity/org org)
-  (if-let [existing (ec/select-org conn (ec/by-cuid (:id org)))]
-    (update-org conn org existing)
-    (insert-org conn org)))
-
-(defn- select-org-display-ids [conn]
-  (ecu/org-display-ids conn))
-
-(defn- init-org [st {:keys [org] :as opts}]
-  (let [conn (get-conn st)
-        existing? (select-org-display-ids conn)
-        org (ec/insert-org conn (-> org
-                                    (assoc :display-id (u/name->display-id (:name org) existing?))
-                                    (org->db)))
-        org-id (:id org)]
-    (when-let [uid (some->> (:user-id opts)
-                            (ec/by-cuid)
-                            (ec/select-users conn)
-                            first
-                            :id)]
-      (ec/insert-user-orgs conn uid [org-id]))
-    (when-let [{:keys [amount from]} (:credits opts)]
-      (let [cse {:cuid (st/new-id)
-                 :org-id org-id
-                 :amount amount
-                 :valid-from from}]
-        (when-let [cs (ec/insert-credit-subscription conn cse)]
-          (ec/insert-org-credit conn {:cuid (st/new-id)
-                                      :org-id org-id
-                                      :amount amount
-                                      :from-time from
-                                      :type :subscription
-                                      :subscription-id (:id cs)}))))
-    (when-let [dek (:dek opts)]
-      (ec/insert-crypto conn {:dek dek :org-id org-id}))
-    (st/org-sid (:cuid org))))
-
-(defn- select-org-by-filter [conn f]
-  (some-> (ecu/org-with-repos conn f)
-          (db->org-with-repos)))
-
-(defn- select-org [conn cuid]
-  (when cuid
-    (select-org-by-filter conn (ec/by-cuid cuid))))
-
-(defn- select-org-by-display-id [st did]
-  (when did
-    (select-org-by-filter (get-conn st) (ec/by-display-id did))))
-
-(defn- select-org-id-by-display-id [st did]
-  (when did
-    (ecu/org-id-by-display-id (get-conn st) did)))
-
-(defn- org-exists? [conn cuid]
-  (some? (ec/select-org conn (ec/by-cuid cuid))))
-
-(defn- delete-org [conn cuid]
-  (when cuid
-    (ec/delete-orgs conn (ec/by-cuid cuid))))
-
-(defn- select-orgs
-  "Finds orgs by filter"
-  [st {:keys [id name]}]
-  (let [query (cond
-                id (ec/by-cuid id)
-                ;; By default, this will use case insensitive search (depends on collation)
-                name [:like :name (str "%" name "%")])]
-    (->> (ec/select-orgs (get-conn st) query)
-         (map db->org-with-repos))))
-
-(defn- select-orgs-by-id [st ids]
-  (->> (ec/select-orgs (get-conn st) [:in :cuid (distinct ids)])
-       (map db->org)))
-
-(defn- count-orgs [st]
-  (ec/count-entities (get-conn st) :orgs))
 
 (defn- global-sid? [type sid]
   (= [st/global (name type)] (take 2 sid)))
@@ -260,205 +53,17 @@
 (defn- global-sid->cuid [sid]
   (nth sid 2))
 
-(defn- webhook->db [wh repo-id]
-  (-> wh
-      (dissoc :id :repo-id :org-id :secret-key)
-      (assoc :cuid (:id wh)
-             :repo-id repo-id
-             :secret (:secret-key wh))))
-
-(defn- insert-webhook [conn wh repo-id]
-  (ec/insert-webhook conn (webhook->db wh repo-id)))
-
-(defn- update-webhook [conn wh existing repo-id]
-  (ec/update-webhook conn (merge existing (webhook->db wh repo-id))))
-
-(defn- upsert-webhook [conn wh]
-  (spec/valid? :entity/webhook wh)
-  (if-let [repo-id (select-repo-id-by-sid conn [(:org-id wh) (:repo-id wh)])]
-    (if-let [existing (ec/select-webhook conn (ec/by-cuid (:id wh)))]
-      (update-webhook conn wh existing repo-id)
-      (insert-webhook conn wh repo-id))
-    (throw (ex-info "Repository does not exist" wh))))
-
-(defn- select-webhook [conn cuid]
-  (-> (ewh/select-webhooks-as-entity conn (ewh/by-cuid cuid))
-      (first)))
-
-(defn- select-repo-webhooks [st [org-id repo-id]]
-  (ewh/select-webhooks-as-entity (get-conn st) (ewh/by-repo org-id repo-id)))
-
-(defn- delete-webhook [conn cuid]
-  (ec/delete-webhooks conn (ec/by-cuid cuid)))
-
 (defn- top-sid? [type sid]
   (and (= 2 (count sid))
        (= (name type) (first sid))))
 
 (def ssh-key? (partial top-sid? :ssh-keys))
 
-(defn- ssh-key->db [k]
-  (-> k
-      (id->cuid)
-      (dissoc :org-id)))
-
-(defn- insert-ssh-key [conn ssh-key org-id]
-  (log/debug "Inserting ssh key:" ssh-key)
-  (ec/insert-ssh-key conn (-> ssh-key
-                              (ssh-key->db)
-                              (assoc :org-id org-id))))
-
-(defn- update-ssh-key [conn ssh-key existing]
-  (log/debug "Updating ssh key:" ssh-key)
-  (ec/update-ssh-key conn (merge existing (ssh-key->db ssh-key))))
-
-(defn- upsert-ssh-key [conn org-id ssh-key]
-  (spec/valid? :entity/ssh-key ssh-key)
-  (if-let [existing (ec/select-ssh-key conn (ec/by-cuid (:id ssh-key)))]
-    (update-ssh-key conn ssh-key existing)
-    (insert-ssh-key conn ssh-key org-id)))
-
-(defn- upsert-ssh-keys [conn org-cuid ssh-keys]
-  (when (not-empty ssh-keys)
-    (if-let [{org-id :id} (ec/select-org conn (ec/by-cuid org-cuid))]
-      (doseq [k ssh-keys]
-        (upsert-ssh-key conn org-id k))
-      (throw (ex-info "Org not found when upserting ssh keys" {:org-id org-cuid})))
-    ssh-keys))
-
-(defn- select-ssh-keys [conn org-id]
-  (essh/select-ssh-keys-as-entity conn org-id))
-
 (def params? (partial top-sid? :build-params))
-
-(defn- insert-param-values [conn values param-id]
-  (when-not (empty? values)
-    (->> values
-         (map (fn [v]
-                (-> (select-keys v [:name :value])
-                    (assoc :params-id param-id))))
-         (ec/insert-org-param-values conn))))
-
-(defn- update-param-values [conn values]
-  (doseq [pv values]
-    (ec/update-org-param-value conn pv)))
-
-(defn- delete-param-values [conn values]
-  (when-not (empty? values)
-    (ec/delete-org-param-values conn [:in :id (map :id values)])))
-
-(defn- param->db [param org-id]
-  (-> param
-      (id->cuid)
-      (select-keys [:cuid :description :label-filters :dek])
-      (assoc :org-id org-id)))
-
-(defn- insert-param [conn param org-id]
-  (let [{:keys [id]} (ec/insert-org-param conn (param->db param org-id))]
-    (insert-param-values conn (:parameters param) id)))
-
-(defn- update-param [conn param org-id existing]
-  (ec/update-org-param conn (merge existing (param->db param org-id)))
-  (let [ex-vals (ec/select-org-param-values conn (ec/by-params (:id existing)))
-        r (lbl/reconcile-labels ex-vals (:parameters param))]
-    (log/debug "Reconciled param values:" r)
-    (insert-param-values conn (:insert r) (:id existing))
-    (update-param-values conn (:update r))
-    (delete-param-values conn (:delete r))))
-
-(defn- upsert-param [conn param org-id]
-  (spec/valid? :entity/org-params param)
-  (if-let [existing (ec/select-org-param conn (ec/by-cuid (:id param)))]
-    (update-param conn param org-id existing)
-    (insert-param conn param org-id)))
-
-(defn- upsert-params [conn org-cuid params]
-  (when-not (empty? params)
-    (let [{org-id :id} (ec/select-org conn (ec/by-cuid org-cuid))]
-      (doseq [p params]
-        (upsert-param conn p org-id))
-      params)))
-
-(defn- select-params [conn org-id]
-  ;; Select org params and values for org cuid
-  (eparam/select-org-params-with-values conn org-id))
-
-(defn- upsert-org-param [st {:keys [org-id] :as param}]
-  (let [conn (get-conn st)]
-    (when-let [{db-id :id} (ec/select-org conn (ec/by-cuid org-id))]
-      (upsert-param conn param db-id)
-      (st/params-sid org-id (:id param)))))
-
-(defn- select-org-param [st [_ _ param-id]]
-  (eparam/select-param-with-values (get-conn st) param-id))
-
-(defn- delete-org-param [st [_ _ param-id]]
-  (pos? (ec/delete-org-params (get-conn st) (ec/by-cuid param-id))))
 
 (defn user? [sid]
   (and (= 4 (count sid))
        (= [st/global "users"] (take 2 sid))))
-
-(defn- user->db [user]
-  (-> user
-      (id->cuid)
-      (select-keys [:cuid :type :type-id :email])
-      (mc/update-existing :type name)
-      (mc/update-existing :type-id str)))
-
-(defn- db->user [user]
-  (-> user
-      (cuid->id)
-      (select-keys [:id :type :type-id :email])
-      (mc/update-existing :type keyword)))
-
-(defn- insert-user [conn user]
-  (let [{:keys [id] :as ins} (ec/insert-user conn (user->db user))
-        ids (ecu/org-ids-by-cuids conn (:orgs user))]
-    (ec/insert-user-orgs conn id ids)
-    ins))
-
-(defn- update-user [conn user {user-id :id :as existing}]
-  (when (ec/update-user conn (merge existing (user->db user)))
-    ;; Update user/org links
-    (let [existing-org (set (eu/select-user-org-cuids conn user-id))
-          new-org (set (:orgs user))
-          to-add (cset/difference new-org existing-org)
-          to-remove (cset/difference existing-org new-org)]
-      (ec/insert-user-orgs conn user-id (ecu/org-ids-by-cuids conn to-add))
-      (when-not (empty? to-remove)
-        (ec/delete-user-orgs conn [:in :org-id (ecu/org-ids-by-cuids conn to-remove)]))
-      user)))
-
-(defn- upsert-user [conn user]
-  (if-let [existing (ec/select-user conn (ec/by-cuid (:id user)))]
-    (update-user conn user existing)
-    (insert-user conn user)))
-
-(defn- select-user-by-filter [conn f]
-  (when-let [r (ec/select-user conn f)]
-    (let [org (eu/select-user-org-cuids conn (:id r))]
-      (cond-> (db->user r)
-        true (drop-nil)
-        (not-empty org) (assoc :orgs org)))))
-
-(defn- select-user-by-type [conn [type type-id]]
-  (select-user-by-filter conn [:and
-                               [:= :type type]
-                               [:= :type-id type-id]]))
-
-(defn- select-user [st id]
-  (select-user-by-filter (get-conn st) (ec/by-cuid id)))
-
-(defn- select-user-orgs [st id]
-  (->> (eu/select-user-orgs (get-conn st) id)
-       (map db->org-with-repos)))
-
-(defn- count-users [st]
-  (ec/count-entities (get-conn st) :users))
-
-(defn- delete-user [st id]
-  (pos? (ec/delete-entities (get-conn st) :users (ec/by-cuid id))))
 
 (defn build? [sid]
   (and (= "builds" (first sid))
@@ -977,17 +582,17 @@
     (let [conn (get-conn this)]
       (condp sid-pred sid
         org?
-        (select-org conn (global-sid->cuid sid))
+        (so/select-org conn (global-sid->cuid sid))
         user?
-        (select-user-by-type conn (drop 2 sid))
+        (su/select-user-by-type conn (drop 2 sid))
         build?
         (select-build conn (rest sid))
         webhook?
-        (select-webhook conn (global-sid->cuid sid))
+        (sw/select-webhook conn (global-sid->cuid sid))
         ssh-key?
-        (select-ssh-keys conn (second sid))
+        (ss/select-ssh-keys conn (second sid))
         params?
-        (select-params conn (second sid))
+        (sp/select-params conn (second sid))
         join-request?
         (select-join-request conn (global-sid->cuid sid))
         email-registration?
@@ -1013,19 +618,19 @@
     (let [conn (get-conn this)]
       (when (condp sid-pred sid
               org?
-              (upsert-org conn obj)
+              (so/upsert-org conn obj)
               user?
-              (upsert-user conn obj)
+              (su/upsert-user conn obj)
               join-request?
               (upsert-join-request conn obj)
               build?
               (upsert-build conn obj)
               webhook?
-              (upsert-webhook conn obj)
+              (sw/upsert-webhook conn obj)
               ssh-key?
-              (upsert-ssh-keys conn (last sid) obj)
+              (ss/upsert-ssh-keys conn (last sid) obj)
               params?
-              (upsert-params conn (last sid) obj)
+              (sp/upsert-params conn (last sid) obj)
               email-registration?
               (insert-email-registration conn obj)
               credit-subscription?
@@ -1055,7 +660,7 @@
     (let [conn (get-conn this)]
       (condp sid-pred sid
         org?
-        (org-exists? conn (global-sid->cuid sid))
+        (so/org-exists? conn (global-sid->cuid sid))
         build?
         (build-exists? conn (rest sid))
         nil)))
@@ -1065,11 +670,11 @@
       (deleted?
        (condp sid-pred sid
          org?
-         (delete-org conn (global-sid->cuid sid))
+         (so/delete-org conn (global-sid->cuid sid))
          email-registration?
          (delete-email-registration conn (global-sid->cuid sid))
          webhook?
-         (delete-webhook conn (last sid))
+         (sw/delete-webhook conn (last sid))
          credit-subscription?
          (delete-credit-subscription conn (last sid))
          queued-task?
@@ -1108,13 +713,13 @@
         add-org-cuid (fn [r e]
                        (assoc r :org-id (str (get-in orgs [(:org-id e) :cuid]))))
         convert (fn [e]
-                  (db->repo e add-org-cuid))]
+                  (sr/db->repo e add-org-cuid))]
     (map convert matches)))
 
 (defn watch-github-repo [st {:keys [org-id] :as repo}]
   (let [conn (get-conn st)]
     (when-let [org (ec/select-org conn (ec/by-cuid org-id))]
-      (let [r (ec/insert-repo conn (repo->db repo (:id org)))]
+      (let [r (ec/insert-repo conn (sr/repo->db repo (:id org)))]
         (sid/->sid [org-id (:display-id r)])))))
 
 (defn unwatch-github-repo [st [org-id repo-id]]
@@ -1132,9 +737,9 @@
     :watch watch-github-repo
     :unwatch unwatch-github-repo}
    :org
-   {:init init-org
-    :search select-orgs
-    :find-multiple select-orgs-by-id
+   {:init so/init-org
+    :search so/select-orgs
+    :find-multiple so/select-orgs-by-id
     :list-credits-since select-org-credits-since
     :list-credits select-org-credits
     :get-available-credits select-avail-credits-amount
@@ -1144,20 +749,20 @@
     :list-credit-consumptions-since select-org-credit-cons-since
     :find-latest-builds select-latest-org-builds
     :find-latest-n-builds select-latest-n-org-builds
-    :find-by-display-id select-org-by-display-id
-    :find-id-by-display-id select-org-id-by-display-id
-    :count count-orgs}
+    :find-by-display-id so/select-org-by-display-id
+    :find-id-by-display-id so/select-org-id-by-display-id
+    :count so/count-orgs}
    :repo
-   {:list-display-ids select-repo-display-ids
+   {:list-display-ids sr/select-repo-display-ids
     :find-next-build-idx select-next-build-idx
-    :find-webhooks select-repo-webhooks
-    :delete delete-repo
-    :count count-repos}
+    :find-webhooks sw/select-repo-webhooks
+    :delete sr/delete-repo
+    :count sr/count-repos}
    :user
-   {:find select-user
-    :orgs select-user-orgs
-    :count count-users
-    :delete delete-user}
+   {:find su/select-user
+    :orgs su/select-user-orgs
+    :count su/count-users
+    :delete su/delete-user}
    :join-request
    {:list-user select-user-join-requests}
    :build
@@ -1172,9 +777,9 @@
    {:list select-email-registrations
     :find-by-email select-email-registration-by-email}
    :param
-   {:save upsert-org-param
-    :find select-org-param
-    :delete delete-org-param}
+   {:save sp/upsert-org-param
+    :find sp/select-org-param
+    :delete sp/delete-org-param}
    :credit
    {:list-active-subscriptions select-active-credit-subs}
    :bitbucket
