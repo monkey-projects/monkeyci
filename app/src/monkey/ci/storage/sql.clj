@@ -366,6 +366,10 @@
          (scs/delete-credit-subscription conn (last sid))
          queued-task?
          (delete-queued-task conn (last sid))
+         user-token?
+         (sut/delete-user-token conn (last sid))
+         org-token?
+         (sot/delete-org-token conn (last sid))
          (log/warn "Deleting entity" sid "is not supported")))))
 
   (list-obj [this sid]

@@ -999,6 +999,9 @@
    (fn [st user-id]
      (list-tokens st user-token user-id))))
 
+(defn delete-user-token [st sid]
+  (p/delete-obj st (apply token-sid user-token sid)))
+
 (def org-token :org-token)
 (def org-token-sid (juxt :org-id :id))
 
@@ -1019,3 +1022,6 @@
    [:org :list-tokens]
    (fn [st org-id]
      (list-tokens st org-token org-id))))
+
+(defn delete-org-token [st sid]
+  (p/delete-obj st (apply token-sid org-token sid)))

@@ -948,7 +948,11 @@
       (testing "can list for user"
         (is (= [(:id token)]
                (->> (st/list-user-tokens st (:id user))
-                    (map :id))))))))
+                    (map :id)))))
+
+      (testing "can delete"
+        (is (true? (st/delete-user-token st [(:id user) (:id token)])))
+        (is (empty? (st/list-user-tokens st (:id user))))))))
 
 (deftest ^:sql org-tokens
   (with-storage conn st
@@ -967,7 +971,11 @@
       (testing "can list for org"
         (is (= [(:id token)]
                (->> (st/list-org-tokens st (:id org))
-                    (map :id))))))))
+                    (map :id)))))
+
+      (testing "can delete"
+        (is (true? (st/delete-org-token st [(:id org) (:id token)])))
+        (is (empty? (st/list-org-tokens st (:id org))))))))
 
 (deftest pool-component
   (testing "creates sql connection pool using settings"

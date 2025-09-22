@@ -669,6 +669,7 @@
     [[:token [:char 64] [:not nil]]
      user-col
      [:valid-until :timestamp]
+     [:description [:varchar 200]]
      fk-user]
     [(h/create-index [:unique :user-token-idx] [:user-tokens :token])])
 
@@ -677,6 +678,7 @@
     [[:token [:char 64] [:not nil]]
      org-col
      [:valid-until :timestamp]
+     [:description [:varchar 200]]
      fk-org]
     [(h/create-index [:unique :org-token-idx] [:org-tokens :token])])])
 

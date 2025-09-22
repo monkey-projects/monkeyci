@@ -25,3 +25,6 @@
 (defn select-user-tokens [st user-id]
   (->> (et/select-user-tokens (sc/get-conn st) user-id)
        (map sc/cuid->id)))
+
+(defn delete-user-token [conn token-id]
+  (ec/delete-entities conn :user-tokens (ec/by-cuid token-id)))

@@ -26,3 +26,6 @@
 (defn select-org-tokens [st org-id]
   (->> (et/select-org-tokens (sc/get-conn st) org-id)
        (map sc/cuid->id)))
+
+(defn delete-org-token [conn token-id]
+  (ec/delete-entities conn :org-tokens (ec/by-cuid token-id)))

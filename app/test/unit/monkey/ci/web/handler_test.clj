@@ -1464,10 +1464,74 @@
                                  :key))))))
 
 (deftest user-token-endpoints
-  (testing "`/user/:user-id/token`"
-    (testing "`POST` creates new token")
+  (h/with-memory-store st
+    (testing "`/user/:user-id/token`"
+      (let [user (h/gen-user)
+            app (make-test-app st)]
+        (is (some? (st/save-user st user)))
+        (testing "`POST` creates new token"
+          (is (= 201 (-> (h/json-request :post (format "/user/%s/token" (:id user))
+                                         {:valid-until (+ (t/now) 10000)
+                                          :description "test token"})
+                         (app)
+                         :status)))
+          (is (= 1 (count (st/list-user-tokens st (:id user))))))
 
-    (testing "`DELETE` deletes token")))
+        (let [r (-> (mock/request :get (format "/user/%s/token" (:id user)))
+                    (app))
+              b (h/reply->json r)]
+          (testing "`GET` lists user tokens"
+            (is (= 200 (:status r)))
+            (is (= 1 (count b))))
+
+          (testing "`GET /:token-id` retrieves token by id"
+            (is (= (first b) (-> (mock/request
+                                  :get
+                                  (format "/user/%s/token/%s" (:id user) (-> b first :id)))
+                                 (app)
+                                 (h/reply->json)))))
+
+          (testing "`DELETE /:token-id` deletes token"
+            (is (= 204 (-> (mock/request
+                            :delete
+                            (format "/user/%s/token/%s" (:id user) (-> b first :id)))
+                           (app)
+                           :status)))))))))
+
+(deftest org-token-endpoints
+  (h/with-memory-store st
+    (testing "`/org/:org-id/token`"
+      (let [org (h/gen-org)
+            app (make-test-app st)]
+        (is (some? (st/save-org st org)))
+        (testing "`POST` creates new token"
+          (is (= 201 (-> (h/json-request :post (format "/org/%s/token" (:id org))
+                                         {:valid-until (+ (t/now) 10000)
+                                          :description "test token"})
+                         (app)
+                         :status)))
+          (is (= 1 (count (st/list-org-tokens st (:id org))))))
+
+        (let [r (-> (mock/request :get (format "/org/%s/token" (:id org)))
+                    (app))
+              b (h/reply->json r)]
+          (testing "`GET` lists org tokens"
+            (is (= 200 (:status r)))
+            (is (= 1 (count b))))
+
+          (testing "`GET /:token-id` retrieves token by id"
+            (is (= (first b) (-> (mock/request
+                                  :get
+                                  (format "/org/%s/token/%s" (:id org) (-> b first :id)))
+                                 (app)
+                                 (h/reply->json)))))
+
+          (testing "`DELETE /:token-id` deletes token"
+            (is (= 204 (-> (mock/request
+                            :delete
+                            (format "/org/%s/token/%s" (:id org) (-> b first :id)))
+                           (app)
+                           :status)))))))))
 
 (deftest resolve-id-from-db
   (h/with-memory-store s

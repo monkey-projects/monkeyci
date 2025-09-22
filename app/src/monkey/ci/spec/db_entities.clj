@@ -201,10 +201,10 @@
 
 (s/def :db/user-token
   (-> (s/keys :req-un [::c/token :db/user-id]
-              :opt-un [:db/valid-until])
+              :opt-un [:db/valid-until :db/description])
       (s/merge :db/common)))
 
 (s/def :db/org-token
   (-> (s/keys :req-un [::c/token :db/org-id]
-              :opt-un [:db/valid-until])
+              :opt-un [:db/valid-until :db/description])
       (s/merge :db/common)))

@@ -673,7 +673,10 @@
         (is (= [t] (sut/list-user-tokens st (:user-id t)))))
 
       (testing "can find by token"
-        (is (= t (sut/find-user-token-by-token st (:token t))))))))
+        (is (= t (sut/find-user-token-by-token st (:token t)))))
+
+      (testing "can delete"
+        (is (true? (sut/delete-user-token st [(:user-id t) (:id t)])))))))
 
 (deftest org-tokens
   (h/with-memory-store st
@@ -686,4 +689,7 @@
         (is (= [t] (sut/list-org-tokens st (:org-id t)))))
 
       (testing "can find by token"
-        (is (= t (sut/find-org-token-by-token st (:token t))))))))
+        (is (= t (sut/find-org-token-by-token st (:token t)))))
+
+      (testing "can delete"
+        (is (true? (sut/delete-org-token st [(:org-id t) (:id t)])))))))
