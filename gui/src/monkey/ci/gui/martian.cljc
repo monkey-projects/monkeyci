@@ -113,6 +113,10 @@
    ;; But now it sends them as keywords, which results in a 400 error on client side.
    (s/optional-key :params) {s/Any s/Str}})
 
+(s/defschema ApiToken
+  {(s/optional-key :description) s/Str
+   (s/optional-key :valid-until) s/Int})
+
 (def Date #"\d{4}-\d{2}-\d{2}")
 
 (defn public-route [conf]
@@ -220,6 +224,19 @@
      :path-parts (into org-path ["/credits"])
      :path-schema org-schema
      :method :get})
+
+   (api-route
+    {:route-name :get-org-tokens
+     :path-parts (into org-path ["/token"])
+     :path-schema org-schema
+     :method :get})
+
+   (api-route
+    {:route-name :create-org-token
+     :path-parts (into org-path ["/token"])
+     :path-schema org-schema
+     :body-schema {:token ApiToken}
+     :method :post})
 
    (api-route
     {:route-name :get-credit-issues

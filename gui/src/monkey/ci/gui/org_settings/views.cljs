@@ -14,7 +14,10 @@
     :link :page/org-params}
    {:id ::ssh-keys
     :header "SSH keys"
-    :link :page/org-ssh-keys}])
+    :link :page/org-ssh-keys}
+   {:id ::api-keys
+    :header "Api keys"
+    :link :page/org-api-keys}])
 
 (defn settings-tabs [active]
   [:div.col-md-3

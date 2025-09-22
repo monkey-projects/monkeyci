@@ -203,3 +203,6 @@
 
 (def webhooks-delete-failed
   (error-msg "Failed to delete webhook"))
+
+(def tokens-load-failed
+  (error-msg "Failed to load API keys"))

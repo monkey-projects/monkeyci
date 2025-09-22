@@ -72,6 +72,7 @@
     ["/o/:org-id/settings" :page/org-settings]
     ["/o/:org-id/params" :page/org-params]
     ["/o/:org-id/ssh-keys" :page/org-ssh-keys]
+    ["/o/:org-id/api-keys" :page/org-api-keys]
     ["/o/:org-id/r/:repo-id" :page/repo]
     ["/o/:org-id/r/:repo-id/edit" :page/repo-edit]
     ["/o/:org-id/r/:repo-id/settings" :page/repo-settings]

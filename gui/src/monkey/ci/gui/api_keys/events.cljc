@@ -1,0 +1,56 @@
+(ns monkey.ci.gui.api-keys.events
+  (:require [monkey.ci.gui.api-keys.db :as db]
+            [monkey.ci.gui.alerts :as a]
+            [monkey.ci.gui.loader :as lo]
+            [monkey.ci.gui.routing :as r]
+            [monkey.ci.gui.martian]
+            [re-frame.core :as rf]))
+
+(def config
+  {db/org-id {:request :get-org-tokens
+              :save-request :create-org-token}})
+
+(rf/reg-event-fx
+ :tokens/load
+ (fn [{:keys [db]} [_ id opts]]
+   {:dispatch [:secure-request
+               (get-in config [id :request])
+               opts
+               [:tokens/load--success id]
+               [:tokens/load--failed id]]
+    :db (lo/before-request db id)}))
+
+(rf/reg-event-db
+ :tokens/load--success
+ (fn [db [_ id v]]
+   (lo/on-success db id v)))
+
+(rf/reg-event-db
+ :tokens/load--failed
+ (fn [db [_ id err]]
+   (lo/on-failure db id a/tokens-load-failed err)))
+
+(rf/reg-event-db
+ :tokens/new
+ (fn [db [_ id]]
+   (db/set-token-edit db id {})))
+
+(rf/reg-event-db
+ :tokens/cancel-edit
+ (fn [db [_ id]]
+   (db/reset-token-edit db id)))
+
+(rf/reg-event-db
+ :tokens/edit-changed
+ (fn [db [_ id prop v]]
+   (db/update-token-edit db id assoc prop v)))
+
+(rf/reg-event-fx
+ :tokens/save
+ (fn [{:keys [db]} [_ id]]
+   {:dispatch [:secure-request
+               (get-in config [id :save-request])
+               (assoc (r/path-params (r/current db))
+                      :token (db/get-token-edit db id))
+               [:tokens/save--success id]
+               [:tokens/save--failed id]]}))
