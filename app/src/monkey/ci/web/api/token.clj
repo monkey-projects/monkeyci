@@ -1,10 +1,15 @@
 (ns monkey.ci.web.api.token
   "API handlers for user and org tokens"
   (:require [monkey.ci.storage :as st]
-            [monkey.ci.web.common :as c]
+            [monkey.ci.web
+             [auth :as auth]
+             [common :as c]]
             [ring.util.response :as rur]))
 
 (def req->user-id (comp :user-id :path :parameters))
+
+(defn- generate-token [req]
+  (assoc-in req [:parameters :body :token] (auth/generate-api-token)))
 
 (c/make-entity-endpoints
  "user-token"
@@ -15,7 +20,9 @@
 (defn- patch-user-token [req]
   (assoc-in req [:parameters :body :user-id] (req->user-id req)))
 
+;; FIXME Store the token value as hashed string
 (def create-user-token (comp (c/entity-creator st/save-user-token c/default-id)
+                             generate-token
                              patch-user-token))
 
 (defn list-user-tokens [req]
@@ -33,6 +40,7 @@
   (assoc-in req [:parameters :body :org-id] (c/org-id req)))
 
 (def create-org-token (comp (c/entity-creator st/save-org-token c/default-id)
+                            generate-token
                             patch-org-token))
 
 (defn list-org-tokens [req]

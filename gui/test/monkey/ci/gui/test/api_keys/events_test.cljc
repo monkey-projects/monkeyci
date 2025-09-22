@@ -67,3 +67,18 @@
        (is (= {:org-id "test-org"
                :token {:description "test desc"}}
               (-> @c first (nth 3))))))))
+
+(deftest tokens-save--success
+  (let [id "test-id"
+        token {:secret "test-secret"}]
+    (testing "sets new token in db"
+      (rf/dispatch-sync [:tokens/save--success id {:body token}])
+      (is (= token (db/get-new-token @app-db id))))))
+
+(deftest tokens-save--failed
+  (let [id "test-id"]
+    (testing "sets error in db"
+      (rf/dispatch-sync [:tokens/save--failed id "test-error"])
+      (is (= [:danger]
+             (->> (db/get-alerts @app-db id)
+                  (map :type)))))))

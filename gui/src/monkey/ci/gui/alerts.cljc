@@ -206,3 +206,6 @@
 
 (def tokens-load-failed
   (error-msg "Failed to load API keys"))
+
+(def token-create-failed
+  (error-msg "Failed to create new API key"))

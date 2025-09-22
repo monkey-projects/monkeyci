@@ -5,6 +5,7 @@
             [monkey.ci.gui.layout :as l]
             [monkey.ci.gui.routing :as r]
             [monkey.ci.gui.table :as t]
+            [monkey.ci.gui.time :as time]
             [monkey.ci.gui.utils :as u]
             [monkey.ci.gui.api-keys.db :as db]
             [monkey.ci.gui.api-keys.events]
@@ -57,7 +58,7 @@
     :columns [{:label "Description"
                :value :description}
               {:label "Valid until"
-               :value :valid-until}]}])
+               :value (comp time/format-date time/parse-epoch :valid-until)}]}])
 
 (defn- page [{id :db-id :as conf} route]
   (rf/dispatch [:tokens/load id (r/path-params route)])
@@ -69,6 +70,8 @@
      [:i "MonkeyCI"] " CLI to access the REST API."]
     [input-form id]
     [add-btn id]
+    [:div.mt-3
+     [co/alerts [:loader/alerts id]]]
     [token-table conf route]]))
 
 (def org-config

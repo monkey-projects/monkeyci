@@ -1,9 +1,11 @@
 (ns monkey.ci.gui.api-keys.events
-  (:require [monkey.ci.gui.api-keys.db :as db]
+  (:require [medley.core :as mc]
+            [monkey.ci.gui.api-keys.db :as db]
             [monkey.ci.gui.alerts :as a]
             [monkey.ci.gui.loader :as lo]
             [monkey.ci.gui.routing :as r]
             [monkey.ci.gui.martian]
+            [monkey.ci.gui.time :as t]
             [re-frame.core :as rf]))
 
 (def config
@@ -51,6 +53,17 @@
    {:dispatch [:secure-request
                (get-in config [id :save-request])
                (assoc (r/path-params (r/current db))
-                      :token (db/get-token-edit db id))
+                      :token (-> (db/get-token-edit db id)
+                                 (mc/update-existing :valid-until (comp t/to-epoch t/parse-iso))))
                [:tokens/save--success id]
                [:tokens/save--failed id]]}))
+
+(rf/reg-event-db
+ :tokens/save--success
+ (fn [db [_ id {:keys [body]}]]
+   (db/set-new-token db id body)))
+
+(rf/reg-event-db
+ :tokens/save--failed
+ (fn [db [_ id err]]
+   (db/set-alerts db id [(a/token-create-failed err)])))

@@ -29,3 +29,12 @@
 
 (defn get-token-edit [db id]
   (get-in db [id ::edit]))
+
+(defn set-new-token [db id v]
+  (assoc-in db [id ::new-token] v))
+
+(defn get-new-token [db id]
+  (get-in db [id ::new-token]))
+
+(def get-alerts l/get-alerts)
+(def set-alerts l/set-alerts)

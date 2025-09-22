@@ -1475,7 +1475,9 @@
                                           :description "test token"})
                          (app)
                          :status)))
-          (is (= 1 (count (st/list-user-tokens st (:id user))))))
+          (let [t (st/list-user-tokens st (:id user))]
+            (is (= 1 (count t)))
+            (is (string? (-> t first :token)) "generates token value")))
 
         (let [r (-> (mock/request :get (format "/user/%s/token" (:id user)))
                     (app))
@@ -1510,7 +1512,9 @@
                                           :description "test token"})
                          (app)
                          :status)))
-          (is (= 1 (count (st/list-org-tokens st (:id org))))))
+          (let [t (st/list-org-tokens st (:id org))]
+            (is (= 1 (count t)))
+            (is (string? (-> t first :token)) "generates token value")))
 
         (let [r (-> (mock/request :get (format "/org/%s/token" (:id org)))
                     (app))
