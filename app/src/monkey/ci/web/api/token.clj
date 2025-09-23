@@ -1,6 +1,9 @@
 (ns monkey.ci.web.api.token
   "API handlers for user and org tokens"
-  (:require [monkey.ci.storage :as st]
+  (:require [buddy.core
+             [codecs :as bcc]
+             [hash :as bch]]
+            [monkey.ci.storage :as st]
             [monkey.ci.web
              [auth :as auth]
              [common :as c]]
@@ -20,8 +23,13 @@
 (defn- patch-user-token [req]
   (assoc-in req [:parameters :body :user-id] (req->user-id req)))
 
-;; FIXME Store the token value as hashed string
-(def create-user-token (comp (c/entity-creator st/save-user-token c/default-id)
+(defn- token-saver [target]
+  (fn [st token]
+    (target st
+            ;; Store the token value as hashed string
+            (update token :token auth/hash-pw))))
+
+(def create-user-token (comp (c/entity-creator (token-saver st/save-user-token) c/default-id)
                              generate-token
                              patch-user-token))
 
@@ -39,7 +47,7 @@
 (defn- patch-org-token [req]
   (assoc-in req [:parameters :body :org-id] (c/org-id req)))
 
-(def create-org-token (comp (c/entity-creator st/save-org-token c/default-id)
+(def create-org-token (comp (c/entity-creator (token-saver st/save-org-token) c/default-id)
                             generate-token
                             patch-org-token))
 

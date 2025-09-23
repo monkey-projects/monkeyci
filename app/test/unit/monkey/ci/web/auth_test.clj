@@ -78,7 +78,7 @@
                    :user-id (:id user)
                    :token (sut/generate-api-token)}]
         (is (st/sid? (st/save-user st user)))
-        (is (st/sid? (st/save-user-token st token)))
+        (is (st/sid? (st/save-user-token st (update token :token sut/hash-pw))))
         (let [r (-> req
                    (assoc :headers
                           {"authorization"
@@ -95,7 +95,7 @@
                    :token (sut/generate-api-token)
                    :valid-until (- (t/now) 1000)}]
         (is (st/sid? (st/save-user st user)))
-        (is (st/sid? (st/save-user-token st token)))
+        (is (st/sid? (st/save-user-token st (update token :token sut/hash-pw))))
         (is (nil? (-> req
                       (assoc :headers
                              {"authorization"
@@ -108,7 +108,7 @@
                    :org-id (:id org)
                    :token (sut/generate-api-token)}]
         (is (st/sid? (st/save-org st org)))
-        (is (st/sid? (st/save-org-token st token)))
+        (is (st/sid? (st/save-org-token st (update token :token sut/hash-pw))))
         (let [r (-> req
                     (assoc :headers
                            {"authorization"
@@ -125,7 +125,7 @@
                    :token (sut/generate-api-token)
                    :valid-until (- (t/now) 1000)}]
         (is (st/sid? (st/save-org st org)))
-        (is (st/sid? (st/save-org-token st token)))
+        (is (st/sid? (st/save-org-token st (update token :token sut/hash-pw))))
         (is (nil? (-> req
                       (assoc :headers
                              {"authorization"

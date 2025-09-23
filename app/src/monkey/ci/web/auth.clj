@@ -32,6 +32,10 @@
   "Retrieves current user id from request"
   (comp :id :identity))
 
+(def hash-pw
+  "Creates SHA256 hash of password, returns hex encoded string"
+  (comp codecs/bytes->hex hash/sha256))
+
 (defn- make-token [role sid]
   {:role role
    :sub (sid/serialize-sid sid)})
@@ -164,14 +168,14 @@
 
 (defn- resolve-user-api-token [req token]
   (let [st (c/req->storage req)]
-    (when-let [t (st/find-user-token-by-token st token)]
+    (when-let [t (st/find-user-token-by-token st (hash-pw token))]
       (when-not (api-token-expired? t)
         (let [u (st/find-user st (:user-id t))]
           ;; Add the allowed organizations to the identity
           (assoc t :orgs (set (:orgs u))))))))
 
 (defn- resolve-org-api-token [req token]
-  (when-let [t (st/find-org-token-by-token (c/req->storage req) token)]
+  (when-let [t (st/find-org-token-by-token (c/req->storage req) (hash-pw token))]
     (when-not (api-token-expired? t)
       ;; Add the allowed organization id to the identity for uniformity
       (assoc t :orgs #{(:org-id t)}))))
@@ -398,8 +402,3 @@
         (-> (rur/response "Invalid signature header")
             (rur/status 401))))))
 
-(defn hash-pw
-  "Creates SHA256 hash of password, returns hex encoded string"
-  [pw]
-  (-> (hash/sha256 pw)
-      (codecs/bytes->hex)))

@@ -1507,14 +1507,17 @@
             app (make-test-app st)]
         (is (some? (st/save-org st org)))
         (testing "`POST` creates new token"
-          (is (= 201 (-> (h/json-request :post (format "/org/%s/token" (:id org))
-                                         {:valid-until (+ (t/now) 10000)
-                                          :description "test token"})
-                         (app)
-                         :status)))
-          (let [t (st/list-org-tokens st (:id org))]
-            (is (= 1 (count t)))
-            (is (string? (-> t first :token)) "generates token value")))
+          (let [r (-> (h/json-request :post (format "/org/%s/token" (:id org))
+                                      {:valid-until (+ (t/now) 10000)
+                                       :description "test token"})
+                      (app))
+                b (h/reply->json r)]
+            (is (= 201 (:status r)))
+            (is (string? (:token b)) "generates token value")
+            
+            (let [t (st/list-org-tokens st (:id org))]
+              (is (= 1 (count t)))
+              (is (not= (-> t first :token) (:token b)) "stores token hashed"))))
 
         (let [r (-> (mock/request :get (format "/org/%s/token" (:id org)))
                     (app))
