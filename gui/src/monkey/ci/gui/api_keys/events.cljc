@@ -35,12 +35,16 @@
 (rf/reg-event-db
  :tokens/new
  (fn [db [_ id]]
-   (db/set-token-edit db id {})))
+   (-> db
+       (db/set-token-edit id {})
+       (db/reset-new-token id))))
 
 (rf/reg-event-db
  :tokens/cancel-edit
  (fn [db [_ id]]
-   (db/reset-token-edit db id)))
+   (-> db
+       (db/reset-token-edit id)
+       (db/reset-new-token id))))
 
 (rf/reg-event-db
  :tokens/edit-changed
@@ -56,14 +60,21 @@
                       :token (-> (db/get-token-edit db id)
                                  (mc/update-existing :valid-until (comp t/to-epoch t/parse-iso))))
                [:tokens/save--success id]
-               [:tokens/save--failed id]]}))
+               [:tokens/save--failed id]]
+    :db (db/set-saving db id)}))
 
 (rf/reg-event-db
  :tokens/save--success
  (fn [db [_ id {:keys [body]}]]
-   (db/set-new-token db id body)))
+   (-> db
+       (db/set-new-token id body)
+       (db/reset-saving id)
+       (db/update-tokens id (comp vec conj) (dissoc body :token))
+       (db/reset-token-edit id))))
 
 (rf/reg-event-db
  :tokens/save--failed
  (fn [db [_ id err]]
-   (db/set-alerts db id [(a/token-create-failed err)])))
+   (-> db
+       (db/set-alerts id [(a/token-create-failed err)])
+       (db/reset-saving id))))

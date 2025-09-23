@@ -21,9 +21,11 @@
      [:<> [:span.me-2 [co/icon :plus-square]] "Add"]]))
 
 (defn- save-btn [id]
-  [:button.btn.btn-primary
-   {:on-click (u/link-evt-handler [:tokens/save id])}
-   [:<> [:span.me-2 [co/icon :floppy]] "Save"]])
+  (let [s? (rf/subscribe [:tokens/saving? id])]
+    [:button.btn.btn-primary
+     {:on-click (u/link-evt-handler [:tokens/save id])
+      :disabled (true? @s?)}
+     [:<> [:span.me-2 [co/icon :floppy]] "Save"]]))
 
 (defn- input-form [id]
   (when @(rf/subscribe [:tokens/editing? id])
@@ -50,15 +52,47 @@
           [save-btn id]
           [co/cancel-btn [:tokens/cancel-edit id]]]]]])))
 
+(defn- new-token-result [id]
+  (when-let [v @(rf/subscribe [:tokens/new id])]
+    [:div.card.mb-3
+     [:div.card-body
+      [:form
+       [:h4 "New Api Key"]
+       [:div.mb-3
+        [f/form-input {:id :description
+                       :label "Description"
+                       :value (:description v)
+                       :extra-opts {:disabled true}}]]
+       [:div.mb-3
+        [f/form-input {:id :valid-until
+                       :label "Valid until"
+                       :value (:valid-until v)
+                       :help-msg "Date at which this api key is no longer valid."
+                       :extra-opts
+                       {:type :date
+                        :disabled true}}]]
+       [:div.mb-3
+        [f/form-input {:id :token
+                       :label "Generated token"
+                       :value (:token v)
+                       :help-msg (str "The secret token.  Keep this value safe, "
+                                      "it cannot be retrieved later.")
+                       :extra-opts {:disabled true}}]]
+       [:div.d-flex.gap-2
+        [co/close-btn [:tokens/cancel-edit id]]]]]]))
+
 (defn- token-table [conf route]
   [t/paged-table
    {:id [::api-keys (:db-id conf) ((:params->id conf) (r/path-params route))]
     :items-sub (:items-sub conf)
     :loading-sub (:loading-sub conf)
-    :columns [{:label "Description"
-               :value :description}
-              {:label "Valid until"
-               :value (comp time/format-date time/parse-epoch :valid-until)}]}])
+    :columns (-> [{:label "Description"
+                   :value :description
+                   :sorter (t/prop-sorter :description)}
+                  {:label "Valid until"
+                   :value (comp time/format-date time/parse-epoch :valid-until)
+                   :sorter (t/prop-sorter :valid-until)}]
+                 (t/add-sorting 0 :asc))}])
 
 (defn- page [{id :db-id :as conf} route]
   (rf/dispatch [:tokens/load id (r/path-params route)])
@@ -69,6 +103,7 @@
     [:p "Api keys can be used to allow services, automated processes or the "
      [:i "MonkeyCI"] " CLI to access the REST API."]
     [input-form id]
+    [new-token-result id]
     [add-btn id]
     [:div.mt-3
      [co/alerts [:loader/alerts id]]]

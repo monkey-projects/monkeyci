@@ -3,11 +3,16 @@
 
 (def org-id ::org-tokens)
 
+(def get-tokens l/get-value)
+(def set-tokens l/set-value)
+
+(def update-tokens l/update-value)
+
 (defn set-org-tokens [db v]
-  (l/set-value db org-id v))
+  (set-tokens db org-id v))
 
 (defn get-org-tokens [db]
-  (l/get-value db org-id))
+  (get-tokens db org-id))
 
 (defn set-org-tokens-loading [db]
   (l/set-loading db org-id))
@@ -33,8 +38,20 @@
 (defn set-new-token [db id v]
   (assoc-in db [id ::new-token] v))
 
+(defn reset-new-token [db id]
+  (update db id dissoc ::new-token))
+
 (defn get-new-token [db id]
   (get-in db [id ::new-token]))
 
 (def get-alerts l/get-alerts)
 (def set-alerts l/set-alerts)
+
+(defn set-saving [db id]
+  (assoc-in db [id ::saving] true))
+
+(defn reset-saving [db id]
+  (update db id dissoc ::saving))
+
+(defn saving? [db id]
+  (true? (get-in db [id ::saving])))

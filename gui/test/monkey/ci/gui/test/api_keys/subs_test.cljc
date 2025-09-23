@@ -34,6 +34,18 @@
 
 (deftest tokens-editing?
   (h/verify-sub [:tokens/editing? ::test-id]
-                #(db/set-token-edit % ::test-id {})
+                #(db/set-token-edit % ::test-id ::editing)
                 true
                 false))
+
+(deftest tokens-saving?
+  (h/verify-sub [:tokens/saving? ::test-id]
+                #(db/set-saving % ::test-id)
+                true
+                false))
+
+(deftest tokens-new
+  (h/verify-sub [:tokens/new ::test-id]
+                #(db/set-new-token % ::test-id ::test-token)
+                ::test-token
+                nil))

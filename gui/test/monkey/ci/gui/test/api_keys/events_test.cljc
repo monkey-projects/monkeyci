@@ -24,18 +24,29 @@
        (is (= :get-org-tokens (-> @c first (nth 2))))))))
 
 (deftest tokens-new
-  (testing "sets token edit object"
-    (let [id "test-id"]
-      (is (nil? (db/get-token-edit @app-db id)))
-      (rf/dispatch-sync [:tokens/new id])
-      (is (some? (db/get-token-edit @app-db id))))))
+  (let [id "test-id"]
+    (is (some? (reset! app-db (db/set-new-token {} id ::new-token))))
+    (is (nil? (db/get-token-edit @app-db id)))
+    (rf/dispatch-sync [:tokens/new id])
+
+    (testing "sets token edit object"
+      (is (some? (db/get-token-edit @app-db id))))
+
+    (testing "clears new token"
+      (is (nil? (db/get-new-token @app-db id))))))
 
 (deftest tokens-cancel-edit
-  (testing "clears token edit object"
-    (let [id "test-id"]
-      (is (some? (db/set-token-edit @app-db id {:description "test"})))
-      (rf/dispatch-sync [:tokens/cancel-edit id])
-      (is (nil? (db/get-token-edit @app-db id))))))
+  (let [id "test-id"]
+    (is (some? (reset! app-db (-> {}
+                                  (db/set-token-edit id {:description "test"})
+                                  (db/set-new-token id ::new-token)))))
+    (rf/dispatch-sync [:tokens/cancel-edit id])
+    
+    (testing "clears token edit object"
+      (is (nil? (db/get-token-edit @app-db id))))
+
+    (testing "clears new token"
+      (is (nil? (db/get-new-token @app-db id))))))
 
 (deftest tokens-edit-changed
   (testing "updates property in edit obj"
@@ -66,19 +77,41 @@
      (testing "passes path params and form contents"
        (is (= {:org-id "test-org"
                :token {:description "test desc"}}
-              (-> @c first (nth 3))))))))
+              (-> @c first (nth 3)))))
+
+     (testing "marks saving"
+       (is (true? (db/saving? @app-db id)))))))
 
 (deftest tokens-save--success
   (let [id "test-id"
         token {:secret "test-secret"}]
+    (is (some? (reset! app-db (-> {}
+                                  (db/set-saving id)
+                                  (db/set-token-edit id ::editing)))))
+    (rf/dispatch-sync [:tokens/save--success id {:body token}])
+    
     (testing "sets new token in db"
-      (rf/dispatch-sync [:tokens/save--success id {:body token}])
-      (is (= token (db/get-new-token @app-db id))))))
+      (is (= token (db/get-new-token @app-db id))))
+
+    (testing "unmarks saving"
+      (is (false? (db/saving? @app-db id))))
+
+    (testing "adds to list of tokens"
+      (is (= [token]
+             (db/get-tokens @app-db id))))
+
+    (testing "clears editing token"
+      (is (nil? (db/get-token-edit @app-db id))))))
 
 (deftest tokens-save--failed
   (let [id "test-id"]
+    (is (some? (reset! app-db (db/set-saving {} id))))
+    (rf/dispatch-sync [:tokens/save--failed id "test-error"])
+    
     (testing "sets error in db"
-      (rf/dispatch-sync [:tokens/save--failed id "test-error"])
       (is (= [:danger]
              (->> (db/get-alerts @app-db id)
-                  (map :type)))))))
+                  (map :type)))))
+
+    (testing "unmarks saving"
+      (is (false? (db/saving? @app-db id))))))
