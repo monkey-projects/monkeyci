@@ -16,7 +16,8 @@
 
 (defn request [method path]
   {:url (sut-url path)
-   :method method})
+   :method method
+   :throw-exceptions false})
 
 (defn set-header [req k v]
   (assoc-in req [:headers k] v))
@@ -51,6 +52,11 @@
   [req token]
   (set-header req "authorization" (str "Bearer " token)))
 
+(defn set-api-token
+  "Sets authorization api token in the request"
+  [req token]
+  (set-header req "authorization" (str "Token " token)))
+
 (defn set-body [req body]
   (let [s (pr-str body)]
     (-> req
@@ -67,6 +73,11 @@
   (try
     (:body (wc/parse-body resp))
     (catch Exception ignored)))
+
+(defn verify! [resp]
+  (when (>= (:status resp) 400)
+    (throw (ex-info "Invalid response" resp)))
+  resp)
 
 (defn create-user
   "Creates a new random user and returns its details"
@@ -85,6 +96,16 @@
   "Deletes given user, returns true if successful"
   [u]
   (= 204 (-> {:url (sut-url (str "/user/" (:id u)))
+              :method :delete}
+             (set-token (sysadmin-token))
+             (http/request)
+             (deref)
+             :status)))
+
+(defn delete-org
+  "Deletes given org, returns true if successful"
+  [org]
+  (= 204 (-> {:url (sut-url (str "/org/" (:id org)))
               :method :delete}
              (set-token (sysadmin-token))
              (http/request)

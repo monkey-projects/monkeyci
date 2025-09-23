@@ -945,6 +945,10 @@
         (is (= token (-> (st/find-user-token st [(:id user) (:id token)])
                          (select-keys (keys token))))))
 
+      (testing "can find by token"
+        (is (= token (some-> (st/find-user-token-by-token st (:token token))
+                             (select-keys (keys token))))))
+      
       (testing "can list for user"
         (is (= [(:id token)]
                (->> (st/list-user-tokens st (:id user))
@@ -967,6 +971,10 @@
       (testing "can find by id"
         (is (= token (-> (st/find-org-token st [(:id org) (:id token)])
                          (select-keys (keys token))))))
+
+      (testing "can find by token"
+        (is (= token (some-> (st/find-org-token-by-token st (:token token))
+                             (select-keys (keys token))))))
 
       (testing "can list for org"
         (is (= [(:id token)]

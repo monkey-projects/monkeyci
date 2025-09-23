@@ -443,7 +443,8 @@
     :find-by-display-id so/select-org-by-display-id
     :find-id-by-display-id so/select-org-id-by-display-id
     :count so/count-orgs
-    :list-tokens sot/select-org-tokens}
+    :list-tokens sot/select-org-tokens
+    :find-token sot/select-org-token-by-token}
    :repo
    {:list-display-ids sr/select-repo-display-ids
     :find-next-build-idx sb/select-next-build-idx
@@ -455,7 +456,8 @@
     :orgs su/select-user-orgs
     :count su/count-users
     :delete su/delete-user
-    :list-tokens sut/select-user-tokens}
+    :list-tokens sut/select-user-tokens
+    :find-token sut/select-user-token-by-token}
    :join-request
    {:list-user sjr/select-user-join-requests}
    :build
