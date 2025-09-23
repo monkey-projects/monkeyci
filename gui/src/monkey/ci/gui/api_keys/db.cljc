@@ -2,26 +2,16 @@
   (:require [monkey.ci.gui.loader :as l]))
 
 (def org-id ::org-tokens)
+(def user-id ::user-tokens)
 
 (def get-tokens l/get-value)
 (def set-tokens l/set-value)
 
 (def update-tokens l/update-value)
 
-(defn set-org-tokens [db v]
-  (set-tokens db org-id v))
-
-(defn get-org-tokens [db]
-  (get-tokens db org-id))
-
-(defn set-org-tokens-loading [db]
-  (l/set-loading db org-id))
-
-(defn reset-org-tokens-loading [db]
-  (l/reset-loading db org-id))
-
-(defn get-org-tokens-loading [db]
-  (l/loading? db org-id))
+(def set-loading l/set-loading)
+(def reset-loading l/reset-loading)
+(def loading? l/loading?)
 
 (defn set-token-edit [db id v]
   (assoc-in db [id ::edit] v))

@@ -220,12 +220,6 @@
      :method :get})
 
    (api-route
-    {:route-name :get-org-credits
-     :path-parts (into org-path ["/credits"])
-     :path-schema org-schema
-     :method :get})
-
-   (api-route
     {:route-name :get-org-tokens
      :path-parts (into org-path ["/token"])
      :path-schema org-schema
@@ -243,6 +237,12 @@
      :path-parts (into org-path ["/token" :token-id])
      :path-schema (assoc org-schema :token-id s/Str)
      :method :delete})
+
+   (api-route
+    {:route-name :get-org-credits
+     :path-parts (into org-path ["/credits"])
+     :path-schema org-schema
+     :method :get})
 
    (api-route
     {:route-name :get-credit-issues
@@ -293,6 +293,25 @@
      :path-schema user-schema
      :body-schema {:join-request
                    {:org-id s/Str}}})
+
+   (api-route
+    {:route-name :get-user-tokens
+     :path-parts (into user-path ["/token"])
+     :path-schema user-schema
+     :method :get})
+
+   (api-route
+    {:route-name :create-user-token
+     :path-parts (into user-path ["/token"])
+     :path-schema user-schema
+     :body-schema {:token ApiToken}
+     :method :post})
+
+   (api-route
+    {:route-name :delete-user-token
+     :path-parts (into user-path ["/token" :token-id])
+     :path-schema (assoc user-schema :token-id s/Str)
+     :method :delete})
 
    (api-route
     {:route-name :get-repo
