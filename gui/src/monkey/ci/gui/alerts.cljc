@@ -209,3 +209,6 @@
 
 (def token-create-failed
   (error-msg "Failed to create new API key"))
+
+(def token-delete-failed
+  (error-msg "Failed to delete API key"))

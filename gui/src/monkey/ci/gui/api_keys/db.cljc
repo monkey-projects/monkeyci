@@ -55,3 +55,21 @@
 
 (defn saving? [db id]
   (true? (get-in db [id ::saving])))
+
+(defn set-token-to-delete [db id t]
+  (assoc-in db [id ::to-delete] t))
+
+(defn reset-token-to-delete [db id]
+  (update db id dissoc ::to-delete))
+
+(defn get-token-to-delete [db id]
+  (get-in db [id ::to-delete]))
+
+(defn set-deleting [db id]
+  (assoc-in db [id ::deleting] true))
+
+(defn reset-deleting [db id]
+  (update db id dissoc ::deleting))
+
+(defn deleting? [db id]
+  (true? (get-in db [id ::deleting])))

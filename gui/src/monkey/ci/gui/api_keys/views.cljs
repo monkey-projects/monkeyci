@@ -3,6 +3,7 @@
   (:require [monkey.ci.gui.components :as co]
             [monkey.ci.gui.forms :as f]
             [monkey.ci.gui.layout :as l]
+            [monkey.ci.gui.modals :as m]
             [monkey.ci.gui.routing :as r]
             [monkey.ci.gui.table :as t]
             [monkey.ci.gui.time :as time]
@@ -81,6 +82,32 @@
        [:div.d-flex.gap-2
         [co/close-btn [:tokens/cancel-edit id]]]]]]))
 
+(def delete-modal-id ::delete-token-confirm)
+
+(defn confirm-delete-modal [id]
+  [m/modal
+   delete-modal-id
+   [:h4 "Confirmation"]
+   [:div
+    [:p "Are you sure you want to delete this Api key?"]
+    [:p "This operation cannot be undone."]]
+   [:div.d-flex.gap-2
+    [:button.btn.btn-danger
+     {:title "Confirm delete"
+      :data-bs-dismiss "modal"
+      :on-click (u/link-evt-handler [:tokens/delete id])}
+     [:span.me-2 co/delete-icon] "Yes, Delete!"]
+    [m/modal-dismiss-btn
+     [:span [:span.me-2 co/cancel-icon] "Oops, No"]]]])
+
+(defn- token-actions [id {token-id :id}]
+  [:button.btn.btn-outline-danger.btn-icon.btn-sm
+   {:on-click (u/link-evt-handler [:tokens/prepare-delete id token-id])
+    :data-bs-toggle "modal"
+    :data-bs-target (u/->dom-id delete-modal-id)
+    :title "Delete token"}
+   [co/icon :trash]])
+
 (defn- token-table [conf route]
   [t/paged-table
    {:id [::api-keys (:db-id conf) ((:params->id conf) (r/path-params route))]
@@ -91,23 +118,27 @@
                    :sorter (t/prop-sorter :description)}
                   {:label "Valid until"
                    :value (comp time/format-date time/parse-epoch :valid-until)
-                   :sorter (t/prop-sorter :valid-until)}]
+                   :sorter (t/prop-sorter :valid-until)}
+                  {:label ""
+                   :value (partial token-actions (:db-id conf))}]
                  (t/add-sorting 0 :asc))}])
 
 (defn- page [{id :db-id :as conf} route]
   (rf/dispatch [:tokens/load id (r/path-params route)])
-  (settings/settings-page
-   ::settings/api-keys
-   [:<>
-    [co/page-title [co/icon-text :key "Api keys"]]
-    [:p "Api keys can be used to allow services, automated processes or the "
-     [:i "MonkeyCI"] " CLI to access the REST API."]
-    [input-form id]
-    [new-token-result id]
-    [add-btn id]
-    [:div.mt-3
-     [co/alerts [:loader/alerts id]]]
-    [token-table conf route]]))
+  [:<>
+   (settings/settings-page
+    ::settings/api-keys
+    [:<>
+     [co/page-title [co/icon-text :key "Api keys"]]
+     [:p "Api keys can be used to allow services, automated processes or the "
+      [:i "MonkeyCI"] " CLI to access the REST API."]
+     [input-form id]
+     [new-token-result id]
+     [add-btn id]
+     [:div.mt-3
+      [co/alerts [:loader/alerts id]]]
+     [token-table conf route]])
+   [confirm-delete-modal id]])
 
 (def org-config
   {:db-id db/org-id

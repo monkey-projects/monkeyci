@@ -10,7 +10,8 @@
 
 (def config
   {db/org-id {:request :get-org-tokens
-              :save-request :create-org-token}})
+              :save-request :create-org-token
+              :delete-request :delete-org-token}})
 
 (rf/reg-event-fx
  :tokens/load
@@ -78,3 +79,37 @@
    (-> db
        (db/set-alerts id [(a/token-create-failed err)])
        (db/reset-saving id))))
+
+(rf/reg-event-db
+ :tokens/prepare-delete
+ (fn [db [_ id token-id]]
+   (db/set-token-to-delete db id token-id)))
+
+(rf/reg-event-fx
+ :tokens/delete
+ (fn [{:keys [db]} [_ id]]
+   (let [token-id (db/get-token-to-delete db id)]
+     {:dispatch [:secure-request
+                 (get-in config [id :delete-request])
+                 (-> (r/current db)
+                     (r/path-params)
+                     (assoc :token-id token-id))
+                 [:tokens/delete--success id token-id]
+                 [:tokens/delete--failed id token-id]]
+      :db (db/set-deleting db id)})))
+
+(rf/reg-event-db
+ :tokens/delete--success
+ (fn [db [_ id token-id]]
+   (-> db
+       (db/update-tokens id (comp vec (partial remove (comp (partial = token-id) :id))))
+       (db/reset-token-to-delete id)
+       (db/reset-deleting id))))
+
+(rf/reg-event-db
+ :tokens/delete--failed
+ (fn [db [_ id token-id err]]
+   (-> db
+       (db/set-alerts id [(a/token-delete-failed err)])
+       (db/reset-token-to-delete id)
+       (db/reset-deleting id))))
