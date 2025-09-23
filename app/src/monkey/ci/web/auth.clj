@@ -166,16 +166,15 @@
 (defn- api-token-expired? [{v :valid-until}]
   (and v (> (t/now) v)))
 
-(defn- resolve-user-api-token [req token]
-  (let [st (c/req->storage req)]
-    (when-let [t (st/find-user-token-by-token st (hash-pw token))]
-      (when-not (api-token-expired? t)
-        (let [u (st/find-user st (:user-id t))]
-          ;; Add the allowed organizations to the identity
-          (assoc t :orgs (set (:orgs u))))))))
+(defn- resolve-user-api-token [st req token]
+  (when-let [t (st/find-user-token-by-token st (hash-pw token))]
+    (when-not (api-token-expired? t)
+      (let [u (st/find-user st (:user-id t))]
+        ;; Add the allowed organizations to the identity
+        (assoc t :orgs (set (:orgs u)))))))
 
-(defn- resolve-org-api-token [req token]
-  (when-let [t (st/find-org-token-by-token (c/req->storage req) (hash-pw token))]
+(defn- resolve-org-api-token [st req token]
+  (when-let [t (st/find-org-token-by-token st (hash-pw token))]
     (when-not (api-token-expired? t)
       ;; Add the allowed organization id to the identity for uniformity
       (assoc t :orgs #{(:org-id t)}))))
@@ -194,14 +193,14 @@
 
 (defn secure-ring-app
   "Wraps the ring handler so it verifies the JWT authorization header"
-  [app rt]
+  [app {:keys [storage] :as rt}]
   (let [pk (rt->pub-key rt)
         jws-backend (bb/jws {:secret pk
                              :token-name "Bearer"
                              :options {:alg :rs256}
                              :authfn (partial resolve-token rt)})
-        user-token-backend (bb/token {:authfn resolve-user-api-token})
-        org-token-backend (bb/token {:authfn resolve-org-api-token})]
+        user-token-backend (bb/token {:authfn (partial resolve-user-api-token storage)})
+        org-token-backend (bb/token {:authfn (partial resolve-org-api-token storage)})]
     (when-not pk
       (log/warn "No public key configured"))
     (-> app
