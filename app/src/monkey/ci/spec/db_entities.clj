@@ -95,8 +95,7 @@
 
 (s/def :db/type (s/with-gen
                   string?
-                  #(gen/fmap clojure.string/join
-                             (gen/vector (gen/char-alphanumeric) 20))))
+                  #(sg/fixed-string 20)))
 (s/def :db/type-id string?)
 (s/def :db/email string?)
 
@@ -199,3 +198,13 @@
 (s/def :db/job-event
   (s/keys :req-un [:db/job-id :job-evt/time :job-evt/event]
           :opt-un [:job-evt/details]))
+
+(s/def :db/user-token
+  (-> (s/keys :req-un [::c/token :db/user-id]
+              :opt-un [:db/valid-until :db/description])
+      (s/merge :db/common)))
+
+(s/def :db/org-token
+  (-> (s/keys :req-un [::c/token :db/org-id]
+              :opt-un [:db/valid-until :db/description])
+      (s/merge :db/common)))

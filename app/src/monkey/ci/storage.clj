@@ -953,3 +953,75 @@
        (when-let [dek (:dek opts)]
          (save-crypto s {:dek dek :org-id org-id}))
        sid))))
+
+(defn- token-sid [type & parts]
+  (into [global (name type)] parts))
+
+(defn- save-token [st type sid token]
+  (p/write-obj st (apply token-sid type sid) token))
+
+(defn find-token [st type sid]
+  (p/read-obj st (apply token-sid type sid)))
+
+(defn- list-tokens [st type owner-id]
+  (->> (p/list-obj st (token-sid type owner-id))
+       (map (partial token-sid type owner-id))
+       (map (partial p/read-obj st))))
+
+(defn find-token-by-token [st type token]
+  (->> (p/list-obj st (token-sid type))
+       (map (partial token-sid type))
+       (mapcat (fn [ut]
+                 (->> (p/list-obj st ut)
+                      (map (partial conj ut)))))
+       (map (partial p/read-obj st))
+       (filter (comp (partial = token) :token))
+       first))
+
+(def user-token :user-token)
+(def user-token-sid (juxt :user-id :id))
+
+(defn save-user-token [st token]
+  (save-token st user-token (user-token-sid token) token))
+
+(defn find-user-token [st sid]
+  (find-token st user-token sid))
+
+(def find-user-token-by-token
+  (override-or
+   [:user :find-token]
+   (fn [st token]
+     (find-token-by-token st user-token token))))
+
+(def list-user-tokens
+  (override-or
+   [:user :list-tokens]
+   (fn [st user-id]
+     (list-tokens st user-token user-id))))
+
+(defn delete-user-token [st sid]
+  (p/delete-obj st (apply token-sid user-token sid)))
+
+(def org-token :org-token)
+(def org-token-sid (juxt :org-id :id))
+
+(defn save-org-token [st token]
+  (save-token st org-token (org-token-sid token) token))
+
+(defn find-org-token [st sid]
+  (find-token st org-token sid))
+
+(def find-org-token-by-token
+  (override-or
+   [:org :find-token]
+   (fn [st token]
+     (find-token-by-token st org-token token))))
+
+(def list-org-tokens
+  (override-or
+   [:org :list-tokens]
+   (fn [st org-id]
+     (list-tokens st org-token org-id))))
+
+(defn delete-org-token [st sid]
+  (p/delete-obj st (apply token-sid org-token sid)))

@@ -511,3 +511,22 @@
    :before-update prepare-job-evt
    :after-update  convert-job-evt
    :after-select  convert-job-evt-select})
+
+(def prepare-token
+  (partial int->time :valid-until))
+(def convert-token
+  (partial time->int :valid-until))
+
+(defentity user-token
+  {:before-insert prepare-token
+   :after-insert  convert-token
+   :before-update prepare-token
+   :after-update  convert-token
+   :after-select  convert-token})
+
+(defentity org-token
+  {:before-insert prepare-token
+   :after-insert  convert-token
+   :before-update prepare-token
+   :after-update  convert-token
+   :after-select  convert-token})

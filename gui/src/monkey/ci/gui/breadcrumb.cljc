@@ -51,6 +51,11 @@
         {:url (r/path-for :page/org-settings (r/path-params (r/current db)))
          :name "Settings"}))
 
+(defn- org-api-keys-breadcrumb [db]
+  (conj (default-breadcrumb db)
+        {:url (r/path-for :page/org-api-keys (r/path-params (r/current db)))
+         :name "Api Keys"}))
+
 (defn- org-watch-repo [db]
   (conj (default-breadcrumb db)
         {:url (r/path-for :page/add-repo (r/path-params (r/current db)))
@@ -73,6 +78,7 @@
    is applied."
   {:page/org-params params-breadcrumb
    :page/org-ssh-keys ssh-keys-breadcrumb
+   :page/org-api-keys org-api-keys-breadcrumb
    :page/org-settings org-settings-breadcrumb
    :page/repo-settings repo-settings-breadcrumb
    :page/add-repo org-watch-repo

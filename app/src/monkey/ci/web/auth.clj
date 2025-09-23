@@ -16,7 +16,9 @@
             [monkey.ci
              [sid :as sid]
              [storage :as st]
+             [time :as t]
              [utils :as u]]
+            [monkey.ci.spec.common :as sc]
             [monkey.ci.web.common :as c]
             [ring.middleware.params :as rmp]
             [ring.util.response :as rur]))
@@ -29,6 +31,10 @@
 (def user-id
   "Retrieves current user id from request"
   (comp :id :identity))
+
+(def hash-pw
+  "Creates SHA256 hash of password, returns hex encoded string"
+  (comp codecs/bytes->hex hash/sha256))
 
 (defn- make-token [role sid]
   {:role role
@@ -48,9 +54,15 @@
 
 (defn generate-secret-key
   "Generates a random secret key object"
-  []
-  (-> (nonce/random-nonce 32)
-      (codecs/bytes->hex)))
+  ([size]
+   (-> (nonce/random-nonce size)
+       (codecs/bytes->hex)))
+  ([]
+   (generate-secret-key 32)))
+
+(defn generate-api-token []
+  ;; Each byte results in 2 chars, so take half token size
+  (generate-secret-key (/ sc/token-size 2)))
 
 (defn sign-jwt [payload pk]
   (jwt/sign payload pk {:alg :rs256 :header {:kid kid}}))
@@ -151,6 +163,23 @@
   ;; Fallback, for backwards compatibility
   nil)
 
+(defn- api-token-expired? [{v :valid-until}]
+  (and v (> (t/now) v)))
+
+(defn- resolve-user-api-token [req token]
+  (let [st (c/req->storage req)]
+    (when-let [t (st/find-user-token-by-token st (hash-pw token))]
+      (when-not (api-token-expired? t)
+        (let [u (st/find-user st (:user-id t))]
+          ;; Add the allowed organizations to the identity
+          (assoc t :orgs (set (:orgs u))))))))
+
+(defn- resolve-org-api-token [req token]
+  (when-let [t (st/find-org-token-by-token (c/req->storage req) (hash-pw token))]
+    (when-not (api-token-expired? t)
+      ;; Add the allowed organization id to the identity for uniformity
+      (assoc t :orgs #{(:org-id t)}))))
+
 (defn- query-auth-to-bearer
   "Middleware that puts the authorization token query param in the authorization header
    if no auth header is provided."
@@ -167,14 +196,18 @@
   "Wraps the ring handler so it verifies the JWT authorization header"
   [app rt]
   (let [pk (rt->pub-key rt)
-        backend (bb/jws {:secret pk
-                         :token-name "Bearer"
-                         :options {:alg :rs256}
-                         :authfn (partial resolve-token rt)})]
+        jws-backend (bb/jws {:secret pk
+                             :token-name "Bearer"
+                             :options {:alg :rs256}
+                             :authfn (partial resolve-token rt)})
+        user-token-backend (bb/token {:authfn resolve-user-api-token})
+        org-token-backend (bb/token {:authfn resolve-org-api-token})]
     (when-not pk
       (log/warn "No public key configured"))
     (-> app
-        (bmw/wrap-authentication backend)
+        (bmw/wrap-authentication jws-backend
+                                 user-token-backend
+                                 org-token-backend)
         ;; Also check authorization query arg, because in some cases it's not possible
         ;; to pass it as a header (e.g. server-sent events).
         (query-auth-to-bearer)
@@ -369,8 +402,3 @@
         (-> (rur/response "Invalid signature header")
             (rur/status 401))))))
 
-(defn hash-pw
-  "Creates SHA256 hash of password, returns hex encoded string"
-  [pw]
-  (-> (hash/sha256 pw)
-      (codecs/bytes->hex)))

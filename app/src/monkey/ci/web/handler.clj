@@ -30,7 +30,8 @@
              [join-request :as jr-api]
              [params :as param-api]
              [repo :as repo-api]
-             [ssh-keys :as ssh-api]]
+             [ssh-keys :as ssh-api]
+             [token :as token-api]]
             [reitit.coercion.schema]
             [reitit.ring :as ring]
             [ring.middleware.cors :as cors]
@@ -152,6 +153,11 @@
    (s/optional-key :id) Id ; Internal id
    (s/optional-key :email) s/Str
    (s/optional-key :orgs) [Id]})
+
+(s/defschema ApiToken
+  {(s/optional-key :id) Id
+   (s/optional-key :description) s/Str
+   (s/optional-key :valid-until) s/Int})
 
 (s/defschema EmailRegistration
   {:email s/Str})
@@ -392,6 +398,16 @@
              :parameters
              {:body {:enc s/Str}}}}]]])
 
+(def org-token-routes
+  ["/token"
+   (c/generic-routes
+    {:creator token-api/create-org-token
+     :getter token-api/get-org-token
+     :searcher token-api/list-org-tokens
+     :deleter token-api/delete-org-token
+     :id-key :token-id
+     :new-schema ApiToken})])
+
 (def org-routes
   ["/org"
    {:auth-chain [org-path-checker]}
@@ -415,7 +431,8 @@
                     credit-routes
                     org-webhook-routes
                     invoice-routes
-                    crypto-routes]})])
+                    crypto-routes
+                    org-token-routes]})])
 
 (def github-routes
   ["/github"
@@ -461,6 +478,16 @@
      :id-key :join-request-id
      :new-schema JoinRequestSchema})])
 
+(def user-token-routes
+  ["/token"
+   (c/generic-routes
+    {:creator token-api/create-user-token
+     :getter token-api/get-user-token
+     :searcher token-api/list-user-tokens
+     :deleter token-api/delete-user-token
+     :id-key :token-id
+     :new-schema ApiToken})])
+
 (def user-routes
   ["/user"
    {:conflicting true
@@ -480,7 +507,8 @@
        {:auth-chain ^:replace []
         :get
         {:handler api/get-user-orgs}}]
-      user-join-request-routes]]
+      user-join-request-routes
+      user-token-routes]]
     ["/:user-type/:type-id"
      {:parameters
       {:path {:user-type s/Str
