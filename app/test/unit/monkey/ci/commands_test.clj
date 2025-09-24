@@ -110,7 +110,14 @@
            (-> {:git-url "http://test-git-url"}
                (sut/args->build)
                :checkout-dir)
-           (System/getProperty "java.io.tmpdir")))))
+           (System/getProperty "java.io.tmpdir"))))
+
+  (testing "uses org and repo id from args"
+    (let [[org-id repo-id] (repeatedly cuid/random-cuid)
+          b (sut/args->build {:org-id org-id
+                              :repo-id repo-id})]
+      (is (= org-id (:org-id b)))
+      (is (= repo-id (:repo-id b))))))
 
 (deftest parse-params
   (testing "empty when empty input"

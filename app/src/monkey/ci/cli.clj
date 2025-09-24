@@ -78,18 +78,6 @@
 (def build-cmd
   {:command "build"
    :description "Build commands"
-   ;; :opts [{:option "server"
-   ;;         :short "s"
-   ;;         :as "Server URL"
-   ;;         :type :string}
-   ;;        {:as "Customer id"
-   ;;         :option "org-id"
-   ;;         :short "c"
-   ;;         :type :string}
-   ;;        {:as "Repository id"
-   ;;         :option "repo-id"
-   ;;         :short "r"
-   ;;         :type :string}]
    :opts [{:as "API url"
            :option "api"
            :short "a"
@@ -100,7 +88,15 @@
            :option "api-key"
            :short "k"
            :type :string
-           :env "MONKEYCI_KEY"}]
+           :env "MONKEYCI_KEY"}
+          {:as "Organization id"
+           :option "org-id"
+           :short "o"
+           :type :string}
+          {:as "Repository id"
+           :option "repo-id"
+           :short "r"
+           :type :string}]
    :subcommands [run-build-cmd
                  verify-build-cmd
                  ;; Disabled until refactored

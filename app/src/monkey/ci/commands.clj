@@ -97,8 +97,8 @@
   "Creates a build object from the command line args"
   [{:keys [workdir dir git-url commit-id branch tag] :as args}]
   (cond-> {:checkout-dir (args->checkout-dir args)
-           :org-id "local-cust"
-           :repo-id "local-repo"
+           :org-id (get args :org-id "local-cust")
+           :repo-id (get args :repo-id "local-repo")
            :build-id (b/local-build-id)
            :dek (codecs/bytes->b64-str (v/generate-key))}
     git-url (assoc-in [:git :url] git-url)
