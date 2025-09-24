@@ -37,6 +37,10 @@
            (fs/canonicalize)
            (str))))
 
+(defn abs-path-safe [a b]
+  (when (and a b)
+    (abs-path a b)))
+
 (defn combine
   "Returns the canonical path of combining `a` and `b`"
   [a b]

@@ -10,6 +10,7 @@
              [blob :as blob]
              [build :as b]
              [git :as git]
+             [params :as params]
              [protocols :as p]
              [utils :as u]
              [workspace :as ws]]
@@ -62,13 +63,8 @@
                             (:checkout-base-dir config)
                             (u/combine (:build-id build))))))
 
-(defrecord ApiBuildParams [api-config]
-  p/BuildParams
-  (get-build-params [this build]
-    (bas/get-params-from-api api-config build)))
-
 (defn new-params [config]
-  (->ApiBuildParams (:api config)))
+  (params/->ApiBuildParams (constantly (:api config))))
 
 (defrecord ApiServer [build api-config]
   co/Lifecycle

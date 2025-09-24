@@ -96,7 +96,6 @@
 (defn args->build
   "Creates a build object from the command line args"
   [{:keys [workdir dir git-url commit-id branch tag] :as args}]
-  ;; TODO Merge this with build/make-build-ctx?
   (cond-> {:checkout-dir (args->checkout-dir args)
            :org-id "local-cust"
            :repo-id "local-repo"
@@ -126,20 +125,16 @@
     (lr/start-and-post conf (ec/make-event :build/pending
                                            :build build))))
 
-(defn- abs-path [a b]
-  (when (and a b)
-    (u/abs-path a b)))
-
 (defn verify-build
   "Runs a linter on the build script to catch any grammatical errors."
   [conf]
   (ra/with-cli-runtime conf
     (fn [rt]
-      (let [{d :checkout-dir :as build} (args->build (:args conf))
-            res (cond->> build
-                  true (b/script-dir)
-                  d (abs-path d)
-                  true (script/verify))]
+      (let [build (args->build (:args conf))
+            d (b/checkout-dir build)
+            res (->> (b/script-dir build)
+                     (u/abs-path-safe d)
+                     (script/verify))]
         (rt/report rt {:type :verify/result :result res})
         (if (->> res
                  (map :result)
@@ -157,7 +152,11 @@
                   :dev-mode? (rt/dev-mode? rt)}]
         (rt/report rt {:type :test/starting
                        :build build})
-        (:exit @(proc/test! (b/script-dir build) rt))))))
+        (-> (b/checkout-dir build)
+            (u/abs-path-safe (b/script-dir build))
+            (proc/test! rt)
+            (deref)
+            :exit)))))
 
 (defn ^:deprecated list-builds [rt]
   (->> (http/get (apply format "%s/customer/%s/repo/%s/builds"

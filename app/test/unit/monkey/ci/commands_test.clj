@@ -175,7 +175,7 @@
                                  (future {:exit 0}))]
         (let [res (sut/run-tests {:args {:dir "test/dir"}})]
           (is (zero? res))
-          (is (= "test/dir" (:dir @inv)))
+          (is (cstr/ends-with? (:dir @inv) "test/dir"))
           (is (true? (:invoked? @inv))))))))
 
 (deftest list-builds
