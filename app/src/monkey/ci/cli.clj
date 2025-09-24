@@ -209,10 +209,18 @@
            :option "config-file"
            :short "c"
            :type :string
-           :multiple true}]
-   :subcommands [build-cmd
-                 internal-cmd
-                 admin-cmd]})
+           :multiple true}]})
+
+(def user-config
+  (assoc base-config
+         :subcommands [build-cmd
+                       ;; For backwards compatibility
+                       admin-cmd]))
+
+(def internal-config
+  (assoc base-config
+         :subcommands [internal-cmd
+                       admin-cmd]))
 
 (defn set-invoker
   "Updates the cli config to replace the `runs` config with the given invoker."
