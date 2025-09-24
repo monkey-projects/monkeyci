@@ -42,50 +42,6 @@
 
 (def rt->job-id (comp bc/job-id :job))
 
-(defn- maybe-set-git-opts
-  "If a git url is specified, updates the build with git information, taken from
-   the arguments and from runtime."
-  [build args]
-  (let [{:keys [git-url branch tag commit-id dir]} args]
-    (cond-> build
-      git-url (-> (assoc :git (-> {:url git-url
-                                   :branch (or branch "main")
-                                   :id commit-id}
-                                  (mc/assoc-some :tag tag)))
-                  ;; Overwrite script dir cause it will be calculated by the git checkout
-                  (assoc-in [:script :script-dir] dir)))))
-
-(defn- includes-build-id? [sid]
-  (= build-sid-length (count sid)))
-
-(defn local-build-id []
-  (str "local-build-" (System/currentTimeMillis)))
-
-(defn make-build-ctx
-  "Creates a build context that can be added to the runtime.  This is used when
-   running a build from cli."
-  [{:keys [args] :as config}]
-  (let [work-dir (:work-dir config)
-        orig-sid (or (some->> (:sid args)
-                              (sid/parse-sid)
-                              (take build-sid-length))
-                     (->> (account->sid config)
-                          (remove nil?)))
-        ;; Either generate a new build id, or use the one given
-        sid (sid/->sid (if (or (empty? orig-sid) (includes-build-id? orig-sid))
-                         orig-sid
-                         (concat orig-sid [(local-build-id)])))
-        id (or (last sid) (local-build-id))]
-    (maybe-set-git-opts
-     {:org-id (first sid)
-      :repo-id (second sid)
-      :build-id id
-      :checkout-dir work-dir
-      :script {:script-dir (u/abs-path work-dir (get args :dir default-script-dir))}
-      :pipeline (:pipeline args)
-      :sid sid}
-     args)))
-
 (def script "Gets script from the build"
   :script)
 
@@ -99,6 +55,22 @@
 (def ^:deprecated rt->script-dir
   "Gets script dir for the build from runtime"
   (comp script-dir rt/build))
+
+(defn- maybe-set-git-opts
+  "If a git url is specified, updates the build with git information, taken from
+   the arguments and from runtime."
+  [build args]
+  (let [{:keys [git-url branch tag commit-id dir]} args]
+    (cond-> build
+      git-url (-> (assoc :git (-> {:url git-url
+                                   :branch (or branch "main")
+                                   :id commit-id}
+                                  (mc/assoc-some :tag tag)))
+                  ;; Overwrite script dir cause it will be calculated by the git checkout
+                  (assoc-in [:script :script-dir] dir)))))
+
+(defn local-build-id []
+  (str "local-build-" (System/currentTimeMillis)))
 
 (defn- build-related-dir
   [base-dir-key rt build-id]

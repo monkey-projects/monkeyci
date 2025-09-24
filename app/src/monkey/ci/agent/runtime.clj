@@ -9,6 +9,7 @@
              [build :as b]
              [cache :as c]
              [edn :as edn]
+             [params :as params]
              [protocols :as p]
              [utils :as u]]
             [monkey.ci.agent
@@ -59,13 +60,8 @@
   (fn [sid]
     (assoc (:api config) :token (make-token (get-privkey config) sid))))
 
-(defrecord ApiBuildParams [api-maker]
-  p/BuildParams
-  (get-build-params [this build]
-    (bas/get-params-from-api (api-maker (b/sid build)) build)))
-
 (defn new-params [config]
-  (->ApiBuildParams (api-with-token-maker config)))
+  (params/->ApiBuildParams (comp (api-with-token-maker config) b/sid)))
 
 ;; TODO Move this implementation to api-server ns
 (defn new-ssh-keys-fetcher [config]

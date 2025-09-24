@@ -20,28 +20,27 @@
              :as :clojure)))
 
 (def api-middleware
-  [mw/wrap-method
-   mw/wrap-url
-   mw/wrap-oauth
-   mw/wrap-accept
-   mw/wrap-query-params
-   mw/wrap-content-type
-   mw/wrap-exceptions])
+  (conj mw/default-middleware
+        mw/wrap-exceptions))
+
+(defn api-request
+  "Sends a request to the api at configured url"
+  [{:keys [url token]} req]
+  (letfn [(build-request [req]
+            (assoc req
+                   :url (str url (:path req))
+                   :oauth-token token
+                   :middelware api-middleware))]
+    (-> req
+        (build-request)
+        (http/request))))
 
 (defn make-client
   "Creates a new api client function for the given url.  It returns a function
    that requires a request object that will send a http request.  The function 
    returns a deferred with the result body.  An authentication token is required."
   [url token]
-  (letfn [(build-request [req]
-            (assoc req
-                   :url (str url (:path req))
-                   :oauth-token token
-                   :middelware api-middleware))]
-    (fn [req]
-      (-> req
-          (build-request)
-          (http/request)))))
+  (partial api-request {:url url :token token}))
 
 (def ctx->api-client (comp :client :api))
 (def ^:deprecated rt->api-client ctx->api-client)

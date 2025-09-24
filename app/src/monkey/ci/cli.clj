@@ -78,18 +78,25 @@
 (def build-cmd
   {:command "build"
    :description "Build commands"
-   ;; :opts [{:option "server"
-   ;;         :short "s"
-   ;;         :as "Server URL"
-   ;;         :type :string}
-   ;;        {:as "Customer id"
-   ;;         :option "org-id"
-   ;;         :short "c"
-   ;;         :type :string}
-   ;;        {:as "Repository id"
-   ;;         :option "repo-id"
-   ;;         :short "r"
-   ;;         :type :string}]
+   :opts [{:as "API url"
+           :option "api"
+           :short "a"
+           :type :string
+           :env "MONKEYCI_API"
+           :default "https://api.monkeyci.com/v1"}
+          {:as "API key"
+           :option "api-key"
+           :short "k"
+           :type :string
+           :env "MONKEYCI_KEY"}
+          {:as "Organization id"
+           :option "org-id"
+           :short "o"
+           :type :string}
+          {:as "Repository id"
+           :option "repo-id"
+           :short "r"
+           :type :string}]
    :subcommands [run-build-cmd
                  verify-build-cmd
                  ;; Disabled until refactored
@@ -209,10 +216,18 @@
            :option "config-file"
            :short "c"
            :type :string
-           :multiple true}]
-   :subcommands [build-cmd
-                 internal-cmd
-                 admin-cmd]})
+           :multiple true}]})
+
+(def user-config
+  (assoc base-config
+         :subcommands [build-cmd
+                       ;; For backwards compatibility
+                       admin-cmd]))
+
+(def internal-config
+  (assoc base-config
+         :subcommands [internal-cmd
+                       admin-cmd]))
 
 (defn set-invoker
   "Updates the cli config to replace the `runs` config with the given invoker."

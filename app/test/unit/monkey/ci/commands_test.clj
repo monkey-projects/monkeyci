@@ -110,7 +110,14 @@
            (-> {:git-url "http://test-git-url"}
                (sut/args->build)
                :checkout-dir)
-           (System/getProperty "java.io.tmpdir")))))
+           (System/getProperty "java.io.tmpdir"))))
+
+  (testing "uses org and repo id from args"
+    (let [[org-id repo-id] (repeatedly cuid/random-cuid)
+          b (sut/args->build {:org-id org-id
+                              :repo-id repo-id})]
+      (is (= org-id (:org-id b)))
+      (is (= repo-id (:repo-id b))))))
 
 (deftest parse-params
   (testing "empty when empty input"
@@ -160,22 +167,22 @@
 
 (deftest verify-build
   (testing "zero when successful"
-    (is (zero? (sut/verify-build {:work-dir "examples"
-                                  :args {:dir "basic-clj"}}))))
+    (is (zero? (sut/verify-build {:args {:workdir "examples"
+                                         :dir "basic-clj"}}))))
   
   (testing "nonzero exit on failure"
     (is (not= 0 (sut/verify-build {})))))
 
 (deftest run-tests
-  (testing "runs test process with build"
+  (testing "runs test process with build script dir"
     (let [inv (atom nil)]
-      (with-redefs [proc/test! (fn [build _]
-                                 (reset! inv {:build build
+      (with-redefs [proc/test! (fn [dir _]
+                                 (reset! inv {:dir dir
                                               :invoked? true})
                                  (future {:exit 0}))]
-        (let [res (sut/run-tests {})]
+        (let [res (sut/run-tests {:args {:dir "test/dir"}})]
           (is (zero? res))
-          (is (some? (:build @inv)))
+          (is (cstr/ends-with? (:dir @inv) "test/dir"))
           (is (true? (:invoked? @inv))))))))
 
 (deftest list-builds

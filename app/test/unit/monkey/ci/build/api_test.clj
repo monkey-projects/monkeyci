@@ -38,6 +38,11 @@
                (:body @(client (sut/as-edn {:path "/test"
                                             :method :get}))))))
 
+      (testing "fails on invalid token"
+        (let [c (sut/make-client base-url "invalid-token")]
+          (is (thrown? Exception
+                       @(c {:path "/test" :method :get})))))
+
       (testing "can post events"
         (let [broker (emba/make-broker client nil)
               event {:type ::test-event :message "test event"}

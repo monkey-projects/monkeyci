@@ -12,6 +12,7 @@
              [artifacts :as a]
              [build :as b]
              [cache :as c]
+             [params :as params]
              [protocols :as p]]
             [monkey.ci.blob.disk :as blob]
             [monkey.ci.containers.podman :as cp]
@@ -64,14 +65,8 @@
 (defn- new-cache [conf]
   (blob-store (lc/get-cache-dir conf)))
 
-(defrecord FixedBuildParams [params]
-  p/BuildParams
-  (get-build-params [_ _]
-    (log/debug "Returning fixed build params:" (map :name params))
-    (md/success-deferred params)))
-
 (defn- new-params [conf]
-  (->FixedBuildParams (lc/get-params conf)))
+  (params/->FixedBuildParams (lc/get-params conf)))
 
 (defn- new-api-server []
   (rr/new-api-server {}))

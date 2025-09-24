@@ -96,10 +96,9 @@
 (defn args->build
   "Creates a build object from the command line args"
   [{:keys [workdir dir git-url commit-id branch tag] :as args}]
-  ;; TODO Merge this with build/make-build-ctx?
   (cond-> {:checkout-dir (args->checkout-dir args)
-           :org-id "local-cust"
-           :repo-id "local-repo"
+           :org-id (get args :org-id "local-cust")
+           :repo-id (get args :repo-id "local-repo")
            :build-id (b/local-build-id)
            :dek (codecs/bytes->b64-str (v/generate-key))}
     git-url (assoc-in [:git :url] git-url)
@@ -131,7 +130,11 @@
   [conf]
   (ra/with-cli-runtime conf
     (fn [rt]
-      (let [res (script/verify (get-in rt [:build :script :script-dir]))]
+      (let [build (args->build (:args conf))
+            d (b/checkout-dir build)
+            res (->> (b/script-dir build)
+                     (u/abs-path-safe d)
+                     (script/verify))]
         (rt/report rt {:type :verify/result :result res})
         (if (->> res
                  (map :result)
@@ -144,9 +147,16 @@
   [conf]
   (ra/with-cli-runtime conf
     (fn [rt]
-      (rt/report rt {:type :test/starting
-                     :build (:build rt)})
-      (:exit @(proc/test! (:build rt) rt)))))
+      (let [build (args->build (:args conf))
+            opts {:watch? (true? (get-in conf [:args :watch]))
+                  :dev-mode? (rt/dev-mode? rt)}]
+        (rt/report rt {:type :test/starting
+                       :build build})
+        (-> (b/checkout-dir build)
+            (u/abs-path-safe (b/script-dir build))
+            (proc/test! rt)
+            (deref)
+            :exit)))))
 
 (defn ^:deprecated list-builds [rt]
   (->> (http/get (apply format "%s/customer/%s/repo/%s/builds"

@@ -109,25 +109,26 @@
     
     (testing "retrieves from remote api"
       ;; Requests look different because of applied middleware
-      (at/with-fake-http [{:request-url (format "http://test-api/org/%s/repo/%s/param" (:id org) (:id repo))
-                           :request-method :get}
+      (at/with-fake-http [{:url (format "http://test-api/org/%s/repo/%s/param"
+                                        (:id org) (:id repo))
+                           :method :get}
                           {:status 200
-                           :body (pr-str param-values)
+                           :body param-values
                            :headers {"Content-Type" "application/edn"}}]
         (is (= param-values
-               (-> (sut/get-params-from-api {:url "http://test-api"
-                                             :token "test-token"}
-                                            build)
+               (-> {:url "http://test-api"
+                    :token "test-token"}
+                   (sut/get-params-from-api build)
                    deref)))))))
 
 (deftest decrypt-key-from-api
   (testing "invokes endpoint on general api"
     (let [org (h/gen-org)]
-      (at/with-fake-http [{:request-url
+      (at/with-fake-http [{:url
                            (format "http://test-api/org/%s/crypto/decrypt-key" (:id org))
-                           :request-method :post}
+                           :method :post}
                           {:status 200
-                           :body (pr-str {:key "decrypted-key"})
+                           :body {:key "decrypted-key"}
                            :headers {"Content-Type" "application/edn"}}]
         (is (= "decrypted-key"
                @(sut/decrypt-key-from-api {:url "http://test-api"
