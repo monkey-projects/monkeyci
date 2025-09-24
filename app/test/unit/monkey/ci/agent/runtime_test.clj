@@ -117,13 +117,13 @@
                          :sub
                          (sid/parse-sid)))))))))
 
-(deftest build-key-decripter
+(deftest build-key-decrypter
   (testing "decrypts from global api"
     (ta/with-fake-http
         ["http://test-api/org/test-org/crypto/decrypt-key"
          (fn [req]
            {:status 200
-            :body (pr-str {:key "decrypted-key"})})]
+            :body {:key "decrypted-key"}})]
       (let [build (-> (h/gen-build)
                       (assoc :org-id "test-org"))
             d (sut/new-build-key-decrypter
@@ -137,7 +137,7 @@
         ["http://test-api/org/test-org/crypto/decrypt-key"
          (fn [req]
            {:status 200
-            :body (pr-str {:key "decrypted-key"})})]
+            :body {:key "decrypted-key"}})]
       (let [org-id "test-org"
             d (sut/new-container-key-decrypter
                {:api {:url "http://test-api"}
