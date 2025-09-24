@@ -89,7 +89,21 @@
                        (-> (run-cli "build" "run"
                                     "--param-file" "params.yml"
                                     "--param-file" "params.edn")
-                           (get-in [:args :param-file]))))))
+                           (get-in [:args :param-file])))))
+
+              (testing "accepts api url"
+                (is (= "http://test"
+                       (-> (run-cli "build"
+                                    "--api" "http://test"
+                                    "run")
+                           (get-in [:args :api])))))
+
+              (testing "accepts api key"
+                (is (= "test-key"
+                       (-> (run-cli "build"
+                                    "--api-key" "test-key"
+                                    "run")
+                           (get-in [:args :api-key]))))))
             
             #_(testing "`watch` subcommand"
                 (testing "runs `watch` command"

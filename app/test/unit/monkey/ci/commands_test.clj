@@ -160,22 +160,22 @@
 
 (deftest verify-build
   (testing "zero when successful"
-    (is (zero? (sut/verify-build {:work-dir "examples"
-                                  :args {:dir "basic-clj"}}))))
+    (is (zero? (sut/verify-build {:args {:workdir "examples"
+                                         :dir "basic-clj"}}))))
   
   (testing "nonzero exit on failure"
     (is (not= 0 (sut/verify-build {})))))
 
 (deftest run-tests
-  (testing "runs test process with build"
+  (testing "runs test process with build script dir"
     (let [inv (atom nil)]
-      (with-redefs [proc/test! (fn [build _]
-                                 (reset! inv {:build build
+      (with-redefs [proc/test! (fn [dir _]
+                                 (reset! inv {:dir dir
                                               :invoked? true})
                                  (future {:exit 0}))]
-        (let [res (sut/run-tests {})]
+        (let [res (sut/run-tests {:args {:dir "test/dir"}})]
           (is (zero? res))
-          (is (some? (:build @inv)))
+          (is (= "test/dir" (:dir @inv)))
           (is (true? (:invoked? @inv))))))))
 
 (deftest list-builds

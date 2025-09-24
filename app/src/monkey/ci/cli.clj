@@ -90,6 +90,17 @@
    ;;         :option "repo-id"
    ;;         :short "r"
    ;;         :type :string}]
+   :opts [{:as "API url"
+           :option "api"
+           :short "a"
+           :type :string
+           :env "MONKEYCI_API"
+           :default "https://api.monkeyci.com/v1"}
+          {:as "API key"
+           :option "api-key"
+           :short "k"
+           :type :string
+           :env "MONKEYCI_KEY"}]
    :subcommands [run-build-cmd
                  verify-build-cmd
                  ;; Disabled until refactored

@@ -8,5 +8,3 @@
                   cli-matic.platform/exit-script (constantly :exit)]
       (testing "runs cli"
         (is (= :exit (sut/-main "-?")))))))
-
-

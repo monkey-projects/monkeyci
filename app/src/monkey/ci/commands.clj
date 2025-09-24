@@ -126,12 +126,20 @@
     (lr/start-and-post conf (ec/make-event :build/pending
                                            :build build))))
 
+(defn- abs-path [a b]
+  (when (and a b)
+    (u/abs-path a b)))
+
 (defn verify-build
   "Runs a linter on the build script to catch any grammatical errors."
   [conf]
   (ra/with-cli-runtime conf
     (fn [rt]
-      (let [res (script/verify (get-in rt [:build :script :script-dir]))]
+      (let [{d :checkout-dir :as build} (args->build (:args conf))
+            res (cond->> build
+                  true (b/script-dir)
+                  d (abs-path d)
+                  true (script/verify))]
         (rt/report rt {:type :verify/result :result res})
         (if (->> res
                  (map :result)
@@ -144,9 +152,12 @@
   [conf]
   (ra/with-cli-runtime conf
     (fn [rt]
-      (rt/report rt {:type :test/starting
-                     :build (:build rt)})
-      (:exit @(proc/test! (:build rt) rt)))))
+      (let [build (args->build (:args conf))
+            opts {:watch? (true? (get-in conf [:args :watch]))
+                  :dev-mode? (rt/dev-mode? rt)}]
+        (rt/report rt {:type :test/starting
+                       :build build})
+        (:exit @(proc/test! (b/script-dir build) rt))))))
 
 (defn ^:deprecated list-builds [rt]
   (->> (http/get (apply format "%s/customer/%s/repo/%s/builds"

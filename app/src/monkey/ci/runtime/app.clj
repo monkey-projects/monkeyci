@@ -308,18 +308,14 @@
 (defn with-server-system [config f]
   (rc/with-system (make-server-system config) f))
 
-(defn- new-cli-build [conf]
-  (b/make-build-ctx conf))
-
 (defn make-cli-system
   "Creates a component system that can be used by CLI commands"
   [config]
   (co/system-map
    :runtime (co/using
              {:config config}
-             [:build :reporter])
-   :reporter (new-reporter config)
-   :build (new-cli-build config)))
+             [:reporter])
+   :reporter (new-reporter config)))
 
 (defn with-cli-runtime [config f]
   (rc/with-runtime (make-cli-system config) f))
