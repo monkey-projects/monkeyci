@@ -7,7 +7,9 @@
             [monkey.ci.entities
              [core :as ec]
              [org :as ecu]]
-            [monkey.ci.spec.entities]
+            [monkey.ci.spec
+             [db-entities]
+             [entities]]
             [monkey.ci.storage.sql
              [common :as sc]
              [repo :as sr]]))

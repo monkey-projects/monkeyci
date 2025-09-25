@@ -6,7 +6,9 @@
              [core :as ec]
              [repo :as er]]
             [monkey.ci.labels :as lbl]
-            [monkey.ci.spec.entities]
+            [monkey.ci.spec
+             [db-entities]
+             [entities]]
             [monkey.ci.storage.sql.common :as sc]))
 
 (defn repo->db
