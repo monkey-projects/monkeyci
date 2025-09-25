@@ -106,6 +106,15 @@
                :account
                (select-keys [:org-id :repo-id])))))
 
+  (testing "does not clear existing account settings"
+    (with-home-config
+      {:account {:org-id "test-customer"}}
+      #(is (= {:org-id "test-customer"
+               :repo-id "arg-repo"}
+              (-> (sut/app-config {} {:repo-id "arg-repo"})
+                  :account
+                  (select-keys [:org-id :repo-id]))))))
+
   (testing "uses `api` arg as account url"
     (is (= "http://test"
            (-> (sut/app-config {} {:api "http://test"})

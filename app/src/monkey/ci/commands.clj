@@ -99,7 +99,7 @@
   (cond-> {:checkout-dir (some-> wd
                                  (fs/canonicalize)
                                  str)
-           :org-id (get-in config [:account :org-id] "local-cust")
+           :org-id (get-in config [:account :org-id] "local-org")
            :repo-id (get-in config [:account :repo-id] "local-repo")
            :build-id (b/local-build-id)
            :dek (codecs/bytes->b64-str (v/generate-key))}

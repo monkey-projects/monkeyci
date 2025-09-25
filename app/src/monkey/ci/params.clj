@@ -21,6 +21,8 @@
 (defrecord CliBuildParams [config]
   p/BuildParams
   (get-build-params [this build]
+    (log/debug "Fetching build params from global api using url:" (:url config))
+    (log/debug "Build sid:" (select-keys build [:org-id :repo-id]))
     (-> (select-keys config [:url])
         (ba/api-request (ba/as-edn
                          {:path (format "/org/%s/repo/%s/param"
@@ -37,4 +39,4 @@
      (->> sources
           (map #(p/get-build-params % b))
           (apply md/zip))
-     (partial apply merge))))
+     (partial apply concat))))

@@ -30,10 +30,17 @@
             (assoc req
                    :url (str url (:path req))
                    :oauth-token token
-                   :middelware api-middleware))]
+                   :middelware api-middleware))
+          (handle-error [ex]
+            (throw (ex-info
+                    (ex-message ex)
+                    (-> (ex-data ex)
+                        ;; Read the response body in case of error
+                        (mc/update-existing :body bs/to-string)))))]
     (-> req
         (build-request)
-        (http/request))))
+        (http/request)
+        (md/catch handle-error))))
 
 (defn make-client
   "Creates a new api client function for the given url.  It returns a function

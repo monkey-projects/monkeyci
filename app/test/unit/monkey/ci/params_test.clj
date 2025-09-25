@@ -19,12 +19,13 @@
 
 (deftest multi-build-params
   (testing "combines multiple sources"
-    (let [s1 (sut/->FixedBuildParams {"first" "first value"
-                                      "second" "second value"})
-          s2 (sut/->FixedBuildParams {"third" "third value"
-                                      "second" "updated value"})
+    (let [s1 (sut/->FixedBuildParams [{:name "first" :value "first value"}
+                                      {:name "second" :value "second value"}])
+          s2 (sut/->FixedBuildParams [{:name "third" :value "third value"}
+                                      {:name "second" :value "updated value"}])
           v (sut/->MultiBuildParams [s1 s2])]
-      (is (= {"first" "first value"
-              "second" "updated value"
-              "third" "third value"}
+      (is (= [{:name "first" :value "first value"}
+              {:name "second" :value "second value"}
+              {:name "third" :value "third value"}
+              {:name "second" :value "updated value"}]
              @(p/get-build-params v {}))))))

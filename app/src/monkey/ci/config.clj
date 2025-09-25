@@ -79,6 +79,7 @@
   [extra-files env]
   (-> (mapv load-config-file (concat [*global-config-file*
                                       *home-config-file*]
+                                     ;; TODO Also read config from script dir
                                      extra-files))
       (conj (load-config-env (:monkeyci-config env)))
       (merge-configs)
@@ -99,7 +100,7 @@
                           (mc/assoc-some :url (:api args)
                                          :token (:api-key args)))]
               (cond-> x
-                (not-empty acc) (assoc :account acc))))
+                (not-empty acc) (update :account merge acc))))
           (do-apply [conf f]
             (f conf))]
     (let [cli-args [http-port
