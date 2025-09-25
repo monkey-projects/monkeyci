@@ -93,31 +93,32 @@
                  str)
         cwd)))
 
-(defn args->build
-  "Creates a build object from the command line args"
-  [{:keys [workdir dir git-url commit-id branch tag] :as args}]
-  (cond-> {:checkout-dir (args->checkout-dir args)
-           :org-id (get args :org-id "local-cust")
-           :repo-id (get args :repo-id "local-repo")
+(defn config->build
+  "Creates a build object from the command line args or global config"
+  [{{:keys [dir git-url commit-id branch tag] :as args} :args wd :work-dir :as config}]
+  (cond-> {:checkout-dir (some-> wd
+                                 (fs/canonicalize)
+                                 str)
+           :org-id (get-in config [:account :org-id] "local-cust")
+           :repo-id (get-in config [:account :repo-id] "local-repo")
            :build-id (b/local-build-id)
            :dek (codecs/bytes->b64-str (v/generate-key))}
     git-url (assoc-in [:git :url] git-url)
     commit-id (assoc-in [:git :ref] commit-id)
     branch (assoc-in [:git :branch] branch)
     tag (assoc-in [:git :tag] tag)
-    (and git-url workdir) (assoc-in [:git :dir] workdir)
+    (and git-url wd) (assoc-in [:git :dir] wd)
     dir (b/set-script-dir dir)))
 
 (defn cli->rt-conf
-  "Creates runtime configuration from the cli options"
+  "Creates runtime configuration from the cli options or configuration."
   [{:keys [args] :as opts}]
   ;; Allow mailman override for testing
   (-> (select-keys opts [:mailman :lib-coords :log-opts :podman])
-      (lc/set-build (args->build args))
+      (lc/set-build (config->build opts))
       (lc/set-params (concat (parse-params (:param args))
                              (load-param-files (:param-file args))))
-      (lc/set-global-api {:url (:api args)
-                          :token (:api-key args)})))
+      (lc/set-global-api (select-keys (:account opts) [:url :token]))))
 
 (defn run-build-local
   "Run a build locally, normally from local source but can also be from a git checkout.
@@ -137,7 +138,7 @@
   [conf]
   (ra/with-cli-runtime conf
     (fn [rt]
-      (let [build (args->build (:args conf))
+      (let [build (config->build conf)
             d (b/checkout-dir build)
             res (->> (b/script-dir build)
                      (u/abs-path-safe d)
@@ -154,7 +155,7 @@
   [conf]
   (ra/with-cli-runtime conf
     (fn [rt]
-      (let [build (args->build (:args conf))
+      (let [build (config->build conf)
             opts {:watch? (true? (get-in conf [:args :watch]))
                   :dev-mode? (rt/dev-mode? rt)}]
         (rt/report rt {:type :test/starting

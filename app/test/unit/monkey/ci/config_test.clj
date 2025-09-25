@@ -106,11 +106,17 @@
                :account
                (select-keys [:org-id :repo-id])))))
 
-  (testing "uses `server` arg as account url"
+  (testing "uses `api` arg as account url"
     (is (= "http://test"
-           (-> (sut/app-config {} {:server "http://test"})
+           (-> (sut/app-config {} {:api "http://test"})
                :account
                :url))))
+
+  (testing "reads api key from args"
+    (is (= "test-token"
+           (-> (sut/app-config {} {:api-key "test-token"})
+               :account
+               :token))))
 
   (testing "oci"
     (testing "keeps credentials from config file"

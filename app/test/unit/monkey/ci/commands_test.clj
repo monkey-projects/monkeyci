@@ -3,7 +3,6 @@
             [babashka.fs :as fs]
             [clj-commons.byte-streams :as bs]
             [clojure.spec.alpha :as spec]
-            [clojure.string :as cstr]
             [clojure.test :refer [deftest is testing]]
             [manifold.deferred :as md]
             [monkey.ci
@@ -41,14 +40,14 @@
 
   (let [broker (tm/test-component)]
     (is (md/deferred? (sut/run-build-local {:mailman broker
-                                            :args {:workdir "/test/dir"
-                                                   :dir ".script"}})))
+                                            :work-dir "/test/dir"
+                                            :args {:dir ".script"}})))
     (let [build (-> broker
                     :broker
                     (tm/get-posted)
                     first
                     :build)]
-      (testing "passes `workdir` as checkout dir and `dir` as script dir"
+      (testing "passes `work-dir` as checkout dir and `dir` as script dir"
         (is (= "/test/dir" (:checkout-dir build)))
         (is (= ".script" (-> build
                              :script
@@ -57,66 +56,53 @@
       (testing "creates local data encryption key for build"
         (is (wc/b64-dek? (:dek build)))))))
 
-(deftest args->build
+(deftest config->build
   (testing "uses workdir as checkout dir"
     (is (= "/test-wd"
-           (-> {:workdir "/test-wd"}
-               (sut/args->build)
-               :checkout-dir))))
-
-  (testing "when no workdir, uses current dir as checkout dir"
-    (is (= (u/cwd)
-           (-> {}
-               (sut/args->build)
+           (-> {:work-dir "/test-wd"}
+               (sut/config->build)
                :checkout-dir))))
 
   (testing "contains git url"
     (is (= "http://git-url"
-           (-> {:git-url "http://git-url"}
-               (sut/args->build)
+           (-> {:args {:git-url "http://git-url"}}
+               (sut/config->build)
                :git
                :url))))
 
   (testing "contains commit id as ref"
     (is (= "test-ref"
-           (-> {:commit-id "test-ref"}
-               (sut/args->build)
+           (-> {:args {:commit-id "test-ref"}}
+               (sut/config->build)
                :git
                :ref))))
 
   (testing "contains branch"
     (is (= "test-ref"
-           (-> {:branch "test-ref"}
-               (sut/args->build)
+           (-> {:args {:branch "test-ref"}}
+               (sut/config->build)
                :git
                :branch))))
 
   (testing "contains tag"
     (is (= "test-ref"
-           (-> {:tag "test-ref"}
-               (sut/args->build)
+           (-> {:args {:tag "test-ref"}}
+               (sut/config->build)
                :git
                :tag))))
 
   (testing "sets workdir as git checkout dir"
     (is (= "/test/wd"
-           (-> {:workdir "/test/wd"
-                :git-url "http://test-url"}
-               (sut/args->build)
+           (-> {:work-dir "/test/wd"
+                :args {:git-url "http://test-url"}}
+               (sut/config->build)
                :git
                :dir))))
 
-  #_(testing "when running from git url, uses temp dir as checkout dir"
-      (is (cstr/starts-with?
-           (-> {:git-url "http://test-git-url"}
-               (sut/args->build)
-               :checkout-dir)
-           (System/getProperty "java.io.tmpdir"))))
-
-  (testing "uses org and repo id from args"
+  (testing "uses org and repo id from account"
     (let [[org-id repo-id] (repeatedly cuid/random-cuid)
-          b (sut/args->build {:org-id org-id
-                              :repo-id repo-id})]
+          b (sut/config->build {:account {:org-id org-id
+                                          :repo-id repo-id}})]
       (is (= org-id (:org-id b)))
       (is (= repo-id (:repo-id b))))))
 
@@ -134,8 +120,8 @@
   (testing "configures global api"
     (is (= {:url "http://test"
             :token "test-token"}
-           (-> {:args {:api "http://test"
-                       :api-key "test-token"}}
+           (-> {:account {:url "http://test"
+                          :token "test-token"}}
                (sut/cli->rt-conf)
                (lc/get-global-api))))))
 
@@ -187,8 +173,8 @@
 
 (deftest verify-build
   (testing "zero when successful"
-    (is (zero? (sut/verify-build {:args {:workdir "examples"
-                                         :dir "basic-clj"}}))))
+    (is (zero? (sut/verify-build {:work-dir "examples"
+                                  :args {:dir "basic-clj"}}))))
   
   (testing "nonzero exit on failure"
     (is (not= 0 (sut/verify-build {})))))
@@ -200,9 +186,10 @@
                                  (reset! inv {:dir dir
                                               :invoked? true})
                                  (future {:exit 0}))]
-        (let [res (sut/run-tests {:args {:dir "test/dir"}})]
+        (let [res (sut/run-tests {:work-dir "/tmp"
+                                  :args {:dir "test/dir"}})]
           (is (zero? res))
-          (is (cstr/ends-with? (:dir @inv) "test/dir"))
+          (is (= "/tmp/test/dir" (:dir @inv)))
           (is (true? (:invoked? @inv))))))))
 
 (deftest list-builds
