@@ -80,8 +80,9 @@
 
 (defn get-params-from-api [api build]
   (md/chain
-   (ba/api-request api {:path (format "/org/%s/repo/%s/param" (:org-id build) (:repo-id build))
-                        :method :get})
+   (ba/api-request api (ba/as-edn
+                        {:path (format "/org/%s/repo/%s/param" (:org-id build) (:repo-id build))
+                         :method :get}))
    :body))
 
 (defn decrypt-key-from-api [api org-id enc-key]
