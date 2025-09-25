@@ -124,3 +124,15 @@
                       (spit "test file"))))
         (is (some? (p/restore-blob ws "test-src" dest)))
         (is (= "test file" (slurp (fs/file (fs/path dest "test.txt")))))))))
+
+(deftest new-params
+  (testing "fixed params when no api key configured"
+    (is (instance? monkey.ci.params.FixedBuildParams
+                   (sut/new-params {}))))
+
+  (testing "combined params when api key configured"
+    (is (instance? monkey.ci.params.MultiBuildParams
+                   (-> {}
+                       (lc/set-global-api {:url "http://test"
+                                           :token "test-token"})
+                       (sut/new-params))))))

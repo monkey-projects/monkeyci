@@ -46,10 +46,15 @@
 (defn set-ending [conf r]
   (assoc conf :ending r))
 
-(def get-api :api)
+(def get-api "Configuration to access build api" :api)
 
 (defn set-api [conf api]
   (assoc conf :api api))
+
+(def get-global-api "Configuration to access global api" :global-api)
+
+(defn set-global-api [conf api]
+  (assoc conf :global-api api))
 
 (defn get-lib-coords [ctx]
   (get ctx :lib-coords {:mvn/version (v/version)}))

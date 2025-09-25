@@ -108,19 +108,26 @@
     (and git-url workdir) (assoc-in [:git :dir] workdir)
     dir (b/set-script-dir dir)))
 
+(defn cli->rt-conf
+  "Creates runtime configuration from the cli options"
+  [{:keys [args] :as opts}]
+  ;; Allow mailman override for testing
+  (-> (select-keys opts [:mailman :lib-coords :log-opts :podman])
+      (lc/set-build (args->build args))
+      (lc/set-params (concat (parse-params (:param args))
+                             (load-param-files (:param-file args))))
+      (lc/set-global-api {:url (:api args)
+                          :token (:api-key args)})))
+
 (defn run-build-local
   "Run a build locally, normally from local source but can also be from a git checkout.
    Returns a deferred that will hold zero if the build succeeds, nonzero if it fails."
   [{:keys [args] :as config}]
   (let [wd (fs/create-temp-dir)
-        build (args->build args)
-        ;; Allow mailman override for testing
-        conf (-> (select-keys config [:mailman :lib-coords :log-config :podman])
-                 (lc/set-work-dir wd)
-                 (lc/set-build build)
-                 (lc/set-params (concat (parse-params (get-in config [:args :param]))
-                                        (load-param-files (get-in config [:args :param-file])))))]
-    (log/info "Running local build for src at:" (:checkout-dir build))
+        conf (-> (cli->rt-conf config)
+                 (lc/set-work-dir wd))
+        build (lc/get-build conf)]
+    (log/info "Running local build for src at:" (b/checkout-dir build))
     (log/debug "Using working directory" (str wd))
     (lr/start-and-post conf (ec/make-event :build/pending
                                            :build build))))

@@ -21,11 +21,20 @@
 (defrecord CliBuildParams [config]
   p/BuildParams
   (get-build-params [this build]
-    (-> {:url (:api config)}
+    (-> (select-keys config [:url])
         (ba/api-request (ba/as-edn
                          {:path (format "/org/%s/repo/%s/param"
                                         (:org-id build)
                                         (:repo-id build))
-                          :headers {"authorization" (str "Token " (:api-key config))}
+                          :headers {"authorization" (str "Token " (:token config))}
                           :method :get}))
         (md/chain :body))))
+
+(defrecord MultiBuildParams [sources]
+  p/BuildParams
+  (get-build-params [_ b]
+    (md/chain
+     (->> sources
+          (map #(p/get-build-params % b))
+          (apply md/zip))
+     (partial apply merge))))

@@ -65,8 +65,12 @@
 (defn- new-cache [conf]
   (blob-store (lc/get-cache-dir conf)))
 
-(defn- new-params [conf]
-  (params/->FixedBuildParams (lc/get-params conf)))
+(defn new-params [conf]
+  (let [global (lc/get-global-api conf)
+        p (params/->FixedBuildParams (lc/get-params conf))]
+    (if (not-empty (:token global))
+      (params/->MultiBuildParams [(params/->CliBuildParams global) p])
+      p)))
 
 (defn- new-api-server []
   (rr/new-api-server {}))

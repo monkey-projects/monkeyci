@@ -13,6 +13,7 @@
              [pem :as pem]
              [process :as proc]
              [utils :as u]]
+            [monkey.ci.local.config :as lc]
             [monkey.ci.runners.controller :as rc]
             [monkey.ci.sidecar
              [config :as cs]
@@ -118,6 +119,25 @@
                               :repo-id repo-id})]
       (is (= org-id (:org-id b)))
       (is (= repo-id (:repo-id b))))))
+
+(deftest cli->rt-conf
+  (testing "adds params from args"
+    (is (= [{:name "key" :value "value"}]
+           (-> {:args {:param ["key=value"]}}
+               (sut/cli->rt-conf)
+               (lc/get-params)))))
+
+  (testing "adds build"
+    (is (some? (-> (sut/cli->rt-conf {})
+                   (lc/get-build)))))
+
+  (testing "configures global api"
+    (is (= {:url "http://test"
+            :token "test-token"}
+           (-> {:args {:api "http://test"
+                       :api-key "test-token"}}
+               (sut/cli->rt-conf)
+               (lc/get-global-api))))))
 
 (deftest parse-params
   (testing "empty when empty input"
