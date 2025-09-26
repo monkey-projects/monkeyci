@@ -79,7 +79,6 @@
   [extra-files env]
   (-> (mapv load-config-file (concat [*global-config-file*
                                       *home-config-file*]
-                                     ;; TODO Also read config from script dir
                                      extra-files))
       (conj (load-config-env (:monkeyci-config env)))
       (merge-configs)

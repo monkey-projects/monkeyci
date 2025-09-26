@@ -118,7 +118,8 @@
       (lc/set-build (config->build opts))
       (lc/set-params (concat (parse-params (:param args))
                              (load-param-files (:param-file args))))
-      (lc/set-global-api (select-keys (:account opts) [:url :token]))))
+      (lc/set-global-api (-> (select-keys (:account opts) [:url :token])
+                             (update :url #(or % "https://api.monkeyci.com/v1"))))))
 
 (defn run-build-local
   "Run a build locally, normally from local source but can also be from a git checkout.
