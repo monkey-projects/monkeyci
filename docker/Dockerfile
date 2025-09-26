@@ -1,4 +1,4 @@
-FROM docker.io/clojure:temurin-23-tools-deps-bullseye-slim
+FROM docker.io/clojure:temurin-24-tools-deps-trixie-slim
 
 # We'll run the whole thing as non-root user
 RUN adduser --system --uid 1000 --shell /bin/bash --disabled-password monkeyci
