@@ -1,6 +1,8 @@
 {:deps {binaryage/oops {:mvn/version "0.7.2"}
         day8.re-frame/http-fx {:mvn/version "0.2.4"}
         com.github.oliyh/martian-re-frame {:mvn/version "0.1.33"}
+        ;; TODO Actual mvn version, deploy for releases
+        com.monkeyci/common {:local/root "../common"}
         com.monkeyci/site-template {:mvn/version "0.2.4-SNAPSHOT"}
         medley/medley {:mvn/version "1.4.0"}
         metosin/reitit-frontend {:mvn/version "0.9.1"}

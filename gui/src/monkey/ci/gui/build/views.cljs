@@ -118,7 +118,6 @@
 
 (defn- build-jobs []
   (let [jobs (rf/subscribe [:build/jobs])]
-    (println "Jobs:" (str @jobs))
     (cond
       (nil? @jobs)
       [:p "Waiting for the build jobs to be loaded..."]

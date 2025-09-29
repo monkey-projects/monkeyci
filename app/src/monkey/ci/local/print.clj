@@ -49,7 +49,6 @@
   "Prints to console"
   [msgs]
   (doseq [m (remove nil? msgs)]
-    ;; TODO Ansi coloring
     (println (cl/style (str "[" (jt/format time-format (jt/local-date-time)) "]") :green)
              (apply-styles (:message m)))))
 
