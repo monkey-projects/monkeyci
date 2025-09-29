@@ -153,4 +153,7 @@
           (is (contains? ids "publish-gui-img-amd")))
 
         (testing "contains gui img manifest job"
-          (is (contains? ids "gui-img-manifest")))))))
+          (is (contains? ids "gui-img-manifest")))
+
+        (testing "contains common publish job"
+          (is (contains? ids "publish-common")))))))

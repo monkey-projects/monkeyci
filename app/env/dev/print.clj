@@ -125,8 +125,8 @@
                 :running 0.5
                 :pending 0}]
     (str "  " white id (apply str (repeat (- po (count id) 2) " "))
-         (fancy-progress-bar (merge {:width pw :value (get values status)}
-                                    (get colors status)))
+         (fancy-progress-bar {:width pw :value (get values status)
+                              :fg 75 :bg nil})
          " " (get msgs status)
          c/reset)))
 

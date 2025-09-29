@@ -1,1 +1,17 @@
-{:paths ["src"]}
+{:paths ["src"]
+
+ :aliases
+ ;; clj -X:test
+ {:test
+  {:extra-paths [:test-paths]
+   :extra-deps {com.monkeyprojects/build {:mvn/version "0.3.1"}}
+   :exec-fn monkey.test/all}
+
+  ;; clj -M:test:junit
+  :junit
+  {:exec-fn monkey.test/junit}
+
+  :watch
+  ;; clj -X:test:watch
+  {:extra-deps {org.clojure/tools.namespace {:mvn/version "1.5.0"}}
+   :exec-fn monkey.test/watch}}}
