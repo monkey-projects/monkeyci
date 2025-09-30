@@ -163,7 +163,7 @@
                        :build build})
         (-> (b/checkout-dir build)
             (u/abs-path-safe (b/script-dir build))
-            (proc/test! rt)
+            (proc/test! opts)
             (deref)
             :exit)))))
 
