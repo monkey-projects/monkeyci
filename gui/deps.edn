@@ -1,9 +1,8 @@
 {:deps {binaryage/oops {:mvn/version "0.7.2"}
         day8.re-frame/http-fx {:mvn/version "0.2.4"}
         com.github.oliyh/martian-re-frame {:mvn/version "0.1.33"}
-        ;; TODO Actual mvn version, deploy for releases
-        com.monkeyci/common {:local/root "../common"}
-        com.monkeyci/site-template {:mvn/version "0.2.4-SNAPSHOT"}
+        com.monkeyci/common {:mvn/version "0.20.2-SNAPSHOT"}
+        com.monkeyci/site-template {:mvn/version "0.2.4"}
         medley/medley {:mvn/version "1.4.0"}
         metosin/reitit-frontend {:mvn/version "0.9.1"}
         org.clojure/core.async {:mvn/version "1.8.741"}
@@ -15,7 +14,8 @@
 
  :aliases
  {:dev
-  {:extra-paths ["env/dev"]}
+  {:extra-paths ["env/dev"]
+   :override-deps {com.monkeyci/common {:local/root "../common"}}}
 
   :test
   {:extra-paths ["test"]
@@ -23,7 +23,8 @@
                 lambdaisland/kaocha-cljs2 {:mvn/version "0.2.72"}
                 day8.re-frame/test {:mvn/version "0.1.5"}
                 devcards/devcards {:mvn/version "0.2.7"}
-                com.monkeyprojects/shadow-junit-xml {:mvn/version "0.2.0"}}}
+                com.monkeyprojects/shadow-junit-xml {:mvn/version "0.2.0"}}
+   :override-deps {com.monkeyci/common {:local/root "../common"}}}
 
   :test/clj
   {:extra-deps {com.monkeyprojects/build {:mvn/version "0.3.1"}}

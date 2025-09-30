@@ -28,3 +28,22 @@
         (is (some? (sut/render-next {:renderer (constantly [["test"] {}])
                                      :prev ["first" "second"]})))
         (is (.startsWith (.toString w) "\033[2A"))))))
+
+(deftest progress-bar
+  (testing "returns string of full width"
+    (let [s (sut/progress-bar {:width 10 :value 0.5})]
+      (is (string? s))
+      (is (= 10 (count s)))))
+
+  (testing "fills up to given value"
+    (is (= "=====     "
+           (sut/progress-bar {:width 10
+                              :value 0.5
+                              :filled-char \=}))))
+
+  (testing "starts at given point"
+    (is (= "  =====   "
+           (sut/progress-bar {:width 10
+                              :value 0.7
+                              :start 0.2
+                              :filled-char \=})))))

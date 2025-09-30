@@ -57,6 +57,14 @@
   [& parts]
   (str (apply ctrl-code parts) "m"))
 
+(def invert
+  "Invert fore and bg colors"
+  (font-code 7))
+
+(def revert
+  "Switch back fore and bg colors"
+  (font-code 27))
+
 (defn color-256
   "Ansi control codes for 256 color code, with optional background color"
   [fg & [bg]]
@@ -100,3 +108,27 @@
     {:prev lines
      :state upd
      :renderer renderer}))
+
+(defn progress-bar
+  "Creates progress bar of given width (chars) with given value filled.  If
+   `decimal-fill` is specified, it is used to determine the char when a
+   place is only partially filled.  Returns a string that can be printed
+   to console."
+  [{w :width p :value f :filled-char u :unfilled-char dp :decimal-fill
+    s :start
+    :or {f \u2588 u \space s 0}}]
+  (let [ev (int (* w p))
+        sv (int (* w s))
+        de (- (* w p) ev)
+        ds (- (* w s) sv)
+        r (cond-> (- w ev)
+            (and dp (pos? de)) dec)]
+    (apply str (->> (concat (repeat sv u)
+                            ;; Reverting colors does not look good
+                            #_(when (and (pos? ds) dp)
+                                [(str c/invert (dp (- 1 ds)) c/revert)])
+                            (repeat (- ev sv) f)
+                            (when (and (pos? de) dp)
+                              [(dp de)])
+                            (repeat r u))
+                    (remove nil?)))))

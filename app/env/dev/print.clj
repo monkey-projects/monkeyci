@@ -86,28 +86,27 @@
   [v]
   (char (- 0x258f (int (* v 8)))))
 
-(defn progress-bar
-  "Draws progress bar of given width (chars) with percentage filled"
-  [w p]
-  (let [f "\u2588"
-        u #_"\u2591" " "
-        n (int (* w p))
-        d (- (* w p) n)
-        r (cond-> (- w n)
-            (pos? d) dec)]
-    (apply str (->> (concat (repeat n f)
-                            (when (pos? d)
-                              [(decimal-progress d)])
-                            (repeat r u))
-                    (remove nil?)))))
+(defn wait-bar
+  "Variant of progress bar that is used when no exact progress is known."
+  [{:keys [width perc increase interval]}]
+  (let [init (+ (- perc) increase)]
+    (loop [s init]
+      (println "[" (c/progress-bar {:width width
+                                    :start (max 0 s)
+                                    :value (min 1 (+ s perc))}) "]")
+      (Thread/sleep interval)
+      (recur (if (>= s 1)
+               init
+               (+ s increase))))))
 
 (def white (c/color-256 15))
 
-(defn fancy-progress-bar [{:keys [width value fg bg]
+(defn fancy-progress-bar [{:keys [fg bg]
                            :or {fg 75
-                                bg 19}}]
+                                bg 19}
+                           :as opts}]
   (str white "[ "
-       (c/color-256 fg bg) (progress-bar width value)
+       (c/color-256 fg bg) (c/progress-bar (select-keys opts [:width :value]))
        c/reset
        white " ]"
        c/reset))
