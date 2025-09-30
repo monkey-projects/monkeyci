@@ -3,9 +3,8 @@
             [babashka.fs :as fs]
             [build :as sut]
             [clojure.string :as cs]
-            [monkey.ci.build
-             [core :as bc]
-             [v2 :as b]]
+            [monkey.ci.api :as m]
+            [monkey.ci.build.core :as bc]
             [monkey.ci.test :as mt]))
 
 (deftest tag-version
@@ -21,9 +20,25 @@
                            {:git
                             {:ref "refs/tags/other"}}})))))
 
+(deftest test-app
+  (testing "creates job if app files changed"
+    (is (m/container-job?
+         (-> mt/test-ctx
+             (mt/with-changes (mt/modified ["app/deps.edn"]))
+             (sut/test-app)))))
+
+  (testing "is dependent on `publish-common` if included"
+    (is (= ["publish-common"]
+           (-> mt/test-ctx
+               (mt/with-changes (mt/modified ["app/deps.edn"
+                                              "common/deps.edn"]))
+               (mt/with-git-ref ["refs/heads/main"])
+               (sut/test-app)
+               :dependencies)))))
+
 (deftest test-gui
   (testing "creates job if gui files changed"
-    (is (b/container-job?
+    (is (m/container-job?
          (-> mt/test-ctx
              (mt/with-changes (mt/modified ["gui/shadow-cljs.edn"]))
              (sut/test-gui)))))
@@ -67,9 +82,9 @@
     (is (nil? (sut/scw-images mt/test-ctx))))
 
   (testing "returns action job"
-    (is (bc/action-job? (-> mt/test-ctx
-                            (mt/with-git-ref "refs/tags/0.1.0")
-                            (sut/scw-images))))))
+    (is (m/action-job? (-> mt/test-ctx
+                           (mt/with-git-ref "refs/tags/0.1.0")
+                           (sut/scw-images))))))
 
 (deftest build-gui-image
   (mt/with-build-params {}
@@ -84,9 +99,9 @@
                       (mt/with-git-ref "refs/heads/main")
                       (mt/with-changes (mt/modified ["gui/deps.edn"])))
               jobs (sut/build-gui-image ctx)
-              job-ids (set (map b/job-id jobs))]
+              job-ids (set (map m/job-id jobs))]
           (testing "creates publish job for each arch"
-            (doseq [a (b/archs ctx)]
+            (doseq [a (m/archs ctx)]
               (is (contains? job-ids (str "publish-gui-img-" (name a))))))
 
           (testing "creates manifest job"
@@ -102,7 +117,7 @@
                   (mt/with-changes (mt/modified ["app/deps.edn"]))
                   (sut/upload-uberjar))]
       (testing "returns action job"
-        (is (bc/action-job? job)))
+        (is (m/action-job? job)))
 
       (mt/with-build-params {"s3-url" "http://test-url"
                              "s3-bucket" "test-bucket"
@@ -145,7 +160,7 @@
                   (-> mt/test-ctx
                       (mt/with-git-ref "refs/tags/0.16.4")
                       (assoc :archs [:amd])))
-            ids (set (map b/job-id jobs))]
+            ids (set (map m/job-id jobs))]
         (testing "contains pushover job"
           (is (contains? ids "pushover")))
 
@@ -154,6 +169,9 @@
 
         (testing "contains gui img manifest job"
           (is (contains? ids "gui-img-manifest")))
+
+        (testing "contains common test job"
+          (is (contains? ids "test-common")))
 
         (testing "contains common publish job"
           (is (contains? ids "publish-common")))))))
