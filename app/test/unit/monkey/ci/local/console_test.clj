@@ -66,6 +66,53 @@
                (sut/get-build)
                :script-msg)))))
 
+(deftest job-init
+  (testing "sets job status to `initializing`"
+    (is (= :initializing (-> {:event {:job-id "test-job"}}
+                             (mi/set-state {:jobs [{:id "test-job"
+                                                    :status :pending}]})
+                             (sut/job-init)
+                             (sut/get-jobs)
+                             first
+                             :status)))))
+
+(deftest job-start
+  (let [r (-> {:event {:job-id "test-job"
+                       :time ::start-time}}
+              (mi/set-state {:jobs [{:id "test-job"
+                                     :status :pending}]})
+              (sut/job-start)
+              (sut/get-jobs)
+              first)]
+    (testing "sets job status to `running`"
+      (is (= :running (:status r))))
+
+    (testing "sets job start time"
+      (is (= ::start-time (:start-time r))))))
+
+(deftest job-end
+  (let [r (-> {:event {:job-id "test-job"
+                       :time ::test-time
+                       :status :success
+                       :message "test msg"
+                       :result {:output "test output"}}}
+              (mi/set-state {:jobs [{:id "test-job"
+                                     :status :running}]})
+              (sut/job-end)
+              (sut/get-jobs)
+              first)]
+    (testing "sets job status"
+      (is (= :success (:status r))))
+
+    (testing "sets job end time"
+      (is (= ::test-time (:end-time r))))
+
+    (testing "sets job output"
+      (is (= "test output" (:output r))))
+
+    (testing "sets job message"
+      (is (= "test msg" (:message r))))))
+
 (deftest routes
   (testing "handles build and job events"
     (let [exp [:build/initializing

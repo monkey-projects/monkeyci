@@ -5,6 +5,7 @@
    renderer to periodically write that information to screen."
   (:require [monkey.ci
              [console :as c]
+             [jobs :as j]
              [utils :as u]]
             [monkey.ci.common.jobs :as cj]
             [monkey.ci.events.mailman.interceptors :as mi]
@@ -24,6 +25,13 @@
 
 (defn set-jobs [state jobs]
   (assoc state :jobs jobs))
+
+(defn update-job [state id f & args]
+  (let [jobs (get-jobs state)
+        m (->> jobs
+               (filter (comp (partial = id) j/job-id))
+               (first))]
+    (set-jobs state (replace {m (apply f m args)} jobs))))
 
 (defmacro with-state [[s ctx] & body]
   `(let [~s (mi/get-state ~ctx)]
@@ -58,11 +66,24 @@
   (with-state [s ctx]
     (update-build s assoc :script-msg (get-in ctx [:event :message]))))
 
-(defn job-init [ctx])
+(defn job-init [ctx]
+  (with-state [s ctx]
+    (update-job s (get-in ctx [:event :job-id])
+                assoc :status :initializing)))
 
-(defn job-start [ctx])
+(defn job-start [ctx]
+  (with-state [s ctx]
+    (update-job s (get-in ctx [:event :job-id])
+                merge {:status :running
+                       :start-time (get-in ctx [:event :time])})))
 
-(defn job-end [ctx])
+(defn job-end [{:keys [event] :as ctx}]
+  (with-state [s ctx]
+    (update-job s (:job-id event)
+                merge
+                (select-keys event [:status :message])
+                {:end-time (:time event)
+                 :output (get-in event [:result :output])})))
 
 ;;; Interceptors
 
