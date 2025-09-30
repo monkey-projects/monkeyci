@@ -1,5 +1,5 @@
 (ns monkey.ci.local.print
-  "Event handlers to print build progress to console"
+  "Event handlers to print build progress a terminal"
   (:require [clansi :as cl]
             [clojure
              [string :as cs]
@@ -13,7 +13,8 @@
              [utils :as u]
              [version :as v]]
             [monkey.ci.build.core :as bc]
-            [monkey.ci.common.jobs :as cj]))
+            [monkey.ci.common.jobs :as cj]
+            [monkey.ci.local.common :as lc]))
 
 (def nil-printer (constantly nil))
 
@@ -121,14 +122,13 @@
 
 (defn make-routes [{:keys [printer]}]
   (let [i [(printer-interceptor printer)]]
-    (->> [[:build/initializing [{:handler build-init}]]
-          [:build/start        [{:handler build-start}]]
-          [:build/end          [{:handler build-end}]]
-          [:script/start       [{:handler script-start}]]
-          [:script/end         [{:handler script-end}]]
-          [:job/initializing   [{:handler job-init}]]
-          [:job/start          [{:handler job-start}]]
-          [:job/end            [{:handler job-end}]]]
-         ;; Add same interceptors to all handlers
-         (mapv (fn [r]
-                 (u/update-nth r 1 #(u/update-nth % 0 assoc :interceptors i)))))))
+    (-> [[:build/initializing [{:handler build-init}]]
+         [:build/start        [{:handler build-start}]]
+         [:build/end          [{:handler build-end}]]
+         [:script/start       [{:handler script-start}]]
+         [:script/end         [{:handler script-end}]]
+         [:job/initializing   [{:handler job-init}]]
+         [:job/start          [{:handler job-start}]]
+         [:job/end            [{:handler job-end}]]]
+        ;; Add same interceptors to all handlers
+        (lc/set-interceptors i))))
