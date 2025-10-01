@@ -1,6 +1,10 @@
 (ns print
-  (:require [monkey.ci.console :as c]
-            [monkey.ci.local.print :as p]))
+  (:require [monkey.ci
+             [console :as c]
+             [time :as t]]
+            [monkey.ci.local
+             [console :as lc]
+             [print :as p]]))
 
 (defn build-start []
   (p/build-start
@@ -151,3 +155,10 @@
        (str "This build has " white (count jobs) " jobs:" c/reset)]
       (map (partial format-job opts) jobs)
       [(str "Elapsed time: " white "02m15s")]))))
+
+(defn build-example-2 []
+  (-> {:build
+       {:build-id "test-build-1"
+        :start-time (t/now)}}
+      (lc/render-state)
+      (c/print-lines)))

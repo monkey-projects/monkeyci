@@ -57,6 +57,12 @@
       (testing "has print routes"
         (is (some? (:print-routes sys))))
 
+      (testing "has state"
+        (is (some? (:state sys))))
+
+      (testing "has renderer"
+        (is (some? (:renderer sys))))
+
       (testing "has podman routes"
         (is (some? (:podman sys))))
 

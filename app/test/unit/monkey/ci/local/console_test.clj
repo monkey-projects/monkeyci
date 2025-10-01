@@ -1,7 +1,9 @@
 (ns monkey.ci.local.console-test
   (:require [clojure.test :refer [deftest testing is]]
+            [com.stuartsierra.component :as co]
             [monkey.ci.events.mailman.interceptors :as mi]
-            [monkey.ci.local.console :as sut]))
+            [monkey.ci.local.console :as sut]
+            [monkey.ci.test.helpers :as h]))
 
 (deftest result->state
   (let [{:keys [leave] :as i} sut/result->state]
@@ -128,3 +130,44 @@
                  (set))]
       (doseq [e exp]
         (is (r e) (str "should handle " e))))))
+
+(deftest periodical-renderer
+  (testing "`start` starts periodical render loop"
+    (let [rendered (atom [])
+          state (atom {})
+          r (-> (sut/map->PeriodicalRenderer
+                 {:state state
+                  :renderer (partial swap! rendered conj)
+                  :interval 100})
+                (co/start))]
+      (is (some? (reset! state {:test :state})))
+      (is (fn? (:render-stop r)))
+      (is (not= :timeout (h/wait-until #(not-empty (remove empty? @rendered)) 500)))
+      (is (= {:test :state}
+             (->> @rendered
+                  (remove empty?)
+                  (first)))
+          "passes state to renderer")))
+
+  (testing "`stop` ends render loop"
+    (let [stopped? (atom false)]
+      (is (nil? (-> (sut/map->PeriodicalRenderer
+                     {:render-stop (fn []
+                                     (reset! stopped? true))})
+                    (co/stop)
+                    :render-stop)))
+      (is (true? @stopped?)))))
+
+(deftest console-renderer
+  (let [src (fn [state]
+              [(str "state to print: " state)])
+        r (sut/console-renderer src)]
+    (testing "is a fn"
+      (is (fn? r)))
+
+    (testing "prints to screen"
+      (let [w (java.io.StringWriter.)]
+        (binding [*out* w]
+          (is (map? (r "test-state"))))
+        (is (= "state to print: test-state"
+               (.trim (.toString w))))))))

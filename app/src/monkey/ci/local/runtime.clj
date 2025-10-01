@@ -19,6 +19,7 @@
             [monkey.ci.events.mailman :as em]
             [monkey.ci.local
              [config :as lc]
+             [console :as lco]
              [events :as le]
              [print :as lp]]
             [monkey.ci.runners.runtime :as rr]
@@ -40,9 +41,14 @@
     (em/map->RouteComponent {:config conf :make-routes make-routes})))
 
 (defn- new-print-routes [conf]
+  ;; TODO Replace with console routes
   (letfn [(make-routes [_]
             (lp/make-routes {:printer lp/console-printer}))]
     (em/map->RouteComponent {:config conf :make-routes make-routes})))
+
+(defn- new-renderer [_]
+  (lco/map->PeriodicalRenderer {:renderer (lco/console-renderer lco/render-state)
+                                :interval 200}))
 
 (defn- new-podman-routes [conf]
   (letfn [(make-routes [{:keys [config build] :as c}]
@@ -119,9 +125,13 @@
    :routes       (co/using
                   (new-routes conf)
                   [:mailman :api-config])
+   :state        (atom {})
    :print-routes (co/using
                   (new-print-routes conf)
-                  [:mailman])
+                  [:mailman :state])
+   :renderer     (co/using
+                  (new-renderer conf)
+                  [:state])
    :podman       (co/using
                   (new-podman-routes conf)
                   [:mailman :artifacts :cache :workspace :build :key-decrypter])

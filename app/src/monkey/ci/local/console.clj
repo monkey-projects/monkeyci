@@ -3,7 +3,10 @@
    for more functionality than a dumb terminal.  The event handlers are
    responsible to add information to the state, which is then used by the
    renderer to periodically write that information to screen."
-  (:require [monkey.ci
+  (:require [com.stuartsierra.component :as co]
+            [java-time.api :as jt]
+            [manifold.time :as mt]
+            [monkey.ci
              [console :as c]
              [jobs :as j]
              [utils :as u]]
@@ -38,6 +41,46 @@
      ~@body))
 
 ;;; Console rendering
+
+(defn- render-build [{:keys [start-time build-id]}]
+  [(str c/reset "Running build: " build-id)
+   (str "Started at: " (jt/local-date-time (jt/instant start-time) (jt/zone-id)))])
+
+(defn- render-jobs [jobs]
+  ;; TODO 
+  [])
+
+(defn render-state
+  "Converts state into printable lines, possibly using ansi control codes."
+  [{:keys [build jobs]}]
+  (cond-> []
+    (nil? build) (concat ["Initializing build..."])
+    build (concat (render-build build))
+    (and build (nil? jobs)) (concat ["Initializing build script..."])
+    jobs (concat (render-jobs jobs))))
+
+(defrecord PeriodicalRenderer [state renderer interval]
+  co/Lifecycle
+  (start [this]
+    (assoc this :render-stop (mt/every (or interval 200) #(renderer @state))))
+  
+  (stop [this]
+    (when-let [s (:render-stop this)]
+      (s))
+    (dissoc this :render-stop)))
+
+(defn console-renderer
+  "Creates a renderer function that invokes `src` to generate printable lines,
+   which are then sent to the terminal."
+  [src]
+  (let [cs (atom {:renderer (fn [state]
+                              ;; Should src be able to update state?
+                              [(src state) state])})]
+    (fn [state]
+      (swap! cs (fn [s]
+                  (-> s
+                      (assoc :state state)
+                      (c/render-next)))))))
 
 ;;; Event handlers
 
