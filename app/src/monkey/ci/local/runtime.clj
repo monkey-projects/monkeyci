@@ -41,9 +41,10 @@
     (em/map->RouteComponent {:config conf :make-routes make-routes})))
 
 (defn- new-print-routes [conf]
-  ;; TODO Replace with console routes
-  (letfn [(make-routes [_]
-            (lp/make-routes {:printer lp/console-printer}))]
+  (letfn [(make-routes [{:keys [state]}]
+            ;; TODO Switch to "dumb" printing if console is not an xterm
+            #_(lp/make-routes {:printer lp/console-printer})
+            (lco/make-routes {:state state}))]
     (em/map->RouteComponent {:config conf :make-routes make-routes})))
 
 (defn- new-renderer [_]
