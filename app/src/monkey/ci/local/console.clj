@@ -59,6 +59,9 @@
 
 (def complete? (comp #{:success :failure :error} :status))
 
+(defn pending? [{:keys [status]}]
+  (or (nil? status) (= :pending status)))
+
 (defn- success-msg [msg]
   (with-color color-success (str \u221a " " msg)))
 
@@ -77,15 +80,19 @@
                  (in-white (format (format " %%%ds" w) (j/job-id job)))
                  " [ "
                  (with-color
-                   (c/color-256 75)
+                   ;;(c/color-256 75)
+                   color-white
                    ;; Make the progress bar as wide as possible and still keep room
                    ;; for the job names and status
-                   (c/progress-bar (cond-> {:width (int (- (or (c/cols) 70) 17 w))}
+                   (c/progress-bar (cond-> {:width (int (- (or (c/cols) 70) 17 w))
+                                            :filled-char #_\u2592 \u25a0}
                                      (complete? job)
                                      (assoc :value 1)
-                                     (not (complete? job))
+                                     (not (or (pending? job) (complete? job)))
                                      (assoc :value (min 1 (+ perc s))
-                                            :start (max 0 s)))))
+                                            :start (max 0 s))
+                                     (pending? job)
+                                     (assoc :value 0))))
                  " ] "
                  ((case (:status job)
                     :success success-msg
@@ -102,7 +109,9 @@
     (and build (nil? jobs)) (concat ["Initializing build script..."])
     jobs (concat (render-jobs i jobs))
     (= :success (:status build)) (concat ["" (success-msg "Build completed successfully!") ""])
-    (= :error (:status build)) (concat ["" (failure-msg "Build failed.") ""])))
+    (= :error (:status build)) (concat ["" (failure-msg "Build failed.")
+                                        (str "Check the logs in " (:checkout-dir build))
+                                        ""])))
 
 (defrecord PeriodicalRenderer [state renderer interval]
   co/Lifecycle
