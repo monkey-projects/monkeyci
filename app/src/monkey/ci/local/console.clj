@@ -101,6 +101,8 @@
   (stop [this]
     (when-let [s (:render-stop this)]
       (s))
+    ;; Final rendering
+    (renderer @state)
     (dissoc this :render-stop)))
 
 (defn console-renderer
