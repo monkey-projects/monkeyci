@@ -159,6 +159,11 @@
 (defn build-example-2 []
   (-> {:build
        {:build-id "test-build-1"
-        :start-time (t/now)}}
+        :start-time (t/now)}
+       :jobs [{:id "unit-tests"
+               :status :success}
+              {:id "publish"
+               :status :running}]
+       :i 10}
       (lc/render-state)
       (c/print-lines)))

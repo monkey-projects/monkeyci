@@ -42,22 +42,56 @@
 
 ;;; Console rendering
 
-(defn- render-build [{:keys [start-time build-id]}]
-  [(str c/reset "Running build: " build-id)
-   (str "Started at: " (jt/local-date-time (jt/instant start-time) (jt/zone-id)))])
+(def color-white   (c/color-256 15))
+(def color-yellow  (c/color-256 11))
+(def color-success (c/color-256 118))
+(def color-failure (c/color-256 160))
 
-(defn- render-jobs [jobs]
-  ;; TODO 
-  [])
+(defn- with-color [c msg]
+  (str c msg c/reset))
+
+(def in-white  (partial with-color color-white))
+(def in-yellow (partial with-color color-yellow))
+
+(defn- render-build [{:keys [start-time build-id]}]
+  [(str c/reset (c/erase-line) "Running build: " (in-yellow build-id))
+   (str "Started at:    " (in-yellow (jt/local-date-time (jt/instant start-time) (jt/zone-id))))])
+
+(def complete? (comp #{:success :failure :error} :status))
+
+(defn- render-jobs [i jobs]
+  (let [w (->> jobs
+               (map (comp count j/job-id))
+               (apply max))
+        perc 0.5
+        inv-speed 20 ; Inverse speed, the lower, the faster the animation runs
+        s (if i (- (mod (float (/ i inv-speed)) (+ 1 perc)) perc) 0)]
+    (mapv (fn [job]
+            (str (c/erase-line)
+                 (in-white (format (format "%%%ds" w) (j/job-id job)))
+                 " [ "
+                 (with-color
+                   (c/color-256 75)
+                   (c/progress-bar (cond-> {:width (int (* (or (c/cols) 70) 0.75))}
+                                     (complete? job)
+                                     (assoc :value 1)
+                                     (not (complete? job))
+                                     (assoc :value (min 1 (+ perc s))
+                                            :start (max 0 s)))))
+                 " ] "
+                 (in-yellow (name (:status job)))))
+          jobs)))
 
 (defn render-state
   "Converts state into printable lines, possibly using ansi control codes."
-  [{:keys [build jobs]}]
+  [{:keys [build jobs i]}]
   (cond-> []
     (nil? build) (concat ["Initializing build..."])
     build (concat (render-build build))
     (and build (nil? jobs)) (concat ["Initializing build script..."])
-    jobs (concat (render-jobs jobs))))
+    jobs (concat (render-jobs i jobs))
+    (= :success (:status build)) (concat [color-success "Build completed succesfully!" c/reset])
+    (= :failure (:status build)) (concat [color-failure "Build failed." c/reset])))
 
 (defrecord PeriodicalRenderer [state renderer interval]
   co/Lifecycle
@@ -78,9 +112,14 @@
                               [(src state) state])})]
     (fn [state]
       (swap! cs (fn [s]
-                  (-> s
-                      (assoc :state state)
-                      (c/render-next)))))))
+                  (let [i (inc (get s :i 0))]
+                    (-> s
+                        (assoc :state state :i i)                                                
+                        ;; Iteration useful for animations
+                        (assoc-in [:state :i] i)
+                        (c/render-next)
+                        ;; Save iteration for next
+                        (assoc :i i))))))))
 
 ;;; Event handlers
 
