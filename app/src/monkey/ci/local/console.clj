@@ -59,6 +59,12 @@
 
 (def complete? (comp #{:success :failure :error} :status))
 
+(defn- success-msg [msg]
+  (with-color color-success (str \u221a " " msg)))
+
+(defn- failure-msg [msg]
+  (with-color color-failure (str "X " msg)))
+
 (defn- render-jobs [i jobs]
   (let [w (->> jobs
                (map (comp count j/job-id))
@@ -68,18 +74,23 @@
         s (if i (- (mod (float (/ i inv-speed)) (+ 1 perc)) perc) 0)]
     (mapv (fn [job]
             (str (c/erase-line)
-                 (in-white (format (format "%%%ds" w) (j/job-id job)))
+                 (in-white (format (format " %%%ds" w) (j/job-id job)))
                  " [ "
                  (with-color
                    (c/color-256 75)
-                   (c/progress-bar (cond-> {:width (int (* (or (c/cols) 70) 0.75))}
+                   ;; Make the progress bar as wide as possible and still keep room
+                   ;; for the job names and status
+                   (c/progress-bar (cond-> {:width (int (- (or (c/cols) 70) 17 w))}
                                      (complete? job)
                                      (assoc :value 1)
                                      (not (complete? job))
                                      (assoc :value (min 1 (+ perc s))
                                             :start (max 0 s)))))
                  " ] "
-                 (in-yellow (name (:status job)))))
+                 ((case (:status job)
+                    :success success-msg
+                    :failure failure-msg
+                    #(in-yellow (str "  " %))) (name (:status job)))))
           jobs)))
 
 (defn render-state
@@ -90,8 +101,8 @@
     build (concat (render-build build))
     (and build (nil? jobs)) (concat ["Initializing build script..."])
     jobs (concat (render-jobs i jobs))
-    (= :success (:status build)) (concat [color-success "Build completed succesfully!" c/reset])
-    (= :failure (:status build)) (concat [color-failure "Build failed." c/reset])))
+    (= :success (:status build)) (concat ["" (success-msg "Build completed successfully!") ""])
+    (= :error (:status build)) (concat ["" (failure-msg "Build failed.") ""])))
 
 (defrecord PeriodicalRenderer [state renderer interval]
   co/Lifecycle
