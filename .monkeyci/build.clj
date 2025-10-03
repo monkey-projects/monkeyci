@@ -48,15 +48,20 @@
 (defn test-lib-changed? [ctx]
   (dir-changed? ctx #"^test-lib/.*"))
 
+(defn common-changed? [ctx]
+  (dir-changed? ctx #"^common/.*"))
+
 (def build-app? (some-fn app-changed? release?))
 (def build-gui? (some-fn gui-changed? release?))
 (def build-test-lib? (some-fn test-lib-changed? release?))
+(def build-common? (some-fn common-changed? release?))
 
 (def publish-app? (some-fn (every-pred app-changed? should-publish?)
                            release?))
 (def publish-gui? (some-fn (every-pred gui-changed? should-publish?)
                            release?))
 (def publish-test-lib? (some-fn (every-pred test-lib-changed? should-publish?) release?))
+(def publish-common? (some-fn (every-pred common-changed? should-publish?) release?))
 
 (defn tag-version
   "Extracts the version from the tag"
@@ -96,22 +101,32 @@
    (str dir "-coverage")
    (str dir "/target/coverage")))
 
-(defn test-app [ctx]
-  (let [junit-artifact (junit-artifact "app")]
-    (when (build-app? ctx)
-      (-> (clj-container "test-app" "app" "-M:test:coverage")
-          (assoc :save-artifacts [junit-artifact
-                                  (coverage-artifact "app")]
-                 :junit {:artifact-id (:id junit-artifact)
-                         :path "junit.xml"})))))
-
-(defn test-test-lib [ctx]
-  (let [junit-artifact (junit-artifact "test-lib")]
-    (when (build-test-lib? ctx)
-      (-> (clj-container "test-test-lib" "test-lib" "-X:test:junit")
+(defn- run-tests [ctx {:keys [id dir cmd should-test?] :or {cmd "-X:test:junit"}}]
+  (let [junit-artifact (junit-artifact dir)]
+    (when (should-test? ctx)
+      (-> (clj-container id dir cmd)
           (assoc :save-artifacts [junit-artifact]
                  :junit {:artifact-id (:id junit-artifact)
                          :path "junit.xml"})))))
+
+(defn test-app [ctx]
+  (some-> (run-tests ctx {:id "test-app"
+                          :dir "app"
+                          :cmd "-M:test:coverage"
+                          :should-test? build-app?})
+          (update :save-artifacts conj (coverage-artifact "app"))
+          (cond->
+            (build-common? ctx) (m/depends-on ["publish-common"]))))
+
+(defn test-test-lib [ctx]
+  (run-tests ctx {:id "test-test-lib"
+                  :dir "test-lib"
+                  :should-test? build-test-lib?}))
+
+(defn test-common [ctx]
+  (run-tests ctx {:id "test-common"
+                  :dir "common"
+                  :should-test? build-common?}))
 
 (def uberjar-artifact
   (m/artifact "uberjar" "app/target/monkeyci-standalone.jar"))
@@ -212,7 +227,7 @@
 (defn oci-app-image [ctx]
   (str app-img ":" (image-version ctx)))
 
-(defn archs [ctx]
+(defn archs [_]
   ;; Use fallback for safety
   #_(or (m/archs ctx) [:amd])
   ;; Using single arch for now.  When using a container agent, it may happen that
@@ -280,6 +295,11 @@
     ;; (format "-Sdeps '{:override-deps {:mvn/version \"%s\"}}'" (tag-version ctx))
     (some-> (publish ctx "publish-test-lib" "test-lib")
             (m/depends-on ["test-test-lib"]))))
+
+(defn publish-common [ctx]
+  (when (publish-common? ctx)
+    (some-> (publish ctx "publish-common" "common")
+            (m/depends-on ["test-common"]))))
 
 (def github-release
   "Creates a release in github"
@@ -361,13 +381,15 @@
 
 ;; List of jobs
 (def jobs
-  [test-app
+  [test-common
+   test-app
    test-gui
    test-test-lib
            
    app-uberjar
    upload-uberjar
    upload-install-script
+   publish-common
    publish-app
    publish-test-lib
    github-release

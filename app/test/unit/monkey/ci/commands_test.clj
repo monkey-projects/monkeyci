@@ -180,17 +180,22 @@
     (is (not= 0 (sut/verify-build {})))))
 
 (deftest run-tests
-  (testing "runs test process with build script dir"
-    (let [inv (atom nil)]
-      (with-redefs [proc/test! (fn [dir _]
-                                 (reset! inv {:dir dir
-                                              :invoked? true})
-                                 (future {:exit 0}))]
-        (let [res (sut/run-tests {:work-dir "/tmp"
-                                  :args {:dir "test/dir"}})]
+  (let [inv (atom nil)]
+    (with-redefs [proc/test! (fn [dir opts]
+                               (reset! inv {:dir dir
+                                            :invoked? true
+                                            :opts opts})
+                               (future {:exit 0}))]
+      (let [res (sut/run-tests {:work-dir "/tmp"
+                                :args {:dir "test/dir"
+                                       :watch true}})]
+        (testing "runs test process with build script dir"
           (is (zero? res))
           (is (= "/tmp/test/dir" (:dir @inv)))
-          (is (true? (:invoked? @inv))))))))
+          (is (true? (:invoked? @inv))))
+
+        (testing "passes watch mode"
+          (is (true? (get-in @inv [:opts :watch?]))))))))
 
 (deftest list-builds
   (testing "reports builds from server"

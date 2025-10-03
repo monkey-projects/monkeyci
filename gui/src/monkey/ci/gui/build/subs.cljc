@@ -1,5 +1,6 @@
 (ns monkey.ci.gui.build.subs
   (:require [clojure.string :as cs]
+            [monkey.ci.common.jobs :as cj]
             [monkey.ci.gui.build.db :as db]
             [monkey.ci.gui.loader :as lo]
             [monkey.ci.gui.logging :as log]
@@ -23,20 +24,8 @@
  :<- [:build/current]
  (fn [b _]
    ;; Sort the jobs in the build by dependency order
-   (let [jobs (-> b :script :jobs vals)]
-     (loop [rem (->> jobs (sort-by :id) vec)
-            proc? #{}
-            res []]
-       (if (empty? rem)
-         res
-         (let [next-jobs (->> rem
-                              (filter (comp (partial every? proc?) :dependencies)))]
-           (if (empty? next-jobs)
-             ;; Safety, should not happen
-             (concat res rem)
-             (recur (remove (set next-jobs) rem)
-                    (clojure.set/union proc? (set (map :id next-jobs)))
-                    (concat res next-jobs)))))))))
+   (-> b :script :jobs vals
+       (cj/sort-by-deps))))
 
 (rf/reg-sub
  :build/loading?
