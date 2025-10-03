@@ -102,7 +102,7 @@
                                      (assoc :value 0))))
                  " ] "
                  (if (= :running (:status job))
-                   (in-yellow (format-elapsed (duration-since (:start-time job))))
+                   (in-yellow (str "  " (format-elapsed (duration-since (:start-time job)))))
                    ((case (:status job)
                       :success success-msg
                       :failure failure-msg
