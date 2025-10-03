@@ -82,8 +82,7 @@
            :option "api"
            :short "a"
            :type :string
-           :env "MONKEYCI_API"
-           :default "https://api.monkeyci.com/v1"}
+           :env "MONKEYCI_API"}
           {:as "API key"
            :option "api-key"
            :short "k"
