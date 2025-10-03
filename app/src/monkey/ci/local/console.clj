@@ -53,9 +53,16 @@
 (def in-white  (partial with-color color-white))
 (def in-yellow (partial with-color color-yellow))
 
+(defn- duration-since [t]
+  (jt/duration (- (System/currentTimeMillis) t)))
+
+(defn- format-elapsed [d]
+  (format "%02dm%02ds" (.toMinutesPart d) (.toSecondsPart d)))
+
 (defn- render-build [{:keys [start-time build-id]}]
   [(str c/reset (c/erase-line) "Running build: " (in-yellow build-id))
-   (str "Started at:    " (in-yellow (jt/local-date-time (jt/instant start-time) (jt/zone-id))))])
+   (str "Started at:    " (in-yellow (jt/local-date-time (jt/instant start-time) (jt/zone-id))))
+   (str "Elapsed:       " (in-yellow (format-elapsed (duration-since start-time))))])
 
 (def complete? (comp #{:success :failure :error} :status))
 
@@ -94,10 +101,12 @@
                                      (pending? job)
                                      (assoc :value 0))))
                  " ] "
-                 ((case (:status job)
-                    :success success-msg
-                    :failure failure-msg
-                    #(in-yellow (str "  " %))) (name (:status job)))))
+                 (if (= :running (:status job))
+                   (in-yellow (format-elapsed (duration-since (:start-time job))))
+                   ((case (:status job)
+                      :success success-msg
+                      :failure failure-msg
+                      #(in-yellow (str "  " %))) (name (:status job))))))
           jobs)))
 
 (defn render-state

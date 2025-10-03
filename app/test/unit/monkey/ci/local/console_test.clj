@@ -181,3 +181,11 @@
         (is (cs/starts-with?
              (.trim (.toString w))
              "state to print: "))))))
+
+(deftest render-state
+  (testing "generates sequence of printable items"
+    (let [r (sut/render-state {:build {:build-id "test-build"
+                                       :start-time 100}
+                               :i 0})]
+      (is (seqable? r))
+      (is (every? string? r)))))
