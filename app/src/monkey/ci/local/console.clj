@@ -53,6 +53,14 @@
 (def in-white  (partial with-color color-white))
 (def in-yellow (partial with-color color-yellow))
 
+(defn logo []
+  [""
+   (str (c/color-256  46) "░▒█▀▄▀█░▄▀▀▄░█▀▀▄░█░▄░█▀▀░█░░█░▒█▀▀▄░▀█▀")
+   (str (c/color-256 118) "░▒█▒█▒█░█░░█░█░▒█░█▀▄░█▀▀░█▄▄█░▒█░░░░▒█░")
+   (str (c/color-256 190) "░▒█░░▒█░░▀▀░░▀░░▀░▀░▀░▀▀▀░▄▄▄▀░▒█▄▄▀░▄█▄")
+   (str color-white "  Build your code in style")
+   c/reset])
+
 (defn- duration-since [t]
   (jt/duration (- (System/currentTimeMillis) t)))
 
@@ -87,12 +95,11 @@
                  (in-white (format (format " %%%ds" w) (j/job-id job)))
                  " [ "
                  (with-color
-                   ;;(c/color-256 75)
                    color-white
                    ;; Make the progress bar as wide as possible and still keep room
                    ;; for the job names and status
                    (c/progress-bar (cond-> {:width (int (- (or (c/cols) 70) 17 w))
-                                            :filled-char #_\u2592 \u25a0}
+                                            :filled-char \u25a0}
                                      (complete? job)
                                      (assoc :value 1)
                                      (not (or (pending? job) (complete? job)))
@@ -112,7 +119,7 @@
 (defn render-state
   "Converts state into printable lines, possibly using ansi control codes."
   [{:keys [build jobs i]}]
-  (cond-> []
+  (cond-> (logo)
     (nil? build) (concat ["Initializing build..."])
     build (concat (render-build build))
     (and build (nil? jobs)) (concat ["Initializing build script..."])

@@ -36,11 +36,12 @@
         com.monkeyprojects/oci-sign {:mvn/version "0.1.5"}
         com.monkeyprojects/oci-vault {:mvn/version "0.2.1"}
         com.mysql/mysql-connector-j {:mvn/version "9.4.0"}
-        com.zaxxer/HikariCP {:mvn/version "7.0.2"}
-        dev.weavejester/ragtime {:mvn/version "0.12.1"}
+        com.squareup.okhttp3/okhttp-jvm {:mvn/version "5.1.0"}
         com.stuartsierra/component {:mvn/version "1.1.0"}
         com.taoensso/telemere {:mvn/version "1.1.0"}
+        com.zaxxer/HikariCP {:mvn/version "7.0.2"}
         commons-io/commons-io {:mvn/version "2.20.0"}
+        dev.weavejester/ragtime {:mvn/version "0.12.1"}
         io.minio/minio {:mvn/version "8.6.0"}
         io.prometheus/prometheus-metrics-core {:mvn/version "1.4.1"}
         io.prometheus/prometheus-metrics-exporter-opentelemetry {:mvn/version "1.4.1"}

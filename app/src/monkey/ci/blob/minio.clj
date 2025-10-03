@@ -20,17 +20,14 @@
       ;; for most situations.
       (readTimeout 30 TimeUnit/SECONDS)
       (writeTimeout 30 TimeUnit/SECONDS)
-      ;; Retry, this may fix the error
+      ;; Retry on connection failure, which may circumvent the "\n not found" error
       (retryOnConnectionFailure true)
-      ;; If not fixed, check if overriding the connection pool may work
       (build)))
 
 (defn make-client [url access-key secret]
   (.. (MinioAsyncClient/builder)
       (endpoint url)
       (credentials access-key secret)
-      ;; Override http client to retry on connection failure, which may circumvent
-      ;; the "\n not found" error
       (httpClient (make-http-client))
       (build)))
 
