@@ -888,7 +888,18 @@
                                                      :public true}}})))
         (is (= 403 (-> (mock/request :get (format "/org/%s/repo/%s/ssh-keys" org-id repo-id))
                        (secure-app-req {:storage st :org-id (st/new-id)})
-                       :status)))))))
+                       :status)))))
+
+    (testing "`PUT` with empty body deletes all"
+      (let [org (h/gen-org)
+            sk (-> (h/gen-ssh-key)
+                   (assoc :org-id (:id org)))]
+        (is (some? (st/save-org st org)))
+        (is (some? (st/save-ssh-keys st (:id org) [sk])))
+        (is (= 200 (-> (h/json-request :put (format "/org/%s/ssh-keys" (:id org)) [])
+                       (secure-app-req {:storage st :org-id (:id org)})
+                       :status)))
+        (is (empty? (st/find-ssh-keys st (:id org))))))))
 
 (defn- generate-build-sid []
   (->> (repeatedly st/new-id)
