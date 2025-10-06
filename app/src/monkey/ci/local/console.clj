@@ -126,6 +126,7 @@
     jobs (concat (render-jobs i jobs))
     (= :success (:status build)) (concat ["" (success-msg "Build completed successfully!") ""])
     (= :error (:status build)) (concat ["" (failure-msg "Build failed.")
+                                        ;; FIXME This should be the local build work dir
                                         (str "Check the logs in " (:checkout-dir build))
                                         ""])))
 
