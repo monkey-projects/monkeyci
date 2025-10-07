@@ -396,8 +396,7 @@
      :body-schema {:repo {:name s/Str
                           :url s/Str
                           :org-id s/Str
-                          :github-id s/Int}}
-     :consumes ["application/edn"]})
+                          :github-id s/Int}}})
 
    (api-route
     {:route-name :watch-bitbucket-repo
@@ -409,8 +408,7 @@
                           :org-id s/Str
                           :workspace s/Str
                           :repo-slug s/Str
-                          :token s/Str}}
-     :consumes ["application/edn"]})
+                          :token s/Str}}})
 
    (api-route
     {:route-name :unwatch-github-repo
@@ -454,7 +452,7 @@
     {:route-name :github-refresh
      :method :post
      :path-parts ["/github/refresh"]
-     :body-schema {:refresh {:refresh-token s/Str}}})
+     :body-schema {:refresh {:refresh-token s/Str}}})   
    
    (public-route
     {:route-name :get-github-config
@@ -504,11 +502,10 @@
    [::mr/init (martian/bootstrap
                url
                routes
-               {:interceptors (concat martian/default-interceptors
-                                      [mi/default-coerce-response
-                                       mi/default-encode-body
-                                       disable-with-credentials
-                                       mh/perform-request])})]))
+               {:interceptors (-> mh/default-interceptors
+                                  (mi/inject disable-with-credentials
+                                             :before
+                                             ::mh/perform-request))})]))
 
 (defn- set-token [opts t]
   (cond-> opts

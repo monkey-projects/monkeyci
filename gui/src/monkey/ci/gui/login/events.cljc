@@ -119,7 +119,9 @@
 
 (rf/reg-event-db
  :login/load-github-config--success
- (fn [db [_ {config :body}]]
+ (fn [db [_ {config :body :as resp}]]
+   (println "Github config loaded:" resp)
+   (println "Body:" config)
    (db/set-github-config db config)))
 
 (rf/reg-event-db

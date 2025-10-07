@@ -268,7 +268,17 @@
             (is (sid/sid? (st/save-ssh-keys s org-id [(assoc k :label-filters lf)])))
             (let [matches (st/find-ssh-keys s org-id)]
               (is (= 1 (count matches)))
-              (is (= lf (-> matches first :label-filters))))))))))
+              (is (= lf (-> matches first :label-filters))))))
+
+        (testing "deletes removed keys from set"
+          (let [new-k (assoc (h/gen-ssh-key) :org-id org-id)]
+            (is (sid/sid? (st/save-ssh-keys s org-id [k new-k])))
+            (is (= 2 (count (st/find-ssh-keys s org-id))))
+            (is (sid/sid? (st/save-ssh-keys s org-id [new-k])))
+            (is (= #{(:id new-k)}
+                   (->> (st/find-ssh-keys s org-id)
+                        (map :id)
+                        (set))))))))))
 
 (deftest ^:sql webhooks
   (with-storage conn s

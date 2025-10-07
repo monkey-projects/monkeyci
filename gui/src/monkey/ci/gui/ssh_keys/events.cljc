@@ -78,7 +78,8 @@
                   :ssh-keys (cond->> all
                               orig (replace {orig ks})
                               (not orig) (concat [ks])
-                              true (map ->api))}
+                              true (map ->api))
+                  :headers {:content-type "application/edn"}}
                  [:ssh-keys/save-set--success ks]
                  [:ssh-keys/save-set--failed ks]]
       :db (db/reset-alerts db)})))
