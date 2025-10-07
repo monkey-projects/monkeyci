@@ -78,8 +78,7 @@
                   :ssh-keys (cond->> all
                               orig (replace {orig ks})
                               (not orig) (concat [ks])
-                              true (map ->api))
-                  :headers {:content-type "application/edn"}}
+                              true (map ->api))}
                  [:ssh-keys/save-set--success ks]
                  [:ssh-keys/save-set--failed ks]]
       :db (db/reset-alerts db)})))
@@ -109,6 +108,9 @@
      {:dispatch [:secure-request
                  :update-org-ssh-keys
                  {:org-id org-id
-                  :ssh-keys (remove (db/same-id? (set-id ks)) all)}
+                  :ssh-keys (->> all
+                                 (remove (db/same-id? (set-id ks)))
+                                 (vec))
+                  :content-type "application/edn"}
                  [:ssh-keys/save-set--success ks]
                  [:ssh-keys/save-set--failed ks]]})))

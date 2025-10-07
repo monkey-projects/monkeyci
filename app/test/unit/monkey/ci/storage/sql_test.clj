@@ -278,7 +278,11 @@
             (is (= #{(:id new-k)}
                    (->> (st/find-ssh-keys s org-id)
                         (map :id)
-                        (set))))))))))
+                        (set))))))
+
+        (testing "when empty set, deletes all keys"
+          (is (sid/sid? (st/save-ssh-keys s org-id [])))
+          (is (empty? (st/find-ssh-keys s org-id))))))))
 
 (deftest ^:sql webhooks
   (with-storage conn s

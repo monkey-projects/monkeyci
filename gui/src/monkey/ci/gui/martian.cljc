@@ -127,7 +127,7 @@
 
 (defn api-route [conf]
   (-> conf
-      (assoc :headers-schema {(s/optional-key :authorization) s/Str})
+      (assoc-in [:headers-schema (s/optional-key :authorization)] s/Str)
       (public-route)))
 
 (def routes
@@ -209,7 +209,8 @@
      :path-parts (into org-path ["/ssh-keys"])
      :path-schema org-schema
      :method :put
-     :body-schema {:ssh-keys [SshKey]}})
+     :body-schema {:ssh-keys [SshKey]}
+     :headers-schema {(s/optional-key :content-type) s/Str}})
 
    (api-route
     {:route-name :get-org-stats
