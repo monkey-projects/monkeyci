@@ -240,7 +240,7 @@
 
    (api-route
     {:route-name :delete-org-token
-     :path-parts (into org-path ["/token" :token-id])
+     :path-parts (into org-path ["/token/" :token-id])
      :path-schema (assoc org-schema :token-id s/Str)
      :method :delete})
 
