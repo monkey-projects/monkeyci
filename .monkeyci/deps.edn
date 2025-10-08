@@ -1,5 +1,5 @@
 {:deps {com.monkeyci/plugin-junit {:mvn/version "0.1.0"}
-        com.monkeyci/plugin-github {:mvn/version "0.2.0-SNAPSHOT"}
+        com.monkeyci/plugin-github {:mvn/version "0.2.0"}
         com.monkeyci/plugin-kaniko {:mvn/version "0.2.1"}
         com.monkeyci/plugin-pushover {:mvn/version "0.1.1"}
         io.minio/minio {:mvn/version "8.5.17"}}}
