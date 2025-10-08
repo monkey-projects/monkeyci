@@ -592,10 +592,12 @@
                        :type)))))
 
 (deftest repo-new
-  (testing "clears editing repo"
+  (testing "replaces editing repo with empty"
     (is (some? (reset! app-db (db/set-editing {} {:id ::editing-repo}))))
     (rf/dispatch-sync [:repo/new])
-    (is (empty? (db/editing @app-db)))))
+    (let [e (db/editing @app-db)]
+      (is (map? e))
+      (is (empty? e)))))
 
 (deftest repo-lookup-github-id
   (rft/run-test-sync

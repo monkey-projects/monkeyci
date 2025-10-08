@@ -308,7 +308,7 @@
                        :value (:url @e)
                        :extra-opts
                        {:on-change (u/form-evt-handler [:repo/url-changed])
-                        :maxlength 300}
+                        :max-length 300}
                        :help-msg (str "This is used when manually triggering a build from the UI. "
                                       "Use an ssh url for private repos.")}]]
        [:div.mb-2
@@ -317,14 +317,14 @@
                        :value (:name @e)
                        :extra-opts
                        {:on-change (u/form-evt-handler [:repo/name-changed])
-                        :maxlength 200}}]]
+                        :max-length 200}}]]
        [:div.mb-2
         [f/form-input {:id :main-branch
                        :label "Main branch"
                        :value (:main-branch @e)
                        :extra-opts
                        {:on-change (u/form-evt-handler [:repo/main-branch-changed])
-                        :maxlength 100}
+                        :max-length 100}
                        :help-msg
                        "Required when you want to determine the 'main branch' in the build script."}]]
        [:div.mb-2.form-check.form-switch
@@ -371,18 +371,21 @@
 
 (defn new [route]
   (rf/dispatch-sync [:repo/new])
-  (l/default
-   [:<>
-    [co/page-title [:span.me-2 co/repo-icon] "Watch Repository"]
-    [:p
-     "Configure a new repository to be watched by " [:i "MonkeyCI"] ". After saving, "
-     "the repository will show up in the list on your overview page. If a " [:b "webhook"]
-     " is configured, any push will result in a new build."]
-    [:div.card
-     [:div.card-body
-      [co/alerts [:repo/edit-alerts]]
-      [edit-form [co/cancel-btn
-                  [:route/goto :page/org (r/path-params route)]]]]]]))
+  ;; Use component fn otherwise the repo is constantly cleared
+  (fn [route]
+    (l/default
+     [:<>
+      [co/page-title [:span.me-2 co/repo-icon] "Watch Repository"]
+      [:p
+       "Configure a new repository to be watched by " [:i "MonkeyCI"] ". After saving, "
+       "the repository will show up in the list on your overview page. If a "
+       [co/docs-link "articles/webhooks" "webhook"] " is configured, any push "
+       "will result in a new build."]
+      [:div.card
+       [:div.card-body
+        [co/alerts [:repo/edit-alerts]]
+        [edit-form [co/cancel-btn
+                    [:route/goto :page/org (r/path-params route)]]]]]])))
 
 (defn settings-page [route]
   [:<>
