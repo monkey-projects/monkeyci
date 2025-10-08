@@ -3,9 +3,11 @@
    for more functionality than a dumb terminal.  The event handlers are
    responsible to add information to the state, which is then used by the
    renderer to periodically write that information to screen."
-  (:require [com.stuartsierra.component :as co]
+  (:require [babashka.fs :as fs]
+            [com.stuartsierra.component :as co]
             [java-time.api :as jt]
             [manifold.time :as mt]
+            [medley.core :as mc]
             [monkey.ci
              [console :as c]
              [jobs :as j]
@@ -126,8 +128,7 @@
     jobs (concat (render-jobs i jobs))
     (= :success (:status build)) (concat ["" (success-msg "Build completed successfully!") ""])
     (= :error (:status build)) (concat ["" (failure-msg "Build failed.")
-                                        ;; FIXME This should be the local build work dir
-                                        (str "Check the logs in " (:checkout-dir build))
+                                        (str "Check the logs in " (:local-dir build))
                                         ""])))
 
 (defrecord PeriodicalRenderer [state renderer interval]
@@ -189,8 +190,12 @@
 
 (defn job-init [ctx]
   (with-state [s ctx]
-    (update-job s (get-in ctx [:event :job-id])
-                assoc :status :initializing)))
+    (-> s
+        (update-job (get-in ctx [:event :job-id])
+                    assoc :status :initializing)
+        (update-build mc/assoc-some :local-dir (some-> (get-in ctx [:event :local-dir])
+                                                       (fs/parent)
+                                                       str)))))
 
 (defn job-start [ctx]
   (with-state [s ctx]

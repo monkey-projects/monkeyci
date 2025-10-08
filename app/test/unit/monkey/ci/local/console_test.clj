@@ -77,7 +77,16 @@
                              (sut/job-init)
                              (sut/get-jobs)
                              first
-                             :status)))))
+                             :status))))
+
+  (testing "sets build local dir as parent of job dir"
+    (is (= "/tmp/test/dir"
+           (-> {:event
+                {:job-id "test-job"
+                 :local-dir "/tmp/test/dir/test-job"}}
+               (sut/job-init)
+               (sut/get-build)
+               :local-dir)))))
 
 (deftest job-start
   (let [r (-> {:event {:job-id "test-job"
