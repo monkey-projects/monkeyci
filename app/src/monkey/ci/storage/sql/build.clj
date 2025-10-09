@@ -1,5 +1,6 @@
 (ns monkey.ci.storage.sql.build
-  (:require [medley.core :as mc]
+  (:require [clojure.tools.logging :as log]
+            [medley.core :as mc]
             [monkey.ci.entities
              [build :as eb]
              [core :as ec]
@@ -48,7 +49,9 @@
 (defn- hydrate-build
   "Fetches jobs related to the build"
   [conn [org-id repo-id] build]
+  (log/debug "Hydrating build:" build)
   (let [jobs (sj/select-build-jobs conn (:id build))]
+    (log/debug "Jobs for" (:id build) ":" jobs)
     (cond-> (-> (db->build build)
                 (assoc :org-id org-id
                        :repo-id repo-id)
@@ -83,9 +86,10 @@
   (->> (eb/select-builds-for-org-since (sc/get-conn st) org-id ts)
        (map db->build)))
 
-(defn select-latest-build [st [org-id repo-id]]
-  (some-> (eb/select-latest-build (sc/get-conn st) org-id repo-id)
-          (db->build)))
+(defn select-latest-build [st [org-id repo-id :as sid]]
+  (let [conn (sc/get-conn st)]
+    (some->> (eb/select-latest-build conn org-id repo-id)
+             (hydrate-build conn sid))))
 
 (defn select-latest-org-builds [st org-id]
   (->> (eb/select-latest-builds (sc/get-conn st) org-id)

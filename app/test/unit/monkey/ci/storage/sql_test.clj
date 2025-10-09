@@ -449,115 +449,120 @@
           (is (= 1 (st/find-next-build-idx s repo-sid))
               "initial index is one")
           (is (= 2 (st/find-next-build-idx s repo-sid))
-              "increases on each invocation")))
+              "increases on each invocation"))))
 
-      (testing "can list builds since timestamp"
-        (let [repo (h/gen-repo)
-              org (-> (h/gen-org)
-                       (assoc :repos {(:id repo) repo}))
-              old-build (-> (h/gen-build)
-                            (assoc :org-id (:id org)
-                                   :repo-id (:id repo)
-                                   :start-time 100)
-                            (dissoc :script))
-              new-build (-> (h/gen-build)
-                            (assoc :org-id (:id org)
-                                   :repo-id (:id repo)
-                                   :start-time 200)
-                            (dissoc :script))]
-          (is (sid/sid? (st/save-org s org)))
-          (is (sid/sid? (st/save-build s old-build)))
-          (is (sid/sid? (st/save-build s new-build)))
-          (let [r (st/list-builds-since s (:id org) 150)]
-            (is (= [(:build-id new-build)] (map :build-id r)))
-            (is (= (:id org) (:org-id (first r))))
-            (is (= (:id repo) (:repo-id (first r)))))))
+    (testing "can list builds since timestamp"
+      (let [repo (h/gen-repo)
+            org (-> (h/gen-org)
+                    (assoc :repos {(:id repo) repo}))
+            old-build (-> (h/gen-build)
+                          (assoc :org-id (:id org)
+                                 :repo-id (:id repo)
+                                 :start-time 100)
+                          (dissoc :script))
+            new-build (-> (h/gen-build)
+                          (assoc :org-id (:id org)
+                                 :repo-id (:id repo)
+                                 :start-time 200)
+                          (dissoc :script))]
+        (is (sid/sid? (st/save-org s org)))
+        (is (sid/sid? (st/save-build s old-build)))
+        (is (sid/sid? (st/save-build s new-build)))
+        (let [r (st/list-builds-since s (:id org) 150)]
+          (is (= [(:build-id new-build)] (map :build-id r)))
+          (is (= (:id org) (:org-id (first r))))
+          (is (= (:id repo) (:repo-id (first r)))))))
 
-      (testing "can find latest by build index"
-        (let [repo (h/gen-repo)
-              org (-> (h/gen-org)
-                       (assoc :repos {(:id repo) repo}))
-              old-build (-> (h/gen-build)
-                            (assoc :org-id (:id org)
-                                   :repo-id (:id repo)
-                                   :start-time 100
-                                   :idx 9
-                                   :build-id "build-9")
-                            (dissoc :script))
-              new-build (-> (h/gen-build)
-                            (assoc :org-id (:id org)
-                                   :repo-id (:id repo)
-                                   :start-time 200
-                                   :idx 10
-                                   :build-id "build-10")
-                            (dissoc :script))]
-          (is (sid/sid? (st/save-org s org)))
-          (is (sid/sid? (st/save-build s old-build)))
-          (is (sid/sid? (st/save-build s new-build)))
-          (let [r (st/find-latest-build s [(:id org) (:id repo)])]
-            (is (= (:build-id new-build) (:build-id r))))))
+    (testing "can find latest by build index"
+      (let [repo (h/gen-repo)
+            org (-> (h/gen-org)
+                    (assoc :repos {(:id repo) repo}))
+            old-build (-> (h/gen-build)
+                          (assoc :org-id (:id org)
+                                 :repo-id (:id repo)
+                                 :start-time 100
+                                 :idx 9
+                                 :build-id "build-9")
+                          (dissoc :script))
+            new-build (-> (h/gen-build)
+                          (assoc :org-id (:id org)
+                                 :repo-id (:id repo)
+                                 :start-time 200
+                                 :idx 10
+                                 :build-id "build-10")
+                          (dissoc :script))
+            job {:id "test-job"}]
+        (is (sid/sid? (st/save-org s org)))
+        (is (sid/sid? (st/save-build s old-build)))
+        (is (sid/sid? (st/save-build s new-build)))
+        (is (sid/sid? (st/save-job s (st/ext-build-sid new-build) job)))
+        (let [r (st/find-latest-build s [(:id org) (:id repo)])]
+          (is (= (:build-id new-build) (:build-id r))
+              "is latest build")
+          (is (= {(:id job) job} (get-in r [:script :jobs]))
+              "contains job details"))))
 
-      (testing "can find all latest for org"
-        (let [repos (repeatedly 2 h/gen-repo)
-              org (-> (h/gen-org)
-                       (assoc :repos (->> repos
-                                          (map (fn [r] [(:id r) r]))
-                                          (into {}))))
-              builds (->> [{:idx 1
-                            :build-id "build-1"
-                            :repo-id (:id (first repos))}
-                           {:idx 2
-                            :build-id "build-2"
-                            :repo-id (:id (first repos))}
-                           {:idx 3
-                            :build-id "build-3"
-                            :repo-id (:id (second repos))}
-                           {:idx 4
-                            :build-id "build-4"
-                            :repo-id (:id (second repos))}]
-                          (map #(assoc % :org-id (:id org))))]
-          (is (sid/sid? (st/save-org s org)))
-          (doseq [b builds]
-            (is (sid/sid? (st/save-build s b))))
-          (let [latest (st/find-latest-builds s (:id org))]
-            (is (= #{"build-2" "build-4"}
-                   (->> latest
-                        (map :build-id)
-                        (set)))))))
+    (testing "can find all latest for org"
+      (let [repos (repeatedly 2 h/gen-repo)
+            org (-> (h/gen-org)
+                    (assoc :repos (->> repos
+                                       (map (fn [r] [(:id r) r]))
+                                       (into {}))))
+            builds (->> [{:idx 1
+                          :build-id "build-1"
+                          :repo-id (:id (first repos))}
+                         {:idx 2
+                          :build-id "build-2"
+                          :repo-id (:id (first repos))}
+                         {:idx 3
+                          :build-id "build-3"
+                          :repo-id (:id (second repos))}
+                         {:idx 4
+                          :build-id "build-4"
+                          :repo-id (:id (second repos))}]
+                        (map #(assoc % :org-id (:id org))))]
+        (is (sid/sid? (st/save-org s org)))
+        (doseq [b builds]
+          (is (sid/sid? (st/save-build s b))))
+        (let [latest (st/find-latest-builds s (:id org))]
+          (is (= #{"build-2" "build-4"}
+                 (->> latest
+                      (map :build-id)
+                      (set)))))))
 
-      (testing "can find latest n for org"
-        (let [repos (repeatedly 2 h/gen-repo)
-              org (-> (h/gen-org)
-                       (assoc :repos (->> repos
-                                          (map (fn [r] [(:id r) r]))
-                                          (into {}))))
-              builds (->> [{:idx 1
-                            :build-id "build-1"
-                            :repo-id (:id (first repos))
-                            :start-time 100}
-                           {:idx 2
-                            :build-id "build-2"
-                            :repo-id (:id (first repos))
-                            :start-time 200}
-                           {:idx 3
-                            :build-id "build-3"
-                            :repo-id (:id (second repos))
-                            :start-time 300}
-                           {:idx 4
-                            :build-id "build-4"
-                            :repo-id (:id (second repos))
-                            :start-time 400}]
-                          (map #(assoc % :org-id (:id org))))]
-          (is (sid/sid? (st/save-org s org)))
-          (doseq [b builds]
-            (is (sid/sid? (st/save-build s b))))
-          (let [latest (st/find-latest-n-builds s (:id org) 2)]
-            (is (= #{"build-3" "build-4"}
-                   (->> latest
-                        (map :build-id)
-                        (set))))
-            (is (= (:id (second repos))
-                   (-> latest first :repo-id)))))))))
+    (testing "can find latest n for org"
+      (let [repos (repeatedly 2 h/gen-repo)
+            org (-> (h/gen-org)
+                    (assoc :repos (->> repos
+                                       (map (fn [r] [(:id r) r]))
+                                       (into {}))))
+            builds (->> [{:idx 1
+                          :build-id "build-1"
+                          :repo-id (:id (first repos))
+                          :start-time 100}
+                         {:idx 2
+                          :build-id "build-2"
+                          :repo-id (:id (first repos))
+                          :start-time 200}
+                         {:idx 3
+                          :build-id "build-3"
+                          :repo-id (:id (second repos))
+                          :start-time 300}
+                         {:idx 4
+                          :build-id "build-4"
+                          :repo-id (:id (second repos))
+                          :start-time 400}]
+                        (map #(assoc % :org-id (:id org))))]
+        (is (sid/sid? (st/save-org s org)))
+        (doseq [b builds]
+          (is (sid/sid? (st/save-build s b))))
+        (let [latest (st/find-latest-n-builds s (:id org) 2)]
+          (is (= #{"build-3" "build-4"}
+                 (->> latest
+                      (map :build-id)
+                      (set))))
+          (is (= (:id (second repos))
+                 (-> latest first :repo-id))))))))
 
 (deftest ^:sql jobs
   (with-storage conn s
