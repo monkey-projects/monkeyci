@@ -21,11 +21,17 @@
 
 (def body c/body)
 
+(defn- save-webhook [st wh]
+  ;; Make sure org id is not the display id
+  (-> wh
+      (update :org-id #(or (st/find-org-id-by-display-id st %) %))
+      (as-> r (st/save-webhook st r))))
+
 (c/make-entity-endpoints "webhook"
                          {:get-id (c/id-getter :webhook-id)
                           :getter (comp #(dissoc % :secret-key)
                                         st/find-webhook)
-                          :saver st/save-webhook
+                          :saver save-webhook
                           :deleter st/delete-webhook})
 
 (c/make-entity-endpoints "user"
@@ -52,7 +58,7 @@
              :secret-key (auth/generate-secret-key)
              :creation-time (t/now)))
 
-(def create-webhook (comp (c/entity-creator st/save-webhook c/default-id)
+(def create-webhook (comp (c/entity-creator save-webhook c/default-id)
                           assign-new-webhook-props))
 
 (def org-id c/org-id)

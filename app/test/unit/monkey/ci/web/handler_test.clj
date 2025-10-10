@@ -174,6 +174,23 @@
                            (secure-app-req {:storage st
                                             :org-id (st/new-id)})
                            :status)))))))
+
+  (testing "can create using org display id"
+    (let [[org-id repo-id] (repeatedly st/new-id)
+          st (st/make-memory-storage)]
+      (is (some? (st/save-org st {:id org-id :display-id "test-org"})))
+      (let [r (-> (h/json-request :post
+                                     "/webhook"
+                                     {:org-id "test-org"
+                                      :repo-id repo-id})
+                     (secure-app-req {:storage st
+                                      :org-id org-id}))
+            b (h/reply->json r)]
+        (is (= 201 (:status r)))
+        (is (= [org-id repo-id]
+               (-> (st/find-webhook st (:id b))
+                   (select-keys [:org-id :repo-id])
+                   (vals)))))))
   
   (testing "`GET /health` returns 200"
     (is (= 200 (-> (mock/request :get "/webhook/health")
