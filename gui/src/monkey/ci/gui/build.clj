@@ -22,6 +22,8 @@
          [:content.flex-fill "Loading..."]]
         [:div.mt-auto
          (cc/footer config)]]]]
+     ;; Must be loaded before bootstrap to enable dropdowns
+     (cc/script (cc/script-url config "popper.min.js"))
      (cc/script (cc/script-url config "bootstrap.min.js"))
      (cc/script (cc/script-url config "theme.min.js"))]
     (map #(cc/script (format "/js/%s.js" (name %1)))
