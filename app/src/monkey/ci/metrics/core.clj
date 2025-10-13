@@ -64,7 +64,8 @@
 (defn- add-entity-metrics [reg st]
   (->> [es/user-count-gauge
         es/org-count-gauge
-        es/repo-count-gauge]
+        es/repo-count-gauge
+        es/email-reg-count-gauge]
        (reduce (fn [r f]
                  (f st r)
                  r)

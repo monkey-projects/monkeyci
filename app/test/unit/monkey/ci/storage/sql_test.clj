@@ -638,6 +638,9 @@
         (is (= [(:id er)] (->> (st/list-email-registrations s)
                                (map :id)))))
 
+      (testing "can count"
+        (is (= 1 (st/count-email-registrations s))))
+      
       (testing "can delete"
         (is (true? (st/delete-email-registration s (:id er))))
         (is (empty? (st/list-email-registrations s)))))))

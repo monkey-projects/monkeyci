@@ -94,6 +94,9 @@
 
       (testing "contains repo count"
         (is (cs/includes? (sut/scrape (:registry co)) "monkeyci_repo_count")))
+
+      (testing "contains email registration count"
+        (is (cs/includes? (sut/scrape (:registry co)) "monkeyci_emailreg_count")))
       
       (finally
         (co/stop co)))))

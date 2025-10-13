@@ -26,3 +26,5 @@
 (defn delete-email-registration [conn cuid]
   (ec/delete-email-registrations conn (ec/by-cuid cuid)))
 
+(defn count-email-registrations [st]
+  (ec/count-entities (sc/get-conn st) :email-registrations))

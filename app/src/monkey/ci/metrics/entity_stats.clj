@@ -26,3 +26,10 @@
   (p/make-gauge (c/metric-id ["repo" "count"]) reg
                 {:callback #(st/count-repos st)
                  :description "Total number of repositories in the database"}))
+
+(defn email-reg-count-gauge
+  "Gauge that counts email registrations in db"
+  [st reg]
+  (p/make-gauge (c/metric-id ["emailreg" "count"]) reg
+                {:callback #(st/count-email-registrations st)
+                 :description "Total number of email registrations in the database"}))

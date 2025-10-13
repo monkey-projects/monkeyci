@@ -696,6 +696,13 @@
 (defn delete-email-registration [s id]
   (p/delete-obj s (email-registration-sid id)))
 
+(def count-email-registrations
+  (override-or
+   [:email-registration :count]
+   (fn [s]
+     (-> (p/list-obj s (email-registration-sid))
+         (count)))))
+
 (def org-credits :org-credits)
 (def org-credit-sid (partial global-sid org-credits))
 

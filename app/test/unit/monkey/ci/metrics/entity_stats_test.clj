@@ -39,3 +39,12 @@
         (is (= 0.0 (gauge-val g)))
         (is (some? (st/save-repo st (h/gen-repo))))
         (is (= 1.0 (gauge-val g)))))))
+
+(deftest email-reg-count-gauge
+  (h/with-memory-store st
+    (testing "provides number of email registrations in storage"
+      (let [reg (p/make-registry)
+            g (sut/email-reg-count-gauge st reg)]
+        (is (= 0.0 (gauge-val g)))
+        (is (some? (st/save-email-registration st (h/gen-email-registration))))
+        (is (= 1.0 (gauge-val g)))))))

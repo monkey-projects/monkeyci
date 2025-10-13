@@ -470,7 +470,8 @@
     :list-events select-job-events}
    :email-registration
    {:list ser/select-email-registrations
-    :find-by-email ser/select-email-registration-by-email}
+    :find-by-email ser/select-email-registration-by-email
+    :count ser/count-email-registrations}
    :param
    {:save sp/upsert-org-param
     :find sp/select-org-param
