@@ -30,7 +30,8 @@
 (deftest run-build-local
   (testing "creates event broker and posts `build/pending` event"
     (let [broker (tm/test-component)]
-      (is (md/deferred? (sut/run-build-local {:mailman broker})))
+      (is (md/deferred? (sut/run-build-local {:mailman broker
+                                              :args {:quiet true}})))
       (let [evt (-> broker
                     :broker
                     (tm/get-posted)
@@ -41,7 +42,8 @@
   (let [broker (tm/test-component)]
     (is (md/deferred? (sut/run-build-local {:mailman broker
                                             :work-dir "/test/dir"
-                                            :args {:dir ".script"}})))
+                                            :args {:dir ".script"
+                                                   :quiet true}})))
     (let [build (-> broker
                     :broker
                     (tm/get-posted)

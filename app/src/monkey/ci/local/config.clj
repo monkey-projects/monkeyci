@@ -39,6 +39,11 @@
 (defn set-params [conf p]
   (assoc conf :params p))
 
+(def get-quiet :quiet)
+
+(defn set-quiet [conf v]
+  (assoc conf :quiet v))
+
 (def get-ending
   "Retrieves the result deferred, that is used to pass build result to the caller."
   :ending)

@@ -47,9 +47,12 @@
             (lco/make-routes {:state state}))]
     (em/map->RouteComponent {:config conf :make-routes make-routes})))
 
-(defn- new-renderer [_]
-  (lco/map->PeriodicalRenderer {:renderer (lco/console-renderer lco/render-state)
-                                :interval 200}))
+(defn- new-renderer [conf]
+  (if-not (lc/get-quiet conf)
+    (lco/map->PeriodicalRenderer {:renderer (lco/console-renderer lco/render-state)
+                                  :interval 200})
+    ;; No rendering
+    {}))
 
 (defn- new-podman-routes [conf]
   (letfn [(make-routes [{:keys [config build] :as c}]

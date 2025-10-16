@@ -42,7 +42,11 @@
           {:as "Build params file"
            :option "param-file"
            :type :string
-           :multiple true}]
+           :multiple true}
+          {:as "No output"
+           :option "quiet"
+           :short "q"
+           :type :with-flag}]
    :runs {:command cmd/run-build-local
           :app-mode :cli}})
 

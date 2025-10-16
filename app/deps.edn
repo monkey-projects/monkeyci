@@ -87,6 +87,10 @@
    :override-deps {com.monkeyci/common {:local/root "../common"}}
    :exec-fn monkey.test/all}
 
+  ;; clj -M:test:kaocha
+  :kaocha
+  {:main-opts ["-m" "kaocha.runner"]}
+
   ;; clj -M:test:junit
   :junit ; Use this in conjunction with :test
   {:extra-deps {lambdaisland/kaocha-junit-xml {:mvn/version "1.17.101"}}

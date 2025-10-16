@@ -116,6 +116,7 @@
   ;; Allow mailman override for testing
   (-> (select-keys opts [:mailman :lib-coords :log-opts :podman])
       (lc/set-build (config->build opts))
+      (lc/set-quiet (:quiet args))
       (lc/set-params (concat (parse-params (:param args))
                              (load-param-files (:param-file args))))
       (lc/set-global-api (-> (select-keys (:account opts) [:url :token])
