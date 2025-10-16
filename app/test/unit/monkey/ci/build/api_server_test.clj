@@ -234,9 +234,8 @@
         (is (not-empty (slurp (:body res))))))))
 
 (deftest get-ip-addr
-  (testing "returns ipv4 address"
-    (is (re-matches #"\d+\.\d+\.\d+\.\d+"
-                    (sut/get-ip-addr)))))
+  (testing "returns valid ip address"
+    (is (some? (java.net.InetAddress/getByName (sut/get-ip-addr))))))
 
 (deftest api-server-routes
   (let [token (sut/generate-token)

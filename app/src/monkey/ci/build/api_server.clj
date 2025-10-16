@@ -111,7 +111,8 @@
   (->> (enumeration-seq (java.net.NetworkInterface/getNetworkInterfaces))
        (remove (some-fn (memfn isLoopback) (memfn isVirtual)))
        (mapcat (comp enumeration-seq (memfn getInetAddresses)))
-       (filter (memfn isSiteLocalAddress))
+       ;; TODO Also allow ipv6 addresses
+       (filter (partial instance? java.net.Inet4Address))
        (map (memfn getHostAddress))))
 
 (defn get-ip-addr

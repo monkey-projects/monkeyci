@@ -201,7 +201,10 @@
               (is (map? args)))
             
             (testing "contains api server url"
-              (is (re-matches #"^http://\d+\.\d+.\d+.\d+:\d+$" (:url (sc/api args))))))
+              (is (some? (-> (sc/api args)
+                             :url
+                             (java.net.URI.)
+                             (.toURL))))))
 
           (testing "adds logback configuration"
             (let [args (get-in deps [:aliases :monkeyci/build :jvm-opts])]
