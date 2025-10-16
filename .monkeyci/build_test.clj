@@ -1,7 +1,7 @@
 (ns build-test
   (:require [clojure.test :refer [deftest testing is]]
-            [babashka.fs :as fs]
             [build :as sut]
+            [minio :as minio]
             [clojure.string :as cs]
             [monkey.ci.api :as m]
             [monkey.ci.build.core :as bc]
@@ -125,10 +125,10 @@
                              "s3-secret-key" "test-secret"}
         (let [inv (atom nil)
               client (atom nil)]
-          (with-redefs [sut/make-s3-client (fn [& args]
-                                             (reset! client args))
-                        sut/put-s3-file (fn [client & args]
-                                          (reset! inv args))]
+          (with-redefs [minio/make-s3-client (fn [& args]
+                                               (reset! client args))
+                        minio/put-s3-file (fn [client & args]
+                                            (reset! inv args))]
             (testing "puts object to s3 bucket using params"
               (is (bc/success? (mt/execute-job job (-> mt/test-ctx
                                                        (mt/with-git-ref "refs/tags/1.2.3")))))

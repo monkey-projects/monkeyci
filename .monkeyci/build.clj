@@ -1,9 +1,9 @@
 ;; Build script for Monkey-ci itself
 (ns build
   (:require [babashka.fs :as fs]
-            [clojure.java.io :as io]
             [clojure.string :as cs]
             [medley.core :as mc]
+            [minio :as minio]
             [monkey.ci.api :as m]
             [monkey.ci.build
              [api :as api]
@@ -12,8 +12,7 @@
             [monkey.ci.plugin
              [github :as gh]
              [kaniko :as kaniko]
-             [pushover :as po]])
-  (:import [io.minio MinioClient PutObjectArgs]))
+             [pushover :as po]]))
 
 (def tag-regex #"^refs/tags/(\d+\.\d+\.\d+(\.\d+)?$)")
 
@@ -145,39 +144,12 @@
                   (m/save-artifacts uberjar-artifact))
         v (m/env {"MONKEYCI_VERSION" v})))))
 
-(defn make-s3-client [url access-key secret]
-  (.. (MinioClient/builder)
-      (endpoint url)
-      (credentials access-key secret)
-      (build)))
-
-(defn put-object-args [bucket dest stream size]
-  (.. (PutObjectArgs/builder)
-      (bucket bucket)
-      (object dest)
-      (stream stream size -1)
-      ;; Make file publicly available
-      (headers {"x-amz-acl" "public-read"})
-      (build)))
-
-(defn put-s3-object
-  "Uploads the file `f` to given bucket destination"
-  [client bucket dest stream size]
-  (with-open [s stream]
-    (let [args (put-object-args bucket dest s size)]
-      (.putObject client args))))
-
-(defn put-s3-file
-  "Uploads the file `f` to given bucket destination"
-  [client bucket dest f]
-  (put-s3-object client bucket dest (io/input-stream f) (fs/size f)))
-
 (defn- upload-to-bucket [ctx do-put]
   (let [params (api/build-params ctx)
         url (get params "s3-url")
         access-key (get params "s3-access-key")
         secret-key (get params "s3-secret-key")
-        client (make-s3-client url access-key secret-key)
+        client (minio/make-s3-client url access-key secret-key)
         bucket (get params "s3-bucket")]
     (if (some? (do-put client bucket))
       m/success
@@ -193,9 +165,9 @@
          (fn [ctx]
            (upload-to-bucket
             ctx
-            #(put-s3-file %1 %2
-                          (format "monkeyci/%s.jar" (image-version ctx))
-                          (m/in-work ctx (:path uberjar-artifact))))))
+            #(minio/put-s3-file %1 %2
+                                (format "monkeyci/%s.jar" (image-version ctx))
+                                (m/in-work ctx (:path uberjar-artifact))))))
         (m/depends-on ["app-uberjar"])
         (m/restore-artifacts [(as-dir uberjar-artifact)]))))
 
@@ -214,10 +186,10 @@
            (let [script (prepare-install-script ctx)]
              (upload-to-bucket
               ctx
-              #(put-s3-object %1 %2
-                              "install-cli.sh"
-                              (java.io.ByteArrayInputStream. (.getBytes script))
-                              (count script))))))
+              #(minio/put-s3-object %1 %2
+                                    "install-cli.sh"
+                                    (java.io.ByteArrayInputStream. (.getBytes script))
+                                    (count script))))))
         (m/depends-on ["upload-uberjar"]))))
 
 (def img-base "rg.fr-par.scw.cloud/monkeyci")
@@ -307,7 +279,7 @@
 
 (defn- shadow-release [id build]
   (-> (m/container-job id)
-      (m/image "docker.io/monkeyci/clojure-node:1.11.4")
+      (m/image "docker.io/monkeyci/clojure-node:1.12.3")
       (m/work-dir "gui")
       (m/script
        ["npm install"
@@ -372,13 +344,6 @@
      {:msg (str "MonkeyCI version " (tag-version ctx) " has been released.")
       :dependencies ["app-img-manifest" "gui-img-manifest"]})))
 
-;; TODO Add jobs that auto-deploy to staging after running some sanity checks
-;; We could do a git push with updated kustomization file.
-;; But running sanity checks requires a running app.  Either we could rely on
-;; argocd to do a blue/green deploy, or start it as a service (somehow) and
-;; run the checks here.  The latter is preferred as it is contained inside the
-;; build process.
-
 ;; List of jobs
 (def jobs
   [test-common
@@ -399,7 +364,7 @@
    build-app-image
    build-gui-image
    
-   ;; Scaleway images
+   ;; Trigger scaleway images
    scw-images
    
    notify])
