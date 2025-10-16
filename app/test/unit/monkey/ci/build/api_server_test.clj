@@ -235,7 +235,16 @@
 
 (deftest get-ip-addr
   (testing "returns valid ip address"
-    (is (some? (java.net.InetAddress/getByName (sut/get-ip-addr))))))
+    (is (instance? java.net.InetAddress (sut/get-ip-addr)))))
+
+(deftest api-host-address
+  (testing "converts ipv4 to url"
+    (is (= "http://1.2.3.4:1234"
+           (sut/->url (java.net.InetAddress/getByName "1.2.3.4") 1234))))
+
+  (testing "converts ipv6 to url"
+    (is (= "http://[0:0:0:0:0:0:0:1]:1234"
+           (sut/->url (java.net.InetAddress/getByName "::1") 1234)))))
 
 (deftest api-server-routes
   (let [token (sut/generate-token)

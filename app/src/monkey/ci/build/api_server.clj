@@ -111,14 +111,25 @@
   (->> (enumeration-seq (java.net.NetworkInterface/getNetworkInterfaces))
        (remove (some-fn (memfn isLoopback) (memfn isVirtual)))
        (mapcat (comp enumeration-seq (memfn getInetAddresses)))
-       ;; TODO Also allow ipv6 addresses
-       (filter (partial instance? java.net.Inet4Address))
-       (map (memfn getHostAddress))))
+       #_(filter (partial instance? java.net.Inet4Address))
+       #_(map (memfn getHostAddress))))
 
 (defn get-ip-addr
   "Determines the ip address of this VM"
   []
   (first (get-all-ip-addresses)))
+
+(defprotocol ApiHostAddress
+  (->url [this port] "Converts this host address to a url with given port"))
+
+(extend-protocol ApiHostAddress
+  java.net.Inet4Address
+  (->url [this port]
+    (format "http://%s:%d" (.getHostAddress this) port))
+
+  java.net.Inet6Address
+  (->url [this port]
+    (format "http://[%s]:%d" (.getHostAddress this) port)))
 
 (defn post-events [req]
   (let [evt (get-in req [:parameters :body])]
@@ -343,4 +354,4 @@
   [{:keys [port] :as conf}]
   (-> conf
       (select-keys [:port :token])
-      (assoc :url (format "http://%s:%d" (get-ip-addr) port))))
+      (assoc :url (->url (get-ip-addr) port))))
