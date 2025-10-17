@@ -21,6 +21,7 @@
           r (-> {:mailman broker}
                 (lc/set-work-dir dir)
                 (lc/set-build (h/gen-build))
+                (lc/set-quiet true)
                 (sut/start-and-post evt))]
       (testing "returns deferred"
         (is (md/deferred? r)))
@@ -84,6 +85,7 @@
       (let [sys (-> {:mailman (tm/test-component)}
                     (lc/set-work-dir dir)
                     (lc/set-build {:dek ::test-dek})
+                    (lc/set-quiet true)
                     (sut/make-system)
                     (co/start))]
         (testing "podman routes"
