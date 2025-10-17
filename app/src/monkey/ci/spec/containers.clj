@@ -1,16 +1,7 @@
 (ns monkey.ci.spec.containers
   "Container related config and context specs"
   (:require [clojure.spec.alpha :as s]
-            [monkey.ci.spec
-             [build :as b]
-             [common :as c]]))
-
-(s/def ::dev-mode? boolean?)
-(s/def ::log-maker fn?)
-
-(s/def ::podman-context
-  (s/keys :req-un [::b/build ::log-maker]
-          :opt-un [::dev-mode? ::c/artifacts ::c/cache]))
+            [monkey.ci.spec.common :as c]))
 
 (s/def ::org-id c/id?)
 (s/def ::repo-id c/id?)

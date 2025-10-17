@@ -45,10 +45,10 @@
 (s/def :job/script (s/coll-of :job/command))
 
 (s/def :script/job
-  (-> (s/keys :req-un [:job/id]
-              :opt-un [:job/type :job/dependencies :job/caches :job/save-artifacts :job/restore-artifacts
-                       :job/script :job/memory :job/cpus :job/size :job/arch :job/status ::c/timeout
-                       :job/credit-multiplier])))
+  (s/keys :req-un [:job/id]
+          :opt-un [:job/type :job/dependencies :job/caches :job/save-artifacts :job/restore-artifacts
+                   :job/script :job/memory :job/cpus :job/size :job/arch :job/status ::c/timeout
+                   :job/credit-multiplier]))
 
 (s/def :script/jobs (s/coll-of :script/job))
 
