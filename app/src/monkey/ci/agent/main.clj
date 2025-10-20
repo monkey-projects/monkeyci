@@ -12,10 +12,7 @@
   (:gen-class)
   (:require [clojure.tools.logging :as log]
             [monkey.ci.agent.runtime :as ar]
-            [monkey.ci
-             [config :as c]
-             ;; Enable additional reader tags
-             [edn]]
+            [monkey.ci.config :as c]
             [monkey.ci.runtime.common :as rc]
             [monkey.ci.web.http :as wh]))
 

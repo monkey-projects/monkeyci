@@ -3,6 +3,7 @@
             [clojure.string :as cs]
             [clojure.tools.logging :as log]
             [monkey.ci
+             [edn :as edn]
              [labels :as lbl]
              [storage :as st]
              [time :as t]
@@ -223,6 +224,9 @@
         ;; Convert keys to kebab-case
         [:formats "application/json" :decoder-opts]
         {:decode-key-fn csk/->kebab-case-keyword})
+       (assoc-in
+        [:formats "application/edn" :decoder-opts]
+        edn/default-opts)
        (assoc-in
         [:formats "application/json" :encoder-opts]
         {:encode-key-fn (comp csk/->camelCase name)}))))
