@@ -5,9 +5,16 @@
             [com.stuartsierra.component :as co]
             [medley.core :as mc]
             [monkey.ci.events.mailman.jms :as jms]
-            [monkey.ci.protocols :as p]
+            [monkey.ci
+             [edn :as edn]
+             [protocols :as p]]
             [monkey.mailman.core :as mmc]
-            [monkey.mailman.nats.core :as mnc]))
+            [monkey.mailman.nats.core :as mnc]
+            [monkey.nats.core :as nats]))
+
+(def default-broker-opts
+  {:serializer   (comp nats/to-bytes edn/->edn)
+   :deserializer (comp edn/edn-> (memfn getData))})
 
 (def ^:private subject-types
   ;; Use the same as jms
