@@ -14,7 +14,10 @@
 
 (def default-broker-opts
   {:serializer   (comp nats/to-bytes edn/->edn)
-   :deserializer (comp edn/edn-> (memfn getData))})
+   :deserializer (fn [msg]
+                   (some-> msg
+                           (.getData)
+                           (edn/edn->)))})
 
 (def ^:private subject-types
   ;; Use the same as jms
@@ -40,7 +43,7 @@
           conn (nats/make-connection conf)
           subjects (types-to-subjects (:prefix conf))
           broker-conf (-> conf
-                          (select-keys [:stream :consumer :poll-opts])
+                          (select-keys [:stream :consumer :poll-opts :serializer :deserializer])
                           (merge {:subject-mapper (comp subjects :type)}))]
       (log/debug "Using broker configuration:" broker-conf)
       (-> this

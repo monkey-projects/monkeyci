@@ -356,6 +356,16 @@
    :enter (fn [ctx]
             (set-podman-opts ctx opts))})
 
+(defn job-queued [conf ctx]
+  (let [{:keys [job-id sid]} (:event ctx)]
+    [(-> (j/job-initializing-evt job-id sid (:credit-multiplier conf))
+         (assoc :local-dir (get-job-dir ctx)))]))
+
+(defn job-queued-result [conf]
+  {:name ::job-queued
+   :leave (fn [ctx]
+            (emi/set-result ctx (job-queued conf ctx)))})
+
 ;;; Event handlers
 
 (def container-end-evt
@@ -384,17 +394,12 @@
                      (mc/filter-keys (complement reserved?)))
      :exit-fn (proc/exit-fn
                (fn [{:keys [exit]}]
-                 (log/info "Container job exited with code" exit)
+                 (log/info "Container job" job-id "exited with code" exit)
                  (try
                    (em/post-events (emi/get-mailman ctx)
                                    [(container-end-evt job-id sid (if (= 0 exit) bc/success bc/failure))])
                    (catch Exception ex
                      (log/error "Failed to post job/executed event" ex)))))}))
-
-(defn job-queued [conf ctx]
-  (let [{:keys [job-id sid]} (:event ctx)]
-    [(-> (j/job-initializing-evt job-id sid (:credit-multiplier conf))
-         (assoc :local-dir (get-job-dir ctx)))]))
 
 (defn job-init [ctx]
   (let [{:keys [job-id sid]} (:event ctx)]
@@ -420,7 +425,7 @@
     [[:container/job-queued
       [{:handler prepare-child-cmd
         :interceptors [emi/handle-job-error
-                       emi/no-result
+                       (job-queued-result conf)
                        state
                        save-job
                        inc-job-count
@@ -433,9 +438,7 @@
                        (art/restore-interceptor emi/get-job-ctx)
                        decrypt-env
                        emi/start-process
-                       (add-podman-opts (:podman conf))]}
-       {:handler (partial job-queued conf)
-        :interceptors [(add-job-dir wd)]}]]
+                       (add-podman-opts (:podman conf))]}]]
 
      [:job/initializing
       ;; TODO Start polling for events from events.edn?

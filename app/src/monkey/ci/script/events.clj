@@ -203,16 +203,6 @@
             (assoc ctx :result [(-> (script-end-evt ctx :error)
                                     (assoc :message (ex-message ex)))]))})
 
-(def handle-job-error
-  "Marks job as failed"
-  {:name ::job-error-handler
-   :error (fn [{{:keys [job-id sid] :as event} :event :as ctx} ex]
-            (log/error "Error in job event" (:type event) "for" job-id ex)
-            (assoc ctx :result [(-> (j/job-end-evt job-id
-                                                   sid
-                                                   (-> bc/failure
-                                                       (bc/with-message (ex-message ex)))))]))})
-
 (def mark-canceled
   "Marks build as canceled, so no other jobs will be enqueued."
   {:name ::mark-canceled
@@ -331,7 +321,7 @@
       ;; Raised when a new job is queued.  This handler splits it up according to
       ;; type and executes before-extensions.  Action jobs are executed immediately.
       [{:handler job-queued
-        :interceptors [handle-job-error
+        :interceptors [emi/handle-job-error
                        state
                        with-job-ctx
                        ext/before-interceptor
@@ -340,7 +330,7 @@
      [:job/executed
       ;; Handle this for both container and action jobs
       [{:handler job-executed
-        :interceptors [handle-job-error
+        :interceptors [emi/handle-job-error
                        state
                        add-job-ctx
                        add-result-to-ctx
