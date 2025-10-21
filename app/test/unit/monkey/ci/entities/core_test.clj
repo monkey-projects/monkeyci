@@ -248,7 +248,19 @@
 
       (testing "can delete"
         (is (= 1 (sut/delete-jobs conn (sut/by-id (:id job)))))
-        (is (empty? (sut/select-jobs conn (sut/by-build (:id build)))))))))
+        (is (empty? (sut/select-jobs conn (sut/by-build (:id build))))))
+
+      (testing "can store regexes in edn"
+        (let [job (sut/insert-job
+                   conn
+                   (-> (eh/gen-job)
+                       (assoc :build-id (:id build)
+                              :details {:test-regex #"some regex"})))]
+          (is (= "some regex"
+                 (some-> (sut/select-job conn (sut/by-id (:id job)))
+                         :details
+                         :test-regex
+                         str))))))))
 
 (deftest ^:sql users
   (eh/with-prepared-db conn
