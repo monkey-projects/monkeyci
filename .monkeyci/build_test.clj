@@ -1,6 +1,7 @@
 (ns build-test
   (:require [clojure.test :refer [deftest testing is]]
             [build :as sut]
+            [clojars :as clojars]
             [minio :as minio]
             [clojure.string :as cs]
             [monkey.ci.api :as m]
@@ -78,21 +79,29 @@
                  second))))))
 
 (deftest publish
-  (mt/with-build-params {"CLOJARS_USERNAME" "testuser"
-                         "CLOJARS_PASSWORD" "testpass"}
-    (let [p (-> mt/test-ctx
-                (mt/with-git-ref "refs/tags/1.2.3")
-                (sut/publish "publish" "app"))
-          e (m/env p)]
-      (testing "creates container job"
-        (is (m/container-job? p)))
+  (with-redefs [clojars/latest-version (constantly "1.0.0")]
+    (let [ctx (-> mt/test-ctx
+                  (mt/with-checkout-dir ".."))]
+      (mt/with-build-params {"CLOJARS_USERNAME" "testuser"
+                             "CLOJARS_PASSWORD" "testpass"}
+        (let [p (-> ctx
+                    (mt/with-git-ref "refs/tags/1.2.3")
+                    (sut/publish "publish" "app"))
+              e (m/env p)]
+          (testing "creates container job"
+            (is (m/container-job? p)))
 
-      (testing "passes clojars credits to env"
-        (is (= "testuser" (get e "CLOJARS_USERNAME")))
-        (is (= "testpass" (get e "CLOJARS_PASSWORD"))))
+          (testing "passes clojars credits to env"
+            (is (= "testuser" (get e "CLOJARS_USERNAME")))
+            (is (= "testpass" (get e "CLOJARS_PASSWORD"))))
 
-      (testing "passes tag version"
-        (is (= "1.2.3" (get e "MONKEYCI_VERSION")))))))
+          (testing "passes tag version"
+            (is (= "1.2.3" (get e "MONKEYCI_VERSION")))))
+
+        (testing "`nil` if version already published"
+          (is (nil? (-> ctx
+                        (mt/with-git-ref "refs/tags/1.0.0")
+                        (sut/publish "publish-app" "app")))))))))
 
 (deftest scw-images
   (testing "`nil` if no images published"
@@ -170,25 +179,27 @@
       (is (cs/includes? r "VERSION=0.16.4")))))
 
 (deftest jobs
-  (mt/with-build-params {}
-    (testing "with release tag"
-      (let [jobs (mt/resolve-jobs
-                  sut/jobs
-                  (-> mt/test-ctx
-                      (mt/with-git-ref "refs/tags/0.16.4")
-                      (assoc :archs [:amd])))
-            ids (set (map m/job-id jobs))]
-        (testing "contains pushover job"
-          (is (contains? ids "pushover")))
+  (with-redefs [clojars/latest-version (constantly "1.0.0")]
+    (mt/with-build-params {}
+      (testing "with release tag"
+        (let [jobs (mt/resolve-jobs
+                    sut/jobs
+                    (-> mt/test-ctx
+                        (mt/with-checkout-dir "..")
+                        (mt/with-git-ref "refs/tags/0.16.4")
+                        (assoc :archs [:amd])))
+              ids (set (map m/job-id jobs))]
+          (testing "contains pushover job"
+            (is (contains? ids "pushover")))
 
-        (testing "contains gui img publishing job"
-          (is (contains? ids "publish-gui-img-amd")))
+          (testing "contains gui img publishing job"
+            (is (contains? ids "publish-gui-img-amd")))
 
-        (testing "contains gui img manifest job"
-          (is (contains? ids "gui-img-manifest")))
+          (testing "contains gui img manifest job"
+            (is (contains? ids "gui-img-manifest")))
 
-        (testing "contains common test job"
-          (is (contains? ids "test-common")))
+          (testing "contains common test job"
+            (is (contains? ids "test-common")))
 
-        (testing "contains common publish job"
-          (is (contains? ids "publish-common")))))))
+          (testing "contains common publish job"
+            (is (contains? ids "publish-common"))))))))

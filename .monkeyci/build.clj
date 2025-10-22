@@ -1,6 +1,7 @@
 ;; Build script for Monkey-ci itself
 (ns build
   (:require [babashka.fs :as fs]
+            [clojars :as clojars]
             [clojure.string :as cs]
             [medley.core :as mc]
             [minio :as minio]
@@ -249,14 +250,19 @@
 (defn publish 
   "Executes script in clojure container that has clojars publish env vars"
   [ctx id dir & [version]]
-  ;; TODO If this is a release, and it's already been deployed, then skip this.
-  ;; This is to be able to re-run a release build when a job down the road has
-  ;; previously failed.
-  (let [env (-> (api/build-params ctx)
-                (select-keys ["CLOJARS_USERNAME" "CLOJARS_PASSWORD"])
-                (mc/assoc-some "MONKEYCI_VERSION" (or version (tag-version ctx))))]
-    (-> (clj-container id dir "-X:jar:deploy")
-        (assoc :container/env env))))
+  (let [v (or version (tag-version ctx))]
+    ;; If this is a release, and it's already been deployed, then skip this.
+    ;; This is to be able to re-run a release build when a job down the road has
+    ;; previously failed.
+    (when-not (= v (->> [(m/checkout-dir ctx) dir "deps.edn"]
+                        (cs/join "/")
+                        (clojars/extract-lib)
+                        (apply clojars/latest-version)))
+      (let [env (-> (api/build-params ctx)
+                    (select-keys ["CLOJARS_USERNAME" "CLOJARS_PASSWORD"])
+                    (mc/assoc-some "MONKEYCI_VERSION" v))]
+        (-> (clj-container id dir "-X:jar:deploy")
+            (assoc :container/env env))))))
 
 (defn publish-app [ctx]
   (when (publish-app? ctx)
