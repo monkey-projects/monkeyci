@@ -101,7 +101,10 @@
         (testing "`nil` if version already published"
           (is (nil? (-> ctx
                         (mt/with-git-ref "refs/tags/1.0.0")
-                        (sut/publish "publish-app" "app")))))))))
+                        (sut/publish "publish-app" "app")))))
+
+        (testing "always publish snapshots"
+          (is (m/container-job? (sut/publish ctx "publish-app" "app"))))))))
 
 (deftest scw-images
   (testing "`nil` if no images published"

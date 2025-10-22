@@ -254,10 +254,10 @@
     ;; If this is a release, and it's already been deployed, then skip this.
     ;; This is to be able to re-run a release build when a job down the road has
     ;; previously failed.
-    (when-not (= v (->> [(m/checkout-dir ctx) dir "deps.edn"]
-                        (cs/join "/")
-                        (clojars/extract-lib)
-                        (apply clojars/latest-version)))
+    (when (or (nil? v) (not= v (->> [(m/checkout-dir ctx) dir "deps.edn"]
+                                    (cs/join "/")
+                                    (clojars/extract-lib)
+                                    (apply clojars/latest-version))))
       (let [env (-> (api/build-params ctx)
                     (select-keys ["CLOJARS_USERNAME" "CLOJARS_PASSWORD"])
                     (mc/assoc-some "MONKEYCI_VERSION" v))]
