@@ -77,6 +77,23 @@
                  :script
                  second))))))
 
+(deftest publish
+  (mt/with-build-params {"CLOJARS_USERNAME" "testuser"
+                         "CLOJARS_PASSWORD" "testpass"}
+    (let [p (-> mt/test-ctx
+                (mt/with-git-ref "refs/tags/1.2.3")
+                (sut/publish "publish" "app"))
+          e (m/env p)]
+      (testing "creates container job"
+        (is (m/container-job? p)))
+
+      (testing "passes clojars credits to env"
+        (is (= "testuser" (get e "CLOJARS_USERNAME")))
+        (is (= "testpass" (get e "CLOJARS_PASSWORD"))))
+
+      (testing "passes tag version"
+        (is (= "1.2.3" (get e "MONKEYCI_VERSION")))))))
+
 (deftest scw-images
   (testing "`nil` if no images published"
     (is (nil? (sut/scw-images mt/test-ctx))))

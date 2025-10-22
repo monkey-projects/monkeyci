@@ -233,7 +233,7 @@
    :image
    {:job-id (str "publish-" id)
     :container-opts
-    {:memory 3                          ;GB
+    {:size 2
      ;; Restore artifacts but modify the path because work dir is not the same
      :restore-artifacts [(update gui-release-artifact :path (partial str "gui/"))]
      :dependencies ["release-gui"]}}
@@ -249,11 +249,13 @@
 (defn publish 
   "Executes script in clojure container that has clojars publish env vars"
   [ctx id dir & [version]]
+  ;; TODO If this is a release, and it's already been deployed, then skip this.
+  ;; This is to be able to re-run a release build when a job down the road has
+  ;; previously failed.
   (let [env (-> (api/build-params ctx)
                 (select-keys ["CLOJARS_USERNAME" "CLOJARS_PASSWORD"])
                 (mc/assoc-some "MONKEYCI_VERSION" (or version (tag-version ctx))))]
-    (-> (clj-container id dir
-                       "-X:jar:deploy")
+    (-> (clj-container id dir "-X:jar:deploy")
         (assoc :container/env env))))
 
 (defn publish-app [ctx]
