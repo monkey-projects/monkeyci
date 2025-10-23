@@ -62,6 +62,7 @@
         org.clojure/core.cache {:mvn/version "1.1.234"}
         org.clojure/tools.logging {:mvn/version "1.3.0"}
         org.eclipse.jgit/org.eclipse.jgit {:mvn/version "7.3.0.202506031305-r"}
+        org.slf4j/jul-to-slf4j {:mvn/version "2.0.17"}
         prismatic/schema {:mvn/version "1.4.1"}
         ring-cors/ring-cors {:mvn/version "0.1.13"}
         yogthos/config {:mvn/version "1.2.1"}}
@@ -73,7 +74,8 @@
   {:extra-deps {org.clojure/test.check {:mvn/version "1.1.1"}
                 org.clojure/tools.namespace {:mvn/version "1.5.0"}}
    :extra-paths ["dev-resources" "env/dev"]
-   :override-deps {com.monkeyci/common {:local/root "../common"}}}
+   :override-deps {com.monkeyci/common {:local/root "../common"}}
+   :jvm-opts ["-Djava.util.logging.config.file=dev-resources/logging.properties"]}
 
   :test-paths ["test/unit" "test/integration" "test/e2e"]
 
