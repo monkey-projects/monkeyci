@@ -693,3 +693,16 @@
 
       (testing "can delete"
         (is (true? (sut/delete-org-token st [(:org-id t) (:id t)])))))))
+
+(deftest mailings
+  (h/with-memory-store st
+    (let [m (h/gen-mailing)]
+      (testing "can save and find"
+        (is (sid/sid? (sut/save-mailing st m)))
+        (is (= m (sut/find-mailing st (:id m)))))
+
+      (testing "can list"
+        (is (= [m] (sut/list-mailings st))))
+
+      (testing "can delete"
+        (is (true? (sut/delete-mailing st (:id m))))))))

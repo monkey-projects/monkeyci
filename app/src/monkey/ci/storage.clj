@@ -1032,3 +1032,23 @@
 
 (defn delete-org-token [st sid]
   (p/delete-obj st (apply token-sid org-token sid)))
+
+(def mailing :mailing)
+(def mailing-sid (partial global-sid mailing))
+
+(defn save-mailing [st m]
+  (p/write-obj st (mailing-sid (:id m)) m))
+
+(defn find-mailing [st id]
+  (p/read-obj st (mailing-sid id)))
+
+(defn delete-mailing [st id]
+  (p/delete-obj st (mailing-sid id)))
+
+(def list-mailings
+  (override-or
+   [:mailing :list]
+   (fn [st]
+     ;; TODO Allow filtering
+     (->> (p/list-obj st (mailing-sid))
+          (map (partial find-mailing st))))))

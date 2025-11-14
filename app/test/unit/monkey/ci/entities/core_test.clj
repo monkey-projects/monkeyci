@@ -503,5 +503,5 @@
                      (assoc :mailing-id (:id r)))]
           (is (number? (:id (sut/insert-sent-mailing conn sm))))))
 
-      (testing "can select sent mailings by mailing"
+      (testing "can select sent mailings by mailing id"
         (is (= 1 (count (sut/select-sent-mailings conn [:= :mailing-id (:id r)]))))))))

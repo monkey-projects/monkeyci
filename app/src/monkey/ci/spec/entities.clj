@@ -224,3 +224,18 @@
   (-> (s/keys :req-un [::c/token :entity/org-id]
               :opt-un [:entity/valid-until :entity/description])
       (s/merge :entity/common)))
+
+(s/def :mailing/creation-time ts?)
+
+(s/def :entity/mailing
+  (-> (s/keys :req-un [:mailing/subject :mailing/creation-time]
+              :opt-un [:mailing/text-body :mailing/html-body])
+      (s/merge :entity/common)))
+
+(s/def :entity/mailing-id string?)
+(s/def :entity/sent-at ts?)
+
+(s/def :entity/sent-mailing
+  (-> (s/keys :req-un [:entity/mailing-id :entity/sent-at]
+              :opt-un [:mailing/scw-id :mailing/to-users :mailing/to-subscribers])
+      (s/merge :entity/common)))

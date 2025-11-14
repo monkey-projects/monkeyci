@@ -686,7 +686,8 @@
     53 :mailings
     [[:subject [:varchar 300] [:not nil]]
      [:text-body :mediumtext]
-     [:html-body :mediumtext]]
+     [:html-body :mediumtext]
+     [:creation-time :timestamp [:not nil]]]
     [])
 
    (entity-table-migration

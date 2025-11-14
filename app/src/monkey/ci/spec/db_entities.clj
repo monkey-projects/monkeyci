@@ -209,8 +209,10 @@
               :opt-un [:db/valid-until :db/description])
       (s/merge :db/common)))
 
+(s/def :mailing/creation-time ts?)
+
 (s/def :db/mailing
-  (-> (s/keys :req-un [:mailing/subject]
+  (-> (s/keys :req-un [:mailing/subject :mailing/creation-time]
               :opt-un [:mailing/text-body :mailing/html-body])
       (s/merge :db/common)))
 

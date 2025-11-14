@@ -3,7 +3,9 @@
    in the general api and are meant to be used by system administrators or
    system processes only."
   (:require [monkey.ci.entities.core :as ec]
-            [monkey.ci.web.api.admin :as api]
+            [monkey.ci.web.api
+             [admin :as api]
+             [mailing :as mailing-api]]
             [monkey.ci.web.common :as c]
             [schema.core :as s]))
 
@@ -52,6 +54,14 @@
          :new-schema CreditSubscription
          :delete-schema DisableCreditSubscription})]]]]])
 
+(def mailing-routes
+  ["/mailing" (c/generic-routes
+               {:id-key :mailing-id
+                :getter mailing-api/get-mailing
+                :creator mailing-api/create-mailing
+                :updater mailing-api/update-mailing
+                :deleter mailing-api/delete-mailing})])
+
 (def admin-routes
   [[""
     ["/login"
@@ -59,12 +69,13 @@
       :parameters {:body UserCredentials}}]
     ;; TODO Create/delete sysadmin users
     #_["/sysadmin"
-     {:post
-      {:handler api/create-sysadmin}
-      :delete
-      {:handler api/delete-sysadmin}}]
+       {:post
+        {:handler api/create-sysadmin}
+        :delete
+        {:handler api/delete-sysadmin}}]
     [""
      {:middleware [:sysadmin-check]}
      credits-routes
+     mailing-routes
      ["/reaper"
       {:post api/cancel-dangling-builds}]]]])

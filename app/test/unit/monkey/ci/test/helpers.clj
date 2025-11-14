@@ -291,6 +291,12 @@
 (defn gen-org-token []
   (gen-entity :entity/org-token))
 
+(defn gen-mailing []
+  (gen-entity :entity/mailing))
+
+(defn gen-sent-mailing []
+  (gen-entity :entity/sent-mailing))
+
 (defn gen-build-sid []
   (repeatedly 3 cuid/random-cuid))
 

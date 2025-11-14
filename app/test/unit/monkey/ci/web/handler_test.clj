@@ -1474,7 +1474,24 @@
                                        {:username "test-admin"
                                         :password "test-pass"})
                        (app)
-                       :status)))))))
+                       :status)))))
+
+    (let [m (h/gen-mailing)]
+      (verify-entity-endpoints {:path "/admin/mailing"
+                                :name "mailing"
+                                :creator st/save-mailing
+                                :base-entity m
+                                :updated-entity (assoc m :subject "updated subject")
+                                :can-delete? true}))
+
+    #_(testing "`/mailing`"
+        (testing "`GET` lists all mailings")
+
+        (testing "`POST` creates new mailing")
+
+        (testing "`/:mailing-id`"
+          (testing "`PUT` updates mailing")
+          (testing "`DELETE` deletes mailing")))))
 
 (deftest crypto-endpoints
   (testing "`POST /:org-id/crypto/decrypt-key` decrypts encrypted key"
