@@ -128,3 +128,9 @@
 
 (defn gen-org-token []
   (gen-spec :db/org-token))
+
+(defn gen-mailing []
+  (gen-spec :db/mailing))
+
+(defn gen-sent-mailing []
+  (gen-spec :db/sent-mailing))

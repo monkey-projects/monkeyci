@@ -91,7 +91,8 @@
     ["/builds/clean" :admin/clean-builds]
     ["/forget" :admin/forget-users]
     ["/invoicing" :admin/invoicing]
-    ["/invoicing/:org-id" :admin/org-invoices]]))
+    ["/invoicing/:org-id" :admin/org-invoices]
+    ["/emails" :admin/emails]]))
 
 (defonce router (atom main-router))
 

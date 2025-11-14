@@ -489,3 +489,19 @@
                (-> (sut/select-org-tokens conn (sut/by-cuid (:cuid token)))
                    first
                    (select-keys (keys token)))))))))
+
+(deftest ^:sql mailings
+  (eh/with-prepared-db conn
+    (let [m (eh/gen-mailing)
+          r (sut/insert-mailing conn m)]
+      (testing "can insert and retrieve"
+        (is (number? (:id r)))
+        (is (= 1 (count (sut/select-mailings conn (sut/by-cuid (:cuid m)))))))
+
+      (testing "can insert sent mailing"
+        (let [sm (-> (eh/gen-sent-mailing)
+                     (assoc :mailing-id (:id r)))]
+          (is (number? (:id (sut/insert-sent-mailing conn sm))))))
+
+      (testing "can select sent mailings by mailing"
+        (is (= 1 (count (sut/select-sent-mailings conn [:= :mailing-id (:id r)]))))))))

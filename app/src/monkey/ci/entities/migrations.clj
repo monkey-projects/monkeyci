@@ -680,7 +680,24 @@
      [:valid-until :timestamp]
      [:description [:varchar 200]]
      fk-org]
-    [(h/create-index [:unique :org-token-idx] [:org-tokens :token])])])
+    [(h/create-index [:unique :org-token-idx] [:org-tokens :token])])
+
+   (entity-table-migration
+    53 :mailings
+    [[:subject [:varchar 300] [:not nil]]
+     [:text-body :mediumtext]
+     [:html-body :mediumtext]]
+    [])
+
+   (entity-table-migration
+    54 :sent-mailings
+    [(fk-col :mailing-id)
+     [:sent-at :timestamp [:not nil]]
+     [:scw-id [:varchar 100]]
+     [:to-users :boolean]
+     [:to-subscribers :boolean]
+     (fk :mailing-id :mailings :id)]
+    [(col-idx :sent-mailings :mailing-id)])])
 
 (defn prepare-migrations
   "Prepares all migrations by formatting to sql, creates a ragtime migration object from it."

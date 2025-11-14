@@ -530,3 +530,17 @@
    :before-update prepare-token
    :after-update  convert-token
    :after-select  convert-token})
+
+(defentity mailing)
+
+(def prepare-sent-mailing
+  (partial int->time :sent-at))
+(def convert-sent-mailing
+  (partial time->int :sent-at))
+
+(defentity sent-mailing
+  {:before-insert prepare-sent-mailing
+   :after-insert  convert-sent-mailing
+   :before-update prepare-sent-mailing
+   :after-update  convert-sent-mailing
+   :after-select  convert-sent-mailing})

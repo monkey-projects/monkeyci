@@ -208,3 +208,16 @@
   (-> (s/keys :req-un [::c/token :db/org-id]
               :opt-un [:db/valid-until :db/description])
       (s/merge :db/common)))
+
+(s/def :db/mailing
+  (-> (s/keys :req-un [:mailing/subject]
+              :opt-un [:mailing/text-body :mailing/html-body])
+      (s/merge :db/common)))
+
+(s/def :db/mailing-id id?)
+(s/def :db/sent-at ts?)
+
+(s/def :db/sent-mailing
+  (-> (s/keys :req-un [:db/mailing-id :db/sent-at]
+              :opt-un [:mailing/scw-id :mailing/to-users :mailing/to-subscribers])
+      (s/merge :db/common)))

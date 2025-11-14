@@ -18,9 +18,9 @@
     [:div.card-img.text-center.text-primary.pt-2
      {:style {:font-size "6em"}}
      [:a {:href url} [co/icon icon]]]
-    [:div.card-body
+    [:div.card-body.d-flex.flex-column
      [:h5.card-title title]
-     [:p.card-text desc]
+     [:p.flex-grow-1.card-text desc]
      [:a.card-link
       {:href url}
       link
@@ -63,7 +63,14 @@
       "Forget Users"
       "Delete any information still referring to users that have requested to be forgotten."
       "Forget users"
-      (r/path-for :admin/forget-users)]]]])
+      (r/path-for :admin/forget-users)]
+
+     [action-card
+      :envelope-at
+      "Emails"
+      "Review sent emails and set up new mailings."
+      "Manage Emails"
+      (r/path-for :admin/emails)]]]])
 
 (defn not-implemented []
   [l/default
