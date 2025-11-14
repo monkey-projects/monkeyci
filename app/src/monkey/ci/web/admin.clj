@@ -60,7 +60,8 @@
                 :getter mailing-api/get-mailing
                 :creator mailing-api/create-mailing
                 :updater mailing-api/update-mailing
-                :deleter mailing-api/delete-mailing})])
+                :deleter mailing-api/delete-mailing
+                :searcher mailing-api/list-mailings})])
 
 (def admin-routes
   [[""

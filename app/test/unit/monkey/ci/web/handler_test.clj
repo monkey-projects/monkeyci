@@ -1484,14 +1484,11 @@
                                 :updated-entity (assoc m :subject "updated subject")
                                 :can-delete? true}))
 
-    #_(testing "`/mailing`"
-        (testing "`GET` lists all mailings")
-
-        (testing "`POST` creates new mailing")
-
-        (testing "`/:mailing-id`"
-          (testing "`PUT` updates mailing")
-          (testing "`DELETE` deletes mailing")))))
+    (testing "`/mailing`"
+      (testing "`GET` lists all mailings"
+        (is (= 204 (-> (mock/request :get "/admin/mailing")
+                       (test-app)
+                       :status)))))))
 
 (deftest crypto-endpoints
   (testing "`POST /:org-id/crypto/decrypt-key` decrypts encrypted key"

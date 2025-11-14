@@ -80,6 +80,13 @@
     :name "Dangling Builds"}
    (default-breadcrumb db)))
 
+(defn- mailings-breadcrumb [db]
+  (mc/insert-nth
+   1
+   {:url (r/path-for :admin/emails)
+    :name "Mailings"}
+   (default-breadcrumb db)))
+
 (def routes
   "Breadcrumb configuration per route.  If no match is found, the default behaviour
    is applied."
@@ -91,7 +98,8 @@
    :page/add-repo org-watch-repo
    :admin/credits credits-breadcrumb
    :admin/org-credits org-credits-breadcrumb
-   :admin/clean-builds clean-builds-breadcrumb})
+   :admin/clean-builds clean-builds-breadcrumb
+   :admin/emails mailings-breadcrumb})
 
 (rf/reg-sub
  :breadcrumb/path

@@ -9,7 +9,8 @@
             [monkey.ci.gui.admin.clean.views :as clean]
             [monkey.ci.gui.admin.credits.views :as credits]
             [monkey.ci.gui.admin.invoicing.views :as inv]
-            [monkey.ci.gui.admin.login.views :as login]            
+            [monkey.ci.gui.admin.login.views :as login]
+            [monkey.ci.gui.admin.mailing.views :as mailing]
             [re-frame.core :as rf]))
 
 (defn action-card [icon title desc link url]
@@ -85,7 +86,8 @@
    :admin/org-credits credits/org-credits
    :admin/invoicing inv/page
    :admin/org-invoices inv/org-invoices
-   :admin/clean-builds clean/page})
+   :admin/clean-builds clean/page
+   :admin/emails mailing/overview})
 
 (defn render-page [route]
   (let [p (get pages (r/route-name route) not-implemented)]
