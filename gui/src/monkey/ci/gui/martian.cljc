@@ -118,6 +118,11 @@
   {(s/optional-key :description) s/Str
    (s/optional-key :valid-until) s/Int})
 
+(s/defschema Mailing
+  {:subject s/Str
+   (s/optional-key :text-body) s/Str
+   (s/optional-key :html-body) s/Str})
+
 (def Date #"\d{4}-\d{2}-\d{2}")
 
 (defn public-route [conf]
@@ -438,6 +443,28 @@
     {:route-name :admin-reaper
      :method :post
      :path-parts ["/admin/reaper"]})
+
+   (api-route
+    {:route-name :admin-list-mailings
+     :method :get
+     :path-parts ["/admin/mailing"]})
+
+   (api-route
+    {:route-name :admin-create-mailing
+     :method :post
+     :path-parts ["/admin/mailing"]
+     :body-schema {:mailing Mailing}})
+
+   (api-route
+    {:route-name :admin-update-mailing
+     :method :put
+     :path-parts ["/admin/mailing/" :mailing-id]
+     :body-schema {:mailing Mailing}})
+
+   (api-route
+    {:route-name :admin-delete-mailing
+     :method :delete
+     :path-parts ["/admin/mailing/" :mailing-id]})
 
    (public-route
     {:route-name :get-version

@@ -87,7 +87,8 @@
    :admin/invoicing inv/page
    :admin/org-invoices inv/org-invoices
    :admin/clean-builds clean/page
-   :admin/emails mailing/overview})
+   :admin/emails mailing/overview
+   :admin/new-email mailing/new-mailing})
 
 (defn render-page [route]
   (let [p (get pages (r/route-name route) not-implemented)]
