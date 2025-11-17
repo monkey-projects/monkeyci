@@ -1488,7 +1488,10 @@
       (testing "`GET` lists all mailings"
         (is (= 204 (-> (mock/request :get "/admin/mailing")
                        (test-app)
-                       :status)))))))
+                       :status))))
+
+      (testing "`/:mailing-id/sends`"
+        (testing "`GET` lists all for mailing")))))
 
 (deftest crypto-endpoints
   (testing "`POST /:org-id/crypto/decrypt-key` decrypts encrypted key"

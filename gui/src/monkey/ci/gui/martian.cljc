@@ -3,6 +3,7 @@
             [martian.cljs-http :as mh]
             [martian.interceptors :as mi]
             [martian.re-frame :as mr]
+            [monkey.ci.common.schemas :as cs]
             [monkey.ci.gui.edn]
             [monkey.ci.gui.local-storage]
             [monkey.ci.gui.logging :as log]
@@ -117,11 +118,6 @@
 (s/defschema ApiToken
   {(s/optional-key :description) s/Str
    (s/optional-key :valid-until) s/Int})
-
-(s/defschema Mailing
-  {:subject s/Str
-   (s/optional-key :text-body) s/Str
-   (s/optional-key :html-body) s/Str})
 
 (def Date #"\d{4}-\d{2}-\d{2}")
 
@@ -453,13 +449,13 @@
     {:route-name :admin-create-mailing
      :method :post
      :path-parts ["/admin/mailing"]
-     :body-schema {:mailing Mailing}})
+     :body-schema {:mailing cs/Mailing}})
 
    (api-route
     {:route-name :admin-update-mailing
      :method :put
      :path-parts ["/admin/mailing/" :mailing-id]
-     :body-schema {:mailing Mailing}})
+     :body-schema {:mailing cs/Mailing}})
 
    (api-route
     {:route-name :admin-delete-mailing
