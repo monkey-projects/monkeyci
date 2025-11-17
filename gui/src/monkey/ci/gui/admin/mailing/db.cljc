@@ -2,6 +2,7 @@
   (:require [monkey.ci.gui.loader :as l]))
 
 (def mailing-id ::id)
+(def editing-id ::editing)
 
 (defn get-mailings [db]
   (l/get-value db mailing-id))
@@ -22,6 +23,9 @@
 (defn set-editing [db m]
   (assoc db ::editing m))
 
+(defn update-editing [db f & args]
+  (apply update db ::editing f args))
+
 (defn reset-editing [db]
   (dissoc db ::editing))
 
@@ -33,3 +37,12 @@
 
 (defn reset-saving [db]
   (dissoc db ::saving))
+
+(defn set-editing-alerts [db a]
+  (l/set-alerts db editing-id a))
+
+(defn get-editing-alerts [db]
+  (l/get-alerts db editing-id))
+
+(defn reset-editing-alerts [db]
+  (l/reset-alerts db editing-id))

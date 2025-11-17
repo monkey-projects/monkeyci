@@ -29,6 +29,7 @@
              [email-registration :as ser]
              [job :as sj]
              [join-request :as sjr]
+             [mailing :as sma]
              [org :as so]
              [org-credit :as soc]
              [org-token :as sot]
@@ -254,6 +255,7 @@
 
 (def user-token? (partial global-sid? st/user-token))
 (def org-token? (partial global-sid? st/org-token))
+(def mailing? (partial global-sid? st/mailing))
 
 (defrecord SqlStorage [pool]
   p/Storage
@@ -295,7 +297,9 @@
         user-token?
         (sut/select-user-token conn (take-last 2 sid))
         org-token?
-        (sot/select-org-token conn (take-last 2 sid)))))
+        (sot/select-org-token conn (take-last 2 sid))
+        mailing?
+        (sma/select-mailing conn (last sid)))))
   
   (write-obj [this sid obj]
     (let [conn (get-conn this)]
@@ -340,6 +344,8 @@
               (sut/upsert-user-token conn obj)
               org-token?
               (sot/upsert-org-token conn obj)
+              mailing?
+              (sma/upsert-mailing conn obj)
               (log/warn "Unrecognized sid when writing:" sid))
         sid)))
 
@@ -370,6 +376,8 @@
          (sut/delete-user-token conn (last sid))
          org-token?
          (sot/delete-org-token conn (last sid))
+         mailing?
+         (sma/delete-mailing conn (last sid))
          (log/warn "Deleting entity" sid "is not supported")))))
 
   (list-obj [this sid]
@@ -484,7 +492,9 @@
    :invoice
    {:list-for-org select-invoices-for-org}
    :queued-task
-   {:list select-queued-tasks}})
+   {:list select-queued-tasks}
+   :mailing
+   {:list sma/select-mailings}})
 
 (defn make-storage [conn-fn]
   (map->SqlStorage {:get-conn conn-fn

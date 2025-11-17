@@ -39,14 +39,20 @@
          c (h/catch-fx :martian.re-frame/request)]
      (h/initialize-martian {:admin-create-mailing {:error-code :no-error
                                                    :body {:id "new-mailing"}}})
-     (is (some? (swap! app-db db/set-editing m)))
+     (is (some? (swap! app-db (fn [db]
+                                (-> db
+                                    (db/set-editing m)
+                                    (db/set-editing-alerts [::test-alert]))))))
      (rf/dispatch [::sut/save-mailing])
      (testing "creates new mailing in backend"
        (is (= 1 (count @c)))
        (is (= :admin-create-mailing (-> @c first (nth 2)))))
 
      (testing "marks saving"
-       (is (true? (db/saving? @app-db)))))))
+       (is (true? (db/saving? @app-db))))
+
+     (testing "clears alerts"
+      (is (empty? (db/get-editing-alerts @app-db)))))))
 
 (deftest save-mailing--success
   (let [mailings [{:id "old-mailing"}]
@@ -64,3 +70,20 @@
     
     (testing "unmarks saving"
       (is (not (db/saving? @app-db))))))
+
+(deftest save-mailing--failure
+  (is (some? (reset! app-db (db/mark-saving {}))))
+  (rf/dispatch-sync [::sut/save-mailing--failure {:message "test error"}])
+  (testing "sets alert"
+    (is (= [:danger]
+           (->> (db/get-editing-alerts @app-db)
+                (map :type)))))
+
+  (testing "unmarks saving"
+    (is (not (db/saving? @app-db)))))
+
+(deftest edit-prop-changed
+  (testing "sets property in edit mailing"
+    (rf/dispatch-sync [::sut/edit-prop-changed :subject "test subject"])
+    (is (= "test subject"
+           (:subject (db/get-editing @app-db))))))

@@ -5,7 +5,18 @@
             [monkey.ci.gui.admin.mailing.subs :as sut]
             [monkey.ci.gui.loader :as lo]
             [monkey.ci.gui.test.helpers :as h]
+            [monkey.ci.gui.test.fixtures :as f]
             [re-frame.core :as rf]))
+
+(rf/clear-subscription-cache!)
+
+(use-fixtures :each f/reset-db)
 
 (deftest mailing-list
   (h/verify-sub [::sut/mailing-list] #(db/set-mailings % ::mailings) ::mailings nil))
+
+(deftest mailing-editing
+  (h/verify-sub [::sut/editing] #(db/set-editing % ::test-editing) ::test-editing nil))
+
+(deftest edit-alerts
+  (h/verify-sub [::sut/edit-alerts] #(db/set-editing-alerts % ::test-alerts) ::test-alerts nil))

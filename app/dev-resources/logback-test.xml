@@ -28,7 +28,6 @@
   <logger name="monkey.ci.web" level="TRACE"/>
   <logger name="monkey.nats" level="DEBUG"/>
   <logger name="user" level="DEBUG"/>
-  <logger name="io.prometheus" level="DEBUG"/>
   
   <root level="INFO">
     <appender-ref ref="STDOUT" />

@@ -212,3 +212,6 @@
 
 (def token-delete-failed
   (error-msg "Failed to delete API key"))
+
+(def save-mailing-failed
+  (error-msg "Failed to save mailing"))

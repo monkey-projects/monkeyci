@@ -1007,6 +1007,19 @@
         (is (true? (st/delete-org-token st [(:id org) (:id token)])))
         (is (empty? (st/list-org-tokens st (:id org))))))))
 
+(deftest ^:sql mailings
+  (with-storage conn st
+    (let [m (h/gen-mailing)]
+      (testing "can save and find"
+        (is (sid/sid? (st/save-mailing st m)))
+        (is (= m (st/find-mailing st (:id m)))))
+
+      (testing "can list"
+        (is (= [m] (st/list-mailings st))))
+
+      (testing "can delete"
+        (is (true? (st/delete-mailing st (:id m))))))))
+
 (deftest pool-component
   (testing "creates sql connection pool using settings"
     (let [s (sut/pool-component {:type :sql

@@ -1476,7 +1476,7 @@
                        (app)
                        :status)))))
 
-    (let [m (h/gen-mailing)]
+    (let [m {:subject "test mailing"}]
       (verify-entity-endpoints {:path "/admin/mailing"
                                 :name "mailing"
                                 :creator st/save-mailing

@@ -2,7 +2,8 @@
   "API Route definitions for administrative purposes.  These are not available
    in the general api and are meant to be used by system administrators or
    system processes only."
-  (:require [monkey.ci.entities.core :as ec]
+  (:require [monkey.ci.common.schemas :as cs]
+            [monkey.ci.entities.core :as ec]
             [monkey.ci.web.api
              [admin :as api]
              [mailing :as mailing-api]]
@@ -57,6 +58,8 @@
 (def mailing-routes
   ["/mailing" (c/generic-routes
                {:id-key :mailing-id
+                :new-schema cs/Mailing
+                :update-schema cs/Mailing
                 :getter mailing-api/get-mailing
                 :creator mailing-api/create-mailing
                 :updater mailing-api/update-mailing
