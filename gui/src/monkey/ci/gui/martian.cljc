@@ -445,7 +445,7 @@
      :path-parts ["/admin/reaper"]})
 
    (api-route
-    {:route-name :admin-list-mailings
+    {:route-name :admin-get-mailings
      :method :get
      :path-parts ["/admin/mailing"]})
 

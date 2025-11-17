@@ -17,6 +17,15 @@
     (l/update-value db mailing-id (partial replace {match upd}))
     (l/update-value db mailing-id (comp vec conj) upd)))
 
+(defn loading? [db]
+  (l/loading? db mailing-id))
+
+(defn get-alerts [db]
+  (l/get-alerts db mailing-id))
+
+(defn set-alerts [db a]
+  (l/set-alerts db mailing-id a))
+
 (defn get-editing [db]
   (::editing db))
 

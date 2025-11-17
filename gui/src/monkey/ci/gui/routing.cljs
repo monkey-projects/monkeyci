@@ -92,8 +92,9 @@
     ["/forget" :admin/forget-users]
     ["/invoicing" :admin/invoicing]
     ["/invoicing/:org-id" :admin/org-invoices]
-    ["/emails" :admin/emails]
-    ["/emails/new" :admin/new-email]]))
+    ["/mailings" :admin/mailings]
+    ["/mailings/new" :admin/new-mailing]
+    ["/mailings/edit/:mailing-id" :admin/mailing-edit]]))
 
 (defonce router (atom main-router))
 

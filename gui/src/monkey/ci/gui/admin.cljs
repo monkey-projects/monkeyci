@@ -68,10 +68,10 @@
 
      [action-card
       :envelope-at
-      "Emails"
-      "Review sent emails and set up new mailings."
-      "Manage Emails"
-      (r/path-for :admin/emails)]]]])
+      "Mailings"
+      "Review sent mailings and set up new mailings."
+      "Manage Mailings"
+      (r/path-for :admin/mailings)]]]])
 
 (defn not-implemented []
   [l/default
@@ -87,8 +87,9 @@
    :admin/invoicing inv/page
    :admin/org-invoices inv/org-invoices
    :admin/clean-builds clean/page
-   :admin/emails mailing/overview
-   :admin/new-email mailing/new-mailing})
+   :admin/mailings mailing/overview
+   :admin/new-mailing mailing/new-mailing
+   :admin/mailing-edit mailing/edit-mailing})
 
 (defn render-page [route]
   (let [p (get pages (r/route-name route) not-implemented)]

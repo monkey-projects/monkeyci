@@ -213,5 +213,11 @@
 (def token-delete-failed
   (error-msg "Failed to delete API key"))
 
-(def save-mailing-failed
+(def mailing-load-failed
+  (error-msg "Failed to retrieve mailings"))
+
+(def mailing-save-success
+  (alert-msg :success (constantly "New mailing has been created.")))
+
+(def mailing-save-failed
   (error-msg "Failed to save mailing"))

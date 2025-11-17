@@ -82,12 +82,12 @@
 
 (defn- mailings-breadcrumb [db]
   (conj (default-breadcrumb db)
-        {:url (r/path-for :admin/emails)
+        {:url (r/path-for :admin/mailings)
          :name "Mailings"}))
 
 (defn- new-mailing-breadcrumb [db]
   (conj (mailings-breadcrumb db)
-        {:url (r/path-for :admin/new-email)
+        {:url (r/path-for :admin/new-mailing)
          :name "New"}))
 
 (def routes
@@ -102,8 +102,8 @@
    :admin/credits credits-breadcrumb
    :admin/org-credits org-credits-breadcrumb
    :admin/clean-builds clean-builds-breadcrumb
-   :admin/emails mailings-breadcrumb
-   :admin/new-email new-mailing-breadcrumb})
+   :admin/mailings mailings-breadcrumb
+   :admin/new-mailing new-mailing-breadcrumb})
 
 (rf/reg-sub
  :breadcrumb/path

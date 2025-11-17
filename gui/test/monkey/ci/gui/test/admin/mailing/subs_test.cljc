@@ -13,7 +13,14 @@
 (use-fixtures :each f/reset-db)
 
 (deftest mailing-list
-  (h/verify-sub [::sut/mailing-list] #(db/set-mailings % ::mailings) ::mailings nil))
+  (let [m [{:id ::test}]]
+    (h/verify-sub [::sut/mailing-list] #(db/set-mailings % m) m nil)))
+
+(deftest loading?
+  (h/verify-sub [::sut/loading?] #(lo/set-loading % db/mailing-id) true false))
+
+(deftest alerts
+  (h/verify-sub [::sut/alerts] #(db/set-alerts % ::test-alerts) ::test-alerts nil))
 
 (deftest mailing-editing
   (h/verify-sub [::sut/editing] #(db/set-editing % ::test-editing) ::test-editing nil))
