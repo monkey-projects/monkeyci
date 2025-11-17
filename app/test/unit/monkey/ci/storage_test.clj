@@ -705,4 +705,16 @@
         (is (= [m] (sut/list-mailings st))))
 
       (testing "can delete"
-        (is (true? (sut/delete-mailing st (:id m))))))))
+        (is (true? (sut/delete-mailing st (:id m)))))
+
+      (testing "sent mailings"
+        (is (sid/sid? (sut/save-mailing st m)))
+        (let [sm {:id (cuid/random-cuid)
+                  :mailing-id (:id m)
+                  :sent-at (t/now)}]
+          (testing "can save and find"
+            (is (sid/sid? (sut/save-sent-mailing st sm)))
+            (is (= sm (sut/find-sent-mailing st [(:id m) (:id sm)]))))
+
+          (testing "can list for mailing"
+            (is (= [sm] (sut/list-sent-mailings st (:id m))))))))))

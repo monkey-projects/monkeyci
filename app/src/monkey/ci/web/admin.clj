@@ -55,16 +55,21 @@
          :new-schema CreditSubscription
          :delete-schema DisableCreditSubscription})]]]]])
 
+(def mailing-sends-routes
+  ["/sends" []])
+
 (def mailing-routes
-  ["/mailing" (c/generic-routes
-               {:id-key :mailing-id
-                :new-schema cs/Mailing
-                :update-schema cs/Mailing
-                :getter mailing-api/get-mailing
-                :creator mailing-api/create-mailing
-                :updater mailing-api/update-mailing
-                :deleter mailing-api/delete-mailing
-                :searcher mailing-api/list-mailings})])
+  ["/mailing"
+   (c/generic-routes
+    {:id-key :mailing-id
+     :new-schema cs/Mailing
+     :update-schema cs/Mailing
+     :getter mailing-api/get-mailing
+     :creator mailing-api/create-mailing
+     :updater mailing-api/update-mailing
+     :deleter mailing-api/delete-mailing
+     :searcher mailing-api/list-mailings
+     :child-routes mailing-sends-routes})])
 
 (def admin-routes
   [[""

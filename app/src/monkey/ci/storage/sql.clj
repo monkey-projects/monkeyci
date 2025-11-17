@@ -494,7 +494,10 @@
    :queued-task
    {:list select-queued-tasks}
    :mailing
-   {:list sma/select-mailings}})
+   {:list sma/select-mailings
+    :save-sent sma/upsert-sent-mailing
+    :find-sent sma/select-sent-mailing
+    :list-sent sma/select-sent-mailings}})
 
 (defn make-storage [conn-fn]
   (map->SqlStorage {:get-conn conn-fn

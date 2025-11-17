@@ -23,3 +23,6 @@
   (let [m (st/list-mailings (c/req->storage req))]
     (-> (rur/response m)
         (rur/status (if (empty? m) 204 200)))))
+
+(defn list-sends [req]
+  )

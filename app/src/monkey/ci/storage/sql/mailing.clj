@@ -1,5 +1,7 @@
 (ns monkey.ci.storage.sql.mailing
-  (:require [monkey.ci.entities.core :as ec]
+  (:require [monkey.ci.entities
+             [core :as ec]
+             [mailing :as em]]
             [monkey.ci.storage.sql.common :as sc]))
 
 (defn- mailing->db [m]
@@ -34,3 +36,37 @@
 
 (defn delete-mailing [conn cuid]
   (ec/delete-entities conn :mailings (ec/by-cuid cuid)))
+
+(def ^:private sent-mailing->db mailing->db)
+
+(defn db->sent-mailing [sm mid]
+  (-> (db->mailing sm)
+      (assoc :mailing-id mid)))
+
+(def sent-mailing->sid (juxt :mailing-id :id))
+
+(defn- insert-sent-mailing [conn sm]
+  (let [m (ec/select-mailing conn (ec/by-cuid (:mailing-id sm)))]
+    (when (ec/insert-sent-mailing conn (-> (sent-mailing->db sm)
+                                           (assoc :mailing-id (:id m))))
+      (sent-mailing->sid sm))))
+
+(defn- update-sent-mailing [conn sm e]
+  (let [m (ec/select-mailing conn (ec/by-cuid (:mailing-id sm)))
+        upd (merge e (sent-mailing->db sm))]
+    (when (ec/update-sent-mailing conn upd)
+      (sent-mailing->sid sm))))
+
+(defn upsert-sent-mailing [st {:keys [id] :as sm}]
+  (let [conn (sc/get-conn st)]
+    (if-let [e (when id (ec/select-sent-mailing conn id))]
+      (update-sent-mailing conn sm e)
+      (insert-sent-mailing conn sm))))
+
+(defn select-sent-mailing [st [mid id]]
+  (some-> (ec/select-sent-mailing (sc/get-conn st) (ec/by-cuid id))
+          (db->sent-mailing mid)))
+
+(defn select-sent-mailings [st mid]
+  (->> (em/select-sent-mailings (sc/get-conn st) mid)
+       (map #(db->sent-mailing % mid))))

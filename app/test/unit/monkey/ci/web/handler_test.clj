@@ -1491,7 +1491,15 @@
                        :status))))
 
       (testing "`/:mailing-id/sends`"
-        (testing "`GET` lists all for mailing")))))
+        (let [{:keys [id] :as m} (h/gen-mailing)
+              {st :storage :as rt} (trt/test-runtime)
+              app (sut/make-app rt)
+              path (str "/admin/mailing/" id)]
+          (is (some? (st/save-mailing st m)))
+          (testing "`GET` lists all for mailing"
+            (is (= 200 (-> (mock/request :get path)
+                           (app)
+                           :status)))))))))
 
 (deftest crypto-endpoints
   (testing "`POST /:org-id/crypto/decrypt-key` decrypts encrypted key"

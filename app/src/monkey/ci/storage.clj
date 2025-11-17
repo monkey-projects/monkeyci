@@ -1052,3 +1052,29 @@
      ;; TODO Allow filtering
      (->> (p/list-obj st (mailing-sid))
           (map (partial find-mailing st))))))
+
+(def sent-mailing-sid mailing-sid)
+
+(def sent-mailing->sid (comp sent-mailing-sid (juxt :mailing-id :id)))
+
+(def save-sent-mailing
+  (override-or
+   [:mailing :save-sent]
+   (fn [st sm]
+     (let [m (find-mailing st (:mailing-id sm))]
+       (save-mailing st (assoc-in m [:sent (:id sm)] sm))))))
+
+(def find-sent-mailing
+  (override-or
+   [:mailing :find-sent]
+   (fn [st sid]
+     (-> (find-mailing st (first sid))
+         (get-in [:sent (last sid)])))))
+
+(def list-sent-mailings
+  (override-or
+   [:mailing :list-sent]
+   (fn [st mid]
+     (-> (find-mailing st mid)
+         :sent
+         vals))))
