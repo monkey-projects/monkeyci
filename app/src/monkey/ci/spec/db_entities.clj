@@ -218,8 +218,9 @@
 
 (s/def :db/mailing-id id?)
 (s/def :db/sent-at ts?)
+(s/def :db/other-dests string?)
 
 (s/def :db/sent-mailing
   (-> (s/keys :req-un [:db/mailing-id :db/sent-at]
-              :opt-un [:mailing/scw-id :mailing/to-users :mailing/to-subscribers])
+              :opt-un [:mailing/scw-id :mailing/to-users :mailing/to-subscribers :db/other-dests])
       (s/merge :db/common)))

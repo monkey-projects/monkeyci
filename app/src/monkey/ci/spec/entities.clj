@@ -234,8 +234,9 @@
 
 (s/def :entity/mailing-id string?)
 (s/def :entity/sent-at ts?)
+(s/def :entity/other-dests (s/coll-of string?))
 
 (s/def :entity/sent-mailing
   (-> (s/keys :req-un [:entity/mailing-id :entity/sent-at]
-              :opt-un [:mailing/scw-id :mailing/to-users :mailing/to-subscribers])
+              :opt-un [:mailing/scw-id :mailing/to-users :mailing/to-subscribers :entity/other-dests])
       (s/merge :entity/common)))

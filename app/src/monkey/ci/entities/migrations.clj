@@ -697,6 +697,7 @@
      [:scw-id [:varchar 100]]
      [:to-users :boolean]
      [:to-subscribers :boolean]
+     [:other-dests :text]
      (fk :mailing-id :mailings :id)]
     [(col-idx :sent-mailings :mailing-id)])])
 
@@ -715,8 +716,9 @@
 
 (defn- load-and-run-migrations [conn]
   (let [[db mig idx :as r] (load-migrations conn)]
-    (log/info "Applying" (count mig) "migrations with db" db)
+    (log/info "Applying" (count mig) "migrations...")
     (rt/migrate-all db idx mig)
+    (log/info "Migrations applied.")
     r))
 
 (defn run-migrations!

@@ -7,4 +7,4 @@
         :join [[:mailings :m] [:= :m.id :sm.mailing-id]]
         :where [:= :m.cuid mailing-cuid]}
        (ec/select conn)
-       (map ec/convert-sent-mailing)))
+       (map ec/convert-sent-mailing-select)))

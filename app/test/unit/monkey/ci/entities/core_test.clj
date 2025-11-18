@@ -500,7 +500,8 @@
 
       (testing "can insert sent mailing"
         (let [sm (-> (eh/gen-sent-mailing)
-                     (assoc :mailing-id (:id r)))]
+                     (assoc :mailing-id (:id r)
+                            :other-dests ["test@monkeyci.com"]))]
           (is (number? (:id (sut/insert-sent-mailing conn sm))))))
 
       (testing "can select sent mailings by mailing id"

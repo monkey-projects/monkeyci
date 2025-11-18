@@ -1490,11 +1490,11 @@
                        (test-app)
                        :status))))
 
-      (testing "`/:mailing-id/sends`"
+      (testing "`/:mailing-id/send`"
         (let [{:keys [id] :as m} (h/gen-mailing)
-              {st :storage :as rt} (trt/test-runtime)
+              {st :storage :as rt} (test-rt)
               app (sut/make-app rt)
-              path (str "/admin/mailing/" id)]
+              path (str "/admin/mailing/" id "/send")]
           (is (some? (st/save-mailing st m)))
           (testing "`GET` lists all for mailing"
             (is (= 200 (-> (mock/request :get path)

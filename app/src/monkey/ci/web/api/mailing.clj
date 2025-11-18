@@ -24,5 +24,13 @@
     (-> (rur/response m)
         (rur/status (if (empty? m) 204 200)))))
 
-(defn list-sends [req]
-  )
+(c/make-entity-endpoints
+ "sent-mailing"
+ {:get-id (comp (juxt :mailing-id :sent-mailing-id) :path :parameters)
+  :getter st/find-mailing
+  :saver st/save-mailing})
+
+(defn list-sent-mailings [req]
+  (-> (st/list-sent-mailings (c/req->storage req)
+                             (get-in req [:parameters :path :mailing-id]))
+      (rur/response)))

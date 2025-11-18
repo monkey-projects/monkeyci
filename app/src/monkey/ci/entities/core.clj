@@ -544,13 +544,20 @@
    :after-select  convert-mailing})
 
 (def prepare-sent-mailing
-  (partial int->time :sent-at))
+  (comp (partial int->time :sent-at)
+        (partial prop->edn :other-dests)))
+
 (def convert-sent-mailing
-  (partial time->int :sent-at))
+  (comp (partial time->int :sent-at)
+        (partial copy-prop :other-dests)))
+
+(def convert-sent-mailing-select
+  (comp (partial time->int :sent-at)
+        (partial edn->prop :other-dests)))
 
 (defentity sent-mailing
   {:before-insert prepare-sent-mailing
    :after-insert  convert-sent-mailing
    :before-update prepare-sent-mailing
    :after-update  convert-sent-mailing
-   :after-select  convert-sent-mailing})
+   :after-select  convert-sent-mailing-select})

@@ -19,3 +19,22 @@
                           :id
                           (st/find-mailing st)
                           :creation-time)))))))
+
+(deftest list-sent-mailings
+  (testing "lists sent mailings for mailing"
+    (let [m (h/gen-mailing)
+          s (-> (h/gen-sent-mailing)
+                (assoc :mailing-id (:id m)))
+          {st :storage :as rt} (trt/test-runtime)]
+      (is (some? (st/save-mailing st m)))
+      (is (some? (st/save-sent-mailing st s)))
+      (let [r (-> rt
+                  (h/->req)
+                  (assoc-in [:parameters :path :mailing-id] (:id m))
+                  (sut/list-sent-mailings))]
+        (is (= 200 (:status r)))
+        (is (= [s] (:body r)))))))
+
+#_(deftest create-sent-mailing
+  (testing "creates in storage")
+  (testing "sends mails"))
