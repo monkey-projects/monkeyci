@@ -35,6 +35,52 @@
         (is (= 200 (:status r)))
         (is (= [s] (:body r)))))))
 
-#_(deftest create-sent-mailing
-  (testing "creates in storage")
-  (testing "sends mails"))
+(deftest create-sent-mailing
+  (let [{st :storage :as rt} (trt/test-runtime)
+        m (h/gen-mailing)]
+    (is (some? (st/save-mailing st m)))
+    (let [r (-> rt
+                (h/->req)
+                (assoc :parameters {:path
+                                    {:mailing-id (:id m)}
+                                    :body
+                                    {:other-dests "test@monkeyci.com"}})
+                (sut/create-sent-mailing))]
+      
+      (testing "creates in storage"
+        (is (= 201 (:status r)))
+        (is (= 1 (count (st/list-sent-mailings st (:id m))))))
+      
+      (testing "sends mails"
+        (is (= 1 (-> rt
+                     :mailer
+                     :mailings
+                     deref
+                     count))))
+
+      (testing "sets mailer id in storage"
+        (is (some? (->> r
+                        :body
+                        :id
+                        (vector (:id m))
+                        (st/find-sent-mailing st)
+                        :scw-id)))))))
+
+(deftest list-destinations
+  (h/with-memory-store st
+    (is (some? (st/save-email-registration st {:id (st/new-id)
+                                               :email "test-reg@monkeyci.com"})))
+    (is (some? (st/save-user st {:type :test
+                                 :type-id (st/new-id)
+                                 :email "test-user@monkeyci.com"})))
+    (testing "fetches email registrations"
+      (is (= ["test-reg@monkeyci.com"]
+             (sut/list-destinations st {:to-subscribers true}))))
+
+    (testing "fetches user emails"
+      (is (= ["test-user@monkeyci.com"]
+             (sut/list-destinations st {:to-users true}))))
+
+    (testing "includes other destinations"
+      (is (= ["other@monkeyci.com"]
+             (sut/list-destinations st {:other-dests ["other@monkeyci.com"]}))))))

@@ -609,6 +609,18 @@
      (-> (p/list-obj s [global users])
          (count)))))
 
+(def list-user-emails
+  (override-or
+   [:user :list-emails]
+   (fn [s]
+     (->> (p/list-obj s [global users])
+          (mapcat (fn [t]
+                    (->> (p/list-obj s [global users t])
+                         (map (partial vector t)))))
+          (map (partial find-user-by-type s))
+          (map :email)
+          (remove nil?)))))
+
 (def list-user-orgs
   (override-or
    [:user :orgs]

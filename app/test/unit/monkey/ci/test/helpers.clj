@@ -318,3 +318,14 @@
 
 (defmethod v/make-vault :noop [_]
   (fake-vault))
+
+(defrecord FakeMailer [mailings]
+  p/Mailer
+  (send-mail [_ mail]
+    (swap! mailings conj mail)
+    {:type :fake
+     :id (str (random-uuid))
+     :mail mail}))
+
+(defn fake-mailer []
+  (->FakeMailer (atom [])))

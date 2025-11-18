@@ -1,10 +1,13 @@
 (ns monkey.ci.web.api.mailing
   "Mailing api handlers"
   (:require [monkey.ci
+             [protocols :as p]
              [storage :as st]
              [time :as t]]
             [monkey.ci.web.common :as c]
             [ring.util.response :as rur]))
+
+(def mailing-id (comp :mailing-id :path :parameters))
 
 (c/make-entity-endpoints
  "mailing"
@@ -30,7 +33,34 @@
   :getter st/find-mailing
   :saver st/save-mailing})
 
+(defn list-destinations
+  "Retrieves all relevant emails according to the sent mail configuration.  This
+   could be emails from users, email registrations and/or additional custom emails."
+  [st m]
+  (concat
+   (when (:to-subscribers m)
+     (->> (st/list-email-registrations st)
+          (map :email)))
+   (when (:to-users m)
+     (st/list-user-emails st))
+   (:other-dests m)))
+
+(defn create-sent-mailing [req]
+  (let [m (c/body req)
+        st (c/req->storage req)
+        mid (mailing-id req)
+        mailer (:mailer (c/req->rt req))
+        mail (when mailer
+               (-> (select-keys m [:subject :html-body :text-body])
+                   (assoc :destinations (list-destinations st m))
+                   (as-> m (p/send-mail mailer m))))
+        r (cond-> (assoc m :mailing-id mid)
+            mail (assoc :scw-id (:id mail)))]
+    (-> (st/save-sent-mailing st r)
+        (rur/response)
+        (rur/status 201))))
+
 (defn list-sent-mailings [req]
   (-> (st/list-sent-mailings (c/req->storage req)
-                             (get-in req [:parameters :path :mailing-id]))
+                             (mailing-id req))
       (rur/response)))
