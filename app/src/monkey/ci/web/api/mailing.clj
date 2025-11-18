@@ -1,6 +1,7 @@
 (ns monkey.ci.web.api.mailing
   "Mailing api handlers"
-  (:require [monkey.ci
+  (:require [clojure.tools.logging :as log]
+            [monkey.ci
              [protocols :as p]
              [storage :as st]
              [time :as t]]
@@ -55,12 +56,16 @@
                    (assoc :destinations (list-destinations st m))
                    (as-> m (p/send-mail mailer m))))
         r (cond-> (assoc m :mailing-id mid)
-            mail (assoc :scw-id (:id mail)))]
+            mail (assoc :mail-id (:id mail)))]
+    (if mailer
+      (log/debug "Sending mailing" mid "to" (count (:destinations mail)) "destinations")
+      (log/warn "No mailer configured, emails will not be sent."))
     (-> (st/save-sent-mailing st r)
         (rur/response)
         (rur/status 201))))
 
 (defn list-sent-mailings [req]
-  (-> (st/list-sent-mailings (c/req->storage req)
-                             (mailing-id req))
-      (rur/response)))
+  (let [sm (st/list-sent-mailings (c/req->storage req)
+                                  (mailing-id req))]
+    (-> (rur/response sm)
+        (rur/status (if (empty? sm) 204 200)))))

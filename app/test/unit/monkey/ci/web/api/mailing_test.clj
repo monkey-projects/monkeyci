@@ -64,7 +64,7 @@
                         :id
                         (vector (:id m))
                         (st/find-sent-mailing st)
-                        :scw-id)))))))
+                        :mail-id)))))))
 
 (deftest list-destinations
   (h/with-memory-store st

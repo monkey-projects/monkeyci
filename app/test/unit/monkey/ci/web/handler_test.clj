@@ -1497,7 +1497,7 @@
               path (str "/admin/mailing/" id "/send")]
           (is (some? (st/save-mailing st m)))
           (testing "`GET` lists all for mailing"
-            (is (= 200 (-> (mock/request :get path)
+            (is (= 204 (-> (mock/request :get path)
                            (app)
                            :status)))))))))
 

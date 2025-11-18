@@ -694,7 +694,7 @@
     54 :sent-mailings
     [(fk-col :mailing-id)
      [:sent-at :timestamp [:not nil]]
-     [:scw-id [:varchar 100]]
+     [:mail-id [:varchar 100]]
      [:to-users :boolean]
      [:to-subscribers :boolean]
      [:other-dests :text]
