@@ -7,6 +7,7 @@
             [monkey.ci.gui.home.views :as home]
             [monkey.ci.gui.job.views :as job]
             [monkey.ci.gui.login.views :as login]
+            [monkey.ci.gui.notifications.views :as notifications]
             [monkey.ci.gui.org.views :as org]
             [monkey.ci.gui.params.views :as params]
             [monkey.ci.gui.repo.views :as repo]
@@ -34,7 +35,8 @@
    :page/repo-edit repo/edit
    :page/repo-settings repo/settings-page
    :page/job job/page
-   :page/webhooks webhooks/page})
+   :page/webhooks webhooks/page
+   :page/unsubscribe-email notifications/unsubscribe-email})
 
 (defn render-page [route]
   (log/debug "Rendering page for route:" (str (r/route-name route)))

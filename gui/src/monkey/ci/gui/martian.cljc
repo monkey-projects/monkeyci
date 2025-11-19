@@ -535,7 +535,14 @@
      :method :post
      :path-parts ["/admin/login"]
      :body-schema {:creds {:username s/Str
-                           :password s/Str}}})])
+                           :password s/Str}}})
+
+   (public-route
+    {:route-name :delete-email-reg
+     :method :delete
+     :path-parts ["/email-registration/" :registration-id]
+     ;; TODO Allow by email address
+     :path-schema {:registration-id s/Str}})])
 
 (def routes
   (concat

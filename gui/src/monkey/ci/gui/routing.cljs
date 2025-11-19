@@ -80,7 +80,8 @@
     ["/o/:org-id/r/:repo-id/b/:build-id" :page/build]
     ["/o/:org-id/r/:repo-id/b/:build-id/j/:job-id" :page/job]
     ["/github/callback" :page/github-callback]
-    ["/bitbucket/callback" :page/bitbucket-callback]]))
+    ["/bitbucket/callback" :page/bitbucket-callback]
+    ["/email/unsubscribe" :page/unsubscribe-email]]))
 
 (defonce admin-router
   (f/router
@@ -99,8 +100,8 @@
 (defonce router (atom main-router))
 
 (def public?
-  "Route names that are publicly accessible."
-  #{:page/login :page/github-callback :page/bitbucket-callback})
+  "Route names that are publicly accessible"
+  #{:page/login :page/github-callback :page/bitbucket-callback :page/unsubscribe-email})
 
 (defn on-route-change [match _]
   (log/debug "Route changed:" match)

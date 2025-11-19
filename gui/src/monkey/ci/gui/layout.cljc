@@ -12,6 +12,7 @@
 (defn user-info []  
   (let [u (rf/subscribe [:login/user])]
     (when @u
+      (println "User:" @u)
       [:div
        [co/user-avatar @u]
        [:p (:name @u) 
@@ -77,9 +78,24 @@
             target)))})
      :clj [target]))
 
-(defn default [subpanel]
+(defn default
+  "Layout for default application pages"
+  [subpanel]
+  (rf/dispatch [:core/init-user])
   [:<>
    [header]
+   [:div.bg-soft-primary-light.flex-fill
+    ;; Relative position necessary for the bg shape to work
+    [:div.container.position-relative.zi-2.my-4
+     [error-boundary subpanel]]]
+   [co/bg-shape]
+   [footer]])
+
+(defn public
+  "Layout for public pages, without user info"
+  [subpanel]
+  [:<>
+   [t/generic-header t/config nil]
    [:div.bg-soft-primary-light.flex-fill
     ;; Relative position necessary for the bg shape to work
     [:div.container.position-relative.zi-2.my-4

@@ -5,12 +5,17 @@
             [monkey.ci.gui.login.db :as ldb]
             [monkey.ci.gui.utils :as u]))
 
-(rf/reg-event-fx
+(rf/reg-event-db
  :initialize-db
+ (fn [_ _]
+   {}))
+
+(rf/reg-event-fx
+ :core/init-user
  [(rf/inject-cofx :local-storage ldb/storage-token-id)]
- (fn [fx _]
+ (fn [{:keys [db] :as fx} _]
    (let [{:keys [github-token bitbucket-token] :as user} (:local-storage fx)]
-     (-> {:db (cond-> {}
+     (-> {:db (cond-> db
                 (not-empty user) (-> (ldb/set-user (dissoc user :token :github-token :bitbucket-token))
                                      (ldb/set-token (:token user))
                                      (ldb/set-github-token github-token)
