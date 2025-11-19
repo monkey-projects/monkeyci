@@ -1073,8 +1073,10 @@
   (override-or
    [:mailing :save-sent]
    (fn [st sm]
-     (let [m (find-mailing st (:mailing-id sm))]
-       (save-mailing st (assoc-in m [:sent (:id sm)] sm))))))
+     (let [m (-> (find-mailing st (:mailing-id sm))
+                 (assoc-in [:sent (:id sm)] sm))]
+       (save-mailing st m)
+       [(:mailing-id sm) (:id sm)]))))
 
 (def find-sent-mailing
   (override-or

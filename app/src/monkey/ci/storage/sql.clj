@@ -465,7 +465,8 @@
     :count su/count-users
     :delete su/delete-user
     :list-tokens sut/select-user-tokens
-    :find-token sut/select-user-token-by-token}
+    :find-token sut/select-user-token-by-token
+    :list-emails su/select-emails}
    :join-request
    {:list-user sjr/select-user-join-requests}
    :build

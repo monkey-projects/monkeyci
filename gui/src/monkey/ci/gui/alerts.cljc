@@ -221,3 +221,9 @@
 
 (def mailing-save-failed
   (error-msg "Failed to save mailing"))
+
+(def sent-mailing-load-failed
+  (error-msg "Failed to retrieve sent mailings"))
+
+(def delivery-save-failed
+  (error-msg "Failed to create new delivery"))

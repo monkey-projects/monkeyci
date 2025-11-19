@@ -20,12 +20,12 @@
    (let [m {:id "test-mailing"
             :subject "test mailing"}
          c (h/catch-fx :martian.re-frame/request)]
-     (h/initialize-martian {:admin-get-mailings {:error-code :no-error
-                                                 :body [m]}})
+     (h/initialize-martian {:get-mailings {:error-code :no-error
+                                           :body [m]}})
      (rf/dispatch [::sut/load-mailings])
      (testing "fetches mailings from backend"
        (is (= 1 (count @c)))
-       (is (= :admin-get-mailings (-> @c first (nth 2))))))))
+       (is (= :get-mailings (-> @c first (nth 2))))))))
 
 (deftest load-mailings--success
   (let [m {:id "test-mailing"
@@ -64,8 +64,8 @@
     (rf-test/run-test-sync
      (let [m {:subject "test mailing"}
            c (h/catch-fx :martian.re-frame/request)]
-       (h/initialize-martian {:admin-create-mailing {:error-code :no-error
-                                                     :body {:id "new-mailing"}}})
+       (h/initialize-martian {:create-mailing {:error-code :no-error
+                                               :body {:id "new-mailing"}}})
        (is (some? (swap! app-db (fn [db]
                                   (-> db
                                       (db/set-editing m)
@@ -73,7 +73,7 @@
        (rf/dispatch [::sut/save-mailing])
        (testing "creates new mailing in backend"
          (is (= 1 (count @c)))
-         (is (= :admin-create-mailing (-> @c first (nth 2)))))
+         (is (= :create-mailing (-> @c first (nth 2)))))
 
        (testing "marks saving"
          (is (true? (db/saving? @app-db))))
@@ -86,8 +86,8 @@
      (let [m {:id "existing"
               :subject "test mailing"}
            c (h/catch-fx :martian.re-frame/request)]
-       (h/initialize-martian {:admin-update-mailing {:error-code :no-error
-                                                     :body m}})
+       (h/initialize-martian {:update-mailing {:error-code :no-error
+                                               :body m}})
        (is (some? (swap! app-db (fn [db]
                                   (-> db
                                       (db/set-editing m)
@@ -95,7 +95,7 @@
        (rf/dispatch [::sut/save-mailing])
        (testing "updates mailing in backend"
          (is (= 1 (count @c)))
-         (is (= :admin-update-mailing (-> @c first (nth 2))))
+         (is (= :update-mailing (-> @c first (nth 2))))
          (is (= "existing" (-> @c first (nth 3) :mailing-id))))
 
        (testing "marks saving"
@@ -159,3 +159,101 @@
     (testing "sets mailing from list by id as editing"
       (is (= (first mailings)
              (db/get-editing @app-db))))))
+
+(deftest load-sent-mailings
+  (rf-test/run-test-sync
+   (let [m {:id "test-sent-mailing"}
+         c (h/catch-fx :martian.re-frame/request)]
+     (h/initialize-martian {:get-sent-mailings {:error-code :no-error
+                                                :body [m]}})
+     (rf/dispatch [::sut/load-sent-mailings])
+     (testing "fetches sent mailings from backend"
+       (is (= 1 (count @c)))
+       (is (= :get-sent-mailings (-> @c first (nth 2))))))))
+
+(deftest load-sent-mailings--success
+  (let [m {:id "test-sent-mailing"}]
+    (testing "sets sent mailings in db"
+      (rf/dispatch-sync [::sut/load-sent-mailings--success {:body [m]}])
+      (is (= [m] (db/get-sent-mailings @app-db))))))
+
+(deftest load-sent-mailings--failure
+  (testing "sets error"
+    (rf/dispatch-sync [::sut/load-sent-mailings--failure "test error"])
+    (is (= [:danger]
+           (->> (db/get-sent-alerts @app-db)
+                (map :type))))))
+
+(deftest new-delivery
+  (testing "sets delivery in db"
+    (rf/dispatch-sync [::sut/new-delivery])
+    (is (some? (db/get-new-delivery @app-db)))))
+
+(deftest cancel-delivery
+  (testing "clears delivery in db"
+    (is (some? (reset! app-db (db/set-new-delivery {} {:to-users true}))))
+    (rf/dispatch-sync [::sut/cancel-delivery])
+    (is (nil? (db/get-new-delivery @app-db)))))
+
+(deftest delivery-prop-changed
+  (testing "sets property in delivery"
+    (rf/dispatch-sync [::sut/delivery-prop-changed :to-users true])
+    (is (true? (:to-users (db/get-new-delivery @app-db))))))
+
+(deftest save-delivery
+  (rf-test/run-test-sync
+   (let [c (h/catch-fx :martian.re-frame/request)]
+     (h/initialize-martian {:create-send-mailing {:error-code :no-error}})
+     (is (some? (swap! app-db
+                       (fn [db]
+                         (-> db
+                             (db/update-new-delivery assoc :other-dests "first\nsecond")
+                             (r/set-current {:parameters
+                                             {:path
+                                              {:mailing-id "test-mailing"}}}))))))
+     (rf/dispatch [::sut/save-delivery])
+
+     (testing "creates delivery in backend"
+       (is (= 1 (count @c)))
+       (is (= :create-send-mailing (-> @c first (nth 2)))))
+
+     (testing "marks saving"
+       (is (true? (db/saving-new-delivery? @app-db))))
+
+     (testing "converts other destinations to list"
+       (is (= ["first" "second"]
+              (-> @c first (nth 3) :send :other-dests))))
+
+     (testing "sets mailing id in path params"
+       (is (= "test-mailing"
+              (-> @c first (nth 3) :mailing-id)))))))
+
+(deftest save-delivery--success
+  (is (some? (reset! app-db (-> {}
+                                (db/mark-saving-new-delivery)
+                                (db/set-new-delivery {:to-users true})))))
+  (rf/dispatch-sync [::sut/save-delivery--success
+                     {:body {:id "delivery-id"
+                             :to-users true}}])
+  
+  (testing "adds delivery to sent mailings"
+    (is (= ["delivery-id"]
+           (->> (db/get-sent-mailings @app-db)
+                (map :id)))))
+  
+  (testing "unmarks saving"
+    (is (not (db/saving-new-delivery? @app-db))))
+  
+  (testing "clears new delivery"
+    (is (nil? (db/get-new-delivery @app-db)))))
+
+(deftest save-delivery--failure
+  (is (some? (reset! app-db (db/mark-saving-new-delivery {}))))
+  (rf/dispatch-sync [::sut/save-delivery--failure {:message "test error"}])
+  (testing "sets alert"
+    (is (= [:danger]
+           (->> (db/get-sent-alerts @app-db)
+                (map :type)))))
+
+  (testing "unmarks saving"
+    (is (not (db/saving-new-delivery? @app-db)))))

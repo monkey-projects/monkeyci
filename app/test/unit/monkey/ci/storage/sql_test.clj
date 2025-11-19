@@ -365,6 +365,7 @@
 (deftest ^:sql users
   (with-storage conn s
     (let [user (-> (h/gen-user)
+                   (assoc :email "test@monkeyci.com")
                    (dissoc :orgs :orgomers))
           user->id (juxt :type :type-id)]
       (testing "can save and find"
@@ -373,6 +374,10 @@
 
       (testing "can find by cuid"
         (is (= user (st/find-user s (:id user)))))
+
+      (testing "can list emails"
+        (is (= ["test@monkeyci.com"]
+               (st/list-user-emails s))))
 
       (testing "can link to org"
         (let [org (h/gen-org)

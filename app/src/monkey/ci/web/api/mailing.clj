@@ -47,22 +47,26 @@
    (:other-dests m)))
 
 (defn create-sent-mailing [req]
-  (let [m (c/body req)
+  (let [b (c/body req)
         st (c/req->storage req)
         mid (mailing-id req)
+        m (st/find-mailing st mid)
         mailer (:mailer (c/req->rt req))
         mail (when mailer
                (-> (select-keys m [:subject :html-body :text-body])
-                   (assoc :destinations (list-destinations st m))
+                   (assoc :destinations (list-destinations st b))
                    (as-> m (p/send-mail mailer m))))
-        r (cond-> (assoc m :mailing-id mid)
+        _ (log/debug "Object returned by mailer:" mail)
+        r (cond-> (assoc b :id (st/new-id) :mailing-id mid :sent-at (t/now))
             mail (assoc :mail-id (:id mail)))]
     (if mailer
       (log/debug "Sending mailing" mid "to" (count (:destinations mail)) "destinations")
       (log/warn "No mailer configured, emails will not be sent."))
-    (-> (st/save-sent-mailing st r)
-        (rur/response)
-        (rur/status 201))))
+    (if-let [sid (st/save-sent-mailing st r)]
+      (-> (rur/response (assoc r :id (last sid)))
+          (rur/status 201))
+      (-> (rur/response {:message "unable to save mailing to database"})
+          (rur/status 500)))))
 
 (defn list-sent-mailings [req]
   (let [sm (st/list-sent-mailings (c/req->storage req)

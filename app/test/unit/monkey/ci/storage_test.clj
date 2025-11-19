@@ -713,8 +713,9 @@
                   :mailing-id (:id m)
                   :sent-at (t/now)}]
           (testing "can save and find"
-            (is (sid/sid? (sut/save-sent-mailing st sm)))
-            (is (= sm (sut/find-sent-mailing st [(:id m) (:id sm)]))))
+            (let [sid (sut/save-sent-mailing st sm)]
+              (is (sid/sid? sid))
+              (is (= sm (sut/find-sent-mailing st sid)))))
 
           (testing "can list for mailing"
             (is (= [sm] (sut/list-sent-mailings st (:id m))))))))))

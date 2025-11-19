@@ -3,6 +3,7 @@
 
 (def mailing-id ::id)
 (def editing-id ::editing)
+(def sent-id ::sent)
 
 (defn get-mailings [db]
   (l/get-value db mailing-id))
@@ -55,3 +56,43 @@
 
 (defn reset-editing-alerts [db]
   (l/reset-alerts db editing-id))
+
+(defn get-sent-mailings [db]
+  (l/get-value db sent-id))
+
+(defn set-sent-mailings [db m]
+  (l/set-value db sent-id m))
+
+(defn update-sent-mailings [db f & args]
+  (apply l/update-value db sent-id f args))
+
+(defn get-sent-alerts [db]
+  (l/get-alerts db sent-id))
+
+(defn set-sent-alerts [db a]
+  (l/set-alerts db sent-id a))
+
+(defn sent-loading? [db]
+  (l/loading? db sent-id))
+
+(defn set-new-delivery [db d]
+  (assoc db ::new-delivery d))
+
+(defn reset-new-delivery [db]
+  (dissoc db ::new-delivery))
+
+(defn get-new-delivery [db]
+  (::new-delivery db))
+
+(defn update-new-delivery [db f & args]
+  (apply update db ::new-delivery f args))
+
+(defn mark-saving-new-delivery [db]
+  (assoc db ::saving-new-delivery true))
+
+(defn unmark-saving-new-delivery [db]
+  (dissoc db ::saving-new-delivery))
+
+(defn saving-new-delivery? [db]
+  (true? (::saving-new-delivery db)))
+

@@ -90,6 +90,11 @@
         {:url (r/path-for :admin/new-mailing)
          :name "New"}))
 
+(defn- edit-mailing-breadcrumb [db]
+  (conj (mailings-breadcrumb db)
+        {:url (r/path-for :admin/mailing-edit (r/path-params (r/current db)))
+         :name "Edit"}))
+
 (def routes
   "Breadcrumb configuration per route.  If no match is found, the default behaviour
    is applied."
@@ -103,7 +108,8 @@
    :admin/org-credits org-credits-breadcrumb
    :admin/clean-builds clean-builds-breadcrumb
    :admin/mailings mailings-breadcrumb
-   :admin/new-mailing new-mailing-breadcrumb})
+   :admin/new-mailing new-mailing-breadcrumb
+   :admin/mailing-edit edit-mailing-breadcrumb})
 
 (rf/reg-sub
  :breadcrumb/path

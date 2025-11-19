@@ -37,7 +37,8 @@
 
 (deftest create-sent-mailing
   (let [{st :storage :as rt} (trt/test-runtime)
-        m (h/gen-mailing)]
+        m (-> (h/gen-mailing)
+              (assoc :subject "Test subject"))]
     (is (some? (st/save-mailing st m)))
     (let [r (-> rt
                 (h/->req)
@@ -50,21 +51,31 @@
       (testing "creates in storage"
         (is (= 201 (:status r)))
         (is (= 1 (count (st/list-sent-mailings st (:id m))))))
+
+      (testing "returns created delivery"
+        (is (map? (:body r)))
+        (is (some? (get-in r [:body :id]))))
       
       (testing "sends mails"
-        (is (= 1 (-> rt
-                     :mailer
-                     :mailings
-                     deref
-                     count))))
+        (let [m (-> rt
+                    :mailer
+                    :mailings
+                    deref)]
+          (is (= 1 (count m)))
+          (is (= "Test subject"
+                 (-> m first :subject)))))
 
-      (testing "sets mailer id in storage"
-        (is (some? (->> r
-                        :body
-                        :id
-                        (vector (:id m))
-                        (st/find-sent-mailing st)
-                        :mail-id)))))))
+      (testing "stored delivery"
+        (let [d (->> r
+                     :body
+                     :id
+                     (vector (:id m))
+                     (st/find-sent-mailing st))]
+          (testing "contains mailer id"
+            (is (some? (:mail-id d))))
+
+          (testing "has `sent-at` timestamp"
+            (is (number? (:sent-at d)))))))))
 
 (deftest list-destinations
   (h/with-memory-store st
