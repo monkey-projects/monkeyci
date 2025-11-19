@@ -502,6 +502,7 @@
     {:route-name :update-mailing
      :method :put
      :path-parts mailing-path
+     :path-schema {:mailing-id s/Str}
      :body-schema {:mailing cs/Mailing}})
 
    (api-route

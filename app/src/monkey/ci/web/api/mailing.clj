@@ -56,8 +56,8 @@
                (-> (select-keys m [:subject :html-body :text-body])
                    (assoc :destinations (list-destinations st b))
                    (as-> m (p/send-mail mailer m))))
-        _ (log/debug "Object returned by mailer:" mail)
         r (cond-> (assoc b :id (st/new-id) :mailing-id mid :sent-at (t/now))
+            ;; FIXME scw returns list of emails, not a single id
             mail (assoc :mail-id (:id mail)))]
     (if mailer
       (log/debug "Sending mailing" mid "to" (count (:destinations mail)) "destinations")
