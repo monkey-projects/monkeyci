@@ -17,7 +17,18 @@
     :admin
     {:init-fn monkey.ci.gui.admin/init
      :depends-on #{:common}}}
-   :output-dir "target/js/frontend/js"}
+   :output-dir "target/js/frontend/js"
+   :devtools
+   {:preloads [day8.re-frame-10x.preload.react-18]}
+   :dev
+   {:compiler-options
+    {:closure-defines
+     {re-frame.trace.trace-enabled?        true
+      day8.re-frame.tracing.trace-enabled? true}}}
+   :release
+   {:build-options
+    {:ns-aliases
+     {day8.re-frame.tracing day8.re-frame.tracing-stubs}}}}
 
   :test/browser
   {:target :browser-test
