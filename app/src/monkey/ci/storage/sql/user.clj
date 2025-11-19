@@ -64,6 +64,10 @@
   (->> (eu/select-user-orgs (sc/get-conn st) id)
        (map so/db->org-with-repos)))
 
+(defn select-emails [st]
+  (->> (eu/select-user-emails (sc/get-conn st))
+       (map :email)))
+
 (defn count-users [st]
   (ec/count-entities (sc/get-conn st) :users))
 

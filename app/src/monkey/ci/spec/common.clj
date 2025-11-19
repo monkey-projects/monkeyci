@@ -73,3 +73,10 @@
 (s/def ::token (s/with-gen
                  string?
                  #(sg/fixed-string token-size)))
+
+(s/def :mailing/subject string?)
+(s/def :mailing/text-body string?)
+(s/def :mailing/html-body string?)
+(s/def :mailing/mail-id string?) ; Infra mail id
+(s/def :mailing/to-users boolean?)
+(s/def :mailing/to-subscribers boolean?)

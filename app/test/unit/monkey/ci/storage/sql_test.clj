@@ -365,6 +365,7 @@
 (deftest ^:sql users
   (with-storage conn s
     (let [user (-> (h/gen-user)
+                   (assoc :email "test@monkeyci.com")
                    (dissoc :orgs :orgomers))
           user->id (juxt :type :type-id)]
       (testing "can save and find"
@@ -373,6 +374,10 @@
 
       (testing "can find by cuid"
         (is (= user (st/find-user s (:id user)))))
+
+      (testing "can list emails"
+        (is (= ["test@monkeyci.com"]
+               (st/list-user-emails s))))
 
       (testing "can link to org"
         (let [org (h/gen-org)
@@ -1006,6 +1011,31 @@
       (testing "can delete"
         (is (true? (st/delete-org-token st [(:id org) (:id token)])))
         (is (empty? (st/list-org-tokens st (:id org))))))))
+
+(deftest ^:sql mailings
+  (with-storage conn st
+    (let [m (h/gen-mailing)]
+      (testing "can save and find"
+        (is (sid/sid? (st/save-mailing st m)))
+        (is (= m (st/find-mailing st (:id m)))))
+
+      (testing "can list"
+        (is (= [m] (st/list-mailings st))))
+
+      (testing "can delete"
+        (is (true? (st/delete-mailing st (:id m)))))
+
+      (testing "sent mailings"
+        (is (sid/sid? (st/save-mailing st m)))
+        (let [sm {:id (cuid/random-cuid)
+                  :mailing-id (:id m)
+                  :sent-at (t/now)}]
+          (testing "can save and find"
+            (is (sid/sid? (st/save-sent-mailing st sm)))
+            (is (= sm (st/find-sent-mailing st [(:id m) (:id sm)]))))
+
+          (testing "can list for mailing"
+            (is (= [sm] (st/list-sent-mailings st (:id m))))))))))
 
 (deftest pool-component
   (testing "creates sql connection pool using settings"

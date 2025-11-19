@@ -16,6 +16,7 @@
              [db :as emd]
              [interceptors :as emi]
              [jms :as emj]]
+            [monkey.ci.mailing.scw :as mailing-scw]
             [monkey.ci.metrics
              [core :as m]
              [events :as me]
@@ -253,6 +254,16 @@
     (->OtlpClient otlp nil)
     {}))
 
+(defmulti make-mailer :type)
+
+(defmethod make-mailer :scw [conf]
+  (mailing-scw/->ScwMailer conf))
+
+(defn new-mailer [{:keys [mailing]}]
+  (if (:type mailing)
+    (make-mailer mailing)
+    {}))
+
 (defn make-server-system
   "Creates a component system that can be used to start an application server."
   [config]
@@ -271,7 +282,7 @@
    :runtime   (co/using
                (new-server-runtime config)
                [:artifacts :metrics :storage :jwk :process-reaper :vault :mailman :update-bus
-                :crypto])
+                :crypto :mailer])
    :pool      (new-db-pool config)
    :migrator  (co/using
                (new-db-migrator config)
@@ -303,7 +314,8 @@
    :update-bus (mb/event-bus)
    :otlp (co/using
           (new-otlp-client config)
-          [:metrics])))
+          [:metrics])
+   :mailer (new-mailer config)))
 
 (defn with-server-system [config f]
   (rc/with-system (make-server-system config) f))

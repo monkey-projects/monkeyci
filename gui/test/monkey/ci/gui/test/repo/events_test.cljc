@@ -39,7 +39,7 @@
     (rft/run-test-sync
      (let [c (h/catch-fx :martian.re-frame/request)]
        (h/initialize-martian {:get-org {:body {}
-                                             :error-code :no-error}})
+                                        :error-code :no-error}})
        (rf/dispatch [:repo/init])
        
        (testing "loads repo"

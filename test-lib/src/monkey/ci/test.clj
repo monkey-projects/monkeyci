@@ -124,3 +124,9 @@
   "Sets build trigger source (e.g. `:api`, `:github-webhook`)"
   [ctx src]
   (assoc-in ctx [:build :source] src))
+
+(defn set-main-branch
+  "Sets the configured main branch for the repo in the context.  See also 
+   `monkey.ci.api/main-branch`."
+  [ctx b]
+  (assoc-in ctx [:build :git :main-branch] b))

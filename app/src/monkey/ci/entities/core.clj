@@ -530,3 +530,34 @@
    :before-update prepare-token
    :after-update  convert-token
    :after-select  convert-token})
+
+(def prepare-mailing
+  (partial int->time :creation-time))
+(def convert-mailing
+  (partial time->int :creation-time))
+
+(defentity mailing
+  {:before-insert prepare-mailing
+   :after-insert  convert-mailing
+   :before-update prepare-mailing
+   :after-update  convert-mailing
+   :after-select  convert-mailing})
+
+(def prepare-sent-mailing
+  (comp (partial int->time :sent-at)
+        (partial prop->edn :other-dests)))
+
+(def convert-sent-mailing
+  (comp (partial time->int :sent-at)
+        (partial copy-prop :other-dests)))
+
+(def convert-sent-mailing-select
+  (comp (partial time->int :sent-at)
+        (partial edn->prop :other-dests)))
+
+(defentity sent-mailing
+  {:before-insert prepare-sent-mailing
+   :after-insert  convert-sent-mailing
+   :before-update prepare-sent-mailing
+   :after-update  convert-sent-mailing
+   :after-select  convert-sent-mailing-select})

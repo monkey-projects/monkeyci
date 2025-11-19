@@ -1474,7 +1474,32 @@
                                        {:username "test-admin"
                                         :password "test-pass"})
                        (app)
-                       :status)))))))
+                       :status)))))
+
+    (let [m {:subject "test mailing"}]
+      (verify-entity-endpoints {:path "/admin/mailing"
+                                :name "mailing"
+                                :creator st/save-mailing
+                                :base-entity m
+                                :updated-entity (assoc m :subject "updated subject")
+                                :can-delete? true}))
+
+    (testing "`/mailing`"
+      (testing "`GET` lists all mailings"
+        (is (= 204 (-> (mock/request :get "/admin/mailing")
+                       (test-app)
+                       :status))))
+
+      (testing "`/:mailing-id/send`"
+        (let [{:keys [id] :as m} (h/gen-mailing)
+              {st :storage :as rt} (test-rt)
+              app (sut/make-app rt)
+              path (str "/admin/mailing/" id "/send")]
+          (is (some? (st/save-mailing st m)))
+          (testing "`GET` lists all for mailing"
+            (is (= 204 (-> (mock/request :get path)
+                           (app)
+                           :status)))))))))
 
 (deftest crypto-endpoints
   (testing "`POST /:org-id/crypto/decrypt-key` decrypts encrypted key"

@@ -609,6 +609,18 @@
      (-> (p/list-obj s [global users])
          (count)))))
 
+(def list-user-emails
+  (override-or
+   [:user :list-emails]
+   (fn [s]
+     (->> (p/list-obj s [global users])
+          (mapcat (fn [t]
+                    (->> (p/list-obj s [global users t])
+                         (map (partial vector t)))))
+          (map (partial find-user-by-type s))
+          (map :email)
+          (remove nil?)))))
+
 (def list-user-orgs
   (override-or
    [:user :orgs]
@@ -1032,3 +1044,51 @@
 
 (defn delete-org-token [st sid]
   (p/delete-obj st (apply token-sid org-token sid)))
+
+(def mailing :mailing)
+(def mailing-sid (partial global-sid mailing))
+
+(defn save-mailing [st m]
+  (p/write-obj st (mailing-sid (:id m)) m))
+
+(defn find-mailing [st id]
+  (p/read-obj st (mailing-sid id)))
+
+(defn delete-mailing [st id]
+  (p/delete-obj st (mailing-sid id)))
+
+(def list-mailings
+  (override-or
+   [:mailing :list]
+   (fn [st]
+     ;; TODO Allow filtering
+     (->> (p/list-obj st (mailing-sid))
+          (map (partial find-mailing st))))))
+
+(def sent-mailing-sid mailing-sid)
+
+(def sent-mailing->sid (comp sent-mailing-sid (juxt :mailing-id :id)))
+
+(def save-sent-mailing
+  (override-or
+   [:mailing :save-sent]
+   (fn [st sm]
+     (let [m (-> (find-mailing st (:mailing-id sm))
+                 (assoc-in [:sent (:id sm)] sm))]
+       (save-mailing st m)
+       [(:mailing-id sm) (:id sm)]))))
+
+(def find-sent-mailing
+  (override-or
+   [:mailing :find-sent]
+   (fn [st sid]
+     (-> (find-mailing st (first sid))
+         (get-in [:sent (last sid)])))))
+
+(def list-sent-mailings
+  (override-or
+   [:mailing :list-sent]
+   (fn [st mid]
+     (-> (find-mailing st mid)
+         :sent
+         vals))))

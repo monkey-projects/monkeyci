@@ -680,7 +680,26 @@
      [:valid-until :timestamp]
      [:description [:varchar 200]]
      fk-org]
-    [(h/create-index [:unique :org-token-idx] [:org-tokens :token])])])
+    [(h/create-index [:unique :org-token-idx] [:org-tokens :token])])
+
+   (entity-table-migration
+    53 :mailings
+    [[:subject [:varchar 300] [:not nil]]
+     [:text-body :mediumtext]
+     [:html-body :mediumtext]
+     [:creation-time :timestamp [:not nil]]]
+    [])
+
+   (entity-table-migration
+    54 :sent-mailings
+    [(fk-col :mailing-id)
+     [:sent-at :timestamp [:not nil]]
+     [:mail-id [:varchar 100]]
+     [:to-users :boolean]
+     [:to-subscribers :boolean]
+     [:other-dests :text]
+     (fk :mailing-id :mailings :id)]
+    [(col-idx :sent-mailings :mailing-id)])])
 
 (defn prepare-migrations
   "Prepares all migrations by formatting to sql, creates a ragtime migration object from it."
@@ -697,8 +716,9 @@
 
 (defn- load-and-run-migrations [conn]
   (let [[db mig idx :as r] (load-migrations conn)]
-    (log/info "Applying" (count mig) "migrations with db" db)
+    (log/info "Applying" (count mig) "migrations...")
     (rt/migrate-all db idx mig)
+    (log/info "Migrations applied.")
     r))
 
 (defn run-migrations!
