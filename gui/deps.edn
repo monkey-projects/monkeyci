@@ -40,6 +40,12 @@
    :exec-fn monkey.ci.gui.build/gen-admin
    :exec-args {:output "target/admin/index.html"}}
 
+  ;; clj -X:gen-404
+  :gen-404
+  {:extra-deps {hiccup/hiccup {:mvn/version "2.0.0"}}
+   :exec-fn monkey.ci.gui.build/gen-404
+   :exec-args {:output "target/error-404.html"}}
+
   ;; clj -X:gen-main:staging or -X:gen-admin:staging
   :staging
   {:exec-args {:base-url "staging.monkeyci.com"}}

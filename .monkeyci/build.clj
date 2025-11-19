@@ -316,7 +316,8 @@
         (m/depends-on ["test-gui"])
         ;; Also generate index pages for app and admin sites
         (update :script (partial concat [(gen-idx ctx :main)
-                                         (gen-idx ctx :admin)]))
+                                         (gen-idx ctx :admin)
+                                         (gen-idx ctx :404)]))
         (assoc :save-artifacts [gui-release-artifact]))))
 
 (defn scw-images

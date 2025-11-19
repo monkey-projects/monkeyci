@@ -41,6 +41,12 @@
            (->> (db/get-alerts @app-db)
                 (map :type))))))
 
+(deftest new-mailing
+  (testing "resets edit mailing"
+    (is (some? (reset! app-db (db/set-editing {} ::test-editing))))
+    (rf/dispatch-sync [::sut/new-mailing])
+    (is (empty? (db/get-editing @app-db)))))
+
 (deftest cancel-edit
   (rf-test/run-test-sync
    (let [c (h/catch-fx :route/goto)]

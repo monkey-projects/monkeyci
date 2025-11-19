@@ -82,13 +82,15 @@
       [co/cancel-btn [::e/cancel-edit]]]]))
 
 (defn new-mailing [_]
-  [l/default
-   [:div.card
-    [:div.card-body
-     [:h3.card-title [co/icon-text :envelope-plus "New Mailing"]]
-     [:p "Create a new mailing.  It will only be sent after you configure the destinations."]
-     [a/component [::s/edit-alerts]]
-     [edit-mailing-form]]]])
+  (rf/dispatch [::e/new-mailing])
+  (fn [_]
+    [l/default
+     [:div.card
+      [:div.card-body
+       [:h3.card-title [co/icon-text :envelope-plus "New Mailing"]]
+       [:p "Create a new mailing.  It will only be sent after you configure the destinations."]
+       [a/component [::s/edit-alerts]]
+       [edit-mailing-form]]]]))
 
 (defn- edit-mailing-general []
   [:<>

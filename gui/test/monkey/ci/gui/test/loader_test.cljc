@@ -62,6 +62,11 @@
            (-> (sut/on-success {} ::test-id {:body ::test-value})
                (sut/get-value ::test-id)))))
 
+  (testing "sets value `nil` when 204 status"
+    (is (nil? (-> (sut/on-success {} ::test-id {:status 204
+                                                :body ""})
+                  (sut/get-value ::test-id)))))
+
   (testing "unmarks loading"
     (let [id ::test-id]
       (is (not (-> {}

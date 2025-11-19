@@ -76,7 +76,15 @@
       (is (= "clojure -X:gen-admin"
              (-> (sut/build-gui-release ctx)
                  :script
-                 second))))))
+                 second)))))
+
+  (testing "generates 404 error page for release"
+    (let [ctx (-> mt/test-ctx
+                  (mt/with-git-ref "refs/tags/0.1.0"))]
+      (is (= "clojure -X:gen-404"
+             (-> (sut/build-gui-release ctx)
+                 :script
+                 (nth 2)))))))
 
 (deftest publish
   (with-redefs [clojars/latest-version (constantly "1.0.0")]
@@ -190,7 +198,7 @@
                   (sut/upload-install-script)))))
 
   (testing "action job on release"
-    (is (b/action-job? (-> mt/test-ctx
+    (is (m/action-job? (-> mt/test-ctx
                            (mt/with-git-ref "refs/tags/0.1.2")
                            (sut/upload-install-script))))))
 

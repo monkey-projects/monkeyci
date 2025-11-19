@@ -27,6 +27,11 @@
  (fn [db [_ resp]]
    (lo/on-failure db db/mailing-id a/mailing-load-failed resp)))
 
+(rf/reg-event-db
+ ::new-mailing
+ (fn [db _]
+   (db/set-editing db {})))
+
 (rf/reg-event-fx
  ::cancel-edit
  (fn [{:keys [db]} _]
@@ -114,7 +119,6 @@
 (rf/reg-event-db
  ::delivery-prop-changed
  (fn [db [_ prop v]]
-   (println "Property changed:" prop v)
    (db/update-new-delivery db assoc prop v)))
 
 (defn- split-others [v]
