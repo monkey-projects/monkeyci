@@ -26,6 +26,8 @@
   (->> (s/keys :req-un [::job-id])
        (s/merge ::build-event)))
 
+(s/def ::runner-details map?)
+
 (defmulti event-type :type)
 
 (defmethod event-type :build/pending [_]
@@ -33,7 +35,8 @@
        (s/merge ::build-event)))
 
 (defmethod event-type :build/initializing [_]
-  (->> (s/keys :req-un [::build])
+  (->> (s/keys :req-un [::build]
+               :opt-un [::runner-details])
        (s/merge ::build-event)))
 
 (defmethod event-type :build/start [_]

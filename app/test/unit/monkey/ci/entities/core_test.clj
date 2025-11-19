@@ -65,7 +65,11 @@
 
       (testing "can update"
         (is (some? (sut/update-repo conn (assoc r :name "updated"))))
-        (is (= "updated" (:name (sut/select-repo conn (sut/by-id (:id r))))))))
+        (is (= "updated" (:name (sut/select-repo conn (sut/by-id (:id r)))))))
+
+      (testing "can mark public"
+        (is (some? (sut/update-repo conn (assoc r :public true))))
+        (is (true? (:public (sut/select-repo conn (sut/by-id (:id r))))))))
 
     (testing "throws on invalid record"
       (is (thrown? Exception (sut/insert-repo conn {:name "orgless repo"}))))))
@@ -244,7 +248,19 @@
 
       (testing "can delete"
         (is (= 1 (sut/delete-jobs conn (sut/by-id (:id job)))))
-        (is (empty? (sut/select-jobs conn (sut/by-build (:id build)))))))))
+        (is (empty? (sut/select-jobs conn (sut/by-build (:id build))))))
+
+      (testing "can store regexes in edn"
+        (let [job (sut/insert-job
+                   conn
+                   (-> (eh/gen-job)
+                       (assoc :build-id (:id build)
+                              :details {:test-regex #"some regex"})))]
+          (is (= "some regex"
+                 (some-> (sut/select-job conn (sut/by-id (:id job)))
+                         :details
+                         :test-regex
+                         str))))))))
 
 (deftest ^:sql users
   (eh/with-prepared-db conn
@@ -441,3 +457,52 @@
       (testing "can select"
         (is (= [(assoc orig-evt :id (:id evt))]
                (sut/select-job-events conn (sut/by-id (:id evt)))))))))
+
+(deftest ^:sql user-tokens
+  (eh/with-prepared-db conn
+    (let [user (sut/insert-user conn (eh/gen-user))
+          token (-> (eh/gen-user-token)
+                    (assoc :user-id (:id user)
+                           :valid-until 100))]
+      
+      (testing "can insert"
+        (is (number? (:id (sut/insert-user-token conn token)))))
+
+      (testing "can select"
+        (is (= token
+               (-> (sut/select-user-tokens conn (sut/by-cuid (:cuid token)))
+                   first
+                   (select-keys (keys token)))))))))
+
+(deftest ^:sql org-tokens
+  (eh/with-prepared-db conn
+    (let [org (sut/insert-org conn (eh/gen-org))
+          token (-> (eh/gen-org-token)
+                    (assoc :org-id (:id org)
+                           :valid-until 100))]
+      
+      (testing "can insert"
+        (is (number? (:id (sut/insert-org-token conn token)))))
+
+      (testing "can select"
+        (is (= token
+               (-> (sut/select-org-tokens conn (sut/by-cuid (:cuid token)))
+                   first
+                   (select-keys (keys token)))))))))
+
+(deftest ^:sql mailings
+  (eh/with-prepared-db conn
+    (let [m (eh/gen-mailing)
+          r (sut/insert-mailing conn m)]
+      (testing "can insert and retrieve"
+        (is (number? (:id r)))
+        (is (= 1 (count (sut/select-mailings conn (sut/by-cuid (:cuid m)))))))
+
+      (testing "can insert sent mailing"
+        (let [sm (-> (eh/gen-sent-mailing)
+                     (assoc :mailing-id (:id r)
+                            :other-dests ["test@monkeyci.com"]))]
+          (is (number? (:id (sut/insert-sent-mailing conn sm))))))
+
+      (testing "can select sent mailings by mailing id"
+        (is (= 1 (count (sut/select-sent-mailings conn [:= :mailing-id (:id r)]))))))))

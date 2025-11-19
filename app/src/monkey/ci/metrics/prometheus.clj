@@ -1,4 +1,4 @@
-(ns monkey.ci.prometheus
+(ns monkey.ci.metrics.prometheus
   "Functionality to export metrics to prometheus format, or push them to a pushgateway.
    Originally we used `micrometer-clj`, but it's really old and incompatible with recent
    versions of the Prometheus libs.  Since we're fixed on Prometheus (for now), it's not

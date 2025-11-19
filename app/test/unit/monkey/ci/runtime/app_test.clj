@@ -11,6 +11,7 @@
              [storage :as st]
              [utils :as u]
              [vault :as v]]
+            [monkey.ci.metrics.otlp :as mo]
             [monkey.ci.runtime.app :as sut]
             [monkey.ci.vault
              [common :as vc]
@@ -67,7 +68,10 @@
             (is (fn? (get-in rt [:crypto :encrypter]))))
 
           (testing "provides decrypter"
-            (is (fn? (get-in rt [:crypto :decrypter]))))))
+            (is (fn? (get-in rt [:crypto :decrypter]))))
+
+          (testing "has mailer"
+            (is (some? (:mailer rt))))))
 
       (testing "provides metrics routes"
         (is (some? (:metrics-routes sys))))
@@ -84,7 +88,10 @@
         (is (some? (:update-bus sys))))
 
       (testing "provides queue options"
-        (is (some? (:queue-options sys)))))))
+        (is (some? (:queue-options sys))))
+
+      (testing "provides otlp client"
+        (is (some? (:otlp sys)))))))
 
 (deftest process-reaper
   (testing "returns empty list when no oci runner"
@@ -219,3 +226,26 @@
               (is (not-empty @cache))))))))
 
   (is (some? (remove-method sut/dek-utils ::test))))
+
+(deftest otlp-client
+  (with-redefs [mo/make-client (constantly ::dummy)]
+    (testing "empty when no config"
+      (is (empty? (sut/new-otlp-client {}))))
+
+    (testing "`start`"
+      (testing "creates otlp client"
+        (is (= ::dummy
+               (-> (sut/new-otlp-client {:otlp
+                                         {:url "http://test-url"}})
+                   (co/start)
+                   :client)))))
+
+    (testing "`stop` stops client"
+      (let [closed? (atom false)
+            c (reify java.lang.AutoCloseable
+                (close [_]
+                  (reset! closed? true)))]
+        (is (nil? (-> (sut/map->OtlpClient {:client c})
+                      (co/stop)
+                      :client)))
+        (is (true? @closed?))))))

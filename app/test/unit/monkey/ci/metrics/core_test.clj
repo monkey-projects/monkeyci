@@ -3,8 +3,10 @@
              [string :as cs]
              [test :refer [deftest is testing]]]
             [com.stuartsierra.component :as co]
-            [monkey.ci.metrics.core :as sut]
-            [monkey.ci.prometheus :as prom]
+            [monkey.ci.metrics
+             [core :as sut]
+             [prometheus :as prom]]
+            [monkey.ci.storage :as st]
             [monkey.ci.test.helpers :as h]
             [taoensso.telemere :as t]))
 
@@ -19,10 +21,6 @@
     (is (some? (-> (sut/make-registry)
                    (co/start)
                    (co/stop))))))
-
-(deftest counter-id
-  (testing "builds metrics name from parts"
-    (is (= "monkeyci_test_metric" (sut/counter-id [:test :metric])))))
 
 (deftest signal->counter
   (testing "creates a gauge that holds signal recv count"
@@ -72,6 +70,7 @@
 
 (deftest metrics-component
   (let [co (-> (sut/make-metrics)
+               (assoc :storage (st/make-memory-storage))
                (co/start))]
     (try
       (testing "creates registry at start"
@@ -86,6 +85,18 @@
                    :id)))
         (is (not= :timeout (h/wait-until #(cs/includes? (sut/scrape (:registry co)) "monkeyci_oci_calls")
                                          1000))))
+
+      (testing "contains user count"
+        (is (cs/includes? (sut/scrape (:registry co)) "monkeyci_user_count")))
+
+      (testing "contains org count"
+        (is (cs/includes? (sut/scrape (:registry co)) "monkeyci_org_count")))
+
+      (testing "contains repo count"
+        (is (cs/includes? (sut/scrape (:registry co)) "monkeyci_repo_count")))
+
+      (testing "contains email registration count"
+        (is (cs/includes? (sut/scrape (:registry co)) "monkeyci_emailreg_count")))
       
       (finally
         (co/stop co)))))

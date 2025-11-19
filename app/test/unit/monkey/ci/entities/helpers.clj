@@ -4,6 +4,7 @@
             [clojure.spec.gen.alpha :as gen]
             [config.core :as cc]
             [monkey.ci.entities.migrations :as m]
+            [monkey.ci.spec.db_entities]
             [monkey.ci.test.helpers :as h]
             [next.jdbc.connection :as conn])
   (:import (com.zaxxer.hikari HikariDataSource)))
@@ -121,3 +122,15 @@
 
 (defn gen-job-evt []
   (gen-spec :db/job-event))
+
+(defn gen-user-token []
+  (gen-spec :db/user-token))
+
+(defn gen-org-token []
+  (gen-spec :db/org-token))
+
+(defn gen-mailing []
+  (gen-spec :db/mailing))
+
+(defn gen-sent-mailing []
+  (gen-spec :db/sent-mailing))

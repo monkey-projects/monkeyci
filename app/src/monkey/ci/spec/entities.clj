@@ -26,8 +26,10 @@
 (s/def :entity/timed
   (s/keys :opt-un [:entity/start-time :entity/end-time]))
 
+(s/def :org/display-id string?)
+
 (s/def :entity/org
-  (-> (s/keys :req-un [:entity/name])
+  (-> (s/keys :req-un [:entity/name :org/display-id])
       (s/merge :entity/common)))
 
 (s/def :label/name string?)
@@ -40,10 +42,11 @@
 
 (s/def :entity/org-id ::c/cuid)
 (s/def :entity/github-id int?)
+(s/def :entity/public boolean?)
 
 (s/def :entity/repo
   (s/keys :req-un [:entity/org-id :entity/name :display/id]
-          :opt-un [:git/url :git/main-branch :entity/github-id :entity/labels]))
+          :opt-un [:git/url :git/main-branch :entity/github-id :entity/labels :entity/public]))
 
 (s/def :entity/repo-id string?)
 (s/def :entity/build-id string?)
@@ -211,3 +214,29 @@
   (s/keys :req-un [:entity/org-id :entity/repo-id :entity/build-id :entity/job-id
                    :job-evt/time :job-evt/event]
           :opt-un [:job-evt/details]))
+
+(s/def :entity/user-token
+  (-> (s/keys :req-un [::c/token :entity/user-id]
+              :opt-un [:entity/valid-until :entity/description])
+      (s/merge :entity/common)))
+
+(s/def :entity/org-token
+  (-> (s/keys :req-un [::c/token :entity/org-id]
+              :opt-un [:entity/valid-until :entity/description])
+      (s/merge :entity/common)))
+
+(s/def :mailing/creation-time ts?)
+
+(s/def :entity/mailing
+  (-> (s/keys :req-un [:mailing/subject :mailing/creation-time]
+              :opt-un [:mailing/text-body :mailing/html-body])
+      (s/merge :entity/common)))
+
+(s/def :entity/mailing-id string?)
+(s/def :entity/sent-at ts?)
+(s/def :entity/other-dests (s/coll-of string?))
+
+(s/def :entity/sent-mailing
+  (-> (s/keys :req-un [:entity/mailing-id :entity/sent-at]
+              :opt-un [:mailing/mail-id :mailing/to-users :mailing/to-subscribers :entity/other-dests])
+      (s/merge :entity/common)))

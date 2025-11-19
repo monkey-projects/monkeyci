@@ -10,7 +10,7 @@
              [blob :as blob]
              [build :as b]
              [git :as git]
-             [prometheus :as prom]
+             [params :as params]
              [protocols :as p]
              [utils :as u]
              [workspace :as ws]]
@@ -20,7 +20,9 @@
             [monkey.ci.events.mailman
              [interceptors :as emi]
              [jms :as emj]]
-            [monkey.ci.metrics.core :as m]
+            [monkey.ci.metrics
+             [core :as m]
+             [prometheus :as prom]]
             [monkey.ci.runners.controller :as rco]
             [monkey.ci.runtime.common :as rc]
             [monkey.mailman.core :as mmc]))
@@ -61,13 +63,8 @@
                             (:checkout-base-dir config)
                             (u/combine (:build-id build))))))
 
-(defrecord ApiBuildParams [api-config]
-  p/BuildParams
-  (get-build-params [this build]
-    (bas/get-params-from-api api-config build)))
-
 (defn new-params [config]
-  (->ApiBuildParams (:api config)))
+  (params/->ApiBuildParams (constantly (:api config))))
 
 (defrecord ApiServer [build api-config]
   co/Lifecycle

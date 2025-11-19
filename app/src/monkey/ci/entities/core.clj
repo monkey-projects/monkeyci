@@ -27,7 +27,8 @@
 
 (defn insert-entities
   "Batch inserts multiple entities at once.  The records are assumed to
-   be vectors of values."
+   be vectors of values.  Returns the input entities with their generated
+   ids added."
   [{:keys [ds sql-opts]} table cols recs]
   (let [sql (h/format {:insert-into table
                        :columns cols
@@ -98,6 +99,16 @@
   (execute-update conn {:delete []
                         :from table
                         :where f}))
+
+(defn count-entities
+  "Counts records in a table, with an optional filter"
+  [conn table & [f]]
+  (->> (cond-> {:select [[[:count :*] :c]]
+                :from table}
+         f (assoc :where f))
+       (select conn)
+       (first)
+       :c))
 
 (defn- maybe-comp
   "Takes functions stored at `k` in the maps, and composes them left to right."
@@ -345,11 +356,11 @@
 
 (defn insert-user-orgs
   "Batch inserts user/org links"
-  [conn user-id cust-ids]
-  (when-not (empty? cust-ids)
+  [conn user-id org-ids]
+  (when-not (empty? org-ids)
     (insert-entities conn :user-orgs
                      [:user-id :org-id]
-                     (map (partial conj [user-id]) cust-ids))))
+                     (map (partial conj [user-id]) org-ids))))
 
 (defaggregate org-param-value)
 
@@ -500,3 +511,53 @@
    :before-update prepare-job-evt
    :after-update  convert-job-evt
    :after-select  convert-job-evt-select})
+
+(def prepare-token
+  (partial int->time :valid-until))
+(def convert-token
+  (partial time->int :valid-until))
+
+(defentity user-token
+  {:before-insert prepare-token
+   :after-insert  convert-token
+   :before-update prepare-token
+   :after-update  convert-token
+   :after-select  convert-token})
+
+(defentity org-token
+  {:before-insert prepare-token
+   :after-insert  convert-token
+   :before-update prepare-token
+   :after-update  convert-token
+   :after-select  convert-token})
+
+(def prepare-mailing
+  (partial int->time :creation-time))
+(def convert-mailing
+  (partial time->int :creation-time))
+
+(defentity mailing
+  {:before-insert prepare-mailing
+   :after-insert  convert-mailing
+   :before-update prepare-mailing
+   :after-update  convert-mailing
+   :after-select  convert-mailing})
+
+(def prepare-sent-mailing
+  (comp (partial int->time :sent-at)
+        (partial prop->edn :other-dests)))
+
+(def convert-sent-mailing
+  (comp (partial time->int :sent-at)
+        (partial copy-prop :other-dests)))
+
+(def convert-sent-mailing-select
+  (comp (partial time->int :sent-at)
+        (partial edn->prop :other-dests)))
+
+(defentity sent-mailing
+  {:before-insert prepare-sent-mailing
+   :after-insert  convert-sent-mailing
+   :before-update prepare-sent-mailing
+   :after-update  convert-sent-mailing
+   :after-select  convert-sent-mailing-select})

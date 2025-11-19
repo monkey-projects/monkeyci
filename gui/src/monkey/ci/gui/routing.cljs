@@ -30,6 +30,12 @@
  (fn [db _]
    (current db)))
 
+(rf/reg-sub
+ :route/org-id
+ :<- [:route/current]
+ (fn [c _]
+   (get-in c [:parameters :path :org-id])))
+
 (def on-page-leave ::on-page-leave)
 
 (defn- path-changed? [from to]
@@ -41,7 +47,6 @@
    (when (path-changed? (current db) match)
      (log/debug "Changing current route from" (clj->js (current db)) "into" (clj->js match))
      (let [handlers (on-page-leave db)]
-       (log/debug "Found" (count handlers) "leave handlers")
        (cond-> {:db (-> db
                         (assoc current match)
                         (dissoc on-page-leave))}
@@ -67,6 +72,7 @@
     ["/o/:org-id/settings" :page/org-settings]
     ["/o/:org-id/params" :page/org-params]
     ["/o/:org-id/ssh-keys" :page/org-ssh-keys]
+    ["/o/:org-id/api-keys" :page/org-api-keys]
     ["/o/:org-id/r/:repo-id" :page/repo]
     ["/o/:org-id/r/:repo-id/edit" :page/repo-edit]
     ["/o/:org-id/r/:repo-id/settings" :page/repo-settings]
@@ -86,7 +92,10 @@
     ["/builds/clean" :admin/clean-builds]
     ["/forget" :admin/forget-users]
     ["/invoicing" :admin/invoicing]
-    ["/invoicing/:org-id" :admin/org-invoices]]))
+    ["/invoicing/:org-id" :admin/org-invoices]
+    ["/mailings" :admin/mailings]
+    ["/mailings/new" :admin/new-mailing]
+    ["/mailings/edit/:mailing-id" :admin/mailing-edit]]))
 
 (defonce router (atom main-router))
 

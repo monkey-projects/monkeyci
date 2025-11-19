@@ -22,9 +22,8 @@
 
 (defn header []
   (conj (t/generic-header t/config [user-info])
-        [:div.row.mt-1
-         [:div.col
-          [b/path-breadcrumb]]]))
+        [:div.mt-1
+         [b/path-breadcrumb]]))
 
 (defn- footer-col [header links]
   (letfn [(footer-link [[lbl url]]

@@ -253,7 +253,7 @@
           ssh-key {:private-key "enc-private-key"
                    :public-key "public-key"}]
       (is (st/sid? (st/save-org st {:id cid
-                                         :repos {rid repo}})))
+                                    :repos {rid repo}})))
       (is (st/sid? (st/save-ssh-keys st cid [ssh-key])))
       (is (= ["public-key"]
              (-> (h/->req rt)
@@ -285,7 +285,27 @@
            (-> (trt/test-runtime)
                (h/->req)
                (sut/make-build-ctx {:main-branch "main"})
-               :source)))))
+               :source))))
+
+  (testing "params"
+    (testing "are added from body and encrypted"
+      (let [p (-> (trt/test-runtime)
+                  (h/->req)
+                  (assoc-in [:parameters :body :params] {"key" "value"})
+                  (assoc-in [:parameters :path :org-id] (cuid/random-cuid))
+                  (sut/make-build-ctx {})
+                  :params)]
+        (is (= ["key"] (keys p)))
+        (is (string? (get p "key")))))
+
+    (testing "converts keywords to strings"
+      (let [p (-> (trt/test-runtime)
+                  (h/->req)
+                  (assoc-in [:parameters :body :params] {:key "value"})
+                  (assoc-in [:parameters :path :org-id] (cuid/random-cuid))
+                  (sut/make-build-ctx {})
+                  :params)]
+        (is (= ["key"] (keys p)))))))
 
 (deftest update-user
   (testing "updates user in storage"
@@ -318,16 +338,16 @@
 (deftest trigger-build
   (h/with-memory-store st
     (letfn [(with-repo [f]
-              (let [cust-id (st/new-id)
+              (let [org-id (st/new-id)
                     repo (-> (h/gen-repo)
-                             (assoc :org-id cust-id))
-                    cust (-> (h/gen-cust)
-                             (assoc :id cust-id
-                                    :repos {(:id repo) repo}))]
-                (st/save-org st cust)
-                (st/save-org-credit st {:org-id cust-id
-                                             :amount 1000})
-                (f cust repo)))
+                             (assoc :org-id org-id))
+                    org (-> (h/gen-org)
+                            (assoc :id org-id
+                                   :repos {(:id repo) repo}))]
+                (st/save-org st org)
+                (st/save-org-credit st {:org-id org-id
+                                        :amount 1000})
+                (f org repo)))
 
             (make-rt []
               (-> (trt/test-runtime)
@@ -340,17 +360,17 @@
             
             (verify-response [p f]
               (with-repo
-                (fn [cust repo]
+                (fn [org repo]
                   (let [rt (make-rt)
                         res (-> rt
                                 (h/->req)
                                 (assoc :parameters p)
-                                (assoc-in [:parameters :path] {:org-id (:id cust)
+                                (assoc-in [:parameters :path] {:org-id (:id org)
                                                                :repo-id (:id repo)})
                                 (sut/trigger-build))]
                     (is (= 202 (:status res)))
                     (f (assoc rt
-                              :sid [(:id cust) (:id repo)]
+                              :sid [(:id org) (:id repo)]
                               :response res))))))
 
             (verify-trigger [p f]
@@ -376,10 +396,10 @@
         (with-repo
           (fn [{org-id :id} {repo-id :id}]
             (is (some? (st/save-org st {:id org-id
-                                             :repos
-                                             {repo-id
-                                              {:id repo-id
-                                               :url "http://test-url"}}})))
+                                        :repos
+                                        {repo-id
+                                         {:id repo-id
+                                          :url "http://test-url"}}})))
             (is (= "http://test-url"
                    (-> (make-req {:path {:org-id org-id
                                          :repo-id repo-id}})
@@ -389,29 +409,62 @@
                        :build
                        :git
                        :url))))))
-      
-      (testing "adds commit id from query params"
-        (verify-trigger
-         {:query {:commit-id "test-id"}}
-         (fn [{:keys [build]}]
-           (is (= "test-id"
-                  (-> build
-                      :git
-                      :commit-id))))))
 
-      (testing "adds branch from query params as ref"
-        (verify-trigger
-         {:query {:branch "test-branch"}}
-         (fn [{:keys [build]}]
-           (is (= "refs/heads/test-branch"
-                  (-> build :git :ref))))))
+      (testing "with body"
+        (testing "adds commit id"
+          (verify-trigger
+           {:body {:commit-id "test-id"}}
+           (fn [{:keys [build]}]
+             (is (= "test-id"
+                    (-> build
+                        :git
+                        :commit-id))))))
 
-      (testing "adds tag from query params as ref"
-        (verify-trigger
-         {:query {:tag "test-tag"}}
-         (fn [{:keys [build]}]
-           (is (= "refs/tags/test-tag"
-                  (-> build :git :ref))))))
+        (testing "adds branch as ref"
+          (verify-trigger
+           {:body {:branch "test-branch"}}
+           (fn [{:keys [build]}]
+             (is (= "refs/heads/test-branch"
+                    (-> build :git :ref))))))
+
+        (testing "adds tag as ref"
+          (verify-trigger
+           {:body {:tag "test-tag"}}
+           (fn [{:keys [build]}]
+             (is (= "refs/tags/test-tag"
+                    (-> build :git :ref))))))
+
+        (testing "passes params to build encrypted"
+          (verify-trigger
+           {:body {:params {"test-param" "test-value"}}}
+           (fn [{:keys [build]}]
+             (let [p (get-in build [:params "test-param"])]
+               (is (string? p))
+               (is (not= "test-value" p)))))))
+
+      (testing "with query params"
+        (testing "adds commit id"
+          (verify-trigger
+           {:query {:commit-id "test-id"}}
+           (fn [{:keys [build]}]
+             (is (= "test-id"
+                    (-> build
+                        :git
+                        :commit-id))))))
+
+        (testing "adds branch as ref"
+          (verify-trigger
+           {:query {:branch "test-branch"}}
+           (fn [{:keys [build]}]
+             (is (= "refs/heads/test-branch"
+                    (-> build :git :ref))))))
+
+        (testing "adds tag as ref"
+          (verify-trigger
+           {:query {:tag "test-tag"}}
+           (fn [{:keys [build]}]
+             (is (= "refs/tags/test-tag"
+                    (-> build :git :ref)))))))
 
       (testing "adds `sid` to event"
         (verify-response
@@ -435,8 +488,8 @@
       
       (testing "returns id"
         (with-repo
-          (fn [cust repo]
-            (is (cuid/cuid? (-> (make-req {:path {:org-id (:id cust)
+          (fn [org repo]
+            (is (cuid/cuid? (-> (make-req {:path {:org-id (:id org)
                                                   :repo-id (:id repo)}})
                                 (sut/trigger-build)
                                 :body

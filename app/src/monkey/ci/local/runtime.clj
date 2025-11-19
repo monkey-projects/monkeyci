@@ -12,13 +12,16 @@
              [artifacts :as a]
              [build :as b]
              [cache :as c]
+             [params :as params]
              [protocols :as p]]
             [monkey.ci.blob.disk :as blob]
             [monkey.ci.containers.podman :as cp]
             [monkey.ci.events.mailman :as em]
             [monkey.ci.local
              [config :as lc]
-             [events :as le]]
+             [console :as lco]
+             [events :as le]
+             [print :as lp]]
             [monkey.ci.runners.runtime :as rr]
             [monkey.ci.runtime.common :as rc]
             [monkey.mailman.core :as mmc]))
@@ -37,11 +40,26 @@
                 (le/make-routes (:mailman c))))]
     (em/map->RouteComponent {:config conf :make-routes make-routes})))
 
+(defn- new-print-routes [conf]
+  (letfn [(make-routes [{:keys [state]}]
+            ;; TODO Switch to "dumb" printing if console is not an xterm
+            #_(lp/make-routes {:printer lp/console-printer})
+            (lco/make-routes {:state state}))]
+    (em/map->RouteComponent {:config conf :make-routes make-routes})))
+
+(defn- new-renderer [conf]
+  (if-not (lc/get-quiet conf)
+    (lco/map->PeriodicalRenderer {:renderer (lco/console-renderer lco/render-state)
+                                  :interval 200})
+    ;; No rendering
+    {}))
+
 (defn- new-podman-routes [conf]
   (letfn [(make-routes [{:keys [config build] :as c}]
             (let [sid (b/sid build)]
               (log/debug "Creating local podman routes for build" build)
-              (-> (select-keys c [:mailman :artifacts :cache :workspace])
+              (-> (select-keys c [:mailman :artifacts :cache :workspace :key-decrypter])
+                  (merge (select-keys config [:podman]))
                   (update :artifacts a/make-blob-repository sid)
                   (update :cache c/make-blob-repository sid)
                   (assoc :work-dir (lc/get-jobs-dir config))
@@ -57,14 +75,12 @@
 (defn- new-cache [conf]
   (blob-store (lc/get-cache-dir conf)))
 
-(defrecord FixedBuildParams [params]
-  p/BuildParams
-  (get-build-params [_ _]
-    (log/debug "Returning fixed build params:" (map :name params))
-    (md/success-deferred params)))
-
-(defn- new-params [conf]
-  (->FixedBuildParams (lc/get-params conf)))
+(defn new-params [conf]
+  (let [global (lc/get-global-api conf)
+        p (params/->FixedBuildParams (lc/get-params conf))]
+    (if (not-empty (:token global))
+      (params/->MultiBuildParams [(params/->CliBuildParams global) p])
+      p)))
 
 (defn- new-api-server []
   (rr/new-api-server {}))
@@ -113,9 +129,16 @@
    :routes       (co/using
                   (new-routes conf)
                   [:mailman :api-config])
+   :state        (atom {})
+   :print-routes (co/using
+                  (new-print-routes conf)
+                  [:mailman :state])
+   :renderer     (co/using
+                  (new-renderer conf)
+                  [:state])
    :podman       (co/using
                   (new-podman-routes conf)
-                  [:mailman :artifacts :cache :workspace :build])
+                  [:mailman :artifacts :cache :workspace :build :key-decrypter])
    :artifacts    (new-artifacts conf)
    :cache        (new-cache conf)
    :workspace    (copy-store conf)
@@ -123,11 +146,13 @@
    :api-config   (rr/new-api-config {})
    :api-server   (co/using
                   (new-api-server)
-                  [:api-config :artifacts :cache :params :build :event-stream :mailman])
+                  [:api-config :artifacts :cache :params :build :event-stream :mailman
+                   :key-decrypter])
    :event-stream (new-event-stream)
    :event-pipe   (co/using
                   (new-event-pipe)
-                  [:event-stream :mailman])))
+                  [:event-stream :mailman])
+   :key-decrypter (constantly (md/success-deferred (:dek (lc/get-build conf))))))
 
 (defn start-and-post
   "Starts component system and posts an event to the event broker to trigger

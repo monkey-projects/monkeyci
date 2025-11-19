@@ -1,7 +1,8 @@
 (ns monkey.ci.metrics.events
   "Event handlers that update metrics"
-  (:require [monkey.ci.metrics.core :as c]
-            [monkey.ci.prometheus :as prom]))
+  (:require [monkey.ci.metrics
+             [common :as c]
+             [prometheus :as prom]]))
 
 (def get-counter ::counter)
 
@@ -33,21 +34,21 @@
      :interceptors [(evt-counter (make-evt-counter reg type labels)
                                  get-label-vals)]}]])
 
-(defn cust-evt-route
-  "Creates an event route that updates an event counter with customer label"
+(defn org-evt-route
+  "Creates an event route that updates an event counter with org label"
   [reg type]
   (evt-route reg
              type
-             ["customer"]
+             ["org"]
              (comp vector ctx->org-id)))
 
 (defn status-evt-route
-  "Creates an event route that updates an event counter with customer label
+  "Creates an event route that updates an event counter with org label
    and status"
   [reg type]
   (evt-route reg
              type
-             ["customer" "status"]
+             ["org" "status"]
              (juxt ctx->org-id
                    ctx->status)))
 
@@ -55,7 +56,7 @@
   "Creates mailman routes that update metrics on received events"
   [reg]
   (concat
-   (mapv (partial cust-evt-route reg)
+   (mapv (partial org-evt-route reg)
          [:build/triggered
           :build/queued
           :build/start

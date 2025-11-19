@@ -29,3 +29,9 @@
                    :join [[:users :u] [:= :u.id :s.user-id]]
                    :where [:= :u.cuid cuid]})
        (first)))
+
+(defn select-user-emails [conn]
+  (ec/select conn
+             {:select [:u.email]
+              :from [[:users :u]]
+              :where [:is-not :u.email nil]}))

@@ -92,7 +92,7 @@
        [co/build-result (:status @build)]])))
 
 (defn- show-repo [c r]
-  (let [repo-path (r/path-for :page/repo {:org-id (:id c)
+  (let [repo-path (r/path-for :page/repo {:org-id (u/org-id c)
                                           :repo-id (:id r)})]
     [:div.card-body.border-top
      [:div.d-flex.flex-row.align-items-start
@@ -233,7 +233,8 @@
   (rf/dispatch [:org/load-recent-builds id])
   (fn [id]
     (let [loaded? (rf/subscribe [:loader/loaded? db/recent-builds])
-          recent (rf/subscribe [:org/recent-builds])]
+          recent (rf/subscribe [:org/recent-builds])
+          org-id (rf/subscribe [:route/org-id])]
       (if (and @loaded? (empty? @recent))
         [with-recent-reload id "No recent builds found for this organization."]
         [:<>
@@ -247,11 +248,13 @@
            [t/paged-table
             {:id ::recent-builds
              :items-sub [:org/recent-builds]
-             :columns (concat [{:label "Repository"
-                                :value (fn [b]
-                                         [:a {:href (r/path-for :page/repo (u/cust->org b))}
-                                          (get-in b [:repo :name])])}]
-                              rv/table-columns)
+             :columns (concat
+                       [{:label "Repository"
+                         :value (fn [b]
+                                  [:a {:href (r/path-for :page/repo {:org-id @org-id
+                                                                     :repo-id (:repo-id b)})}
+                                   (get-in b [:repo :name])])}]
+                       rv/table-columns)
              :loading {:sub [:loader/init-loading? db/recent-builds]}}]]]]))))
 
 (defn- overview-tabs
@@ -278,7 +281,9 @@
    [add-repo-btn id]
    [:p.mt-2
     "A repository points to a remote git site, that contains a MonkeyCI script.  See "
-    [co/docs-link "articles/repos" "the documentation on repositories."]]])
+    [co/docs-link "articles/repos" "the documentation on repositories."] " Want to "
+    "learn how to write your first build script?  Check out "
+    [co/docs-link "categories/getting-started" "the getting started guide."]]])
 
 (defn- org-details [id]
   (let [o (rf/subscribe [:org/info])]

@@ -21,17 +21,26 @@
 
 (def body c/body)
 
+(defn- save-webhook [st wh]
+  ;; Make sure org id is not the display id
+  (-> wh
+      (update :org-id #(or (st/find-org-id-by-display-id st %) %))
+      (as-> r (st/save-webhook st r))))
+
 (c/make-entity-endpoints "webhook"
                          {:get-id (c/id-getter :webhook-id)
                           :getter (comp #(dissoc % :secret-key)
                                         st/find-webhook)
-                          :saver st/save-webhook
+                          :saver save-webhook
                           :deleter st/delete-webhook})
 
 (c/make-entity-endpoints "user"
                          {:get-id (c/id-getter (juxt :user-type :type-id))
                           :getter st/find-user-by-type
                           :saver st/save-user})
+
+(def delete-user
+  (c/entity-deleter (c/id-getter :user-id) st/delete-user))
 
 (defn get-user-orgs
   "Retrieves all users linked to the org in the request path"
@@ -49,7 +58,7 @@
              :secret-key (auth/generate-secret-key)
              :creation-time (t/now)))
 
-(def create-webhook (comp (c/entity-creator st/save-webhook c/default-id)
+(def create-webhook (comp (c/entity-creator save-webhook c/default-id)
                           assign-new-webhook-props))
 
 (def org-id c/org-id)
@@ -135,11 +144,6 @@
     (rur/response b)
     (rur/not-found nil)))
 
-(defn- as-ref [k v]
-  (fn [p]
-    (when-let [r (get-in p [:query k])]
-      (format "refs/%s/%s" v r))))
-
 (def build-sid c/build-sid)
 
 (defn- with-artifacts [req f]
@@ -187,6 +191,12 @@
     (with-artifacts req (comp get-contents
                               (partial artifact-by-id (artifact-id req))))))
 
+(defn- as-ref [k v]
+  (fn [p]
+    (when-let [r (or (get-in p [:query k])
+                     (get-in p [:body k]))]
+      (format "refs/%s/%s" v r))))
+
 (def params->ref
   "Creates a git ref from the query parameters (either branch or tag)"
   (some-fn (as-ref :branch "heads")
@@ -198,12 +208,14 @@
   (-> (:path p)
       (select-keys [:org-id :repo-id])
       (assoc :source :api
-             :git (-> (:query p)
+             :git (-> (merge (:body p) (:query p))
                       (select-keys [:commit-id :branch :tag])
                       (assoc :url (:url repo))
                       (mc/assoc-some :ref (or (params->ref p)
                                               (some->> (:main-branch repo) (str "refs/heads/")))
                                      :main-branch (:main-branch repo))))
+      (mc/assoc-some :params (some->> (get-in p [:body :params])
+                                      (mc/map-keys name)))
       (wt/prepare-triggered-build (c/req->rt req) repo)))
 
 (defn- build-triggered-response [build]
@@ -212,14 +224,12 @@
       (rur/status 202)))
 
 (defn trigger-build [req]
-  (let [{p :parameters} req
-        st (c/req->storage req)
+  (let [st (c/req->storage req)
         repo-sid (c/repo-sid req)
-        repo (st/find-repo st repo-sid)
-        build (make-build-ctx req repo)]
+        repo (st/find-repo st repo-sid)]
     (log/debug "Triggering build for repo sid:" repo-sid)
     (if repo
-      (build-triggered-response build)
+      (build-triggered-response (make-build-ctx req repo))
       (rur/not-found {:message "Repository does not exist"}))))
 
 (defn retry-build

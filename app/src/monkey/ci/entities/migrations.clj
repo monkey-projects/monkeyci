@@ -87,7 +87,7 @@
     (not no-cascade?) (conj :on-delete-cascade)))
 
 (def fk-customer (fk :customer-id :customers :id))
-(def fk-org (fk :org-id :customers :id))
+(def fk-org (fk :org-id :orgs :id))
 (def fk-repo (fk :repo-id :repos :id))
 (def fk-user (fk :user-id :users :id))
 (def fk-job (fk :job-id :jobs :id))
@@ -646,7 +646,60 @@
     [{:alter-table :webhooks
       :drop-column :creation-time}
      {:alter-table :webhooks
-      :drop-column :last-inv-time}])])
+      :drop-column :last-inv-time}])
+
+   (migration
+    (mig-id 49 :add-public-repo)
+    [{:alter-table :repos
+      :add-column [:public :boolean]}]
+    [{:alter-table :repos
+      :drop-column :public}])
+
+   (migration
+    (mig-id 50 :org-display-id)
+    [{:alter-table :orgs
+      :add-column [:display-id [:varchar 30]]}
+     {:alter-table :orgs
+      :add-index [:unique nil :display-id]}]
+    [{:alter-table :orgs
+      :drop-column :display-id}])
+
+   (entity-table-migration
+    51 :user-tokens
+    [[:token [:char 64] [:not nil]]
+     user-col
+     [:valid-until :timestamp]
+     [:description [:varchar 200]]
+     fk-user]
+    [(h/create-index [:unique :user-token-idx] [:user-tokens :token])])
+
+   (entity-table-migration
+    52 :org-tokens
+    [[:token [:char 64] [:not nil]]
+     org-col
+     [:valid-until :timestamp]
+     [:description [:varchar 200]]
+     fk-org]
+    [(h/create-index [:unique :org-token-idx] [:org-tokens :token])])
+
+   (entity-table-migration
+    53 :mailings
+    [[:subject [:varchar 300] [:not nil]]
+     [:text-body :mediumtext]
+     [:html-body :mediumtext]
+     [:creation-time :timestamp [:not nil]]]
+    [])
+
+   (entity-table-migration
+    54 :sent-mailings
+    [(fk-col :mailing-id)
+     [:sent-at :timestamp [:not nil]]
+     [:mail-id [:varchar 100]]
+     [:to-users :boolean]
+     [:to-subscribers :boolean]
+     [:other-dests :text]
+     (fk :mailing-id :mailings :id)]
+    [(col-idx :sent-mailings :mailing-id)])])
 
 (defn prepare-migrations
   "Prepares all migrations by formatting to sql, creates a ragtime migration object from it."
@@ -663,8 +716,9 @@
 
 (defn- load-and-run-migrations [conn]
   (let [[db mig idx :as r] (load-migrations conn)]
-    (log/info "Applying" (count mig) "migrations with db" db)
+    (log/info "Applying" (count mig) "migrations...")
     (rt/migrate-all db idx mig)
+    (log/info "Migrations applied.")
     r))
 
 (defn run-migrations!

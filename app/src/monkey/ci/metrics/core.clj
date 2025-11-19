@@ -1,10 +1,11 @@
 (ns monkey.ci.metrics.core
-  (:require [clojure.string :as cs]
-            [clojure.tools.logging :as log]
+  (:require [clojure.tools.logging :as log]
             [com.stuartsierra.component :as co]
             [medley.core :as mc]
             [monkey.ci.common.preds :as cp]
-            [monkey.ci.prometheus :as prom]
+            [monkey.ci.metrics
+             [entity-stats :as es]
+             [prometheus :as prom]]
             [taoensso.telemere :as t]))
 
 (defn make-registry []
@@ -14,12 +15,6 @@
   "Creates a string that can be used by Prometheus for scraping"
   [r]
   (prom/scrape r))
-
-(defn counter-id [parts]
-  (->> parts
-       (map name)
-       (cs/join "_")
-       (str "monkeyci_")))
 
 (defn signal->counter
   "Registers a signal handler that creates a counter in the registry that counts 
@@ -66,6 +61,16 @@
                       :tx (id-filter :oci/invocation)})
     reg))
 
+(defn- add-entity-metrics [reg st]
+  (->> [es/user-count-gauge
+        es/org-count-gauge
+        es/repo-count-gauge
+        es/email-reg-count-gauge]
+       (reduce (fn [r f]
+                 (f st r)
+                 r)
+               reg)))
+
 (defn- remove-signal-handlers []
   (let [handlers [::oci-calls
                   :build/triggered
@@ -77,8 +82,10 @@
 (defrecord Metrics []
   co/Lifecycle
   (start [this]
-    (assoc this :registry (-> (make-registry)
-                              (add-oci-metrics))))
+    (let [st (:storage this)]
+      (assoc this :registry (cond-> (make-registry)
+                              true (add-oci-metrics)
+                              st (add-entity-metrics st)))))
 
   (stop [this]
     (remove-signal-handlers)

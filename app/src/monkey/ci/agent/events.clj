@@ -14,6 +14,7 @@
              [mailman :as em]
              [polling :as ep]]
             [monkey.ci.events.mailman.interceptors :as emi]
+            [monkey.ci.runners.interceptors :as ri]
             [monkey.ci.script.config :as sc]
             [monkey.mailman.core :as mmc]))
 
@@ -81,15 +82,13 @@
 (defn generate-script-config [ctx build]
   (let [host (bas/get-ip-addr)
         conf (get-config ctx)]
-    ;; TODO Add encrypted build DEK, it will be needed by the script to encrypt
-    ;; env vars
     (-> sc/empty-config
         (sc/set-build (-> build
                           ;; Also set credit multiplier, for action jobs
                           (b/set-credit-multiplier (:credit-multiplier conf))))
         (sc/set-archs (:archs conf))
         ;; Use external ip address, so containers can access the api too
-        (sc/set-api {:url (str "http://" host ":" (-> conf :api-server :port))
+        (sc/set-api {:url (bas/->url host (-> conf :api-server :port))
                      :token (get-token ctx)}))))
 
 (defn- write-log-config [conf dest]
@@ -170,7 +169,12 @@
 (def result-build-init-evt
   {:name ::result-build-init-evt
    :leave (fn [ctx]
-            (assoc ctx :result [(b/build-init-evt (get-build ctx))]))})
+            (assoc ctx :result [(-> (b/build-init-evt (get-build ctx))
+                                    (assoc :runner-details
+                                           (-> ctx
+                                               (get-config)
+                                               :runner-details
+                                               (assoc :runner :agent))))]))})
 
 (def cleanup
   "Interceptor that deletes all files from a build, after build end"

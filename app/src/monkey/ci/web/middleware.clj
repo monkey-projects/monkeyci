@@ -77,6 +77,26 @@
         (em/post-events (c/req->mailman req) evt))
       (r/remove-events resp))))
 
+(defn resolve-org-id
+  "Replaces the org id when a display id is given.  How resolving happens is 
+   delegated to a resolver fn that takes the req and the org display id.  Since
+   there is no sure way to distinguish between a display id and a cuid, the
+   resolver should be able to handle both situations."
+  [h resolver]
+  (fn [req]
+    (-> req
+        (mc/update-existing-in [:parameters :path :org-id] (partial resolver req))
+        (h))))
+
+(defn replace-body-org-id
+  "Since the `org-id` can be a cuid or a display id, this interceptor replaces the
+   value in the request body with the one in the path params."
+  [h]
+  (fn [req]
+    (-> req
+        (mc/update-existing-in [:parameters :body :org-id] (constantly (c/org-id req)))
+        (h))))
+
 (def default-middleware
   "Default middleware for http servers"
   [rrmp/parameters-middleware

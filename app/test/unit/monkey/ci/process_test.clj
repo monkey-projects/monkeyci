@@ -11,17 +11,15 @@
             [monkey.ci.test.runtime :as trt]))
 
 (deftest test!
-  (let [build {:build-id "test-build"}
-        rt (trt/test-runtime)]
-    
+  (let [dir "test/dir"]
     (with-redefs [bp/process identity]
       (testing "runs child process to execute unit tests"
-        (is (= "clojure" (-> (sut/test! build rt)
+        (is (= "clojure" (-> (sut/test! dir {})
                              :cmd
                              first))))
 
-      (testing "enables watch mode if passed in cmdline"
-        (is (cs/includes? (-> (sut/test! build (assoc-in rt [:config :args :watch] true))
+      (testing "enables watch mode if passed in opts"
+        (is (cs/includes? (-> (sut/test! dir {:watch? true})
                               :cmd
                               (nth 2))
                           ":watch? true"))))))

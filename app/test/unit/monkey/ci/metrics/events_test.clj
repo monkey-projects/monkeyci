@@ -1,8 +1,9 @@
 (ns monkey.ci.metrics.events-test
   (:require [clojure.string :as cs]
             [clojure.test :refer [deftest testing is]]
-            [monkey.ci.metrics.events :as sut]
-            [monkey.ci.prometheus :as prom]
+            [monkey.ci.metrics
+             [events :as sut]
+             [prometheus :as prom]]
             [monkey.mailman.core :as mmc]))
 
 (deftest evt-counter
@@ -20,7 +21,7 @@
         router (-> (sut/make-routes reg)
                    (mmc/router))
         type->id #(str (namespace %) "_" (name %))]
-    (testing "customer events"
+    (testing "org events"
       (let [types [:build/triggered
                    :build/queued
                    :build/start
@@ -30,14 +31,14 @@
                    :job/start]]
         (doseq [t types]
           (let [id (type->id t)]
-            (testing (format "`%s` increases counter for %s with customer label" (str t) id)
+            (testing (format "`%s` increases counter for %s with org label" (str t) id)
               (is (nil? (-> {:type t
-                             :sid ["test-cust"]}
+                             :sid ["test-org"]}
                             (router)
                             :result)))
               (is (cs/includes?
                    (prom/scrape reg)
-                   (format "monkeyci_%s_total{customer=\"test-cust\"} 1.0" id))))))))
+                   (format "monkeyci_%s_total{org=\"test-org\"} 1.0" id))))))))
 
     (testing "status events"
       (let [types [:build/end
@@ -48,10 +49,10 @@
           (let [id (type->id t)]
             (testing (format "`%s` increases counter for %s with status label" (str t) id)
               (is (nil? (-> {:type t
-                             :sid ["test-cust"]
+                             :sid ["test-org"]
                              :status :success}
                             (router)
                             :result)))
               (is (cs/includes?
                    (prom/scrape reg)
-                   (format "monkeyci_%s_total{customer=\"test-cust\",status=\"success\"} 1.0" id))))))))))
+                   (format "monkeyci_%s_total{org=\"test-org\",status=\"success\"} 1.0" id))))))))))

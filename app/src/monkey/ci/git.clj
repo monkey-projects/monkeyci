@@ -5,7 +5,8 @@
             [clojure.java.io :as io]
             [clojure.string :as cs]
             [clojure.tools.logging :as log])
-  (:import [org.eclipse.jgit.ignore IgnoreNode IgnoreNode$MatchResult]))
+  (:import [org.eclipse.jgit.ignore IgnoreNode IgnoreNode$MatchResult]
+           [org.eclipse.jgit.api CloneCommand CheckoutCommand]))
 
 (defn- write-ssh-keys [dir idx r]
   (let [keys ((juxt :public-key :private-key) r)
@@ -63,9 +64,12 @@
         branch (opts->branch opts)]
     (git/with-identity id-config
       (log/debug "Cloning" url "and branch" branch "into" dir "with id config" id-config)
-      (git/git-clone url
-                     :branch branch
-                     :dir dir))))
+      ;; Do not use the built-in clone fn, it fails on detached heads
+      (cond-> (-> (git/clone-cmd url)
+                  (.setDirectory (fs/file dir)))
+        (nil? branch) (.setNoCheckout true)
+        branch (.setBranch branch)
+        true (.call)))))
 
 (defn checkout [repo id]
   (log/debug "Checking out" id "from repo" repo)

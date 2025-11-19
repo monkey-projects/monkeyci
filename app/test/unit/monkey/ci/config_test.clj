@@ -106,11 +106,26 @@
                :account
                (select-keys [:org-id :repo-id])))))
 
-  (testing "uses `server` arg as account url"
+  (testing "does not clear existing account settings"
+    (with-home-config
+      {:account {:org-id "test-customer"}}
+      #(is (= {:org-id "test-customer"
+               :repo-id "arg-repo"}
+              (-> (sut/app-config {} {:repo-id "arg-repo"})
+                  :account
+                  (select-keys [:org-id :repo-id]))))))
+
+  (testing "uses `api` arg as account url"
     (is (= "http://test"
-           (-> (sut/app-config {} {:server "http://test"})
+           (-> (sut/app-config {} {:api "http://test"})
                :account
                :url))))
+
+  (testing "reads api key from args"
+    (is (= "test-token"
+           (-> (sut/app-config {} {:api-key "test-token"})
+               :account
+               :token))))
 
   (testing "oci"
     (testing "keeps credentials from config file"
@@ -143,6 +158,6 @@
 
 (deftest home-config-file
   (testing "is by default in the user home dir"
-    (is (= (str (System/getProperty "user.home") "/.monkeyci/config.edn")
+    (is (= (str (System/getProperty "user.home") "/.config/monkeyci/config.edn")
            sut/*home-config-file*))))
 

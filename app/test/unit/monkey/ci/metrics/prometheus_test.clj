@@ -1,7 +1,7 @@
-(ns monkey.ci.prometheus-test
+(ns monkey.ci.metrics.prometheus-test
   (:require [clojure.test :refer [deftest testing is]]
             [clojure.string :as cs]
-            [monkey.ci.prometheus :as sut]))
+            [monkey.ci.metrics.prometheus :as sut]))
 
 (deftest make-registry
   (testing "creates a new Prometheus registry"
@@ -32,7 +32,14 @@
                                                   :labels ["domain"]})]
       (is (= "test-domain" (.. c
                                (collect) (getDataPoints) (get 0)
-                               (getLabels) (getValue 0)))))))
+                               (getLabels) (getValue 0))))))
+
+  (testing "has datapoints initially"
+    (let [dp (-> (sut/make-counter "empty_counter" (sut/make-registry))
+                 (.collect)
+                 (.getDataPoints))]
+      (is (not-empty dp))
+      (is (double? (-> dp first (.getValue)))))))
 
 (deftest push-gw
   (testing "creates push gateway"

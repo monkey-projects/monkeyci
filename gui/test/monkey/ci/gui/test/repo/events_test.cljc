@@ -4,6 +4,7 @@
             [day8.re-frame.test :as rft]
             [monkey.ci.gui.org.db :as cdb]
             [monkey.ci.gui.loader :as lo]
+            [monkey.ci.gui.org.db :as odb]
             [monkey.ci.gui.repo.db :as db]
             [monkey.ci.gui.repo.events :as sut]
             [monkey.ci.gui.test.fixtures :as f]
@@ -38,7 +39,7 @@
     (rft/run-test-sync
      (let [c (h/catch-fx :martian.re-frame/request)]
        (h/initialize-martian {:get-org {:body {}
-                                             :error-code :no-error}})
+                                        :error-code :no-error}})
        (rf/dispatch [:repo/init])
        
        (testing "loads repo"
@@ -52,7 +53,7 @@
     (rft/run-test-sync
      (let [c (h/catch-fx :martian.re-frame/request)]
        (h/initialize-martian {:get-org {:body {:name "test org"}
-                                             :error-code :no-error}})
+                                        :error-code :no-error}})
        
        (rf/dispatch [:repo/load "test-org-id"])
        (is (= 1 (count @c)))
@@ -63,7 +64,7 @@
      (let [c (h/catch-fx :martian.re-frame/request)]
        (reset! app-db (cdb/set-org {} {:name "existing org"}))
        (h/initialize-martian {:get-org {:body {:name "test org"}
-                                             :error-code :no-error}})
+                                        :error-code :no-error}})
        
        (rf/dispatch [:repo/load "test-org-id"])
        (is (empty? @c)))))
@@ -158,15 +159,98 @@
              (db/get-builds @app-db))))))
 
 (deftest show-trigger-build
+  (rf/dispatch-sync [:repo/show-trigger-build])
+  
   (testing "sets `show trigger form` flag in db"
+    (is (db/show-trigger-form? @app-db)))
+
+  (testing "initializes trigger form with single param"
+    (is (= 1 (-> (db/trigger-form @app-db)
+                 :params
+                 count))))
+
+  (testing "adds empty param"
+    (is (some? (reset! app-db (db/set-trigger-form {} {}))))
     (rf/dispatch-sync [:repo/show-trigger-build])
-    (is (db/show-trigger-form? @app-db))))
+    (is (= 1 (-> (db/trigger-form @app-db)
+                 :params
+                 count))))
+
+  (testing "sets ref to repo main branch"
+    (is (some? (reset! app-db (-> {}
+                                  (r/set-current
+                                   {:parameters
+                                    {:path
+                                     {:repo-id "test-repo"}}})
+                                  (odb/set-org {:id "test-org"
+                                                :repos
+                                                [{:id "test-repo"
+                                                  :main-branch "test-branch"}]})
+                                  (db/set-trigger-form {})))))
+    (rf/dispatch-sync [:repo/show-trigger-build])
+    (let [f (db/trigger-form @app-db)]
+      (is (= "branch" (:trigger-type f)))
+      (is (= "test-branch" (:trigger-ref f)))))
+
+  (testing "keeps previous trigger form"
+    (let [orig {:trigger-ref "original"
+                :params [{:name "test param"}]}]
+      (is (some? (reset! app-db (db/set-trigger-form {} orig))))
+      (rf/dispatch-sync [:repo/show-trigger-build])
+      (is (= orig (db/trigger-form @app-db))))))
 
 (deftest hide-trigger-build
   (testing "unsets `show trigger form` flag in db"
     (reset! app-db (db/set-show-trigger-form {} true))
     (rf/dispatch-sync [:repo/hide-trigger-build])
     (is (nil? (db/show-trigger-form? @app-db)))))
+
+(deftest trigger-type-changed
+  (testing "sets trigger type in db"
+    (rf/dispatch-sync [:repo/trigger-type-changed "updated-type"])
+    (is (= "updated-type" (-> (db/trigger-form @app-db)
+                              :trigger-type)))))
+
+(deftest trigger-ref-changed
+  (testing "sets trigger ref in db"
+    (rf/dispatch-sync [:repo/trigger-ref-changed "test-branch"])
+    (is (= "test-branch" (-> (db/trigger-form @app-db)
+                             :trigger-ref)))))
+
+(deftest add-trigger-param
+  (testing "adds empty param to trigger form"
+    (is (some? (reset! app-db (db/set-trigger-form {} {:params [{:name "first"}]}))))
+    (rf/dispatch-sync [:repo/add-trigger-param])
+    (let [p (:params (db/trigger-form @app-db))]
+      (is (= 2 (count p)))
+      (is (empty? (:name (last p)))))))
+
+(deftest remove-trigger-param
+  (testing "removes param at index from trigger form"
+    (is (some? (reset! app-db (db/set-trigger-form {} {:params
+                                                       [{:name "first"}
+                                                        {:name "second"}]}))))
+    (rf/dispatch-sync [:repo/remove-trigger-param 0])
+    (is (= [{:name "second"}]
+           (:params (db/trigger-form @app-db))))))
+
+(deftest trigger-param-name-changed
+  (testing "updates name for trigger param at idx"
+    (rf/dispatch-sync [:repo/trigger-param-name-changed 0 "test-name"])
+    (is (= "test-name"
+           (-> (db/trigger-form @app-db)
+               :params
+               first
+               :name)))))
+
+(deftest trigger-param-val-changed
+  (testing "updates value for trigger param at idx"
+    (rf/dispatch-sync [:repo/trigger-param-val-changed 0 "test-val"])
+    (is (= "test-val"
+           (-> (db/trigger-form @app-db)
+               :params
+               first
+               :value)))))
 
 (deftest trigger-build
   (testing "sets `triggering` flag"
@@ -176,16 +260,24 @@
   (testing "invokes build trigger endpoint with params"
     (rft/run-test-sync
      (let [c (h/catch-fx :martian.re-frame/request)]
-       (is (some? (h/set-repo-path! "test-org" "test-repo")))
+       (is (some? (reset! app-db (-> {}
+                                     (h/set-repo-path "test-org" "test-repo")
+                                     (db/set-trigger-form
+                                      {:trigger-type "branch"
+                                       :trigger-ref "main"
+                                       :params [{:name "test-param"
+                                                 :value "test-val"}
+                                                {:name ""
+                                                 :value ""}]})))))
        (h/initialize-martian {:trigger-build {:body {:build-id "test-build"}
                                               :error-code :no-error}})
-       (rf/dispatch [:repo/trigger-build {:trigger-type ["branch"]
-                                          :trigger-ref ["main"]}])
+       (rf/dispatch [:repo/trigger-build])
        
        (is (= 1 (count @c)))
        (is (= {:branch "main"
                :org-id "test-org"
-               :repo-id "test-repo"}
+               :repo-id "test-repo"
+               :params {"test-param" "test-val"}}
               (-> @c first (nth 3)))))))
 
   (testing "clears notifications"
@@ -201,7 +293,12 @@
   (testing "hides trigger form"
     (is (some? (reset! app-db (db/set-show-trigger-form {} true))))
     (rf/dispatch-sync [:repo/trigger-build--success {:body {:build-id "test-build"}}])
-    (is (not (db/show-trigger-form? @app-db)))))
+    (is (not (db/show-trigger-form? @app-db))))
+
+  (testing "clears trigger form"
+    (is (some? (reset! app-db (db/set-trigger-form {} ::original))))
+    (rf/dispatch-sync [:repo/trigger-build--success {:body {:build-id "test-build"}}])
+    (is (nil? (db/trigger-form @app-db)))))
 
 (deftest trigger-build--failed
   (testing "sets error alert"
@@ -304,6 +401,11 @@
   (testing "updates editing repo url"
     (rf/dispatch-sync [:repo/url-changed "new url"])
     (is (= "new url" (:url (db/editing @app-db))))))
+
+(deftest repo-public-toggled
+  (testing "updates editing repo public flag"
+    (rf/dispatch-sync [:repo/public-toggled true])
+    (is (true? (:public (db/editing @app-db))))))
 
 (deftest repo-github-id-changed
   (testing "updates editing github id"
@@ -490,10 +592,12 @@
                        :type)))))
 
 (deftest repo-new
-  (testing "clears editing repo"
+  (testing "replaces editing repo with empty"
     (is (some? (reset! app-db (db/set-editing {} {:id ::editing-repo}))))
     (rf/dispatch-sync [:repo/new])
-    (is (empty? (db/editing @app-db)))))
+    (let [e (db/editing @app-db)]
+      (is (map? e))
+      (is (empty? e)))))
 
 (deftest repo-lookup-github-id
   (rft/run-test-sync

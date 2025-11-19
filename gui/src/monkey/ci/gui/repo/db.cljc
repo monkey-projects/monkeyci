@@ -1,5 +1,7 @@
 (ns monkey.ci.gui.repo.db
-  (:require [monkey.ci.gui.loader :as lo]))
+  (:require [medley.core :as mc]
+            [monkey.ci.gui.loader :as lo]
+            [monkey.ci.gui.utils :as u]))
 
 (def id ::repo)
 
@@ -17,6 +19,12 @@
 
 (defn set-builds [db b]
   (lo/set-value db id b))
+
+(defn find-repo-in-org [o repo-id]
+  ;; TODO Optimize org structure for faster lookup
+  (some->> o
+           :repos
+           (u/find-by-id repo-id)))
 
 (def build-uid (juxt :org-id :repo-id :build-id))
 
@@ -36,6 +44,19 @@
 
 (defn set-latest-build [db b]
   (assoc db latest-build b))
+
+(def trigger-form ::trigger-form)
+
+(defn set-trigger-form [db f]
+  (assoc db trigger-form f))
+
+(defn update-trigger-form [db f & args]
+  (apply update db trigger-form f args))
+
+(defn update-trigger-param [db idx f & args]
+  (update-in db [trigger-form :params]
+             (fn [p]
+               (vec (mc/replace-nth idx (apply f (nth p idx) args) p)))))
 
 (def show-trigger-form? ::show-trigger-form?)
 

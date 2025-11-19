@@ -9,7 +9,8 @@
             [monkey.ci
              [cuid :as cuid]
              [protocols :as p]
-             [sid :as sid]]
+             [sid :as sid]
+             [utils :as u]]
             [monkey.ci.common.preds :as cp]
             [monkey.ci.storage.cached :as cached])
   (:import [java.io File PushbackReader]))
@@ -96,11 +97,34 @@
 
 (def org-sid (partial global-sid :orgs))
 
-(defn save-org [s cust]
-  (p/write-obj s (org-sid (:id cust)) cust))
+(defn save-org [s org]
+  (p/write-obj s (org-sid (:id org)) org))
 
 (defn find-org [s id]
   (p/read-obj s (org-sid id)))
+
+(def find-org-by-display-id
+  (override-or
+   [:org :find-by-display-id]
+   (fn [s did]
+     (->> (p/list-obj s (org-sid))
+          (map (comp (partial p/read-obj s) org-sid))
+          (filter (comp (partial = did) :display-id))
+          (first)))))
+
+(def find-org-id-by-display-id
+  "Optimization for fast id lookup"
+  (override-or
+   [:org :find-id-by-display-id]
+   (fn [s did]
+     (some-> (find-org-by-display-id s did)
+             :id))))
+
+(def delete-org
+  (override-or
+   [:org :delete]
+   (fn [s id]
+     (p/delete-obj s (org-sid id)))))
 
 (def find-orgs
   "Fetches multiple orgs, without repos"
@@ -129,6 +153,13 @@
        
        :else
        []))))
+
+(def count-orgs
+  (override-or
+   [:org :count]
+   (fn [s]
+     (-> (p/list-obj s (global-sid :orgs))
+         (count)))))
 
 (def save-repo
   "Saves the repository by updating the org it belongs to"
@@ -165,8 +196,8 @@
   "Deletes repository with given sid, including all builds"
   (override-or
    [:repo :delete]
-   (fn [s [cust-id repo-id :as sid]]
-     (when (some? (update-obj s (org-sid cust-id) update :repos dissoc repo-id))
+   (fn [s [org-id repo-id :as sid]]
+     (when (some? (update-obj s (org-sid org-id) update :repos dissoc repo-id))
        ;; Delete all builds
        (->> (list-build-ids s sid)
             (map (comp sid/->sid (partial concat [builds] sid) vector))
@@ -179,6 +210,15 @@
             (map (comp (partial p/delete-obj s) webhook-sid :id))
             (doall))
        true))))
+
+(def count-repos
+  (override-or
+   [:repo :count]
+   (fn [s]
+     (->> (p/list-obj s (global-sid :orgs))
+          (map (partial find-org s))
+          (map (comp count :repos))
+          (reduce +)))))
 
 (def list-repo-display-ids
   "Lists all display ids for the repos for given org"
@@ -555,6 +595,32 @@
               (filter (comp (partial = id) :id))
               (first)))))))
 
+(def delete-user
+  (override-or
+   [:user :delete]
+   (fn [s id]
+     (when-let [m (find-user s id)]
+       (p/delete-obj s (user->sid m))))))
+
+(def count-users
+  (override-or
+   [:user :count]
+   (fn [s]
+     (-> (p/list-obj s [global users])
+         (count)))))
+
+(def list-user-emails
+  (override-or
+   [:user :list-emails]
+   (fn [s]
+     (->> (p/list-obj s [global users])
+          (mapcat (fn [t]
+                    (->> (p/list-obj s [global users t])
+                         (map (partial vector t)))))
+          (map (partial find-user-by-type s))
+          (map :email)
+          (remove nil?)))))
+
 (def list-user-orgs
   (override-or
    [:user :orgs]
@@ -642,6 +708,13 @@
 (defn delete-email-registration [s id]
   (p/delete-obj s (email-registration-sid id)))
 
+(def count-email-registrations
+  (override-or
+   [:email-registration :count]
+   (fn [s]
+     (-> (p/list-obj s (email-registration-sid))
+         (count)))))
+
 (def org-credits :org-credits)
 (def org-credit-sid (partial global-sid org-credits))
 
@@ -685,10 +758,10 @@
 (def list-org-credit-subscriptions
   (override-or
    [:org :list-credit-subscriptions]
-   (fn [st cust-id]
-     (let [sid (credit-sub-sid cust-id)]
+   (fn [st org-id]
+     (let [sid (credit-sub-sid org-id)]
        (->> (p/list-obj st sid)
-            (map (partial vector cust-id))
+            (map (partial vector org-id))
             (map (partial find-credit-subscription st)))))))
 
 (def list-active-credit-subscriptions
@@ -773,8 +846,8 @@
 (defn save-crypto [st crypto]
   (p/write-obj st (crypto-sid (:org-id crypto)) crypto))
 
-(defn find-crypto [st cust-id]
-  (p/read-obj st (crypto-sid cust-id)))
+(defn find-crypto [st org-id]
+  (p/read-obj st (crypto-sid org-id)))
 
 (def sysadmin :sysadmin)
 (defn sysadmin-sid [& parts]
@@ -862,3 +935,160 @@
           (map (comp job-event-sid (partial conj job-sid)))
           (map (partial p/read-obj st))
           (sort-by :time)))))
+
+(defn- list-org-display-ids [s]
+  (->> (p/list-obj s (global-sid :orgs))
+       (map (partial p/read-obj s))
+       (map :display-id)
+       (remove nil?)
+       (set)))
+
+(def init-org
+  "Creates a new organization record, with dependent records also added.
+   This is useful to perform the update atomically (e.g. in single trx)."
+  (override-or
+   [:org :init]
+   (fn [s {:keys [org] :as opts}]
+     (let [existing? (list-org-display-ids s)
+           sid (save-org s (-> org
+                               ;; TODO Limit to max length
+                               (assoc :display-id (u/name->display-id (:name org) existing?))))
+           org-id (last sid)]
+       (when-let [uid (:user-id opts)]
+         (let [u (find-user s uid)]
+           (save-user s (update u :orgs (comp vec conj) org-id))))
+       (when-let [{:keys [amount from]} (:credits opts)]
+         (let [cs {:id (cuid/random-cuid)
+                   :org-id org-id
+                   :amount amount
+                   :valid-from from}]
+           (when (save-credit-subscription s cs)
+             (save-org-credit s {:id (cuid/random-cuid)
+                                 :org-id org-id
+                                 :amount amount
+                                 :from-time from
+                                 :type :subscription
+                                 :subscription-id (:id cs)}))))
+       (when-let [dek (:dek opts)]
+         (save-crypto s {:dek dek :org-id org-id}))
+       sid))))
+
+(defn- token-sid [type & parts]
+  (into [global (name type)] parts))
+
+(defn- save-token [st type sid token]
+  (p/write-obj st (apply token-sid type sid) token))
+
+(defn find-token [st type sid]
+  (p/read-obj st (apply token-sid type sid)))
+
+(defn- list-tokens [st type owner-id]
+  (->> (p/list-obj st (token-sid type owner-id))
+       (map (partial token-sid type owner-id))
+       (map (partial p/read-obj st))))
+
+(defn find-token-by-token [st type token]
+  (->> (p/list-obj st (token-sid type))
+       (map (partial token-sid type))
+       (mapcat (fn [ut]
+                 (->> (p/list-obj st ut)
+                      (map (partial conj ut)))))
+       (map (partial p/read-obj st))
+       (filter (comp (partial = token) :token))
+       first))
+
+(def user-token :user-token)
+(def user-token-sid (juxt :user-id :id))
+
+(defn save-user-token [st token]
+  (save-token st user-token (user-token-sid token) token))
+
+(defn find-user-token [st sid]
+  (find-token st user-token sid))
+
+(def find-user-token-by-token
+  (override-or
+   [:user :find-token]
+   (fn [st token]
+     (find-token-by-token st user-token token))))
+
+(def list-user-tokens
+  (override-or
+   [:user :list-tokens]
+   (fn [st user-id]
+     (list-tokens st user-token user-id))))
+
+(defn delete-user-token [st sid]
+  (p/delete-obj st (apply token-sid user-token sid)))
+
+(def org-token :org-token)
+(def org-token-sid (juxt :org-id :id))
+
+(defn save-org-token [st token]
+  (save-token st org-token (org-token-sid token) token))
+
+(defn find-org-token [st sid]
+  (find-token st org-token sid))
+
+(def find-org-token-by-token
+  (override-or
+   [:org :find-token]
+   (fn [st token]
+     (find-token-by-token st org-token token))))
+
+(def list-org-tokens
+  (override-or
+   [:org :list-tokens]
+   (fn [st org-id]
+     (list-tokens st org-token org-id))))
+
+(defn delete-org-token [st sid]
+  (p/delete-obj st (apply token-sid org-token sid)))
+
+(def mailing :mailing)
+(def mailing-sid (partial global-sid mailing))
+
+(defn save-mailing [st m]
+  (p/write-obj st (mailing-sid (:id m)) m))
+
+(defn find-mailing [st id]
+  (p/read-obj st (mailing-sid id)))
+
+(defn delete-mailing [st id]
+  (p/delete-obj st (mailing-sid id)))
+
+(def list-mailings
+  (override-or
+   [:mailing :list]
+   (fn [st]
+     ;; TODO Allow filtering
+     (->> (p/list-obj st (mailing-sid))
+          (map (partial find-mailing st))))))
+
+(def sent-mailing-sid mailing-sid)
+
+(def sent-mailing->sid (comp sent-mailing-sid (juxt :mailing-id :id)))
+
+(def save-sent-mailing
+  (override-or
+   [:mailing :save-sent]
+   (fn [st sm]
+     (let [m (-> (find-mailing st (:mailing-id sm))
+                 (assoc-in [:sent (:id sm)] sm))]
+       (save-mailing st m)
+       [(:mailing-id sm) (:id sm)]))))
+
+(def find-sent-mailing
+  (override-or
+   [:mailing :find-sent]
+   (fn [st sid]
+     (-> (find-mailing st (first sid))
+         (get-in [:sent (last sid)])))))
+
+(def list-sent-mailings
+  (override-or
+   [:mailing :list-sent]
+   (fn [st mid]
+     (-> (find-mailing st mid)
+         :sent
+         vals))))

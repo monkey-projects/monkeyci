@@ -4,6 +4,7 @@
              [codecs :as bcc]
              [hash :as bch]]
             [buddy.core.keys.pem :as pem]
+            [camel-snake-kebab.core :as csk]
             [clojure
              [math :as math]
              [repl :as cr]
@@ -35,6 +36,10 @@
    (some-> p
            (fs/canonicalize)
            (str))))
+
+(defn abs-path-safe [a b]
+  (when (and a b)
+    (abs-path a b)))
 
 (defn combine
   "Returns the canonical path of combining `a` and `b`"
@@ -197,3 +202,21 @@
 (defn maybe-deref [x]
   (cond-> x
     (md/deferred? x) (deref)))
+
+(defn update-nth [c idx f & args]
+  (mc/replace-nth idx (apply f (nth c idx) args) c))
+
+(defn name->display-id
+  "Generates a unique display id using the given name.  It checks the `existing?`
+   fn to avoid collisions."
+  [n existing?]
+  (let [;; TODO Check what happens with special chars
+        new-id (csk/->kebab-case n)]
+    (loop [id new-id
+           idx 2]
+      ;; Try a new id until we find one that does not exist yet.
+      ;; Alternatively we could parse the ids to extract the max index (but yagni)
+      (if (existing? id)
+        (recur (str new-id "-" idx)
+               (inc idx))
+        id))))

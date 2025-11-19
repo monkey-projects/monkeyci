@@ -3,9 +3,11 @@
             [clojure.string :as cs]
             [clojure.tools.logging :as log]
             [monkey.ci
+             [edn :as edn]
              [labels :as lbl]
              [storage :as st]
-             [time :as t]]
+             [time :as t]
+             [utils :as u]]
             [muuntaja.core :as mc]
             [reitit.ring :as ring]
             [ring.util.response :as rur]
@@ -67,10 +69,13 @@
 ;; Reitit rewrites records in the data to hashmaps, so wrap it in a type
 (deftype RuntimeWrapper [runtime])
 
+(def route-data (comp :data :reitit.core/match))
+
 (defn req->rt
   "Gets the runtime from the request"
   [req]
-  (some-> (get-in req [:reitit.core/match :data ::runtime])
+  (some-> (route-data req)
+          ::runtime
           (.runtime)))
 
 (defn from-rt
@@ -207,17 +212,8 @@
   [st obj]
   (let [existing? (-> (:org-id obj)
                       (as-> cid (st/list-repo-display-ids st cid))
-                      (set))
-        ;; TODO Check what happens with special chars
-        new-id (csk/->kebab-case (:name obj))]
-    (loop [id new-id
-           idx 2]
-      ;; Try a new id until we find one that does not exist yet.
-      ;; Alternatively we could parse the ids to extract the max index (but yagni)
-      (if (existing? id)
-        (recur (str new-id "-" idx)
-               (inc idx))
-        id))))
+                      (set))]
+    (u/name->display-id (:name obj) existing?)))
 
 (defn make-muuntaja
   "Creates muuntaja instance with custom settings"
@@ -228,6 +224,9 @@
         ;; Convert keys to kebab-case
         [:formats "application/json" :decoder-opts]
         {:decode-key-fn csk/->kebab-case-keyword})
+       (assoc-in
+        [:formats "application/edn" :decoder-opts]
+        edn/default-opts)
        (assoc-in
         [:formats "application/json" :encoder-opts]
         {:encode-key-fn (comp csk/->camelCase name)}))))

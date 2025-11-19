@@ -1,6 +1,6 @@
-(require '[monkey.ci.build.core :as bc])
+(ns build
+  (:require [monkey.ci.api :as m]))
 
-(bc/pipeline
- {:name "Failing pipeline"
-  :jobs [(bc/action-job "failing-job" (constantly bc/failure))]})
+(m/action-job "failing-job" (constantly m/failure))
+
 

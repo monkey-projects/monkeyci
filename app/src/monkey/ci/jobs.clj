@@ -130,27 +130,27 @@
 (defn execute!
   "Executes the given action job"
   [job ctx]
-    (let [build (:build ctx)
-          build-sid (build/sid build)
-          a (-> (recurse-action job)
-                (cache/wrap-caches)
-                (art/wrap-artifacts))
-          job (assoc job
-                     :start-time (t/now))]
-      (em/post-events (:mailman ctx)
-                      [(-> (job-start-evt (job-id job) build-sid)
-                           ;; For action jobs, add the credit multiplier on job start since there is
-                           ;; no `initializing` event.
-                           (merge (select-keys build [:credit-multiplier])))])
-      (-> ctx
-          (make-job-dir-absolute)
-          (a)
-          (md/chain
-           (fn [r]
-             (log/debug "Action job" (job-id job) "executed with result:" r)
-             (md/chain
-              (em/post-events (:mailman ctx) [(job-executed-evt (job-id job) build-sid r)])
-              (constantly r)))))))
+  (let [build (:build ctx)
+        build-sid (build/sid build)
+        a (-> (recurse-action job)
+              (cache/wrap-caches)
+              (art/wrap-artifacts))
+        job (assoc job
+                   :start-time (t/now))]
+    (em/post-events (:mailman ctx)
+                    [(-> (job-start-evt (job-id job) build-sid)
+                         ;; For action jobs, add the credit multiplier on job start since there is
+                         ;; no `initializing` event.
+                         (merge (select-keys build [:credit-multiplier])))])
+    (-> ctx
+        (make-job-dir-absolute)
+        (a)
+        (md/chain
+         (fn [r]
+           (log/debug "Action job" (job-id job) "executed with result:" r)
+           (md/chain
+            (em/post-events (:mailman ctx) [(job-executed-evt (job-id job) build-sid r)])
+            (constantly r)))))))
 
 (defn- find-dependents
   "Finds all jobs that are dependent on this job"

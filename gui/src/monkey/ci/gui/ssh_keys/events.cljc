@@ -108,6 +108,9 @@
      {:dispatch [:secure-request
                  :update-org-ssh-keys
                  {:org-id org-id
-                  :ssh-keys (remove (db/same-id? (set-id ks)) all)}
+                  :ssh-keys (->> all
+                                 (remove (db/same-id? (set-id ks)))
+                                 (vec))
+                  :content-type "application/edn"}
                  [:ssh-keys/save-set--success ks]
                  [:ssh-keys/save-set--failed ks]]})))

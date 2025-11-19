@@ -285,6 +285,18 @@
 (defn gen-job-evt []
   (gen-entity :entity/job-event))
 
+(defn gen-user-token []
+  (gen-entity :entity/user-token))
+
+(defn gen-org-token []
+  (gen-entity :entity/org-token))
+
+(defn gen-mailing []
+  (gen-entity :entity/mailing))
+
+(defn gen-sent-mailing []
+  (gen-entity :entity/sent-mailing))
+
 (defn gen-build-sid []
   (repeatedly 3 cuid/random-cuid))
 
@@ -306,3 +318,14 @@
 
 (defmethod v/make-vault :noop [_]
   (fake-vault))
+
+(defrecord FakeMailer [mailings]
+  p/Mailer
+  (send-mail [_ mail]
+    (swap! mailings conj mail)
+    {:type :fake
+     :id (str (random-uuid))
+     :mail mail}))
+
+(defn fake-mailer []
+  (->FakeMailer (atom [])))

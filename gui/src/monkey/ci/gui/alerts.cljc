@@ -35,6 +35,15 @@
 (defn error-msg [msg]
   (alert-msg :danger #(str msg ": " (u/error-msg %))))
 
+(def github-load-user-failed
+  (error-msg "Unable to retrieve user details from Github"))
+
+(def github-login-failed
+  (error-msg "Unable to fetch Github user token"))
+
+(def github-load-config-failed
+  (error-msg "Unable to load Github config"))
+
 (defn org-details-failed [id]
   (error-msg (str "Could not load details for organization " id)))
 
@@ -57,6 +66,15 @@
                  "You may need to "
                  [:a.text-white {:href gh-installation-url :target :_blank}
                   [:b "configure the MonkeyCI application in Github."]]]])))
+
+(def bitbucket-load-config-failed
+  (error-msg "Unable to load Bitbucket config"))
+
+(def bitbucket-load-user-failed
+  (error-msg "Unable to retrieve user details from Bitbucket"))
+
+(def bitbucket-login-failed
+  (error-msg "Unable to fetch Bitbucket user token"))
 
 (def bitbucket-ws-failed
   (error-msg "Unable to fetch Bitbucket workspaces"))
@@ -185,3 +203,27 @@
 
 (def webhooks-delete-failed
   (error-msg "Failed to delete webhook"))
+
+(def tokens-load-failed
+  (error-msg "Failed to load API keys"))
+
+(def token-create-failed
+  (error-msg "Failed to create new API key"))
+
+(def token-delete-failed
+  (error-msg "Failed to delete API key"))
+
+(def mailing-load-failed
+  (error-msg "Failed to retrieve mailings"))
+
+(def mailing-save-success
+  (alert-msg :success (constantly "New mailing has been created.")))
+
+(def mailing-save-failed
+  (error-msg "Failed to save mailing"))
+
+(def sent-mailing-load-failed
+  (error-msg "Failed to retrieve sent mailings"))
+
+(def delivery-save-failed
+  (error-msg "Failed to create new delivery"))

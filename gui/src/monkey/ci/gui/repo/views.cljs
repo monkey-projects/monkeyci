@@ -41,30 +41,72 @@
    [repo-settings-btn]
    [trigger-build-btn]])
 
-(defn- trigger-type []
-  [:select.form-select {:name :trigger-type}
+(defn- trigger-type [t]
+  [:select.form-select {:name :trigger-type
+                        :value (:trigger-type t)
+                        :on-change (u/form-evt-handler [:repo/trigger-type-changed])}
    [:option {:value :branch} "Branch"]
    [:option {:value :tag} "Tag"]
    [:option {:value :commit-id} "Commit Id"]])
 
+(defn- trigger-params [t]
+  (letfn [(param-input [idx {:keys [name value]}]
+            [:div.row.mb-2
+             [:div.col-3
+              [:input.form-control
+               {:value name
+                :placeholder "Parameter name"
+                :on-change (u/form-evt-handler [:repo/trigger-param-name-changed idx])}]]
+             [:div.col-8
+              [:input.form-control
+               {:value value
+                :placeholder "Parameter value"
+                :on-change (u/form-evt-handler [:repo/trigger-param-val-changed idx])}]]
+             [:div.col-1
+              [:button.btn.btn-danger
+               {:title "Remove parameter"
+                :on-click (u/link-evt-handler [:repo/remove-trigger-param idx])}
+               [co/icon :trash]]]])]
+    [:<>
+     [:h6 "Parameters"]
+     ;; TODO Link to params screen here
+     [:p
+      "You can specify additional build parameters, which will override any parameters "
+      "configured on the organization level."]
+     (->> (:params t)
+          (map-indexed param-input)
+          (into [:<>]))
+     [:button.btn.btn-outline-primary
+      {:on-click (u/link-evt-handler [:repo/add-trigger-param])}
+      [:span.me-2 [co/icon :plus-square]] "Add Parameter"]]))
+
 (defn trigger-form [repo]
-  (let [show? (rf/subscribe [:repo/show-trigger-form?])]
+  (let [show? (rf/subscribe [:repo/show-trigger-form?])
+        tf (rf/subscribe [:repo/trigger-form])]
     (when @show?
       [:div.card.my-2
        [:div.card-body
         [:h5.card-title "Trigger Build"]
+        [:p
+         "This will create a new build using the script provided in the "
+         [:code ".monkeyci/"] " directory from the code checked out at the specified ref."]
         [:form {:on-submit (f/submit-handler [:repo/trigger-build])}
-         [:div.row.mb-3
+         [:div.row.mb-2
           [:div.col-2
-           [trigger-type]]
+           [trigger-type @tf]]
           [:div.col-10
            [:input.form-control {:type :text
                                  :name :trigger-ref
-                                 :default-value (:main-branch @repo)}]]]
+                                 :default-value (:main-branch @repo)
+                                 :value (:trigger-ref @tf)
+                                 :on-change (u/form-evt-handler [:repo/trigger-ref-changed])}]]]
          [:div.row
-          [:div.col
-           [:button.btn.btn-primary.me-1
+          [:div.col [trigger-params @tf]]]
+         [:div.row.mt-3
+          [:div.col.d-flex.gap-2
+           [:button.btn.btn-primary
             {:type :submit}
+            [:span.me-2 [co/icon :play-circle]]
             "Trigger"]
            [co/cancel-btn [:repo/hide-trigger-build]]]]]]])))
 
@@ -108,6 +150,8 @@
   (let [loaded? (rf/subscribe [:builds/loaded?])]
     (when-not @loaded?
       (rf/dispatch [:builds/load]))
+    ;; TODO If repo is public, all users have access but they can't change
+    ;; anything.
     [:<>
      [:div.d-flex.gap-1.align-items-start
       [:h4.me-2.text-primary [:span.me-2 co/build-icon] "Builds"]
@@ -264,7 +308,7 @@
                        :value (:url @e)
                        :extra-opts
                        {:on-change (u/form-evt-handler [:repo/url-changed])
-                        :maxlength 300}
+                        :max-length 300}
                        :help-msg (str "This is used when manually triggering a build from the UI. "
                                       "Use an ssh url for private repos.")}]]
        [:div.mb-2
@@ -273,16 +317,26 @@
                        :value (:name @e)
                        :extra-opts
                        {:on-change (u/form-evt-handler [:repo/name-changed])
-                        :maxlength 200}}]]
+                        :max-length 200}}]]
        [:div.mb-2
         [f/form-input {:id :main-branch
                        :label "Main branch"
                        :value (:main-branch @e)
                        :extra-opts
                        {:on-change (u/form-evt-handler [:repo/main-branch-changed])
-                        :maxlength 100}
+                        :max-length 100}
                        :help-msg
                        "Required when you want to determine the 'main branch' in the build script."}]]
+       [:div.mb-2.form-check.form-switch
+        [:input.form-check-input
+         {:type :checkbox
+          :role :switch
+          :value :public
+          :on-change (u/form-evt-handler [:repo/public-toggled] u/evt->checked)
+          :id :public}]
+        [:label.form-check-label
+         {:for :public}
+         "Public visibility"]]
        [:div.mb-2
         [github-id-input @e]]]
       [:div.col
@@ -317,18 +371,21 @@
 
 (defn new [route]
   (rf/dispatch-sync [:repo/new])
-  (l/default
-   [:<>
-    [co/page-title [:span.me-2 co/repo-icon] "Watch Repository"]
-    [:p
-     "Configure a new repository to be watched by " [:i "MonkeyCI"] ". After saving, "
-     "the repository will show up in the list on your overview page. If a " [:b "webhook"]
-     " is configured, any push will result in a new build."]
-    [:div.card
-     [:div.card-body
-      [co/alerts [:repo/edit-alerts]]
-      [edit-form [co/cancel-btn
-                  [:route/goto :page/org (r/path-params route)]]]]]]))
+  ;; Use component fn otherwise the repo is constantly cleared
+  (fn [route]
+    (l/default
+     [:<>
+      [co/page-title [:span.me-2 co/repo-icon] "Watch Repository"]
+      [:p
+       "Configure a new repository to be watched by " [:i "MonkeyCI"] ". After saving, "
+       "the repository will show up in the list on your overview page. If a "
+       [co/docs-link "articles/webhooks" "webhook"] " is configured, any push "
+       "will result in a new build."]
+      [:div.card
+       [:div.card-body
+        [co/alerts [:repo/edit-alerts]]
+        [edit-form [co/cancel-btn
+                    [:route/goto :page/org (r/path-params route)]]]]]])))
 
 (defn settings-page [route]
   [:<>

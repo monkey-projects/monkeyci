@@ -120,3 +120,5 @@
   (cond-> x
     customer-id (-> (dissoc :customer-id)
                     (assoc :org-id customer-id))))
+
+(def org-id (some-fn :display-id :id))

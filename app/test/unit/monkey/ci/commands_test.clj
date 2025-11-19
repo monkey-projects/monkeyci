@@ -10,7 +10,9 @@
              [cuid :as cuid]
              [edn :as edn]
              [pem :as pem]
-             [process :as proc]]
+             [process :as proc]
+             [utils :as u]]
+            [monkey.ci.local.config :as lc]
             [monkey.ci.runners.controller :as rc]
             [monkey.ci.sidecar
              [config :as cs]
@@ -21,12 +23,15 @@
              [config :as tc]
              [helpers :as h]
              [mailman :as tm]]
-            [monkey.ci.web.http :as wh]))
+            [monkey.ci.web
+             [crypto :as wc]
+             [http :as wh]]))
 
 (deftest run-build-local
   (testing "creates event broker and posts `build/pending` event"
     (let [broker (tm/test-component)]
-      (is (md/deferred? (sut/run-build-local {:mailman broker})))
+      (is (md/deferred? (sut/run-build-local {:mailman broker
+                                              :args {:quiet true}})))
       (let [evt (-> broker
                     :broker
                     (tm/get-posted)
@@ -34,20 +39,93 @@
         (is (= :build/pending (:type evt)))
         (is (some? (:build evt))))))
 
-  (testing "passes `workdir` as checkout dir and `dir` as script dir"
-    (let [broker (tm/test-component)]
-      (is (md/deferred? (sut/run-build-local {:mailman broker
-                                              :args {:workdir "/test/dir"
-                                                     :dir ".script"}})))
-      (let [build (-> broker
-                      :broker
-                      (tm/get-posted)
-                      first
-                      :build)]
+  (let [broker (tm/test-component)]
+    (is (md/deferred? (sut/run-build-local {:mailman broker
+                                            :work-dir "/test/dir"
+                                            :args {:dir ".script"
+                                                   :quiet true}})))
+    (let [build (-> broker
+                    :broker
+                    (tm/get-posted)
+                    first
+                    :build)]
+      (testing "passes `work-dir` as checkout dir and `dir` as script dir"
         (is (= "/test/dir" (:checkout-dir build)))
         (is (= ".script" (-> build
                              :script
-                             :script-dir)))))))
+                             :script-dir))))
+
+      (testing "creates local data encryption key for build"
+        (is (wc/b64-dek? (:dek build)))))))
+
+(deftest config->build
+  (testing "uses workdir as checkout dir"
+    (is (= "/test-wd"
+           (-> {:work-dir "/test-wd"}
+               (sut/config->build)
+               :checkout-dir))))
+
+  (testing "contains git url"
+    (is (= "http://git-url"
+           (-> {:args {:git-url "http://git-url"}}
+               (sut/config->build)
+               :git
+               :url))))
+
+  (testing "contains commit id as ref"
+    (is (= "test-ref"
+           (-> {:args {:commit-id "test-ref"}}
+               (sut/config->build)
+               :git
+               :ref))))
+
+  (testing "contains branch"
+    (is (= "test-ref"
+           (-> {:args {:branch "test-ref"}}
+               (sut/config->build)
+               :git
+               :branch))))
+
+  (testing "contains tag"
+    (is (= "test-ref"
+           (-> {:args {:tag "test-ref"}}
+               (sut/config->build)
+               :git
+               :tag))))
+
+  (testing "sets workdir as git checkout dir"
+    (is (= "/test/wd"
+           (-> {:work-dir "/test/wd"
+                :args {:git-url "http://test-url"}}
+               (sut/config->build)
+               :git
+               :dir))))
+
+  (testing "uses org and repo id from account"
+    (let [[org-id repo-id] (repeatedly cuid/random-cuid)
+          b (sut/config->build {:account {:org-id org-id
+                                          :repo-id repo-id}})]
+      (is (= org-id (:org-id b)))
+      (is (= repo-id (:repo-id b))))))
+
+(deftest cli->rt-conf
+  (testing "adds params from args"
+    (is (= [{:name "key" :value "value"}]
+           (-> {:args {:param ["key=value"]}}
+               (sut/cli->rt-conf)
+               (lc/get-params)))))
+
+  (testing "adds build"
+    (is (some? (-> (sut/cli->rt-conf {})
+                   (lc/get-build)))))
+
+  (testing "configures global api"
+    (is (= {:url "http://test"
+            :token "test-token"}
+           (-> {:account {:url "http://test"
+                          :token "test-token"}}
+               (sut/cli->rt-conf)
+               (lc/get-global-api))))))
 
 (deftest parse-params
   (testing "empty when empty input"
@@ -66,6 +144,35 @@
     (is (= [{:name "key" :value "key=value"}]
            (sut/parse-params ["key=key=value"])))))
 
+(deftest load-param-files
+  (h/with-tmp-dir dir
+    (testing "reads edn file"
+      (let [p (str dir "/test-params.edn")]
+        (is (nil? (spit p (pr-str {:test-key "test-val"}))))
+        (is (= [{:name "test-key" :value "test-val"}]
+               (sut/load-param-files [p])))))
+
+    (testing "reads json file"
+      (let [p (str dir "/test-params.json")]
+        (is (nil? (spit p "{\"test-key\": \"test-val\"}")))
+        (is (= [{:name "test-key" :value "test-val"}]
+               (sut/load-param-files [p])))))
+
+    (testing "reads yaml file"
+      (let [p (str dir "/test-params.yaml")]
+        (is (nil? (spit p "test-key: test-val")))
+        (is (= [{:name "test-key" :value "test-val"}]
+               (sut/load-param-files [p])))))
+
+    (testing "reads java properties file"
+      (let [p (str dir "/test-params.properties")]
+        (is (nil? (spit p "test-key=test-val")))
+        (is (= [{:name "test-key" :value "test-val"}]
+               (sut/load-param-files [p])))))
+
+    (testing "fails on unsupported file type"
+      (is (thrown? Exception (sut/load-param-files ["test.txt"]))))))
+
 (deftest verify-build
   (testing "zero when successful"
     (is (zero? (sut/verify-build {:work-dir "examples"
@@ -75,16 +182,22 @@
     (is (not= 0 (sut/verify-build {})))))
 
 (deftest run-tests
-  (testing "runs test process with build"
-    (let [inv (atom nil)]
-      (with-redefs [proc/test! (fn [build _]
-                                 (reset! inv {:build build
-                                              :invoked? true})
-                                 (future {:exit 0}))]
-        (let [res (sut/run-tests {})]
+  (let [inv (atom nil)]
+    (with-redefs [proc/test! (fn [dir opts]
+                               (reset! inv {:dir dir
+                                            :invoked? true
+                                            :opts opts})
+                               (future {:exit 0}))]
+      (let [res (sut/run-tests {:work-dir "/tmp"
+                                :args {:dir "test/dir"
+                                       :watch true}})]
+        (testing "runs test process with build script dir"
           (is (zero? res))
-          (is (some? (:build @inv)))
-          (is (true? (:invoked? @inv))))))))
+          (is (= "/tmp/test/dir" (:dir @inv)))
+          (is (true? (:invoked? @inv))))
+
+        (testing "passes watch mode"
+          (is (true? (get-in @inv [:opts :watch?]))))))))
 
 (deftest list-builds
   (testing "reports builds from server"
@@ -92,7 +205,7 @@
           builds {:key "value"}
           rt {:reporter (partial swap! reported conj)
               :config {:account {:url "http://server/api"
-                                 :org-id "test-cust"
+                                 :org-id "test-org"
                                  :repo-id "test-repo"}}}]
       (with-redefs [http/request (constantly (md/success-deferred {:body (pr-str builds)}))]
         (is (some? (sut/list-builds rt)))

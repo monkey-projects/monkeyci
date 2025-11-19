@@ -2,6 +2,7 @@
   "Links route names to actual components to be rendered"
   (:require [monkey.ci.gui.logging :as log]
             [monkey.ci.gui.routing :as r]
+            [monkey.ci.gui.api-keys.views :as api-keys]
             [monkey.ci.gui.build.views :as build]
             [monkey.ci.gui.home.views :as home]
             [monkey.ci.gui.job.views :as job]
@@ -21,6 +22,7 @@
    :page/github-callback login/github-callback
    :page/bitbucket-callback login/bitbucket-callback
    :page/org org/page
+   :page/org-api-keys api-keys/org-page
    :page/org-settings org/page-edit
    :page/org-new org/page-new
    :page/org-join home/page-join

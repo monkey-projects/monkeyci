@@ -51,7 +51,9 @@
     (testing "`start`"
       (let [s (co/start (sut/map->NatsComponent {:config {:prefix "test"
                                                           :stream "test-stream"
-                                                          :consumer "test-consumer"}}))]
+                                                          :consumer "test-consumer"
+                                                          :serializer ::test-serializer
+                                                          :deserializer ::test-deserializer}}))]
         (testing "creates connection"
           (is (= ::nats (get-in s [:broker :nats])))
           (is (= ::nats (:conn s))))
@@ -63,7 +65,13 @@
           (is (= "test-stream" (get-in s [:broker :config :stream]))))
 
         (testing "configures consumer"
-          (is (= "test-consumer" (get-in s [:broker :config :consumer]))))))
+          (is (= "test-consumer" (get-in s [:broker :config :consumer]))))
+
+        (testing "configures serializer"
+          (is (= ::test-serializer (get-in s [:broker :config :serializer]))))
+
+        (testing "configures deserializer"
+          (is (= ::test-deserializer (get-in s [:broker :config :deserializer]))))))
 
     (testing "`stop`"
       (let [stopped? (atom false)

@@ -13,9 +13,18 @@
              [edn]
              [utils :as u]]))
 
+(defn user-home []
+  (System/getProperty "user.home"))
+
+(defn xdg-config-home []
+  (or (System/getenv "XDG_CONFIG_HOME")
+      (-> (fs/path (user-home) ".config")
+          (fs/canonicalize)
+          str)))
+
 (def ^:dynamic *global-config-file* "/etc/monkeyci/config.edn")
-(def ^:dynamic *home-config-file* (-> (System/getProperty "user.home")
-                                      (fs/path ".monkeyci" "config.edn")
+(def ^:dynamic *home-config-file* (-> (xdg-config-home)
+                                      (fs/path "monkeyci" "config.edn")
                                       (fs/canonicalize)
                                       str))
 
@@ -87,9 +96,10 @@
             (update x :work-dir (comp u/abs-path #(or (:workdir args) % (u/cwd)))))
           (account [x]
             (let [acc (-> (select-keys args [:org-id :repo-id])
-                          (mc/assoc-some :url (:server args)))]
+                          (mc/assoc-some :url (:api args)
+                                         :token (:api-key args)))]
               (cond-> x
-                (not-empty acc) (assoc :account acc))))
+                (not-empty acc) (update :account merge acc))))
           (do-apply [conf f]
             (f conf))]
     (let [cli-args [http-port

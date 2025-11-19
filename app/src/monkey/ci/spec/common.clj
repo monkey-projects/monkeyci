@@ -4,7 +4,8 @@
             [java-time.api :as jt]
             [monkey.ci
              [cuid :as cuid]
-             [protocols :as p]]))
+             [protocols :as p]]
+            [monkey.ci.spec.gen :as sg]))
 
 (def ts-gen (gen/choose (jt/to-millis-from-epoch (jt/offset-date-time 2020 1 1))
                         (jt/to-millis-from-epoch (jt/offset-date-time 2030 1 1))))
@@ -66,3 +67,16 @@
 
 (s/def :queued-task/creation-time ts?)
 (s/def :queued-task/task map?)
+
+(def token-size "Api token size in chars" 64)
+
+(s/def ::token (s/with-gen
+                 string?
+                 #(sg/fixed-string token-size)))
+
+(s/def :mailing/subject string?)
+(s/def :mailing/text-body string?)
+(s/def :mailing/html-body string?)
+(s/def :mailing/mail-id string?) ; Infra mail id
+(s/def :mailing/to-users boolean?)
+(s/def :mailing/to-subscribers boolean?)

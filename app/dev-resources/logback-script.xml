@@ -1,5 +1,6 @@
 <configuration>
-  
+
+  <!--
   <appender name="LOKI" class="com.github.loki4j.logback.Loki4jAppender">
     <http>
       <url>http://loki.monkey-projects.be/loki/api/v1/push</url>
@@ -19,6 +20,7 @@
       <batchTimeoutMs>1000</batchTimeoutMs>
     </batch>
   </appender>
+  -->
 
   <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
     <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
@@ -35,6 +37,7 @@
   <logger name="io" level="WARN"/>
   <logger name="monkey.ci" level="DEBUG"/>
   <logger name="monkey.ci.jobs" level="TRACE"/>
+  <logger name="monkey.mailman.nats.core" level="TRACE"/>
 
   <root level="INFO">
     <appender-ref ref="STDOUT"/>

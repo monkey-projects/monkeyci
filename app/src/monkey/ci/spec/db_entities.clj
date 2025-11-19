@@ -18,6 +18,7 @@
 (s/def :github/secret string?)
 (s/def :db/name (s/and string? not-empty))
 (s/def :db/description string?)
+(s/def :db/display-id string?)
 
 (s/def :db/common
   (s/keys :req-un [:db/cuid]
@@ -32,15 +33,15 @@
       (s/merge :db/common)))
 
 (s/def :db/org
-  (-> (s/keys :req-un [:db/name])
+  (-> (s/keys :req-un [:db/name :db/display-id])
       (s/merge :db/common)))
 
-(s/def :db/display-id string?)
 (s/def :db/org-id id?)
+(s/def :db/public boolean?)
 
 (s/def :db/repo
   (-> (s/keys :req-un [:db/display-id :db/org-id :db/name]
-              :opt-un [:git/url :git/main-branch])
+              :opt-un [:git/url :git/main-branch :db/public])
       (s/merge :db/common)))
 
 (s/def :db/repo-id id?)
@@ -94,8 +95,7 @@
 
 (s/def :db/type (s/with-gen
                   string?
-                  #(gen/fmap clojure.string/join
-                             (gen/vector (gen/char-alphanumeric) 20))))
+                  #(sg/fixed-string 20)))
 (s/def :db/type-id string?)
 (s/def :db/email string?)
 
@@ -198,3 +198,29 @@
 (s/def :db/job-event
   (s/keys :req-un [:db/job-id :job-evt/time :job-evt/event]
           :opt-un [:job-evt/details]))
+
+(s/def :db/user-token
+  (-> (s/keys :req-un [::c/token :db/user-id]
+              :opt-un [:db/valid-until :db/description])
+      (s/merge :db/common)))
+
+(s/def :db/org-token
+  (-> (s/keys :req-un [::c/token :db/org-id]
+              :opt-un [:db/valid-until :db/description])
+      (s/merge :db/common)))
+
+(s/def :mailing/creation-time ts?)
+
+(s/def :db/mailing
+  (-> (s/keys :req-un [:mailing/subject :mailing/creation-time]
+              :opt-un [:mailing/text-body :mailing/html-body])
+      (s/merge :db/common)))
+
+(s/def :db/mailing-id id?)
+(s/def :db/sent-at ts?)
+(s/def :db/other-dests string?)
+
+(s/def :db/sent-mailing
+  (-> (s/keys :req-un [:db/mailing-id :db/sent-at]
+              :opt-un [:mailing/mail-id :mailing/to-users :mailing/to-subscribers :db/other-dests])
+      (s/merge :db/common)))

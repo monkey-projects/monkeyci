@@ -13,6 +13,7 @@
   (dissoc db ::submitting?))
 
 (defn set-user [db u]
+  (println "Setting user:" (str u))
   (assoc db ::user u))
 
 (def user ::user)

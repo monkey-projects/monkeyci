@@ -59,3 +59,6 @@
 
 (defprotocol AddRouter
   (add-router [broker routes opts] "Registers a listener for given routes in the broker"))
+
+(defprotocol Mailer
+  (send-mail [mailer mail] "Sends an email with specified configuration"))

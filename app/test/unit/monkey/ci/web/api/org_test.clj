@@ -47,21 +47,38 @@
         (is (some? repos))
         (is (not (map? repos)))
         (is (= (select-keys repo [:id :name])
-               (first repos)))))))
+               (first repos))))))
+
+  (testing "retrieves org by display-id"
+    (let [org {:id (st/new-id)
+               :name "Some org"}
+          {st :storage :as rt} (trt/test-runtime)]
+      (is (sid/sid? (st/init-org st {:org org})))
+      (let [r (-> rt
+                  (h/->req)
+                  (h/with-path-param :org-id "some-org")
+                  (sut/get-org)
+                  :body)]
+        (is (= (:id org) (:id r)))))))
 
 (deftest create-org
-  (testing "returns created org with id"
-    (let [r (-> (trt/test-runtime)
-                (h/->req)
-                (h/with-body {:name "new org"})
-                (sut/create-org)
-                :body)]
+  (let [r (-> (trt/test-runtime)
+              (h/->req)
+              (h/with-body {:name "new org"})
+              (sut/create-org)
+              :body)]
+    (testing "returns created org with id"
+      (is (map? r))
       (is (= "new org" (:name r)))
-      (is (string? (:id r)))))
+      (is (string? (:id r))))
+
+    (testing "assigns display id"
+      (is (= "new-org" (:display-id r)))))
 
   (let [user (-> (h/gen-user)
                  (dissoc :orgs))
         {st :storage :as rt} (trt/test-runtime)
+        _ (st/save-user st user)
         r (-> rt
               (trt/set-dek-generator (constantly {:enc "encrypted-key"
                                                   :key "plain-key"}))
@@ -164,6 +181,18 @@
                  (sut/search-orgs)
                  :status))))))
 
+(deftest delete-org
+  (h/with-memory-store st
+    (testing "deletes org with id from storage"
+      (let [org (h/gen-org)]
+        (is (sid/sid? (st/save-org st org)))
+        (is (= 204 (-> {:storage st}
+                       (h/->req)
+                       (assoc-in [:parameters :path :org-id] (:id org))
+                       (sut/delete-org)
+                       :status)))
+        (is (nil? (st/find-org st (:id org))))))))
+
 (deftest recent-builds
   (h/with-memory-store st
     (testing "status `404` if org does not exist"
@@ -178,7 +207,7 @@
     (testing "retrieves builds"
       (let [repo (h/gen-repo)
             org (-> (h/gen-org)
-                     (assoc :repos {(:id repo) repo}))
+                    (assoc :repos {(:id repo) repo}))
             now (jt/instant)
             old-build {:org-id (:id org)
                        :repo-id (:id repo)

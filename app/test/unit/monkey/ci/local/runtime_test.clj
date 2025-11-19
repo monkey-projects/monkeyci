@@ -21,6 +21,7 @@
           r (-> {:mailman broker}
                 (lc/set-work-dir dir)
                 (lc/set-build (h/gen-build))
+                (lc/set-quiet true)
                 (sut/start-and-post evt))]
       (testing "returns deferred"
         (is (md/deferred? r)))
@@ -34,6 +35,7 @@
   (h/with-tmp-dir dir
     (let [sys (-> {}
                   (lc/set-work-dir dir)
+                  (lc/set-build {:dek ::test-dek})
                   (sut/make-system))]
       (testing "has mailman"
         (is (some? (:mailman sys))))
@@ -53,6 +55,15 @@
       (testing "has mailman routes"
         (is (some? (:routes sys))))
 
+      (testing "has print routes"
+        (is (some? (:print-routes sys))))
+
+      (testing "has state"
+        (is (some? (:state sys))))
+
+      (testing "has renderer"
+        (is (some? (:renderer sys))))
+
       (testing "has podman routes"
         (is (some? (:podman sys))))
 
@@ -63,7 +74,27 @@
         (is (some? (:event-pipe sys))))
 
       (testing "when container build"
-        (testing "has workspace")))))
+        (testing "has workspace"))
+
+      (testing "has key decrypter"
+        (let [kd (:key-decrypter sys)]
+          (is (fn? kd))
+          (is (= ::test-dek @(kd ::enc-key ::test-sid))))))
+
+    (testing "after start"
+      (let [sys (-> {:mailman (tm/test-component)}
+                    (lc/set-work-dir dir)
+                    (lc/set-build {:dek ::test-dek})
+                    (lc/set-quiet true)
+                    (sut/make-system)
+                    (co/start))]
+        (testing "podman routes"
+          (let [p (:podman sys)]
+            (is (some? p))
+            (testing "is passed key decrypter"
+              (is (some? (get p :key-decrypter))))))
+
+        (is (some? (co/stop sys)))))))
 
 (deftest event-pipe
   (let [broker (em/make-component {:type :manifold})
@@ -101,3 +132,15 @@
                       (spit "test file"))))
         (is (some? (p/restore-blob ws "test-src" dest)))
         (is (= "test file" (slurp (fs/file (fs/path dest "test.txt")))))))))
+
+(deftest new-params
+  (testing "fixed params when no api key configured"
+    (is (instance? monkey.ci.params.FixedBuildParams
+                   (sut/new-params {}))))
+
+  (testing "combined params when api key configured"
+    (is (instance? monkey.ci.params.MultiBuildParams
+                   (-> {}
+                       (lc/set-global-api {:url "http://test"
+                                           :token "test-token"})
+                       (sut/new-params))))))

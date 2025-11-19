@@ -94,7 +94,7 @@
           (mmc/post-events events)))
 
 (defmethod make-component :nats [config]
-  (emn/map->NatsComponent {:config config}))
+  (emn/map->NatsComponent {:config (merge emn/default-broker-opts config)}))
 
 (defn listener-stream
   "Registers a listener that posts received events to a stream.

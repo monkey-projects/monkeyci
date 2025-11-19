@@ -16,9 +16,11 @@
              [db :as emd]
              [interceptors :as emi]
              [jms :as emj]]
+            [monkey.ci.mailing.scw :as mailing-scw]
             [monkey.ci.metrics
              [core :as m]
-             [events :as me]]
+             [events :as me]
+             [otlp :as mo]]
             [monkey.ci.reporting.print]
             [monkey.ci.runners.oci :as ro]
             [monkey.ci.runtime.common :as rc]
@@ -234,6 +236,34 @@
 (defn- new-server-runner [config]
   (make-server-runner config))
 
+(defrecord OtlpClient [config metrics]
+  co/Lifecycle
+  (start [this]
+    (log/info "Pushing metrics to OpenTelemetry endpoint:" (:url config))
+    (assoc this :client (mo/make-client (:url config)
+                                        (:registry metrics)
+                                        config)))
+
+  (stop [{:keys [client] :as this}]
+    (when client
+      (.close client))
+    (dissoc this :client)))
+
+(defn new-otlp-client [{:keys [otlp]}]
+  (if (not-empty otlp)
+    (->OtlpClient otlp nil)
+    {}))
+
+(defmulti make-mailer :type)
+
+(defmethod make-mailer :scw [conf]
+  (mailing-scw/->ScwMailer conf))
+
+(defn new-mailer [{:keys [mailing]}]
+  (if (:type mailing)
+    (make-mailer mailing)
+    {}))
+
 (defn make-server-system
   "Creates a component system that can be used to start an application server."
   [config]
@@ -252,7 +282,7 @@
    :runtime   (co/using
                (new-server-runtime config)
                [:artifacts :metrics :storage :jwk :process-reaper :vault :mailman :update-bus
-                :crypto])
+                :crypto :mailer])
    :pool      (new-db-pool config)
    :migrator  (co/using
                (new-db-migrator config)
@@ -261,7 +291,9 @@
                (new-storage config)
                [:pool])
    :jwk       (new-jwk config)
-   :metrics   (new-metrics)
+   :metrics   (co/using
+               (new-metrics)
+               [:storage])
    :metrics-routes (co/using
                     (new-metrics-routes)
                     [:metrics :mailman])
@@ -279,13 +311,14 @@
    :update-routes (co/using
                    (new-update-routes)
                    [:mailman :update-bus])
-   :update-bus (mb/event-bus)))
+   :update-bus (mb/event-bus)
+   :otlp (co/using
+          (new-otlp-client config)
+          [:metrics])
+   :mailer (new-mailer config)))
 
 (defn with-server-system [config f]
   (rc/with-system (make-server-system config) f))
-
-(defn- new-cli-build [conf]
-  (b/make-build-ctx conf))
 
 (defn make-cli-system
   "Creates a component system that can be used by CLI commands"
@@ -293,9 +326,8 @@
   (co/system-map
    :runtime (co/using
              {:config config}
-             [:build :reporter])
-   :reporter (new-reporter config)
-   :build (new-cli-build config)))
+             [:reporter])
+   :reporter (new-reporter config)))
 
 (defn with-cli-runtime [config f]
   (rc/with-runtime (make-cli-system config) f))

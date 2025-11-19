@@ -111,13 +111,16 @@
                                 (let [dek (-> (ba/decrypt-key (get-api-client ctx) (:dek build))
                                               (bcc/b64->bytes))
                                       iv (v/cuid->iv (b/org-id build))]
-                                  (log/debug "Encrypting job env vars using key:" dek)
                                   (fn [v]
                                     (vc/encrypt dek iv v))))]
                 (log/debug "Loading script jobs using context" job-ctx)
                 (->> (s/load-jobs (get-build ctx) job-ctx)
                      (group-by j/job-id)
                      ;; Encrypt container env vars (possibly sensitive information)
+                     ;; FIXME Scripts may want to read back the env vars passed to
+                     ;; container jobs, which will be encrypted at that point.  So it
+                     ;; may be better to only encrypt them when they are sent out in
+                     ;; an event.
                      (mc/map-vals (comp (partial encrypt-env encrypter) first))
                      (set-jobs ctx))))}))
 
@@ -199,16 +202,6 @@
             (log/error "Failed to handle event" (:type event) ", marking script as failed" ex)
             (assoc ctx :result [(-> (script-end-evt ctx :error)
                                     (assoc :message (ex-message ex)))]))})
-
-(def handle-job-error
-  "Marks job as failed"
-  {:name ::job-error-handler
-   :error (fn [{{:keys [job-id sid] :as event} :event :as ctx} ex]
-            (log/error "Error in job event" (:type event) "for" job-id ex)
-            (assoc ctx :result [(-> (j/job-end-evt job-id
-                                                   sid
-                                                   (-> bc/failure
-                                                       (bc/with-message (ex-message ex)))))]))})
 
 (def mark-canceled
   "Marks build as canceled, so no other jobs will be enqueued."
@@ -328,7 +321,7 @@
       ;; Raised when a new job is queued.  This handler splits it up according to
       ;; type and executes before-extensions.  Action jobs are executed immediately.
       [{:handler job-queued
-        :interceptors [handle-job-error
+        :interceptors [emi/handle-job-error
                        state
                        with-job-ctx
                        ext/before-interceptor
@@ -337,7 +330,7 @@
      [:job/executed
       ;; Handle this for both container and action jobs
       [{:handler job-executed
-        :interceptors [handle-job-error
+        :interceptors [emi/handle-job-error
                        state
                        add-job-ctx
                        add-result-to-ctx

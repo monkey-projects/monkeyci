@@ -5,9 +5,19 @@
             [com.stuartsierra.component :as co]
             [medley.core :as mc]
             [monkey.ci.events.mailman.jms :as jms]
-            [monkey.ci.protocols :as p]
+            [monkey.ci
+             [edn :as edn]
+             [protocols :as p]]
             [monkey.mailman.core :as mmc]
-            [monkey.mailman.nats.core :as mnc]))
+            [monkey.mailman.nats.core :as mnc]
+            [monkey.nats.core :as nats]))
+
+(def default-broker-opts
+  {:serializer   (comp nats/to-bytes edn/->edn)
+   :deserializer (fn [msg]
+                   (some-> msg
+                           (.getData)
+                           (edn/edn->)))})
 
 (def ^:private subject-types
   ;; Use the same as jms
@@ -33,7 +43,7 @@
           conn (nats/make-connection conf)
           subjects (types-to-subjects (:prefix conf))
           broker-conf (-> conf
-                          (select-keys [:stream :consumer :poll-opts])
+                          (select-keys [:stream :consumer :poll-opts :serializer :deserializer])
                           (merge {:subject-mapper (comp subjects :type)}))]
       (log/debug "Using broker configuration:" broker-conf)
       (-> this

@@ -55,6 +55,8 @@
   "Given a relative path `p`, returns it as a subpath to the job working directory.
    Fails if an absolute path is given."
   [ctx p]
+  (when (fs/absolute? p)
+    (throw (ex-info "Path must be relative" {:path p})))
   (let [wd (core/work-dir ctx)]
     (str (fs/normalize (fs/path wd p)))))
 

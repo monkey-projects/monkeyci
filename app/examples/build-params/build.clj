@@ -1,10 +1,10 @@
-(require '[monkey.ci.build.api :as api])
-(require '[monkey.ci.build.core :as c])
+(ns build
+  (:require [monkey.ci.api :as api]))
 
 (defn ^:job check-build-params [ctx]
   (println "Fetching build parameters")
   (if (some? (api/build-params ctx))
-    c/success
-    c/failure))
+    api/success
+    api/failure))
 
 [check-build-params]

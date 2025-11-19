@@ -9,7 +9,8 @@
             [monkey.ci.gui.admin.clean.views :as clean]
             [monkey.ci.gui.admin.credits.views :as credits]
             [monkey.ci.gui.admin.invoicing.views :as inv]
-            [monkey.ci.gui.admin.login.views :as login]            
+            [monkey.ci.gui.admin.login.views :as login]
+            [monkey.ci.gui.admin.mailing.views :as mailing]
             [re-frame.core :as rf]))
 
 (defn action-card [icon title desc link url]
@@ -18,9 +19,9 @@
     [:div.card-img.text-center.text-primary.pt-2
      {:style {:font-size "6em"}}
      [:a {:href url} [co/icon icon]]]
-    [:div.card-body
+    [:div.card-body.d-flex.flex-column
      [:h5.card-title title]
-     [:p.card-text desc]
+     [:p.flex-grow-1.card-text desc]
      [:a.card-link
       {:href url}
       link
@@ -63,7 +64,14 @@
       "Forget Users"
       "Delete any information still referring to users that have requested to be forgotten."
       "Forget users"
-      (r/path-for :admin/forget-users)]]]])
+      (r/path-for :admin/forget-users)]
+
+     [action-card
+      :envelope-at
+      "Mailings"
+      "Review sent mailings and set up new mailings."
+      "Manage Mailings"
+      (r/path-for :admin/mailings)]]]])
 
 (defn not-implemented []
   [l/default
@@ -78,7 +86,10 @@
    :admin/org-credits credits/org-credits
    :admin/invoicing inv/page
    :admin/org-invoices inv/org-invoices
-   :admin/clean-builds clean/page})
+   :admin/clean-builds clean/page
+   :admin/mailings mailing/overview
+   :admin/new-mailing mailing/new-mailing
+   :admin/mailing-edit mailing/edit-mailing})
 
 (defn render-page [route]
   (let [p (get pages (r/route-name route) not-implemented)]

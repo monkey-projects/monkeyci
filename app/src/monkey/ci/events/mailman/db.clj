@@ -1,7 +1,6 @@
 (ns monkey.ci.events.mailman.db
   "Event handlers that write stuff to the database"
-  (:require #_[clojure.spec.alpha :as spec]
-            [clojure.tools.logging :as log]
+  (:require [clojure.tools.logging :as log]
             [medley.core :as mc]
             [monkey.ci
              [build :as b]
@@ -9,7 +8,8 @@
              [storage :as st]
              [time :as t]]
             [monkey.ci.events.mailman :as em]
-            [monkey.ci.events.mailman.interceptors :as emi]))
+            [monkey.ci.events.mailman.interceptors :as emi]
+            [monkey.ci.runners.interceptors :as ri]))
 
 (def get-db emi/get-db)
 
@@ -163,6 +163,10 @@
                                                             :credit-id (-> avail first :id)))))))
                ctx)))})
 
+(def save-runner-details
+  (ri/save-runner-details
+   (comp :runner-details :event)))
+
 ;;; Event handlers
 
 (defn check-credits
@@ -197,6 +201,7 @@
 
 (def build-initializing
   "Updates build state to `initializing`.  Returns a consolidated `build/updated` event."
+  ;; TODO Save runner details if any
   (build-update (fn [b _] (assoc b :status :initializing))))
 
 (def build-start
@@ -297,7 +302,8 @@
 
      [:build/initializing
       [{:handler build-initializing
-        :interceptors build-int}]]
+        :interceptors (conj build-int
+                            save-runner-details)}]]
 
      [:build/start
       [{:handler build-start

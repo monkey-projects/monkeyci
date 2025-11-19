@@ -1,7 +1,8 @@
 (ns monkey.ci.web.common-test
   (:require [clj-commons.byte-streams :as bs]
             [clojure.test :refer [deftest is testing]]
-            [monkey.ci.web.common :as sut]))
+            [monkey.ci.web.common :as sut]
+            [muuntaja.core :as m]))
 
 (deftest parse-body
   (testing "parses string body according to content type"
@@ -23,7 +24,15 @@
     (is (= "http://test:1234/v1"
            (sut/req->ext-uri
             {:scheme :http
-             :uri "/v1/customer/test-cust"
+             :uri "/v1/org/test-cust"
              :headers {"host" "test:1234"}}
-            "/customer")))))
+            "/org")))))
 
+(deftest muuntaja
+  (testing "can encode/decode regexes using edn"
+    (let [m (sut/make-muuntaja)
+          ct "application/edn"]
+      (is (= "test-regex"
+             (->> (m/encode m ct #"test-regex")
+                  (m/decode m ct)
+                  str))))))

@@ -1,7 +1,8 @@
 (ns monkey.ci.gui.repo.events
-  (:require [monkey.ci.gui.alerts :as a]
+  (:require [medley.core :as mc]
+            [monkey.ci.gui.alerts :as a]
             [monkey.ci.gui.apis.github]
-            [monkey.ci.gui.org.db :as cdb]
+            [monkey.ci.gui.org.db :as odb]
             [monkey.ci.gui.loader :as lo]
             [monkey.ci.gui.repo.db :as db]
             [monkey.ci.gui.routing :as r]
@@ -31,7 +32,7 @@
  :repo/load
  ;; Since repos are part of the org, this actually loads the org.
  (fn [{:keys [db]} [_ org-id]]
-   (let [existing (cdb/org db)]
+   (let [existing (odb/org db)]
      (cond-> {:db (db/set-builds db nil)}
        (not existing)
        (assoc :dispatch [:org/load org-id])))))
@@ -83,35 +84,91 @@
    (when (for-repo? db evt)
      (handle-event db evt))))
 
+(defn- set-default-trigger-ref [f db]
+  (let [b (some-> (db/find-repo-in-org (odb/get-org db) (r/repo-id db))
+                  :main-branch)]
+    (cond-> f
+      b (assoc :trigger-type "branch"
+               :trigger-ref b))))
+
 (rf/reg-event-db
  :repo/show-trigger-build
  (fn [db _]
-   (db/set-show-trigger-form db true)))
+   (-> db
+       (db/set-show-trigger-form true)
+       (db/update-trigger-form
+        (fn [{:keys [params] :as f}]
+          (cond-> f
+            (empty? f) (set-default-trigger-ref db)
+            ;; Add a single empty param for input
+            (empty? params) (assoc :params [{:name "" :value ""}])))))))
 
 (rf/reg-event-db
  :repo/hide-trigger-build
  (fn [db _]
    (db/set-show-trigger-form db nil)))
 
+(rf/reg-event-db
+ :repo/trigger-type-changed
+ (fn [db [_ v]]
+   (db/update-trigger-form db assoc :trigger-type v)))
+
+(rf/reg-event-db
+ :repo/trigger-ref-changed
+ (fn [db [_ v]]
+   (db/update-trigger-form db assoc :trigger-ref v)))
+
+(rf/reg-event-db
+ :repo/add-trigger-param
+ (fn [db _]
+   (db/update-trigger-form db update :params conj {:name "" :value ""})))
+
+(rf/reg-event-db
+ :repo/remove-trigger-param
+ (fn [db [_ idx]]
+   (db/update-trigger-form db update :params (comp vec (partial mc/remove-nth idx)))))
+
+(rf/reg-event-db
+ :repo/trigger-param-name-changed
+ (fn [db [_ idx v]]
+   (db/update-trigger-param db idx assoc :name v)))
+
+(rf/reg-event-db
+ :repo/trigger-param-val-changed
+ (fn [db [_ idx v]]
+   (db/update-trigger-param db idx assoc :value v)))
+
 (defn- add-ref
   "Adds query params according to the trigger form input"
-  [params {:keys [trigger-type trigger-ref]}]
-  (let [tt (first trigger-type)
-        v (first trigger-ref)]
-    (cond-> params
-      (and tt v) (assoc (keyword tt) v))))
+  [params {tt :trigger-type v :trigger-ref}]
+  (cond-> params
+    (and tt v) (assoc (keyword tt) v)))
+
+(defn- add-build-params
+  "Adds non-empty build parameters to the request body"
+  [r {:keys [params]}]
+  (let [->e (juxt :name :value)
+        e? (partial every? empty?)]
+    (cond-> r
+      (not-empty params)
+      (assoc :params (->> params
+                          (map ->e)
+                          (remove e?)
+                          (into {}))))))
 
 (rf/reg-event-fx
  :repo/trigger-build
- (fn [{:keys [db]} [_ form-vals]]
-   (let [params (get-in db [:route/current :parameters :path])]
+ (fn [{:keys [db]} _]
+   (let [params (get-in db [:route/current :parameters :path])
+         f (db/trigger-form db)]
      {:db (-> db
               (db/set-triggering)
               (db/reset-alerts))
       :dispatch [:secure-request
                  :trigger-build
                  (-> (select-keys params [:org-id :repo-id])
-                     (add-ref form-vals))
+                     (add-ref f)
+                     (add-build-params f))
                  [:repo/trigger-build--success]
                  [:repo/trigger-build--failed]]})))
 
@@ -120,7 +177,8 @@
  (fn [db [_ {:keys [body]}]]
    (-> db
        (db/set-alerts [(a/build-trigger-success)])
-       (db/set-show-trigger-form nil))))
+       (db/set-show-trigger-form nil)
+       (db/set-trigger-form nil))))
 
 (rf/reg-event-db
  :repo/trigger-build--failed
@@ -160,17 +218,22 @@
 (rf/reg-event-db
  :repo/name-changed
  (fn [db [_ v]]
-   (assoc-in db [db/editing :name] v)))
+   (db/update-editing db assoc :name v)))
 
 (rf/reg-event-db
  :repo/main-branch-changed
  (fn [db [_ v]]
-   (assoc-in db [db/editing :main-branch] v)))
+   (db/update-editing db assoc :main-branch v)))
 
 (rf/reg-event-db
  :repo/url-changed
  (fn [db [_ v]]
-   (assoc-in db [db/editing :url] v)))
+   (db/update-editing db assoc :url v)))
+
+(rf/reg-event-db
+ :repo/public-toggled
+ (fn [db [_ v]]
+   (db/update-editing db assoc :public v)))
 
 (rf/reg-event-db
  :repo/github-id-changed
@@ -199,9 +262,9 @@
 
 (defn- parse-github-id [repo]
   (let [id (:new-github-id repo)]
-    (-> repo
-        (dissoc :new-github-id)
-        (assoc :github-id (some-> id u/parse-int)))))
+    (cond-> repo
+      true (dissoc :new-github-id)
+      (not-empty id) (assoc :github-id (some-> id u/parse-int)))))
 
 (rf/reg-event-fx
  :repo/save
@@ -227,7 +290,7 @@
  :repo/save--success
  (fn [db [_ new? {:keys [body]}]]
    (-> db
-       (cdb/replace-repo body)
+       (odb/replace-repo body)
        (db/unmark-saving)
        (db/set-edit-alerts [(if new?
                               a/repo-create-success
@@ -261,11 +324,11 @@
  (fn [{:keys [db]} _]
    (let [params (-> (r/current db) (r/path-params))
          repo-id (:repo-id params)
-         repo (u/find-by-id repo-id (:repos (cdb/get-org db)))]
+         repo (u/find-by-id repo-id (:repos (odb/get-org db)))]
      {:db (-> db
               (db/unmark-deleting)
-              (cdb/update-org remove-repo repo-id)
-              (cdb/set-alerts
+              (odb/update-org remove-repo repo-id)
+              (odb/set-alerts
                [{:type :info
                  :message (str "Repository " (:name repo) " has been deleted.")}]))
       :dispatch [:route/goto :page/org (select-keys params [:org-id])]})))

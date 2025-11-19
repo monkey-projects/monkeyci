@@ -39,6 +39,11 @@
 (defn set-params [conf p]
   (assoc conf :params p))
 
+(def get-quiet :quiet)
+
+(defn set-quiet [conf v]
+  (assoc conf :quiet v))
+
 (def get-ending
   "Retrieves the result deferred, that is used to pass build result to the caller."
   :ending)
@@ -46,10 +51,15 @@
 (defn set-ending [conf r]
   (assoc conf :ending r))
 
-(def get-api :api)
+(def get-api "Configuration to access build api" :api)
 
 (defn set-api [conf api]
   (assoc conf :api api))
+
+(def get-global-api "Configuration to access global api" :global-api)
+
+(defn set-global-api [conf api]
+  (assoc conf :global-api api))
 
 (defn get-lib-coords [ctx]
   (get ctx :lib-coords {:mvn/version (v/version)}))

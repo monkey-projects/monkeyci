@@ -1,5 +1,5 @@
-(ns monkey.ci.example.parallel-jobs
-  (:require [monkey.ci.build.core :refer [action-job]]))
+(ns build
+  (:require [monkey.ci.api :refer [action-job]]))
 
 (defn first-job [_]
   (println "Starting first job")

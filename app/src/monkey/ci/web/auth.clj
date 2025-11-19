@@ -16,7 +16,9 @@
             [monkey.ci
              [sid :as sid]
              [storage :as st]
+             [time :as t]
              [utils :as u]]
+            [monkey.ci.spec.common :as sc]
             [monkey.ci.web.common :as c]
             [ring.middleware.params :as rmp]
             [ring.util.response :as rur]))
@@ -29,6 +31,10 @@
 (def user-id
   "Retrieves current user id from request"
   (comp :id :identity))
+
+(def hash-pw
+  "Creates SHA256 hash of password, returns hex encoded string"
+  (comp codecs/bytes->hex hash/sha256))
 
 (defn- make-token [role sid]
   {:role role
@@ -48,9 +54,15 @@
 
 (defn generate-secret-key
   "Generates a random secret key object"
-  []
-  (-> (nonce/random-nonce 32)
-      (codecs/bytes->hex)))
+  ([size]
+   (-> (nonce/random-nonce size)
+       (codecs/bytes->hex)))
+  ([]
+   (generate-secret-key 32)))
+
+(defn generate-api-token []
+  ;; Each byte results in 2 chars, so take half token size
+  (generate-secret-key (/ sc/token-size 2)))
 
 (defn sign-jwt [payload pk]
   (jwt/sign payload pk {:alg :rs256 :header {:kid kid}}))
@@ -97,20 +109,6 @@
 (defn keypair->rt [kp]
   {:pub (.getPublic kp)
    :priv (.getPrivate kp)})
-
-(defn ^:deprecated config->keypair
-  "Loads private and public keys from the app config, returns a map that can be
-   used in the context `:jwk`."
-  [conf]
-  (log/debug "Configured JWK:" (:jwk conf))
-  (let [m {:private-key (comp bk/str->private-key u/try-slurp)
-           :public-key (comp bk/str->public-key u/try-slurp)}
-        loaded-keys (mapv (fn [[k f]]
-                            (when-let [v (get-in conf [:jwk k])]
-                              (f v)))
-                          m)]
-    (when (every? some? loaded-keys)
-      (zipmap [:priv :pub] loaded-keys))))
 
 (defn make-jwk
   "Creates a JWK object from a public key that can be exposed for external 
@@ -165,6 +163,22 @@
   ;; Fallback, for backwards compatibility
   nil)
 
+(defn- api-token-expired? [{v :valid-until}]
+  (and v (> (t/now) v)))
+
+(defn- resolve-user-api-token [st req token]
+  (when-let [t (st/find-user-token-by-token st (hash-pw token))]
+    (when-not (api-token-expired? t)
+      (let [u (st/find-user st (:user-id t))]
+        ;; Add the allowed organizations to the identity
+        (assoc t :orgs (set (:orgs u)))))))
+
+(defn- resolve-org-api-token [st req token]
+  (when-let [t (st/find-org-token-by-token st (hash-pw token))]
+    (when-not (api-token-expired? t)
+      ;; Add the allowed organization id to the identity for uniformity
+      (assoc t :orgs #{(:org-id t)}))))
+
 (defn- query-auth-to-bearer
   "Middleware that puts the authorization token query param in the authorization header
    if no auth header is provided."
@@ -179,16 +193,20 @@
 
 (defn secure-ring-app
   "Wraps the ring handler so it verifies the JWT authorization header"
-  [app rt]
+  [app {:keys [storage] :as rt}]
   (let [pk (rt->pub-key rt)
-        backend (bb/jws {:secret pk
-                         :token-name "Bearer"
-                         :options {:alg :rs256}
-                         :authfn (partial resolve-token rt)})]
+        jws-backend (bb/jws {:secret pk
+                             :token-name "Bearer"
+                             :options {:alg :rs256}
+                             :authfn (partial resolve-token rt)})
+        user-token-backend (bb/token {:authfn (partial resolve-user-api-token storage)})
+        org-token-backend (bb/token {:authfn (partial resolve-org-api-token storage)})]
     (when-not pk
       (log/warn "No public key configured"))
     (-> app
-        (bmw/wrap-authentication backend)
+        (bmw/wrap-authentication jws-backend
+                                 user-token-backend
+                                 org-token-backend)
         ;; Also check authorization query arg, because in some cases it's not possible
         ;; to pass it as a header (e.g. server-sent events).
         (query-auth-to-bearer)
@@ -197,30 +215,149 @@
 (defn sysadmin? [user]
   (some-> user :type name (= role-sysadmin)))
 
-(defn- check-org-authorization!
-  "Checks if the request identity grants access to the org specified in 
-   the parameters path."
-  [req]
-  (when-let [cid (get-in req [:parameters :path :org-id])]
-    (when-not (and (ba/authenticated? req)
-                   (or (sysadmin? (:identity req))
-                       (contains? (get-in req [:identity :orgs]) cid)))
-      (throw (ex-info "Credentials do not grant access to this org"
-                      {:type :auth/unauthorized
-                       :org-id cid})))))
+(defn allowed? [r]
+  (or (nil? r) (= :granted (:permission r))))
 
-(defn org-authorization
-  "Middleware that verifies the identity token to check if the user or build has
-   access to the given org."
+(defn denied? [r]
+  (= :denied (:permission r)))
+
+(defn- denied [reason props]
+  (assoc props
+         :permission :denied
+         :reason reason))
+
+(def granted {:permission :granted})
+
+(defn- last-allowed?
+  "Checks if the last value in the chain allows the request"
+  [chain]
+  (when-not (empty? chain)
+    (->> chain
+         (remove nil?)
+         (last)
+         (allowed?))))
+
+(defn auth-chain
+  "Applies the authorization chain to the request.  The chain consists of
+   functions that are applied to the request.  Each part can return a
+   non-nil value, which is interpreted as a security advise.  This can
+   be to deny, or allow the request.  If the request is denied, an 
+   authorization exception is thrown.  This system allows a large degree
+   of autonomy to each checker.  They can inspect the previous advises,
+   and modify their response accordingly."
+  [chain req]
+  (log/trace "Verifying auth chain:" chain)
+  (->> chain
+       (reduce (fn [r c]
+                 (->> (conj r (c r req))
+                      vec))
+               [])
+       (remove nil?)
+       last))
+
+(defn chain-result->response [r req]
+  (if (ba/authenticated? req)
+    ;; TODO Allow more properties
+    (c/error-response (or (:reason r) "You do not have access to this resource") 403)
+    (c/error-response "Unauthenticated" 401)))
+
+(defn auth-chain-middleware
+  "Middleware that extracts any authorization checkers from the route data
+   and applies them.  If the chain results in a request denied, a 403 response
+   is returned."
   [h]
   (fn [req]
-    (check-org-authorization! req)
-    (h req)))
+    (let [checkers (-> req
+                       (c/route-data)
+                       :auth-chain)]
+      (let [ac (auth-chain checkers req)]
+        (if (denied? ac)
+          (chain-result->response ac req)
+          (h req))))))
+
+(defn- denied-no-org-access [org-id]
+  (denied "Credentials do not grant access to this org"
+          {:org-id org-id}))
+
+(defn- org-checker [kind id-resolver]
+  (fn [_ req]
+    (when-let [oid (get-in req [:parameters kind :org-id])]
+      (when-not
+          (and (ba/authenticated? req)
+               (or (sysadmin? (:identity req))
+                   (contains? (get-in req [:identity :orgs])
+                              oid)
+                   ;; Should also match org display ids
+                   (contains? (get-in req [:identity :orgs])
+                              (id-resolver req oid))))
+        (denied-no-org-access oid)))))
+
+(def org-auth-checker
+  "Checks if the user has access to the organization"
+  (partial org-checker :path))
+
+(def org-body-checker
+  "Checks if the user has access to the organization specified in the body"
+  (partial org-checker :body))
+
+(defn webhook-org-checker
+  "Verifies if the user has permissions on the webhook org"
+  [_ req]
+  ;; TODO Also allow for sysadmins
+  (when-let [{:keys [org-id]} (st/find-webhook (c/req->storage req)
+                                               (get-in req [:parameters :path :webhook-id]))]
+    (when-not (contains? (get-in req [:identity :orgs]) org-id)
+      (denied-no-org-access org-id))))
+
+(defn public-repo-checker
+  "Checks if the repository that's being accessed is public, and the
+   request method is `GET`."
+  [chain req]
+  ;; Only check if a previous chain part has not already allowed it
+  (when-not (last-allowed? chain)
+    (let [sid (c/repo-sid req)]
+      (when-let [repo (st/find-repo (c/req->storage req) sid)]
+        (cond
+          (not (:public repo))
+          (denied "Repository is not public"
+                  {:sid sid})
+          (not (#{:get :options} (:request-method req)))
+          (denied "You do not have permission to modify this repo"
+                  {:sid sid})
+          :else
+          ;; Explicitly permission granted
+          granted)))))
+
+(defn current-user-checker
+  "Verifies that the current user matches the one in the request path"
+  [_ req]
+  (when (= (user-id req) (get-in req [:parameters :path :user-id]))
+    granted))
+
+(defn deny-all
+  "Chain checker that denies all requests"
+  [_ _]
+  (denied "You do not have access" {}))
+
+(defn sysadmin-checker
+  "Allows sysadmins"
+  [_ req]
+  (when (sysadmin? (:identity req))
+    (log/trace "Granting access to sysadmin:" (:identity req))
+    granted))
+
+(defn readonly-checker
+  "Only allows non-destructive requests"
+  [_ req]
+  (let [m (:request-method req)]
+    (if (#{:get :options :head} m)
+      granted
+      (denied "Request method not allowed" {:method m}))))
 
 (defn sysadmin-authorization
   [h]
   (fn [req]
-    (when (not= :sysadmin (-> req :identity :type keyword))
+    (when-not (sysadmin? (:identity req))
       (throw (ex-info "Only system administrators have access to this area"
                       {:type :auth/unauthorized})))
     (h req)))
@@ -264,8 +401,3 @@
         (-> (rur/response "Invalid signature header")
             (rur/status 401))))))
 
-(defn hash-pw
-  "Creates SHA256 hash of password, returns hex encoded string"
-  [pw]
-  (-> (hash/sha256 pw)
-      (codecs/bytes->hex)))

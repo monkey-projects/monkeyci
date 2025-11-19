@@ -70,3 +70,8 @@
 (deftest file-hash
   (testing "calculates hash string for file"
     (is (string? (sut/file-hash "deps.edn")))))
+
+(deftest update-nth
+  (testing "applies f to nth item in collection"
+    (is (= ["a" "B" "c"]
+           (sut/update-nth ["a" "b" "c"] 1 (memfn toUpperCase))))))

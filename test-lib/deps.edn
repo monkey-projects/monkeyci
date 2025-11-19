@@ -1,4 +1,4 @@
-{:deps {com.monkeyci/app {:mvn/version "0.17.2-SNAPSHOT"}}
+{:deps {com.monkeyci/app {:mvn/version "0.20.6"}}
  :paths ["src" "resources"]
 
  :aliases
@@ -21,7 +21,7 @@
   {:extra-deps {com.monkeyprojects/build {:mvn/version "0.3.1"}}
    :exec-fn monkey.build/jar
    :exec-args {:lib com.monkeyci/test
-               :version [[:env "MONKEYCI_VERSION"] "0.18.1-SNAPSHOT"]
+               :version [[:env "MONKEYCI_VERSION"] "0.20.7-SNAPSHOT"]
                :jar "target/monkeyci-test.jar"}}
 
   :install

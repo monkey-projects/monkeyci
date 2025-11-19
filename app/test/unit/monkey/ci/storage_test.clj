@@ -14,14 +14,72 @@
 
 (deftest orgs
   (h/with-memory-store st
-    (testing "can find multiple"
-      (let [orgs (repeatedly 3 h/gen-org)]
-        (doseq [c orgs]
-          (sut/save-org st c))
+    (let [orgs (repeatedly 3 h/gen-org)]
+      (doseq [c orgs]
+        (sut/save-org st c))
+      (testing "can find multiple"
         (let [r (sut/find-orgs st (->> orgs
-                                            (take 2)
-                                            (map :id)))]
-          (is (= (take 2 orgs) r)))))))
+                                       (take 2)
+                                       (map :id)))]
+          (is (= (take 2 orgs) r))))
+
+      (testing "can count"
+        (is (= 3 (sut/count-orgs st))))
+
+      (testing "can delete"
+        (let [org (first orgs)]
+          (is (true? (sut/delete-org st (:id org))))
+          (is (nil? (sut/find-org st (:id org)))))))
+
+    (testing "can find by display id"
+      (let [org {:id (cuid/random-cuid)
+                 :name "test org"
+                 :display-id "test-org"}]
+        (is (sid/sid? (sut/save-org st org)))
+        (is (= org (sut/find-org-by-display-id st "test-org")))))))
+
+(deftest init-org
+  (h/with-memory-store st
+    (let [org {:id (sut/new-id)
+               :name "test org"}
+          user {:id (sut/new-id)
+                :name "testuser"
+                :type "github"
+                :type-id "1243"}]
+      (is (some? (sut/save-user st user)))
+
+      (let [res (sut/init-org st {:org org
+                                  :user-id (:id user)
+                                  :credits {:amount 1000
+                                            :from (t/now)}
+                                  :dek "test-dek"})]
+        (is (sid/sid? res))
+
+        (let [m (sut/find-org st (:id org))]
+          (testing "creates new org"
+            (is (= (:id org) (:id m))))
+
+          (testing "assigns display id"
+            (is (= "test-org" (:display-id m)))))
+
+        (testing "links org to user"
+          (is (= [(:id org)] (->> (sut/list-user-orgs st (:id user))
+                                  (map :id)))))
+
+        (testing "creates credit subscription"
+          (let [cs (sut/list-org-credit-subscriptions st (:id org))]
+            (is (= 1 (count cs)))
+            (is (= 1000 (-> cs first :amount)))))
+
+        (testing "creates starting credit"
+          (let [c (sut/list-org-credits st (:id org))]
+            (is (= 1 (count c)))
+            (is (= 1000 (-> c first :amount)))))
+
+        (testing "creates crypto with dek"
+          (let [c (sut/find-crypto st (:id org))]
+            (is (some? c))
+            (is (= "test-dek" (:dek c)))))))))
 
 (deftest webhooks
   (testing "webhook-sid is a sid"
@@ -306,16 +364,21 @@
                :id (sut/new-id)
                :name "test user"
            :email "test@monkeyci.com"}]
-    
-    (testing "can save and find github user"
-      (h/with-memory-store st
-        (is (sid/sid? (sut/save-user st u)))
-        (is (= u (sut/find-user-by-type st [:github 1234])) "can retrieve user by github id")))
 
-    (testing "can save and find user by cuid"
-      (h/with-memory-store st
+    (h/with-memory-store st
+      (testing "can save and find github user"
         (is (sid/sid? (sut/save-user st u)))
-        (is (= u (sut/find-user st (:id u))) "can retrieve user by id")))))
+        (is (= u (sut/find-user-by-type st [:github 1234])) "can retrieve user by github id"))
+
+      (testing "can find user by cuid"
+        (is (= u (sut/find-user st (:id u))) "can retrieve user by id"))
+
+      (testing "can count"
+        (is (= 1 (sut/count-users st))))
+
+      (testing "can delete"
+        (is (true? (sut/delete-user st (:id u))))
+        (is (= 0 (sut/count-users st)))))))
 
 (deftest update-repo
   (testing "updates repo in org object"
@@ -354,6 +417,17 @@
 
       (testing "removes webhooks for repo"
         (is (empty? (sut/find-webhook st (:id wh))))))))
+
+(deftest count-repo
+  (testing "counts repos in storage"
+    (h/with-memory-store st
+      (let [[oid rid] (repeatedly sut/new-id)]
+        (is (some? (sut/save-org st {:id oid})))
+        (is (= 0 (sut/count-repos st)))
+        (is (some? (sut/save-repo st {:id rid
+                                      :org-id oid
+                                      :url "http://test-repo"})))
+        (is (= 1 (sut/count-repos st)))))))
 
 (deftest watch-github-repo
   (h/with-memory-store st
@@ -587,3 +661,61 @@
       (testing "can save and list for job"
         (is (sid/sid? (sut/save-job-event st evt)))
         (is (= [evt] (sut/list-job-events st job-sid)))))))
+
+(deftest user-tokens
+  (h/with-memory-store st
+    (let [t (h/gen-user-token)]
+      (testing "can save and find"
+        (is (sid/sid? (sut/save-user-token st t)))
+        (is (= t (sut/find-user-token st [(:user-id t) (:id t)]))))
+
+      (testing "can list for user"
+        (is (= [t] (sut/list-user-tokens st (:user-id t)))))
+
+      (testing "can find by token"
+        (is (= t (sut/find-user-token-by-token st (:token t)))))
+
+      (testing "can delete"
+        (is (true? (sut/delete-user-token st [(:user-id t) (:id t)])))))))
+
+(deftest org-tokens
+  (h/with-memory-store st
+    (let [t (h/gen-org-token)]
+      (testing "can save and find"
+        (is (sid/sid? (sut/save-org-token st t)))
+        (is (= t (sut/find-org-token st [(:org-id t) (:id t)]))))
+
+      (testing "can list for org"
+        (is (= [t] (sut/list-org-tokens st (:org-id t)))))
+
+      (testing "can find by token"
+        (is (= t (sut/find-org-token-by-token st (:token t)))))
+
+      (testing "can delete"
+        (is (true? (sut/delete-org-token st [(:org-id t) (:id t)])))))))
+
+(deftest mailings
+  (h/with-memory-store st
+    (let [m (h/gen-mailing)]
+      (testing "can save and find"
+        (is (sid/sid? (sut/save-mailing st m)))
+        (is (= m (sut/find-mailing st (:id m)))))
+
+      (testing "can list"
+        (is (= [m] (sut/list-mailings st))))
+
+      (testing "can delete"
+        (is (true? (sut/delete-mailing st (:id m)))))
+
+      (testing "sent mailings"
+        (is (sid/sid? (sut/save-mailing st m)))
+        (let [sm {:id (cuid/random-cuid)
+                  :mailing-id (:id m)
+                  :sent-at (t/now)}]
+          (testing "can save and find"
+            (let [sid (sut/save-sent-mailing st sm)]
+              (is (sid/sid? sid))
+              (is (= sm (sut/find-sent-mailing st sid)))))
+
+          (testing "can list for mailing"
+            (is (= [sm] (sut/list-sent-mailings st (:id m))))))))))
