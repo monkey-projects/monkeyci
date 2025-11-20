@@ -16,13 +16,17 @@
   
   p/Mailer
   (send-mail [this {:keys [subject text-body html-body destinations]}]
-    (->> (select-keys config [:project-id :from :bcc])
-         (merge {:to (map (partial hash-map :email) destinations)
-                 :subject subject
-                 :text text-body
-                 :html html-body})
-         (m/filter-vals some?)
-         (hash-map :region (:region config) :body)
-         (mc/response-for (:ctx this) :create-email)
-         (deref)
-         :body)))
+    (let [uh (:unsubscribe config)]
+      (->> (select-keys config [:project-id :from :bcc])
+           (merge (cond-> {:to (map (partial hash-map :email) destinations)
+                           :subject subject
+                           :text text-body
+                           :html html-body}
+                    uh (assoc :additional-headers
+                              [{:key "list-unsubscribe"
+                                :value uh}])))
+           (m/filter-vals some?)
+           (hash-map :region (:region config) :body)
+           (mc/response-for (:ctx this) :create-email)
+           (deref)
+           :body))))

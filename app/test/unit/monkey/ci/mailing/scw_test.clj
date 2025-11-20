@@ -16,7 +16,7 @@
                                       (md/success-deferred
                                        {:status 200
                                         :body {:id "test-mail"}})))]
-      (let [m (-> (sut/->ScwMailer {})
+      (let [m (-> (sut/->ScwMailer {:unsubscribe "mailto:test-unsub"})
                   (co/start))]
         (testing "`start` creates api context"
           (is (= ::email-ctx (:ctx m))))
@@ -26,4 +26,8 @@
                  (-> (p/send-mail m {:subject "test mail"})
                      :id)))
           (is (= "test mail"
-                 (get-in @params [:body :subject]))))))))
+                 (get-in @params [:body :subject])))
+          (is (= {:key "list-unsubscribe"
+                  :value "mailto:test-unsub"}
+                 (-> (get-in @params [:body :additional-headers])
+                     first))))))))
