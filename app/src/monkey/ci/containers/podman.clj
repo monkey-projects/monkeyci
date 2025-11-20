@@ -449,11 +449,14 @@
 
      [:container/end
       [{:handler job-exec
-        :interceptors [emi/handle-job-error
-                       state
+        :interceptors [state
                        require-job
                        remove-job
                        dec-job-count
+                       ;; Handle any errors before decreasing job count, to make sure that's
+                       ;; being executed.
+                       emi/handle-job-error
+                       ;; In case of error, don't clean up.  Useful for debugging.
                        (cleanup conf)
                        (add-job-dir wd)
                        (add-job-ctx job-ctx)

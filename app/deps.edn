@@ -171,7 +171,8 @@
 
   :uber
   {:exec-fn monkey.build/uberjar
-   :exec-args {:jar "target/monkeyci-standalone.jar"}}
+   :exec-args {:jar "target/monkeyci-standalone.jar"}
+   :override-deps {com.monkeyci/common {:local/root "../common"}}}
 
   :json-logging
   {:extra-deps {ch.qos.logback.contrib/logback-json-classic {:mvn/version "0.1.5"}}
