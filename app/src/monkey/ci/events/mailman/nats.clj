@@ -35,12 +35,18 @@
 (defn types-to-subjects [prefix]
   (make-subject-mapping prefix))
 
+(defn log-errors [err]
+  ;; Just log it for now
+  (log/error "Got NATS error:" err))
+
 (defrecord NatsComponent [broker]
   co/Lifecycle
   (start [this]
     (log/debug "Connecting to NATS broker at" (get-in this [:config :urls]))
     (let [conf (:config this)
-          conn (nats/make-connection conf)
+          conn (-> conf
+                   (assoc :error-listener (nats/->error-listener log-errors))
+                   (nats/make-connection))
           subjects (types-to-subjects (:prefix conf))
           broker-conf (-> conf
                           (select-keys [:stream :consumer :poll-opts :serializer :deserializer])
