@@ -1,7 +1,7 @@
 {:deps {binaryage/oops {:mvn/version "0.7.2"}
         day8.re-frame/http-fx {:mvn/version "0.2.4"}
         com.github.oliyh/martian-re-frame {:mvn/version "0.2.1"}
-        com.monkeyci/common {:mvn/version "0.20.7"}
+        com.monkeyci/common {:local/root "../common"}
         com.monkeyci/site-template {:mvn/version "0.2.5"}
         medley/medley {:mvn/version "1.4.0"}
         metosin/reitit-frontend {:mvn/version "0.9.1"}
@@ -14,8 +14,7 @@
 
  :aliases
  {:dev
-  {:extra-paths ["env/dev"]
-   :override-deps {com.monkeyci/common {:local/root "../common"}}}
+  {:extra-paths ["env/dev"]}
 
   :test
   {:extra-paths ["test"]
@@ -24,7 +23,7 @@
                 day8.re-frame/test {:mvn/version "0.1.7"}
                 devcards/devcards {:mvn/version "0.2.7"}
                 com.monkeyprojects/shadow-junit-xml {:mvn/version "0.2.0"}}
-   :override-deps {com.monkeyci/common {:local/root "../common"}}}
+   :override-deps {}}
 
   :test/clj
   {:extra-deps {com.monkeyprojects/build {:mvn/version "0.3.1"}}
