@@ -37,7 +37,9 @@
 (defn delete-mailing [conn cuid]
   (ec/delete-entities conn :mailings (ec/by-cuid cuid)))
 
-(def ^:private sent-mailing->db mailing->db)
+(defn sent-mailing->db [sm]
+  (-> (mailing->db sm)
+      (dissoc :mailing-id)))
 
 (defn db->sent-mailing [sm mid]
   (-> (db->mailing sm)
@@ -59,7 +61,7 @@
 
 (defn upsert-sent-mailing [st {:keys [id] :as sm}]
   (let [conn (sc/get-conn st)]
-    (if-let [e (when id (ec/select-sent-mailing conn id))]
+    (if-let [e (when id (ec/select-sent-mailing conn (ec/by-cuid id)))]
       (update-sent-mailing conn sm e)
       (insert-sent-mailing conn sm))))
 

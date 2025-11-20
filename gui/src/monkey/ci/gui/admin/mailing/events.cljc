@@ -144,7 +144,8 @@
    (-> db
        (db/unmark-saving-new-delivery)
        (db/reset-new-delivery)
-       (db/update-sent-mailings (comp vec conj) d))))
+       (db/update-sent-mailings (comp vec conj) d)
+       (db/set-sent-alerts [(a/delivery-save-success)]))))
 
 (rf/reg-event-db
  ::save-delivery--failure

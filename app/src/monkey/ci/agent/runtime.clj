@@ -206,6 +206,7 @@
     (ep/map->PollLoop {:running? (atom false)
                        :config (->> (select-keys (:poll-loop conf) (keys defaults))
                                     (merge defaults))
+                       ;; TODO Reset job count after some timeout (resilience)
                        :max-reached? max-jobs-reached?})))
 
 (defn make-container-system

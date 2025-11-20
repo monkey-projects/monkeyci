@@ -8,6 +8,7 @@
              [blob :as blob]
              [build :as b]
              [oci :as oci]
+             [protocols :as p]
              [reporting :as rep]
              [storage :as s]
              [vault :as v]]
@@ -254,15 +255,21 @@
     (->OtlpClient otlp nil)
     {}))
 
+(defrecord NoopMailer []
+  p/Mailer
+  (send-mail [_ _]
+    nil))
+
 (defmulti make-mailer :type)
+
+(defmethod make-mailer :default [_]
+  (->NoopMailer))
 
 (defmethod make-mailer :scw [conf]
   (mailing-scw/->ScwMailer conf))
 
 (defn new-mailer [{:keys [mailing]}]
-  (if (:type mailing)
-    (make-mailer mailing)
-    {}))
+  (make-mailer mailing))
 
 (defn make-server-system
   "Creates a component system that can be used to start an application server."

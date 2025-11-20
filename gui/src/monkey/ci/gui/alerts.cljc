@@ -225,5 +225,8 @@
 (def sent-mailing-load-failed
   (error-msg "Failed to retrieve sent mailings"))
 
+(def delivery-save-success
+  (alert-msg :success (constantly "New delivery has been created.")))
+
 (def delivery-save-failed
   (error-msg "Failed to create new delivery"))

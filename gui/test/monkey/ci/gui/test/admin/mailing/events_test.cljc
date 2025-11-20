@@ -251,7 +251,12 @@
     (is (not (db/saving-new-delivery? @app-db))))
   
   (testing "clears new delivery"
-    (is (nil? (db/get-new-delivery @app-db)))))
+    (is (nil? (db/get-new-delivery @app-db))))
+
+  (testing "sets alert"
+    (is (= [:success]
+           (->> (db/get-sent-alerts @app-db)
+                (map :type))))))
 
 (deftest save-delivery--failure
   (is (some? (reset! app-db (db/mark-saving-new-delivery {}))))

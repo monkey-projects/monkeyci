@@ -1035,7 +1035,10 @@
             (is (= sm (st/find-sent-mailing st [(:id m) (:id sm)]))))
 
           (testing "can list for mailing"
-            (is (= [sm] (st/list-sent-mailings st (:id m))))))))))
+            (is (= [sm] (st/list-sent-mailings st (:id m)))))
+
+          (testing "can update"
+            (is (some? (st/save-sent-mailing st (assoc sm :to-users true))))))))))
 
 (deftest pool-component
   (testing "creates sql connection pool using settings"
