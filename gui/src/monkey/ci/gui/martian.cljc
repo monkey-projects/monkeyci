@@ -627,9 +627,10 @@
  [(rf/inject-cofx :local-storage ldb/storage-token-id)]
  (fn [{:keys [db local-storage]} [_ orig-evt {{:keys [token] :as body} :body}]]
    (letfn [(update-token [evt t]
-             (vec (concat (take 2 evt)
-                          [(set-token (nth evt 2) t)]
-                          (drop 3 evt))))]
+             (when (<= 3 (count evt))
+               (vec (concat (take 2 evt)
+                            [(set-token (nth evt 2) t)]
+                            (drop 3 evt)))))]
      (log/debug "Token successfully refreshed, dispatching original event:" (str orig-evt))
      {:db (-> db
               (ldb/set-token token)

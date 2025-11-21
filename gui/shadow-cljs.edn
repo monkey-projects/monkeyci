@@ -17,7 +17,13 @@
     :admin
     {:init-fn monkey.ci.gui.admin/init
      :depends-on #{:common}}}
-   :output-dir "target/js/frontend/js"}
+   :output-dir "target/js/frontend/js"
+   :devtools
+   {:preloads [re-frisk-remote.preload]}
+   :compiler-options
+   {:closure-defines
+    {"re_frame.trace.trace_enabled_QMARK_" true
+     monkey.ci.gui.version/VERSION "0.20.7"}}}
 
   :test/browser
   {:target :browser-test

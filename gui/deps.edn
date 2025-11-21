@@ -14,7 +14,8 @@
 
  :aliases
  {:dev
-  {:extra-paths ["env/dev"]}
+  {:extra-paths ["env/dev"]
+   :extra-deps {re-frisk-remote/re-frisk-remote {:mvn/version "1.6.0"}}}
 
   :test
   {:extra-paths ["test"]

@@ -18,7 +18,7 @@
     (rf/dispatch-sync [:initialize-db])
     (is (nil? (::test-key @app-db)))))
 
-(deftest core-init-user
+#_(deftest core-init-user
   (testing "loads tokens from local storage"
     (rf/reg-cofx :local-storage (fn [cofx id]
                                   (cond-> cofx

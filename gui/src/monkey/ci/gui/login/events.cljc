@@ -15,8 +15,12 @@
 (rf/reg-event-fx
  :login/login-and-redirect
  (fn [{:keys [db]} _]
-   (let [next-route (:path (r/current db))]
-     {:local-storage [storage-redir-id {:redirect-to next-route}]
+   (let [cr (r/current db)
+         next-route (:path cr)]
+     {:local-storage [storage-redir-id
+                      ;; Ignore public routes to avoid redirecting to the callback pages
+                      (when-not (r/public? (r/route-name cr))
+                        {:redirect-to next-route})]
       :dispatch [:route/goto :page/login]})))
 
 (rf/reg-event-db
@@ -88,10 +92,10 @@
  :github/load-user--success
  [(rf/inject-cofx :local-storage storage-redir-id)]
  (fn [{:keys [db local-storage]} [_ github-user]]
-   (let [redir (:redirect-to local-storage)]
-     {:db (db/set-github-user db github-user)
-      :dispatch (redirect-evt (db/user db) local-storage)
-      :local-storage [storage-redir-id (dissoc local-storage :redirect-to)]})))
+   (log/debug "Github user loaded, redirecting to page as stored locally")
+   {:db (db/set-github-user db github-user)
+    :dispatch (redirect-evt (db/user db) local-storage)
+    :local-storage [storage-redir-id (dissoc local-storage :redirect-to)]}))
 
 (rf/reg-event-fx
  :github/load-user--failed
@@ -120,8 +124,6 @@
 (rf/reg-event-db
  :login/load-github-config--success
  (fn [db [_ {config :body :as resp}]]
-   (println "Github config loaded:" resp)
-   (println "Body:" config)
    (db/set-github-config db config)))
 
 (rf/reg-event-db

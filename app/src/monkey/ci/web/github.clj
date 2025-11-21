@@ -159,15 +159,17 @@
   (c/from-rt req (comp :github rt/config)))
 
 (defn- request-access-token [client-id client-secret opts]
-  (-> (http/post "https://github.com/login/oauth/access_token"
-                 {:query-params (merge {:client_id client-id
-                                        :client_secret client-secret}
-                                       opts)
-                  :headers {"Accept" "application/json"
-                            "User-Agent" user-agent}
-                  :throw-exceptions false})
-      (md/chain c/parse-body)
-      deref))
+  (let [qp (merge {:client_id client-id
+                   :client_secret client-secret}
+                  opts)]
+    (log/debug "Requesting github access token with params:" qp)
+    (-> (http/post "https://github.com/login/oauth/access_token"
+                   {:query-params qp
+                    :headers {"Accept" "application/json"
+                              "User-Agent" user-agent}
+                    :throw-exceptions false})
+        (md/chain c/parse-body)
+        deref)))
 
 (defn- request-new-token [req]
   (let [code (get-in req [:parameters :query :code])

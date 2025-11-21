@@ -6,13 +6,13 @@
             [monkey.ci.gui.template :as t]
             #?(:cljs [monkey.ci.gui.logging :as log])
             [monkey.ci.gui.utils :as u]
+            [monkey.ci.gui.version :as v]
             #?(:cljs [reagent.core :as rc])
             [re-frame.core :as rf]))
 
 (defn user-info []  
   (let [u (rf/subscribe [:login/user])]
     (when @u
-      (println "User:" @u)
       [:div
        [co/user-avatar @u]
        [:p (:name @u) 
@@ -51,7 +51,7 @@
 
 (defn footer []
   (let [v (rf/subscribe [:version])]
-    (tc/footer (assoc t/config :version @v))))
+    (tc/footer (assoc t/config :version (str v/VERSION " - " @v)))))
 
 (defn error-boundary [target]
   #?(:cljs
@@ -81,7 +81,7 @@
 (defn default
   "Layout for default application pages"
   [subpanel]
-  (rf/dispatch [:core/init-user])
+  #_(rf/dispatch [:core/init-user])
   [:<>
    [header]
    [:div.bg-soft-primary-light.flex-fill

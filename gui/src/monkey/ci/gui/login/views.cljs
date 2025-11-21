@@ -17,24 +17,26 @@
 
 (defn- github-btn []
   (rf/dispatch [:login/load-github-config])
-  (let [callback-url (str (r/origin) (r/path-for :page/github-callback))
-        github-client-id (rf/subscribe [:login/github-client-id])]
-    [login-btn
-     (str "https://github.com/login/oauth/authorize?client_id=" @github-client-id
-          "&redirect_uri=" (r/uri-encode callback-url))
-     [:<> [:img.me-2 {:src "/img/github-mark.svg" :height "20px"}] "Login with GitHub"]
-     (nil? @github-client-id)]))
+  (fn []
+    (let [callback-url (str (r/origin) (r/path-for :page/github-callback))
+          github-client-id (rf/subscribe [:login/github-client-id])]
+      [login-btn
+       (str "https://github.com/login/oauth/authorize?client_id=" @github-client-id
+            "&redirect_uri=" (r/uri-encode callback-url))
+       [:<> [:img.me-2 {:src "/img/github-mark.svg" :height "20px"}] "Login with GitHub"]
+       (nil? @github-client-id)])))
 
 (defn- bitbucket-btn []
   (rf/dispatch [:login/load-bitbucket-config])
-  (let [bitbucket-client-id (rf/subscribe [:login/bitbucket-client-id])]
-    ;; Unfortunately, bitbucket does not allow to specify callback url, so it's the one
-    ;; that is configured in the app.
-    [login-btn
-     (str "https://bitbucket.com/site/oauth2/authorize?client_id=" @bitbucket-client-id
-          "&response_type=code")
-     [:<> [:img.me-2 {:src "/img/mark-gradient-blue-bitbucket.svg" :height "20px"}] "Login with Bitbucket"]
-     (nil? @bitbucket-client-id)]))
+  (fn []
+    (let [bitbucket-client-id (rf/subscribe [:login/bitbucket-client-id])]
+      ;; Unfortunately, bitbucket does not allow to specify callback url, so it's the one
+      ;; that is configured in the app.
+      [login-btn
+       (str "https://bitbucket.com/site/oauth2/authorize?client_id=" @bitbucket-client-id
+            "&response_type=code")
+       [:<> [:img.me-2 {:src "/img/mark-gradient-blue-bitbucket.svg" :height "20px"}] "Login with Bitbucket"]
+       (nil? @bitbucket-client-id)])))
 
 (defn login-form []
   [:div.d-flex.flex-wrap.gap-2

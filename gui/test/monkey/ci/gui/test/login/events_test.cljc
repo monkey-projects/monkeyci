@@ -14,13 +14,21 @@
   f/reset-db)
 
 (deftest login-and-redirect
+  (h/catch-fx :route/goto)
   (testing "sets redirect route in local storage"
-    (h/catch-fx :route/goto)
     (let [c (h/catch-fx :local-storage)]
       (rf-test/run-test-sync
        (is (some? (reset! app-db {r/current {:path "/redirect/path"}})))
        (rf/dispatch [:login/login-and-redirect])
        (is (= "/redirect/path" (-> @c first second :redirect-to))))))
+
+  (testing "does not set if route is public"
+    (let [c (h/catch-fx :local-storage)]
+      (rf-test/run-test-sync
+       (is (some? (reset! app-db {r/current {:path "/github/callback"
+                                             :data {:name :page/github-callback}}})))
+       (rf/dispatch [:login/login-and-redirect])
+       (is (nil? (-> @c first second :redirect-to))))))
 
   (testing "changes route to login"
     (let [r (h/catch-fx :route/goto)]

@@ -10,7 +10,7 @@
  (fn [_ _]
    {}))
 
-(rf/reg-event-fx
+#_(rf/reg-event-fx
  :core/init-user
  [(rf/inject-cofx :local-storage ldb/storage-token-id)]
  (fn [{:keys [db] :as fx} _]
