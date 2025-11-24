@@ -22,8 +22,12 @@
    {:preloads [re-frisk-remote.preload]}
    :compiler-options
    {:closure-defines
-    {"re_frame.trace.trace_enabled_QMARK_" true
-     monkey.ci.gui.version/VERSION "0.20.7"}}}
+    {monkey.ci.gui.version/VERSION "0.20.8"}}
+   :dev
+   {:compiler-options
+    {:closure-defines
+     {"re_frame.trace.trace_enabled_QMARK_" true
+      monkey.ci.gui.version/VERSION "dev"}}}}
 
   :test/browser
   {:target :browser-test
