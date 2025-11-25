@@ -38,14 +38,15 @@
 (deftest create-sent-mailing
   (let [{st :storage :as rt} (trt/test-runtime)
         m (-> (h/gen-mailing)
-              (assoc :subject "Test subject"))]
+              (assoc :subject "Test subject"
+                     :text-body "Hi {{EMAIL}}"))]
     (is (some? (st/save-mailing st m)))
     (let [r (-> rt
                 (h/->req)
                 (assoc :parameters {:path
                                     {:mailing-id (:id m)}
                                     :body
-                                    {:other-dests "test@monkeyci.com"}})
+                                    {:other-dests ["test@monkeyci.com"]}})
                 (sut/create-sent-mailing))]
       
       (testing "creates in storage"
@@ -56,26 +57,34 @@
         (is (map? (:body r)))
         (is (some? (get-in r [:body :id]))))
       
-      (testing "sends mails"
-        (let [m (-> rt
-                    :mailer
-                    :mailings
-                    deref)]
-          (is (= 1 (count m)))
-          (is (= "Test subject"
-                 (-> m first :subject)))))
+      (let [mailings (-> rt
+                         :mailer
+                         :mailings
+                         deref)]
+        (testing "sends mails"
+          (is (= 1 (count mailings))))
 
-      (testing "stored delivery"
-        (let [d (->> r
-                     :body
-                     :id
-                     (vector (:id m))
-                     (st/find-sent-mailing st))]
-          (testing "contains mailer id"
-            (is (some? (:mail-id d))))
+        (testing "wraps subject in replacement fn"
+          (let [s (-> mailings first :subject)]
+            (is (fn? s))
+            (is (= "Test subject" (s "test")))))
 
-          (testing "has `sent-at` timestamp"
-            (is (number? (:sent-at d)))))))))
+        (testing "stores delivery"
+          (let [d (->> r
+                       :body
+                       :id
+                       (vector (:id m))
+                       (st/find-sent-mailing st))]
+            (testing "contains mailer id"
+              (is (some? (:mail-id d))))
+
+            (testing "has `sent-at` timestamp"
+              (is (number? (:sent-at d))))))
+
+        (testing "substitutes `{{EMAIL}}` with email"
+          (let [b (-> mailings first :text-body)]
+            (is (= "Hi test-dest"
+                   (b "test-dest")))))))))
 
 (deftest list-destinations
   (h/with-memory-store st

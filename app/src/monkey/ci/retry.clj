@@ -62,3 +62,15 @@
   [f limit]
   (fn []
     (min (f) limit)))
+
+(defn too-many-requests? [r]
+  (= 429 (:status r)))
+
+(defn throttle
+  "Convenience function that retries the request if it returns a 429 (too many requests)
+   with maximum 10 invocations and a max delay of 60 seconds."
+  [f & [{:keys [retries max-delay]
+         :or {retries 10 max-delay 60000}}]]
+  (async-retry f {:max-retries retries
+                  :retry-if too-many-requests?
+                  :backoff (with-max (exponential-delay 1000) max-delay)}))

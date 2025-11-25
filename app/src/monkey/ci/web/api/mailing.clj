@@ -1,6 +1,7 @@
 (ns monkey.ci.web.api.mailing
   "Mailing api handlers"
   (:require [clojure.tools.logging :as log]
+            [medley.core :as mc]
             [monkey.ci
              [protocols :as p]
              [storage :as st]
@@ -46,6 +47,11 @@
      (st/list-user-emails st))
    (:other-dests m)))
 
+(defn- email-subst [txt]
+  ;; TODO Make more generic?
+  (fn [rcpt]
+    (.replace txt "{{EMAIL}}" rcpt)))
+
 (defn create-sent-mailing [req]
   (let [b (c/body req)
         st (c/req->storage req)
@@ -54,6 +60,7 @@
         mailer (:mailer (c/req->rt req))
         mail (when mailer
                (-> (select-keys m [:subject :html-body :text-body])
+                   (as-> v (mc/map-vals email-subst v))
                    (assoc :destinations (list-destinations st b))
                    (as-> m (p/send-mail mailer m))))
         r (cond-> (assoc b :id (st/new-id) :mailing-id mid :sent-at (t/now))
