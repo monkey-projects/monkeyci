@@ -230,3 +230,6 @@
 
 (def delivery-save-failed
   (error-msg "Failed to create new delivery"))
+
+(def unregister-email-failed
+  (error-msg "Failed unregister your email"))

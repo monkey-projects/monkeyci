@@ -7,3 +7,8 @@
 
 (defn reset-unregistering [db]
   (dissoc db unregistering?))
+
+(def alerts ::alerts)
+
+(defn set-alerts [db a]
+  (assoc db ::alerts a))

@@ -18,7 +18,8 @@
                             {:status 204
                              :error-code :no-error}})
      (is (some? (:martian.re-frame/martian @app-db)))
-     (rf/dispatch [:notifications/unregister-email {:id "test-id"}])
+     (is (some? (swap! app-db db/set-alerts [{:type :info :message "test alert"}])))
+     (rf/dispatch [::sut/unregister-email {:id "test-id"}])
 
      (testing "sends unregister request to backend"
        (is (= 1 (count @c)))
@@ -28,4 +29,26 @@
        (is (= "test-id" (-> @c first (nth 3) :id))))
 
      (testing "marks unregistering"
-       (is (true? (db/unregistering? @app-db)))))))
+       (is (true? (db/unregistering? @app-db))))
+
+     (testing "clears alerts"
+       (is (empty? (db/alerts @app-db)))))))
+
+(deftest unregister-email--success
+  (is (some? (reset! app-db (db/set-unregistering {}))))
+  (rf/dispatch-sync [::sut/unregister-email--success {}])
+  
+  (testing "unmarks unregistering"
+    (is (not (db/unregistering? @app-db)))))
+
+(deftest unregister-email--failed
+  (is (some? (reset! app-db (db/set-unregistering {}))))
+  (rf/dispatch-sync [::sut/unregister-email--failure {:message "test error"}])
+  
+  (testing "unmarks unregistering"
+    (is (not (db/unregistering? @app-db))))
+
+  (testing "sets alert"
+    (is (= [:danger]
+           (->> (db/alerts @app-db)
+                (map :type))))))
