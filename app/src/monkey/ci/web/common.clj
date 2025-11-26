@@ -8,12 +8,13 @@
              [storage :as st]
              [time :as t]
              [utils :as u]]
+            [monkey.ci.common.schemas :as schemas]
             [muuntaja.core :as mc]
             [reitit.ring :as ring]
             [ring.util.response :as rur]
             [schema.core :as s]))
 
-(def not-empty-str (s/constrained s/Str not-empty))
+(def not-empty-str schemas/not-empty-str)
 (def Id not-empty-str)
 (def Name not-empty-str)
 

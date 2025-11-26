@@ -538,11 +538,10 @@
                            :password s/Str}}})
 
    (public-route
-    {:route-name :delete-email-reg
-     :method :delete
-     :path-parts ["/email-registration/" :registration-id]
-     ;; TODO Allow by email address
-     :path-schema {:registration-id s/Str}})])
+    {:route-name :unregister-email
+     :method :post
+     :path-parts ["/email-registration/unregister"]
+     :query-schema cs/EmailUnregistrationQuery})])
 
 (def routes
   (concat

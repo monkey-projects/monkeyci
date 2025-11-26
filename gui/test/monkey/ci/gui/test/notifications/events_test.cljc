@@ -14,15 +14,18 @@
   (rf-test/run-test-sync
    (let [org {:name "test org"}
          c (h/catch-fx :martian.re-frame/request)]
-     (h/initialize-martian {:delete-email-reg
+     (h/initialize-martian {:unregister-email
                             {:status 204
                              :error-code :no-error}})
      (is (some? (:martian.re-frame/martian @app-db)))
-     (rf/dispatch [:notifications/unregister-email "test-id"])
+     (rf/dispatch [:notifications/unregister-email {:id "test-id"}])
 
-     (testing "sends delete request to backend"
+     (testing "sends unregister request to backend"
        (is (= 1 (count @c)))
-       (is (= :delete-email-reg (-> @c first (nth 2)))))
+       (is (= :unregister-email (-> @c first (nth 2)))))
+
+     (testing "passes params"
+       (is (= "test-id" (-> @c first (nth 3) :id))))
 
      (testing "marks unregistering"
        (is (true? (db/unregistering? @app-db)))))))

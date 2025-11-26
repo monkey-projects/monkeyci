@@ -5,10 +5,10 @@
 
 (rf/reg-event-fx
  :notifications/unregister-email
- (fn [{:keys [db]} [_ id]]
+ (fn [{:keys [db]} [_ params]]
    {:dispatch [:secure-request
-               :delete-email-reg
-               {:registration-id id}
+               :unregister-email
+               params
                [:notifications/unregister-email--success]
                [:notifications/unregister-email--failure]]
     :db (db/set-unregistering db)}))

@@ -335,6 +335,38 @@
       (is (= 200 (:status (sut/create-email-registration req))))
       (is (= 1 (count (st/list-email-registrations st)))))))
 
+(deftest unregister-email
+  (let [{st :storage :as rt} (trt/test-runtime)]
+    (testing "with `id` deletes email registration by id"
+      (let [reg (h/gen-email-registration)]
+        (is (some? (st/save-email-registration st reg)))
+        (is (= 200 (-> (h/->req rt)
+                       (assoc-in [:parameters :query :id] (:id reg))
+                       (sut/unregister-email)
+                       :status)))
+        (is (nil? (st/find-email-registration st (:id reg))))))
+    
+    (testing "with `email` deletes email registration by email"
+      (let [email "test@monkeyci.com"
+            reg (-> (h/gen-email-registration)
+                    (assoc :email email))]
+        (is (some? (st/save-email-registration st reg)))
+        (is (= 200 (-> (h/->req rt)
+                       (assoc-in [:parameters :query :email] email)
+                       (sut/unregister-email)
+                       :status)))
+        (is (nil? (st/find-email-registration st (:id reg))))))
+    
+    (testing "with `email` of user, updates user notification configuration")
+    (testing "with `user-id`, updates user notification configuration")
+
+    (testing "returns status `204` when no matches found"
+      (is (= 204
+             (-> (h/->req rt)
+                 (assoc-in [:parameters :query :id] "nonexisting")
+                 (sut/unregister-email)
+                 :status))))))
+
 (deftest trigger-build
   (h/with-memory-store st
     (letfn [(with-repo [f]

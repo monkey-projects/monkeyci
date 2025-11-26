@@ -719,3 +719,16 @@
 
           (testing "can list for mailing"
             (is (= [sm] (sut/list-sent-mailings st (:id m))))))))))
+
+(deftest email-registrations
+  (h/with-memory-store st
+    (let [r (h/gen-email-registration)]
+      (testing "can save and find"
+        (is (sid/sid? (sut/save-email-registration st r)))
+        (is (= r (sut/find-email-registration st (:id r)))))
+
+      (testing "can list"
+        (is (= [r] (sut/list-email-registrations st))))
+
+      (testing "can find by email"
+        (is (= r (sut/find-email-registration-by-email st (:email r))))))))

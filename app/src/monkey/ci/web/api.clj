@@ -292,3 +292,26 @@
       (rur/response existing)
       (when (st/save-email-registration st body)
         (rur/created (:id body) body)))))
+
+(defn- unregister-by-id [req]
+  (st/delete-email-registration (c/req->storage req)
+                                (get-in req [:parameters :query :id])))
+
+(defn- unregister-by-email [req]
+  (let [st (c/req->storage req)]
+    (when-let [m (st/find-email-registration-by-email st (get-in req [:parameters :query :email]))]
+      (st/delete-email-registration st (:id m)))))
+
+(defn unregister-email
+  "Multipurpose unregistration handler, meant to allow people to easily unsubscribe
+   from the mailing list.  It accepts a subscription id, an email or a user id.  If
+   it's an email subscription, the record is deleted.  If it's a user id or email,
+   the user settings are updated to no longer receive mailings."
+  [req]
+  (letfn [(has-param? [p req]
+            (some? (get-in req [:parameters :query p])))]
+    (if (condp has-param? req
+          :id (unregister-by-id req)
+          :email (unregister-by-email req))
+      (rur/status 200)
+      (rur/status 204))))

@@ -13,6 +13,7 @@
              [storage :as st]
              [utils :as u]
              [version :as v]]
+            [monkey.ci.common.schemas :as schemas]
             [monkey.ci.metrics.core :as metrics]
             [monkey.ci.web
              [admin :as admin]
@@ -69,8 +70,8 @@
     (wh/text-response (metrics/scrape m))
     (rur/status 204)))
 
-(def Id c/Id)
-(def Name c/Name)
+(def Id schemas/Id)
+(def Name schemas/Name)
 
 (defn- assoc-id [s]
   (assoc s (s/optional-key :id) Id))
@@ -523,11 +524,19 @@
 
 (def email-registration-routes
   ["/email-registration"
-   (c/generic-routes {:getter api/get-email-registration
-                      :creator api/create-email-registration
-                      :deleter api/delete-email-registration
-                      :id-key :email-registration-id
-                      :new-schema EmailRegistration})])
+   ["/unregister"
+    {:conflicting true
+     :post
+     {:handler api/unregister-email
+      :parameters
+      {:query schemas/EmailUnregistrationQuery}}}]
+   ["" (-> (c/generic-routes
+            {:getter api/get-email-registration
+             :creator api/create-email-registration
+             :deleter api/delete-email-registration
+             :id-key :email-registration-id
+             :new-schema EmailRegistration})
+           (u/update-nth 1 u/update-nth 1 assoc :conflicting true))]])
 
 (def routes
   [["/health" {:get health}]

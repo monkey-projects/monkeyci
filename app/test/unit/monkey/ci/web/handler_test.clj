@@ -1383,7 +1383,18 @@
                             :base-entity {:email "test@monkeyci.com"}
                             :creator st/save-email-registration
                             :can-update? false
-                            :can-delete? true}))
+                            :can-delete? true})
+
+  (testing "POST `/email-registration/unregister`"
+    (testing "returns 200 if matching user"
+      (h/with-memory-store st
+        (let [app (make-test-app st)
+              email "existing@monkeyci.com"]
+          (is (some? (st/save-email-registration st {:email email})))
+          (is (= 200
+                 (-> (mock/request :post (str "/email-registration/unregister?email=" email))
+                     (test-app)
+                     :status))))))))
 
 (deftest admin-routes
   (testing "`/admin`"
