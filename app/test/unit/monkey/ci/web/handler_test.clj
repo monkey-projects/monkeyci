@@ -1393,7 +1393,7 @@
           (is (some? (st/save-email-registration st {:email email})))
           (is (= 200
                  (-> (mock/request :post (str "/email-registration/unregister?email=" email))
-                     (test-app)
+                     (app)
                      :status))))))))
 
 (deftest admin-routes
