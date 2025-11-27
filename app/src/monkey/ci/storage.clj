@@ -957,11 +957,12 @@
        (when-let [uid (:user-id opts)]
          (let [u (find-user s uid)]
            (save-user s (update u :orgs (comp vec conj) org-id))))
-       (doseq [{:keys [amount from]} (:credits opts)]
+       (doseq [{:keys [amount from until]} (:credits opts)]
          (let [cs {:id (cuid/random-cuid)
                    :org-id org-id
                    :amount amount
-                   :valid-from from}]
+                   :valid-from from
+                   :valid-until until}]
            (when (save-credit-subscription s cs)
              (save-org-credit s {:id (cuid/random-cuid)
                                  :org-id org-id

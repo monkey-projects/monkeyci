@@ -66,11 +66,12 @@
                             first
                             :id)]
       (ec/insert-user-orgs conn uid [org-id]))
-    (doseq [{:keys [amount from]} (:credits opts)]
+    (doseq [{:keys [amount from until]} (:credits opts)]
       (let [cse {:cuid (st/new-id)
                  :org-id org-id
                  :amount amount
-                 :valid-from from}]
+                 :valid-from from
+                 :valid-until until}]
         (when-let [cs (ec/insert-credit-subscription conn cse)]
           (ec/insert-org-credit conn {:cuid (st/new-id)
                                       :org-id org-id
