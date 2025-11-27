@@ -28,12 +28,12 @@
              (mt/with-changes (mt/modified ["app/deps.edn"]))
              (sut/test-app)))))
 
-  (testing "is dependent on `publish-common` if included"
-    (is (= ["publish-common"]
+  (testing "is dependent on `test-common` if included"
+    (is (= ["test-common"]
            (-> mt/test-ctx
                (mt/with-changes (mt/modified ["app/deps.edn"
                                               "common/deps.edn"]))
-               (mt/with-git-ref ["refs/heads/main"])
+               (mt/with-git-ref "refs/heads/main")
                (sut/test-app)
                :dependencies)))))
 
@@ -113,6 +113,28 @@
 
         (testing "always publish snapshots"
           (is (m/container-job? (sut/publish ctx "publish-app" "app"))))))))
+
+(deftest publish-app
+  (let [ctx (-> mt/test-ctx
+                (mt/with-changes (mt/modified ["app/deps.edn"]))
+                (mt/with-git-ref "refs/heads/main"))]
+    (testing "depends on `test-app`"
+      (is (contains?
+           (-> ctx
+               (sut/publish-app)
+               :dependencies
+               (set))
+           "test-app")))
+    
+    (testing "is dependent on `publish-common` if included"
+      (is (contains?
+           (-> ctx
+               (mt/with-changes (mt/modified ["app/deps.edn"
+                                              "common/deps.edn"]))
+               (sut/publish-app)
+               :dependencies
+               (set))
+           "publish-common")))))
 
 (deftest scw-images
   (testing "`nil` if no images published"

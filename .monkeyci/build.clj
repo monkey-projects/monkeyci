@@ -116,7 +116,7 @@
                           :should-test? build-app?})
           (update :save-artifacts conj (coverage-artifact "app"))
           (cond->
-            (build-common? ctx) (m/depends-on ["publish-common"]))))
+            (build-common? ctx) (m/depends-on ["test-common"]))))
 
 (defn test-test-lib [ctx]
   (run-tests ctx {:id "test-test-lib"
@@ -267,7 +267,8 @@
 (defn publish-app [ctx]
   (when (publish-app? ctx)
     (some-> (publish ctx "publish-app" "app")
-            (m/depends-on ["test-app"]))))
+            (m/depends-on (cond-> ["test-app"]
+                            (publish-common? ctx) (conj "publish-common"))))))
 
 (defn publish-test-lib [ctx]
   (when (publish-test-lib? ctx)
