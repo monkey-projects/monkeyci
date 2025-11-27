@@ -50,17 +50,6 @@
   {:name s/Str
    :value s/Str})
 
-(s/defschema UpdateRepo
-  {:org-id s/Str
-   :name s/Str
-   :url s/Str
-   (s/optional-key :main-branch) s/Str
-   (s/optional-key :public) s/Bool
-   (s/optional-key :github-id) s/Int
-   (s/optional-key :labels) [Label]})
-
-(def NewRepo UpdateRepo)
-
 (s/defschema log-query-schema
   {:query s/Str
    :direction s/Str
@@ -178,14 +167,14 @@
      :method :post
      :path-parts (into org-path ["/repo"])
      :path-schema org-schema
-     :body-schema {:repo NewRepo}})
+     :body-schema {:repo cs/NewRepo}})
 
    (api-route
     {:route-name :update-repo
      :method :put
      :path-parts repo-path
      :path-schema repo-schema
-     :body-schema {:repo UpdateRepo}})
+     :body-schema {:repo cs/UpdateRepo}})
 
    (api-route
     {:route-name :delete-repo

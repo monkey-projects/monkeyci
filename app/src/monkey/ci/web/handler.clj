@@ -76,10 +76,6 @@
 (defn- assoc-id [s]
   (assoc s (s/optional-key :id) Id))
 
-(s/defschema Label
-  {:name Name
-   :value c/not-empty-str})
-
 (s/defschema NewOrg
   {:name Name})
 
@@ -97,26 +93,13 @@
 (s/defschema UpdateWebhook
   (assoc-id NewWebhook))
 
-(s/defschema NewRepo
-  {:org-id Id
-   :name Name
-   :url s/Str
-   (s/optional-key :main-branch) Id
-   (s/optional-key :labels) [Label]
-   (s/optional-key :public) s/Bool})
-
-(s/defschema UpdateRepo
-  (-> NewRepo
-      (assoc-id)
-      (assoc (s/optional-key :github-id) s/Int)))
-
 (s/defschema WatchGithubRepo
-  (-> NewRepo
-      (assoc-id)
+  (-> schemas/UpdateRepo
+      (dissoc (s/optional-key :github-id))
       (assoc :github-id s/Int)))
 
 (s/defschema WatchBitBucketRepo
-  (-> NewRepo
+  (-> schemas/NewRepo
       (assoc-id)
       (assoc :workspace s/Str
              :repo-slug s/Str
@@ -316,8 +299,8 @@
            :updater repo-api/update-repo
            :getter  repo-api/get-repo
            :deleter repo-api/delete-repo
-           :new-schema NewRepo
-           :update-schema UpdateRepo
+           :new-schema schemas/NewRepo
+           :update-schema schemas/UpdateRepo
            :id-key :repo-id
            :child-routes [repo-parameter-routes
                           repo-ssh-keys-routes

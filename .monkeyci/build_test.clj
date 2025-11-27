@@ -125,7 +125,7 @@
                :dependencies
                (set))
            "test-app")))
-    
+
     (testing "is dependent on `publish-common` if included"
       (is (contains?
            (-> ctx

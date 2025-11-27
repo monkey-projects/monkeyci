@@ -268,6 +268,8 @@
   (when (publish-app? ctx)
     (some-> (publish ctx "publish-app" "app")
             (m/depends-on (cond-> ["test-app"]
+                            ;; TODO Since this job may also be excluded depending
+                            ;; on clojars, this could still be incorrect
                             (publish-common? ctx) (conj "publish-common"))))))
 
 (defn publish-test-lib [ctx]
