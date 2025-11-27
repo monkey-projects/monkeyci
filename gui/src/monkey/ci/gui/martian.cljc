@@ -83,16 +83,6 @@
    :public-key s/Str
    :label-filters [LabelFilterDisjunction]})
 
-(s/defschema UserCredits
-  {:amount s/Int
-   (s/optional-key :reason) s/Str
-   :from-time s/Int})
-
-(s/defschema CreditSubscription
-  {:amount s/Int
-   :valid-from s/Int
-   (s/optional-key :valid-until) s/Int})
-
 (s/defschema NewWebhook
   {:org-id s/Str
    :repo-id s/Str})
@@ -288,7 +278,7 @@
     {:route-name :create-credit-issue
      :path-parts ["/admin/credits/" :org-id "/issue"]
      :path-schema org-schema
-     :body-schema {:credits UserCredits}
+     :body-schema {:credits cs/UserCredits}
      :method :post})
 
    (api-route
@@ -307,7 +297,7 @@
     {:route-name :create-credit-sub
      :path-parts ["/admin/credits/" :org-id "/subscription"]
      :path-schema org-schema
-     :body-schema {:sub CreditSubscription}
+     :body-schema {:sub cs/CreditSubscription}
      :method :post})])
 
 (def token-routes

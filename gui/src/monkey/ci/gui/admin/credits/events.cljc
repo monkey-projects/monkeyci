@@ -154,7 +154,7 @@
    {:dispatch [:secure-request
                :create-credit-sub
                {:sub
-                (-> (select-keys params [:reason :amount :valid-from :valid-until])
+                (-> (select-keys params [:description :amount :valid-from :valid-until])
                     (as-> t (mc/map-vals first t))
                     (mc/update-existing :valid-from date->epoch)
                     (mc/update-existing :valid-until date->epoch)

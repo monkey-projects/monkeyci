@@ -157,7 +157,10 @@
    {:id ::credits
     :items-sub [:credits/subs]
     :loading {:sub [:credits/subs-loading?]}
-    :columns (-> [{:label "Valid from"
+    :columns (-> [{:label "Description"
+                   :value :description
+                   :sorter (t/prop-sorter :description)}
+                  {:label "Valid from"
                    :value (formatted-time :valid-from)
                    :sorter (t/prop-sorter :valid-from)}
                   {:label "Valid until"
@@ -166,7 +169,7 @@
                   {:label "Amount"
                    :value :amount
                    :sorter (t/prop-sorter :amount)}]
-                 (t/add-sorting 0 :desc))}])
+                 (t/add-sorting 1 :desc))}])
 
 (defn- sub-save-btn []
   (save-btn [:credits/sub-saving?]))
@@ -174,6 +177,7 @@
 (defn- sub-credits-form []
   [:form
    {:on-submit (f/submit-handler [:credits/save-sub])}
+   [form-input :description "Description" :text]
    [form-input :amount "Credit amount" :number]
    [form-input :valid-from "Valid from" :date "The date the subscription becomes active."]
    [form-input :valid-until "Valid until" :date "Optional date the subscription ends."]
