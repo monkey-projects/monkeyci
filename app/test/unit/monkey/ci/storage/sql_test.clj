@@ -117,8 +117,8 @@
           _ (st/save-user s user)
           res (st/init-org s {:org org
                               :user-id (:id user)
-                              :credits {:amount 1000
-                                        :from (t/now)}
+                              :credits [{:amount 1000
+                                         :from (t/now)}]
                               :dek "test-dek"})]
       
       (testing "creates new org"

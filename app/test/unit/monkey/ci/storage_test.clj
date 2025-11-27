@@ -50,8 +50,8 @@
 
       (let [res (sut/init-org st {:org org
                                   :user-id (:id user)
-                                  :credits {:amount 1000
-                                            :from (t/now)}
+                                  :credits [{:amount 1000
+                                             :from (t/now)}]
                                   :dek "test-dek"})]
         (is (sid/sid? res))
 
@@ -66,7 +66,7 @@
           (is (= [(:id org)] (->> (sut/list-user-orgs st (:id user))
                                   (map :id)))))
 
-        (testing "creates credit subscription"
+        (testing "creates credit subscriptions"
           (let [cs (sut/list-org-credit-subscriptions st (:id org))]
             (is (= 1 (count cs)))
             (is (= 1000 (-> cs first :amount)))))

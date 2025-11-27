@@ -101,6 +101,7 @@
    :jvm-opts ["-Dlogback.configurationFile=resources/logback.xml"]}
 
   ;; clj -M:test:e2e
+  ;; Set MONKEYCI_URL env
   :e2e
   {:main-opts ["-m" "kaocha.runner"
                "-c" "kaocha/e2e.edn"]

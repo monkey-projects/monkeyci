@@ -49,8 +49,8 @@
           org (assoc (c/body req) :id org-id)
           res (st/init-org st {:org org
                                :user-id (-> req :identity :id)
-                               :credits {:amount config/free-credits
-                                         :from (t/now)}
+                               :credits [{:amount config/free-credits
+                                          :from (t/now)}]
                                :dek (:enc (crypto/generate-dek req org-id))})]
       (-> (st/find-org st (last res))
           (rur/response)

@@ -34,6 +34,31 @@
                      (c/try-parse-body)
                      :orgs))))
 
+        (testing "repo"
+          (let [repo {:org-id (:id org)
+                      :name "test repo"
+                      :url "http://github.com/test"
+                      :main-branch "main"}
+                path (str "/org/" (:id org) "/repo")
+                reply (request :post path repo)
+                repo-id (:id (c/try-parse-body reply))]
+            (testing "can create"
+              (is (= 201 (:status reply)))
+              (is (string? repo-id)))
+
+            (testing "can update"
+              (is (= 200 (-> (request :put (str path "/" repo-id)
+                                      (assoc repo :github-id 1234))
+                             :status))))
+
+            (testing "can create with github id"
+              (is (= 201 (->> {:org-id (:id org)
+                               :name "other repo"
+                               :url "http://github.com/other"
+                               :github-id 5678}
+                              (request :post path)
+                              :status))))))
+        
         (testing "can delete org"
           (is (= 204 (-> (request :delete (str "/org/" (:id org)))
                          :status))))))

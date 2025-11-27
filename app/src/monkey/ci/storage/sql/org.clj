@@ -66,7 +66,7 @@
                             first
                             :id)]
       (ec/insert-user-orgs conn uid [org-id]))
-    (when-let [{:keys [amount from]} (:credits opts)]
+    (doseq [{:keys [amount from]} (:credits opts)]
       (let [cse {:cuid (st/new-id)
                  :org-id org-id
                  :amount amount
