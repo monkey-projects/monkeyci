@@ -657,7 +657,8 @@
           cs (-> (h/gen-credit-subs)
                  (assoc :org-id (:id org)
                         :valid-from (- now 1000)
-                        :valid-until (+ now 1000)))
+                        :valid-until (+ now 1000)
+                        :description "Test subscription"))
           sid (st/credit-sub-sid (:id org) (:id cs))]
       (is (sid/sid? (st/save-org s org)))
 

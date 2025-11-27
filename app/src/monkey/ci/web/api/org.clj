@@ -43,14 +43,20 @@
                           :saver save-org
                           :deleter st/delete-org})
 
+(defn auto-subs
+  "Automatically assigned subscriptions.  These can be temporary actions as well."
+  []
+  [{:amount config/free-credits
+    :from (t/now)
+    :description "Basic free subscription"}])
+
 (defn create-org [req]
   (st/with-transaction (c/req->storage req) st
     (let [org-id (cuid/random-cuid)
           org (assoc (c/body req) :id org-id)
           res (st/init-org st {:org org
                                :user-id (-> req :identity :id)
-                               :credits [{:amount config/free-credits
-                                          :from (t/now)}]
+                               :credits (auto-subs)
                                :dek (:enc (crypto/generate-dek req org-id))})]
       (-> (st/find-org st (last res))
           (rur/response)

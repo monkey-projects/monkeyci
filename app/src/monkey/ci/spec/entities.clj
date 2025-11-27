@@ -141,7 +141,7 @@
 
 (s/def :entity/credit-subscription
   (-> (s/keys :req-un [:entity/org-id :entity/amount :entity/valid-from]
-              :opt-un [:entity/valid-until])
+              :opt-un [:entity/valid-until :entity/description])
       (s/merge :entity/common)))
 
 (s/def :entity/from-time ts?)

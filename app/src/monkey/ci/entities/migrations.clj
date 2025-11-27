@@ -699,7 +699,14 @@
      [:to-subscribers :boolean]
      [:other-dests :text]
      (fk :mailing-id :mailings :id)]
-    [(col-idx :sent-mailings :mailing-id)])])
+    [(col-idx :sent-mailings :mailing-id)])
+
+   (migration
+    (mig-id 55 :sub-description)
+    [{:alter-table :credit-subscriptions
+      :add-column [:description [:varchar 300]]}]
+    [{:alter-table :credit-subscriptions
+      :drop-column :description}])])
 
 (defn prepare-migrations
   "Prepares all migrations by formatting to sql, creates a ragtime migration object from it."
