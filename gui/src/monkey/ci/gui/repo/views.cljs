@@ -5,7 +5,7 @@
             [monkey.ci.gui.forms :as f]
             [monkey.ci.gui.layout :as l]
             [monkey.ci.gui.modals :as m]
-            [monkey.ci.gui.repo.events]
+            [monkey.ci.gui.repo.events :as e]
             [monkey.ci.gui.repo.subs]
             [monkey.ci.gui.repo-settings.views :as settings]
             [monkey.ci.gui.routing :as r]
@@ -266,34 +266,37 @@
     (cs/includes? url "github.com")))
 
 (defn- github-id-input [r]
-  (let [gh? (github-url? r)]
-    [:<>
-     [:label.form-label {:for :github-id} "Github Id"]
-     [:div.input-group
-      [:input.form-control
-       {:id :github-id
-        :name :github-id
-        :value (:new-github-id r)
-        :read-only (not gh?)
-        :disabled (not gh?)
-        :maxlength 20
-        :on-change (u/form-evt-handler [:repo/github-id-changed])}]
-      (if (nil? (:github-id r))
-        [:button.btn.btn-icon
-         {:class :btn-primary
-          :title "Look up the Github id for this repo"
-          :type :button
-          :on-click (u/link-evt-handler [:repo/lookup-github-id {:monkeyci/repo r}])}
-         [co/icon :eye]]
-        ;; Only allow unwatching if the original repo had an id
-        [:button.btn.btn-icon
-         {:class :btn-danger
-          :title "Stop watching this repo"
-          :type :button
-          :on-click (u/link-evt-handler [:repo/unwatch-github {:monkeyci/repo r}])}
-         [co/icon :eye-slash]])]
-     [:span.form-text {:id :github-id-help}
-      "If you have installed the Github MonkeyCI app, the native id is used for watching the repo."]]))
+  (fn [r]
+    (let [gh? (github-url? @r)]
+      [:<>
+       [:label.form-label {:for :github-id} "Github Id"]
+       [:div.input-group
+        [:input.form-control
+         {:id :github-id
+          :name :github-id
+          :value (:github-id @r)
+          :read-only (not gh?)
+          :disabled (not gh?)
+          :maxlength 20
+          :on-change (u/form-evt-handler [:repo/github-id-changed])}]
+        (if (nil? (:github-id @r))
+          [:button.btn.btn-icon
+           {:class :btn-primary
+            :title "Look up the Github id for this repo"
+            :read-only (not gh?)
+            :disabled (not gh?)
+            :type :button
+            :on-click (u/link-evt-handler [:repo/lookup-github-id {:monkeyci/repo @r}])}
+           [co/icon :eye]]
+          ;; Only allow unwatching if the original repo had an id
+          [:button.btn.btn-icon
+           {:class :btn-danger
+            :title "Stop watching this repo"
+            :type :button
+            :on-click (u/link-evt-handler [::e/unwatch-github {:monkeyci/repo @r}])}
+           [co/icon :eye-slash]])]
+       [:span.form-text {:id :github-id-help}
+        "If you have installed the Github MonkeyCI app, the native id is used for watching the repo."]])))
 
 (defn- edit-form [close-btn]
   (let [e (rf/subscribe [:repo/editing])]
@@ -338,7 +341,7 @@
          {:for :public}
          "Public visibility"]]
        [:div.mb-2
-        [github-id-input @e]]]
+        [github-id-input e]]]
       [:div.col
        [:h5 [co/icon-text :tags "Labels"]]
        [:p.text-body-secondary

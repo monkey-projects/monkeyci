@@ -207,7 +207,7 @@
                     (filter (comp (partial = repo-id) :id))
                     (first))]
      {:dispatch [:org/load--success resp]
-      :db (db/set-editing db (assoc match :new-github-id (str (:github-id match))))})))
+      :db (db/set-editing db (mc/update-existing match :github-id str))})))
 
 (rf/reg-event-db
  :repo/load+edit--failed
@@ -238,7 +238,7 @@
 (rf/reg-event-db
  :repo/github-id-changed
  (fn [db [_ v]]
-   (assoc-in db [db/editing :new-github-id] v)))
+   (assoc-in db [db/editing :github-id] v)))
 
 (rf/reg-event-db
  :repo/label-add
@@ -260,11 +260,13 @@
  (fn [db [_ lbl new-name]]
    (db/update-label db lbl assoc :value new-name)))
 
+(rf/reg-event-db
+ ::unwatch-github
+ (fn [db _]
+   (db/update-editing db dissoc :github-id)))
+
 (defn- parse-github-id [repo]
-  (let [id (:new-github-id repo)]
-    (cond-> repo
-      true (dissoc :new-github-id)
-      (not-empty id) (assoc :github-id (some-> id u/parse-int)))))
+  (mc/update-existing repo :github-id u/parse-int))
 
 (rf/reg-event-fx
  :repo/save
@@ -358,7 +360,7 @@
 (rf/reg-event-db
  :repo/lookup-github-id--success
  (fn [db [_ {:keys [id]}]]
-   (db/update-editing db assoc :new-github-id (str id))))
+   (db/update-editing db assoc :github-id (str id))))
 
 (rf/reg-event-fx
  :repo/lookup-github-id--failed
