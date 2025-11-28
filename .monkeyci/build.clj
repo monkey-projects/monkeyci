@@ -3,81 +3,17 @@
   (:require [babashka.fs :as fs]
             [clojars :as clojars]
             [clojure.string :as cs]
+            [config :as config]
             [medley.core :as mc]
             [minio :as minio]
             [monkey.ci.api :as m]
-            [monkey.ci.build
-             [api :as api]
-             [core :as core]]
+            [monkey.ci.build.api :as api]
             [monkey.ci.ext.junit]
             [monkey.ci.plugin
              [github :as gh]
              [kaniko :as kaniko]
-             [pushover :as po]]))
-
-(def tag-regex #"^refs/tags/(\d+\.\d+\.\d+(\.\d+)?$)")
-
-(defn ref?
-  "Returns a predicate that checks if the ref matches the given regex"
-  [re]
-  #(core/ref-regex % re))
-
-(def release?
-  (ref? tag-regex))
-
-(def api-trigger?
-  (comp (partial = :api)
-        m/source))
-
-(def should-publish?
-  (some-fn m/main-branch? release?))
-
-(defn- dir-changed?
-  "True if files have been touched for the given regex, or the 
-   build was triggered from the api."
-  [ctx re]
-  (or (m/touched? ctx re)      
-      (api-trigger? ctx)))
-
-(defn app-changed? [ctx]
-  (dir-changed? ctx #"^app/.*"))
-
-(defn gui-changed? [ctx]
-  (dir-changed? ctx #"^gui/.*"))
-
-(defn test-lib-changed? [ctx]
-  (dir-changed? ctx #"^test-lib/.*"))
-
-(defn common-changed? [ctx]
-  (dir-changed? ctx #"^common/.*"))
-
-(def build-app? (some-fn app-changed? release? m/manual?))
-(def build-gui? (some-fn gui-changed? release? m/manual?))
-(def build-test-lib? (some-fn test-lib-changed? release? m/manual?))
-(def build-common? (some-fn common-changed? release? m/manual?))
-
-(def publish-app? (some-fn (every-pred app-changed? should-publish?)
-                           release?))
-(def publish-gui? (some-fn (every-pred gui-changed? should-publish?)
-                           release?))
-(def publish-test-lib? (some-fn (every-pred test-lib-changed? should-publish?) release?))
-(def publish-common? (some-fn (every-pred common-changed? should-publish?) release?))
-
-(defn tag-version
-  "Extracts the version from the tag"
-  [ctx]
-  (some->> (m/git-ref ctx)
-           (re-matches tag-regex)
-           (second)))
-
-(defn image-version
-  "Retrieves image version from the tag, or the build id if this is the main branch."
-  [ctx]
-  ;; Prefix prod images with "release" for image retention policies
-  (or (some->> (tag-version ctx) (str "release-"))
-      (m/build-id ctx)
-      ;; Fallback
-      "latest"))
+             [pushover :as po]]
+            [predicates :as p]))
 
 (defn clj-container 
   "Executes script in clojure container"
@@ -113,20 +49,20 @@
   (some-> (run-tests ctx {:id "test-app"
                           :dir "app"
                           :cmd "-M:test:coverage"
-                          :should-test? build-app?})
+                          :should-test? p/build-app?})
           (update :save-artifacts conj (coverage-artifact "app"))
           (cond->
-            (build-common? ctx) (m/depends-on ["test-common"]))))
+            (p/build-common? ctx) (m/depends-on ["test-common"]))))
 
 (defn test-test-lib [ctx]
   (run-tests ctx {:id "test-test-lib"
                   :dir "test-lib"
-                  :should-test? build-test-lib?}))
+                  :should-test? p/build-test-lib?}))
 
 (defn test-common [ctx]
   (run-tests ctx {:id "test-common"
                   :dir "common"
-                  :should-test? build-common?}))
+                  :should-test? p/build-common?}))
 
 (def uberjar-artifact
   (m/artifact "uberjar" "app/target/monkeyci-standalone.jar"))
@@ -138,8 +74,8 @@
   (update art :path (comp str fs/parent)))
 
 (defn app-uberjar [ctx]
-  (when (publish-app? ctx)
-    (let [v (tag-version ctx)]
+  (when (p/publish-app? ctx)
+    (let [v (config/tag-version ctx)]
       (cond-> (-> (clj-container "app-uberjar" "app" "-X:jar:uber")
                   (m/depends-on ["test-app"])
                   (m/save-artifacts uberjar-artifact))
@@ -160,14 +96,14 @@
   "Job that uploads the uberjar to configured s3 bucket.  From there it 
    will be downloaded by Ansible scripts."
   [ctx]
-  (when (publish-app? ctx)
+  (when (p/publish-app? ctx)
     (-> (m/action-job
          "upload-uberjar"
          (fn [ctx]
            (upload-to-bucket
             ctx
             #(minio/put-s3-file %1 %2
-                                (format "monkeyci/%s.jar" (image-version ctx))
+                                (format "monkeyci/%s.jar" (config/image-version ctx))
                                 (m/in-work ctx (:path uberjar-artifact))))))
         (m/depends-on ["app-uberjar"])
         (m/restore-artifacts [(as-dir uberjar-artifact)]))))
@@ -177,10 +113,10 @@
    script contents."
   [ctx]
   (cs/replace (slurp (m/in-work ctx "app/dev-resources/install-cli.sh"))
-              "{{version}}" (tag-version ctx)))
+              "{{version}}" (config/tag-version ctx)))
 
 (defn upload-install-script [ctx]
-  (when (release? ctx)
+  (when (p/release? ctx)
     (-> (m/action-job
          "upload-install-script"
          (fn [ctx]
@@ -193,27 +129,12 @@
                                     (count script))))))
         (m/depends-on ["upload-uberjar"]))))
 
-(def img-base "rg.fr-par.scw.cloud/monkeyci")
-(def app-img (str img-base "/monkeyci-api"))
-(def gui-img (str img-base "/monkeyci-gui"))
-
-(defn oci-app-image [ctx]
-  (str app-img ":" (image-version ctx)))
-
-(defn archs [_]
-  ;; Use fallback for safety
-  #_(or (m/archs ctx) [:amd])
-  ;; Using single arch for now.  When using a container agent, it may happen that
-  ;; multiple builds run on the same agent but for different architectures, which may
-  ;; mess up the result (e.g. amd container but actually arm arch)
-  [:amd])
-
 (defn build-app-image [ctx]
-  (when (publish-app? ctx)
+  (when (p/publish-app? ctx)
     (kaniko/multi-platform-image
      {:dockerfile "docker/Dockerfile"
-      :archs (archs ctx)
-      :target-img (oci-app-image ctx)
+      :args (config/archs ctx)
+      :target-img (config/app-image ctx)
       :image
       {:job-id "publish-app-img"
        :container-opts
@@ -242,15 +163,15 @@
    {:job-id (str id "-manifest")}})
 
 (defn build-gui-image [ctx]
-  (when (publish-gui? ctx)
+  (when (p/publish-gui? ctx)
     (kaniko/multi-platform-image
-     (gui-image-config "gui-img" gui-img (image-version ctx) (archs ctx))
+     (gui-image-config "gui-img" config/gui-img (config/image-version ctx) (config/archs ctx))
      ctx)))
 
 (defn publish 
   "Executes script in clojure container that has clojars publish env vars"
   [ctx id dir & [version]]
-  (let [v (or version (tag-version ctx))]
+  (let [v (or version (config/tag-version ctx))]
     ;; If this is a release, and it's already been deployed, then skip this.
     ;; This is to be able to re-run a release build when a job down the road has
     ;; previously failed.
@@ -265,22 +186,22 @@
             (assoc :container/env env))))))
 
 (defn publish-app [ctx]
-  (when (publish-app? ctx)
+  (when (p/publish-app? ctx)
     (some-> (publish ctx "publish-app" "app")
             (m/depends-on (cond-> ["test-app"]
                             ;; TODO Since this job may also be excluded depending
                             ;; on clojars, this could still be incorrect
-                            (publish-common? ctx) (conj "publish-common"))))))
+                            (p/publish-common? ctx) (conj "publish-common"))))))
 
 (defn publish-test-lib [ctx]
-  (when (publish-test-lib? ctx)
+  (when (p/publish-test-lib? ctx)
     ;; TODO Overwrite monkeyci version if necessary
-    ;; (format "-Sdeps '{:override-deps {:mvn/version \"%s\"}}'" (tag-version ctx))
+    ;; (format "-Sdeps '{:override-deps {:mvn/version \"%s\"}}'" (config/tag-version ctx))
     (some-> (publish ctx "publish-test-lib" "test-lib")
             (m/depends-on ["test-test-lib"]))))
 
 (defn publish-common [ctx]
-  (when (publish-common? ctx)
+  (when (p/publish-common? ctx)
     (some-> (publish ctx "publish-common" "common")
             (m/depends-on ["test-common"]))))
 
@@ -300,7 +221,7 @@
                  (m/cache "node-modules" "node_modules")])))
 
 (defn test-gui [ctx]
-  (when (build-gui? ctx)
+  (when (p/build-gui? ctx)
     (let [art-id "junit-gui"
           junit "junit.xml"]
       (-> (shadow-release "test-gui" :test/node)
@@ -311,10 +232,10 @@
                          :path junit})))))
 
 (defn- gen-idx [ctx type]
-  (format "clojure -X%s:gen-%s" (if (release? ctx) "" ":staging") (name type)))
+  (format "clojure -X%s:gen-%s" (if (p/release? ctx) "" ":staging") (name type)))
 
 (defn build-gui-release [ctx]
-  (when (publish-gui? ctx)
+  (when (p/publish-gui? ctx)
     (-> (shadow-release "release-gui" :frontend)
         (m/depends-on ["test-gui"])
         ;; Also generate index pages for app and admin sites
@@ -327,13 +248,13 @@
   "Generates a job that patches the scw-images repo in order to build a new
    Scaleway-specific image, using the version associated with this build."
   [ctx]
-  (let [v (image-version ctx)
+  (let [v (config/image-version ctx)
         patches (->> [{:dir "api"
                        :dep "app-img-manifest"
-                       :checker publish-app?}
+                       :checker p/publish-app?}
                       {:dir "gui"
                        :dep "gui-img-manifest"
-                       :checker publish-gui?}]
+                       :checker p/publish-gui?}]
                      (filter (fn [{:keys [checker]}]
                                (checker ctx)))
                      (map (fn [{:keys [dir dep]}]
@@ -351,9 +272,9 @@
           (m/depends-on (map :dep patches))))))
 
 (defn notify [ctx]
-  (when (release? ctx)
+  (when (p/release? ctx)
     (po/pushover-msg
-     {:msg (str "MonkeyCI version " (tag-version ctx) " has been released.")
+     {:msg (str "MonkeyCI version " (config/tag-version ctx) " has been released.")
       :dependencies ["app-img-manifest" "gui-img-manifest"]})))
 
 ;; List of jobs

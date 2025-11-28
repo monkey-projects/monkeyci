@@ -1,6 +1,7 @@
 (ns build-test
   (:require [clojure.test :refer [deftest testing is]]
             [build :as sut]
+            [config :as config]
             [clojars :as clojars]
             [minio :as minio]
             [clojure.string :as cs]
@@ -11,15 +12,15 @@
 (deftest tag-version
   (testing "returns valid version"
     (is (= "0.1.0"
-           (sut/tag-version {:build
-                             {:git
-                              {:ref "refs/tags/0.1.0"}}}))))
+           (config/tag-version {:build
+                                {:git
+                                 {:ref "refs/tags/0.1.0"}}}))))
 
   (testing "`nil` if not a version number"
     (is (nil?
-         (sut/tag-version {:build
-                           {:git
-                            {:ref "refs/tags/other"}}})))))
+         (config/tag-version {:build
+                              {:git
+                               {:ref "refs/tags/other"}}})))))
 
 (deftest test-app
   (testing "creates job if app files changed"
