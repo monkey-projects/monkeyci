@@ -61,6 +61,7 @@
   (emi/update-state ctx assoc ::initial-job-ctx job-ctx))
 
 (def get-initial-job-ctx (comp ::initial-job-ctx emi/get-state))
+(def get-job-filter (comp :filter emi/get-state))
 
 (defn get-job-ctx
   "Gets or creates a job context from the state for the current job."
@@ -102,7 +103,10 @@
   (letfn [(encrypt-env [encrypter job]
             (letfn [(encrypt-val [v]
                       (@encrypter v))]
-              (mc/update-existing job :container/env (partial mc/map-vals encrypt-val))))]
+              (mc/update-existing job :container/env (partial mc/map-vals encrypt-val))))
+          (filter-jobs [f jobs]
+            (cond->> jobs
+              f (j/filter-jobs (if (fn? f) f (comp (set f) j/job-id)))))]
     {:name ::load-jobs
      :enter (fn [ctx]
               (let [build (get-build ctx)
@@ -113,8 +117,10 @@
                                       iv (v/cuid->iv (b/org-id build))]
                                   (fn [v]
                                     (vc/encrypt dek iv v))))]
-                (log/debug "Loading script jobs using context" job-ctx)
+                (log/debug "Loading script jobs using context" job-ctx
+                           "and filter" (get-job-filter ctx))
                 (->> (s/load-jobs (get-build ctx) job-ctx)
+                     (filter-jobs (get-job-filter ctx))
                      (group-by j/job-id)
                      ;; Encrypt container env vars (possibly sensitive information)
                      ;; FIXME Scripts may want to read back the env vars passed to
@@ -297,9 +303,10 @@
       (select-keys [:artifacts :cache :mailman :build :archs])
       (assoc :api {:client (:api-client conf)})))
 
-(defn make-routes [{:keys [build] :as conf}]
-  (let [state (emi/with-state (atom {:build build
-                                     ::initial-job-ctx (make-job-ctx conf)}))]
+(defn make-routes [{:keys [result] :as conf}]
+  (let [state (emi/with-state (atom (-> conf
+                                        (select-keys [:build :filter])
+                                        (assoc ::initial-job-ctx (make-job-ctx conf)))))]
     [[:script/initializing
       [{:handler script-init
         :interceptors [handle-script-error
@@ -315,7 +322,7 @@
      [:script/end
       [{:handler script-end
         :interceptors [emi/no-result
-                       (emi/realize-deferred (:result conf))]}]]
+                       (emi/realize-deferred result)]}]]
 
      [:job/queued
       ;; Raised when a new job is queued.  This handler splits it up according to

@@ -117,6 +117,7 @@
   (-> (select-keys opts [:mailman :lib-coords :log-opts :podman])
       (lc/set-build (config->build opts))
       (lc/set-quiet (:quiet args))
+      (lc/set-job-filter (:filter args))
       (lc/set-params (concat (parse-params (:param args))
                              (load-param-files (:param-file args))))
       (lc/set-global-api (-> (select-keys (:account opts) [:url :token])
@@ -125,7 +126,7 @@
 (defn run-build-local
   "Run a build locally, normally from local source but can also be from a git checkout.
    Returns a deferred that will hold zero if the build succeeds, nonzero if it fails."
-  [{:keys [args] :as config}]
+  [config]
   (let [wd (fs/create-temp-dir)
         conf (-> (cli->rt-conf config)
                  (lc/set-work-dir wd))

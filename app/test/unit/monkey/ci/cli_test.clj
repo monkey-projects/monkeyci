@@ -103,7 +103,14 @@
                        (-> (run-cli "build"
                                     "--api-key" "test-key"
                                     "run")
-                           (get-in [:args :api-key]))))))
+                           (get-in [:args :api-key])))))
+
+              (testing "accepts job filter"
+                (is (= ["test-job"]
+                       (-> (run-cli "build"
+                                    "run"
+                                    "--filter" "test-job")
+                           (get-in [:args :filter]))))))
             
             #_(testing "`watch` subcommand"
                 (testing "runs `watch` command"

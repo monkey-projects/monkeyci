@@ -46,7 +46,8 @@
 (defn auto-subs
   "Automatically assigned subscriptions.  These can be temporary actions as well."
   []
-  ;; TODO Make this configurable?
+  ;; TODO Make this configurable.  Initially read it from app config, later we
+  ;; could introduce some kind of template entity for this.
   [{:amount config/free-credits
     :from (t/now)
     :description "Basic free subscription"}

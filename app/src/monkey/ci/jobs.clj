@@ -152,12 +152,12 @@
             (em/post-events (:mailman ctx) [(job-executed-evt (job-id job) build-sid r)])
             (constantly r)))))))
 
-(defn- find-dependents
+(defn find-dependents
   "Finds all jobs that are dependent on this job"
   [job others]
   (letfn [(dependent? [j]
             (and (some? (deps j))
-                 ((deps j) job)))]
+                 ((set (deps j)) job)))]
     (filterv dependent? others)))
 
 (defn- find-job
@@ -276,6 +276,23 @@
       (if (= p r)
         (vals r)
         (recur r (add-missing-deps r))))))
+
+;; Alternative algorithm
+#_(defn filter-jobs
+    "Applies filter fn to the given list of jobs, but also includes any dependencies."
+    [f jobs]
+    (let [by-id (->> (group-by j/job-id jobs)
+                     (mc/map-vals first))]
+      (loop [r {}
+             ;; Use set for deduplication
+             todo (set (filter f jobs))]
+        (if (empty? todo)
+          (vals r)
+          (let [n (first todo)]
+            (recur (assoc r (j/job-id n) n)
+                   (-> (rest todo)
+                       (concat (map by-id (j/deps n)))
+                       (set))))))))
 
 (defn label-filter
   "Predicate function that matches a job by its labels"

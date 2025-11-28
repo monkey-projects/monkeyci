@@ -7,7 +7,9 @@
              [edn :as edn]
              [git :as git]]
             [monkey.ci.events.mailman.interceptors :as emi]
-            [monkey.ci.local.events :as sut]
+            [monkey.ci.local
+             [config :as lc]
+             [events :as sut]]
             [monkey.ci.script.config :as sc]
             [monkey.ci.test
              [helpers :as h]
@@ -72,6 +74,18 @@
                  :jobs
                  (get "test-job")))))))
 
+(deftest add-build-opts
+  (let [{:keys [enter] :as i} (sut/add-build-opts
+                               (lc/set-job-filter {} ["test-filter"]))]
+    (is (keyword? (:name i)))
+
+    (testing "sets job filter in context"
+      (is (= ["test-filter"]
+             (-> {}
+                 (enter)
+                 (sut/get-build-opts)
+                 :filter))))))
+
 (defn- has-interceptor? [routes evt id]
   (contains? (->> routes
                   (into {})
@@ -130,6 +144,7 @@
                             :token "test-token"})
               (sut/set-child-opts {:log-config "test-config.xml"
                                    :lib-coords {:mvn/version "test"}})
+              (sut/set-build-opts {:filter ["test-filter"]})
               (sut/prepare-child-cmd))]
     (testing "starts child process command"
       (testing "in script dir"
@@ -147,7 +162,10 @@
             (let [api (sc/api conf)]
               (is (not-empty api))
               (is (= "http://localhost:1234" (:url api)))
-              (is (= "test-token" (:token api)))))))
+              (is (= "test-token" (:token api)))))
+
+          (testing "with job filter"
+            (is (= ["test-filter"] (sc/job-filter conf))))))
 
       (testing "passes deps"
         (let [deps (-> r :cmd (nth 2) (edn/edn->))]

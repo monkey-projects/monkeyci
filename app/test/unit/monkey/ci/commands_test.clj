@@ -125,7 +125,13 @@
            (-> {:account {:url "http://test"
                           :token "test-token"}}
                (sut/cli->rt-conf)
-               (lc/get-global-api))))))
+               (lc/get-global-api)))))
+
+  (testing "sets job filter"
+    (is (= ["test-job"]
+           (-> {:args {:filter ["test-job"]}}
+               (sut/cli->rt-conf)
+               (lc/get-job-filter))))))
 
 (deftest parse-params
   (testing "empty when empty input"

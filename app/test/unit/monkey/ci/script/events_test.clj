@@ -85,7 +85,19 @@
             (is (= (vc/encrypt dek (v/cuid->iv org-id) "secret-value")
                    (-> res
                        (sut/get-jobs)
-                       (get-in ["job-with-env" :container/env "env-var"]))))))))))
+                       (get-in ["job-with-env" :container/env "env-var"]))))))))
+
+    (testing "applies job filter"
+      (let [job-ctx (atom nil)]
+        (with-redefs [sc/load-jobs (fn [_ _]
+                                     [{:id "first"}
+                                      {:id "second"}])]
+          (is (= ["first"]
+                 (-> {}
+                     (emi/set-state {:filter ["first"]})
+                     (enter)
+                     (sut/get-jobs)
+                     (keys)))))))))
 
 (deftest add-job-ctx
   (let [{:keys [enter] :as i} sut/add-job-ctx
@@ -264,21 +276,36 @@
       (testing (format "handles `%s` event type" t)
         (is (contains? routes t))))
 
-    (testing "`script/initializing` passes api client for loading"
-      (let [fake-loader {:name ::sut/load-jobs
-                         :enter (fn [ctx]
-                                  (cond-> ctx
-                                    (= ::test-client (-> ctx
-                                                         (sut/get-initial-job-ctx)
-                                                         (ba/ctx->api-client)))
-                                    (sut/set-jobs {"test-job" {:id "test-job"}})))}
-            r (-> (sut/make-routes {:api-client ::test-client})
-                  (mmc/router)
-                  (mmc/replace-interceptors [fake-loader]))]
-        (is (not-empty (-> (r {:type :script/initializing})
-                           (first)
-                           :result
-                           :jobs)))))
+    (testing "`script/initializing`"
+      (testing "passes api client for loading"
+        (let [fake-loader {:name ::sut/load-jobs
+                           :enter (fn [ctx]
+                                    (cond-> ctx
+                                      (= ::test-client (-> ctx
+                                                           (sut/get-initial-job-ctx)
+                                                           (ba/ctx->api-client)))
+                                      (sut/set-jobs {"test-job" {:id "test-job"}})))}
+              r (-> (sut/make-routes {:api-client ::test-client})
+                    (mmc/router)
+                    (mmc/replace-interceptors [fake-loader]))]
+          (is (not-empty (-> (r {:type :script/initializing})
+                             (first)
+                             :result
+                             :jobs)))))
+
+      (testing "applies filter when loading jobs"
+        (let [f ["test-job"]
+              fake-loader {:name ::sut/load-jobs
+                           :enter (fn [ctx]
+                                    (when (= f (sut/get-job-filter ctx))
+                                      (sut/set-jobs ctx {"test-job" {:id "test-job"}})))}
+              r (-> (sut/make-routes {:filter f})
+                    (mmc/router)
+                    (mmc/replace-interceptors [fake-loader]))]
+          (is (not-empty (-> (r {:type :script/initializing})
+                             (first)
+                             :result
+                             :jobs))))))
 
     (testing "`job/executed` adds result from extensions to event"
       (let [ext-id ::test-ext

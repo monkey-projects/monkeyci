@@ -9,11 +9,12 @@
 (s/def ::api ::ba/api)
 (s/def ::build map?) ; TODO specify
 (s/def ::job map?) ; TODO specify
+(s/def ::filter (s/coll-of string?))
 (s/def ::result md/deferred?)
 
 (s/def ::config
   (s/keys :req [::api ::build]
-          :opt [::result]))
+          :opt [::result ::filter]))
 
 (s/def ::artifacts p/repo?)
 (s/def ::cache p/repo?)

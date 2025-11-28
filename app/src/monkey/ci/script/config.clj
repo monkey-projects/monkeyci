@@ -29,3 +29,8 @@
 
 (defn set-archs [c a]
   (assoc c archs a))
+
+(def job-filter ::ss/filter)
+
+(defn set-job-filter [c f]
+  (assoc c job-filter f))

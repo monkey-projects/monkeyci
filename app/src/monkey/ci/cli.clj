@@ -46,7 +46,12 @@
           {:as "No output"
            :option "quiet"
            :short "q"
-           :type :with-flag}]
+           :type :with-flag}
+          {:as "Job filter"
+           :option "filter"
+           :short "f"
+           :type :string
+           :multiple true}]
    :runs {:command cmd/run-build-local
           :app-mode :cli}})
 
