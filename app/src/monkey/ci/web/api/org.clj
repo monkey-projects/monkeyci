@@ -46,9 +46,16 @@
 (defn auto-subs
   "Automatically assigned subscriptions.  These can be temporary actions as well."
   []
+  ;; TODO Make this configurable?
   [{:amount config/free-credits
     :from (t/now)
-    :description "Basic free subscription"}])
+    :description "Basic free subscription"}
+   {:amount 2000
+    :from (t/now)
+    :until (-> (jt/offset-date-time)
+               (jt/plus (jt/years 1))
+               (jt/to-millis-from-epoch))
+    :description "Year's end promotion"}])
 
 (defn create-org [req]
   (st/with-transaction (c/req->storage req) st
