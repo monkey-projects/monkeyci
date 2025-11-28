@@ -164,7 +164,7 @@
 
 (defn- render-tbody [cols items {:keys [on-row-click]}]
   (letfn [(td? [x]
-            (and (keyword? x) (re-matches #"^td\..*" (name x))))
+            (and (keyword? x) (re-matches #"^td\.?.*" (name x))))
           (render-cell [v]
             ;; Allow rendering functions to define their own td
             (if (and (vector? v) (td? (first v)))

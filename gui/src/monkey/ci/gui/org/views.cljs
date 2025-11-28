@@ -4,6 +4,9 @@
             [monkey.ci.gui.org.db :as db]
             [monkey.ci.gui.org.events]
             [monkey.ci.gui.org.subs]
+            [monkey.ci.gui.org.views-activity :as va]
+            [monkey.ci.gui.org.views-repos :as vr]
+            [monkey.ci.gui.org.views-stats :as vs]
             [monkey.ci.gui.forms :as f]
             [monkey.ci.gui.apis.bitbucket]
             [monkey.ci.gui.apis.github]
@@ -20,104 +23,6 @@
 
 (defn org-icon []
   [:span.me-2 co/org-icon])
-
-(defn build-chart-config [{:keys [elapsed-seconds consumed-credits]}]
-  (let [dates (->> (concat (map :date elapsed-seconds)
-                           (map :date consumed-credits))
-                   (set)
-                   (sort))]
-    {:type :bar
-     :data {:labels (->> dates
-                         (map (comp time/format-date time/parse-epoch)))
-            :datasets
-            [{:label "Elapsed minutes"
-              :data (map (comp #(/ % 60) :seconds) elapsed-seconds)}
-             {:label "Consumed credits"
-              :data (map (comp - :credits) consumed-credits)}]}
-     :options
-     {:scales
-      {"x"
-       {:stacked true}
-       "y"
-       {:type :linear
-        :display true
-        :position :left
-        :stacked true}}}}))
-
-(defn history-chart []
-  (let [stats (rf/subscribe [:org/stats])]
-    [charts/chart-component :org/builds (build-chart-config (:stats @stats))]))
-
-(defn credits-chart-config [stats]
-  (when-let [{:keys [consumed available]} stats]
-    ;; TODO Colors
-    {:type :doughnut
-     :data {:labels [(str available " available")
-                     (str consumed " consumed")]
-            :datasets
-            [{:label "Credits"
-              :data [available consumed]}]}}))
-
-(defn credits-chart []
-  (let [stats (rf/subscribe [:org/credit-stats])]
-    (when @stats
-      [charts/chart-component :org/credits (credits-chart-config @stats)])))
-
-(def stats-period-days 30)
-
-(defn org-stats [org-id]
-  (rf/dispatch [:org/load-stats org-id stats-period-days])
-  (rf/dispatch [:org/load-credits org-id])
-  (fn [org-id]
-    [:div.row
-     [:div.col-8
-      [:div.card
-       [:div.card-body
-        [:h5 "History"]
-        [:p
-         (str "Build elapsed times and consumed credits over the past " stats-period-days " days.")]
-        [history-chart]]]]
-     [:div.col-4
-      [:div.card
-       [:div.card-body
-        [:h5 "Credits"]
-        [:p "Credit consumption for this month."]
-        [credits-chart]]]]]))
-
-(defn- latest-build [r]
-  (let [build (rf/subscribe [:org/latest-build (:id r)])]
-    (when @build
-      [:a {:title (str "Latest build: " (:build-id @build))
-           :href (r/path-for :page/build @build)}
-       [co/build-result (:status @build)]])))
-
-(defn- show-repo [c r]
-  (let [repo-path (r/path-for :page/repo {:org-id (u/org-id c)
-                                          :repo-id (:id r)})]
-    [:div.card-body.border-top
-     [:div.d-flex.flex-row.align-items-start
-      [:div.me-auto
-       [:h6 {:title (:id r)}
-        [:span.me-2 co/repo-icon]
-        [:a.link-dark.me-3 {:href repo-path} (:name r)]
-        [latest-build r]]
-       [:p "Url: " [:a {:href (:url r) :target :_blank} (:url r)]]]
-      [:a.btn.btn-primary
-       {:href repo-path}
-       [co/icon :three-dots-vertical] " Details"]]]))
-
-(defn- repo-group-card [org title repos]
-  (->> repos
-       (sort-by :name)
-       (map (partial show-repo org))
-       (into
-        [:div.card.mb-3
-         [:div.card-header
-          (when title
-            [:h5.card-header-title [:span.me-2 co/repo-group-icon] title])]])))
-
-(defn- show-repo-group [org [p repos]]
-  (repo-group-card org (or p "(No value)") repos))
 
 (defn- add-github-repo-btn [id]
   (when @(rf/subscribe [:login/github-user?])
@@ -139,15 +44,6 @@
    [add-github-repo-btn id]
    [add-bitbucket-repo-btn id]])
 
-(defn- watch-repo-link [id]
-  (cond
-    @(rf/subscribe [:login/github-user?])
-    {:href (r/path-for :page/add-github-repo {:org-id id})
-     :title "Link an existing GitHub repository"}
-    @(rf/subscribe [:login/bitbucket-user?])
-    {:href (r/path-for :page/add-bitbucket-repo {:org-id id})
-     :title "Link an existing Bitbucket repository"}))
-
 (defn- settings-btn [id]
   [:a.btn.btn-outline-primary
    {:href (r/path-for :page/org-settings {:org-id id})
@@ -158,6 +54,34 @@
   [:a.btn.btn-primary
    {:href (r/path-for :page/add-repo {:org-id id})}
    [:span.me-2 [co/icon :plus-square]] "Add Repository"])
+
+(defn- overview-tabs
+  "Displays tab pages for various organization overview screens"
+  [id]
+  [tabs/tabs ::overview
+   [{:id :activity
+     :header [:span [:span.me-2 [co/icon :activity]] "Activity"]
+     :contents [va/recent-builds id]
+     :current? true}
+    {:id :stats
+     :header [:span [:span.me-2 [co/icon :bar-chart]] "Statistics"]
+     :contents [vs/org-stats id]}
+    {:id :repos
+     :header [:span [:span.me-2 co/repo-icon] "Repositories"]
+     :contents [vr/org-repos]}]])
+
+(defn- repo-intro [id]
+  [:<>
+   [:p.mt-2
+    "Looks like you have not configured any repositories yet.  You can add a new "
+    "repository manually, or use the " [:a (vr/watch-repo-link id) "Watch Repository"]
+    " button to find one in your repository manager."]
+   [add-repo-btn id]
+   [:p.mt-2
+    "A repository points to a remote git site, that contains a MonkeyCI script.  See "
+    [co/docs-link "articles/repos" "the documentation on repositories."] " Want to "
+    "learn how to write your first build script?  Check out "
+    [co/docs-link "categories/getting-started" "the getting started guide."]]])
 
 (defn- org-actions [id]
   [:div.d-flex.gap-2
@@ -170,120 +94,6 @@
     [:div.d-flex.gap-2
      [co/page-title {:class :me-auto} [org-icon] (:name @c)]
      [org-actions (:id @c)]]))
-
-(defn- label-selector []
-  (let [l (rf/subscribe [:org/labels])
-        sel (rf/subscribe [:org/group-by-lbl])]
-    (->> @l
-         (map (fn [v]
-                [:option {:value v} (str "Group by " v)]))
-         (into [:select.form-select
-                {:id :group-by-label
-                 :aria-label "Label selector"
-                 :value @sel
-                 :on-change (u/form-evt-handler [:org/group-by-lbl-changed])}
-                [:option {:value nil} "Ungrouped"]]))))
-
-(defn- repo-name-filter []
-  (let [f (rf/subscribe [:org/repo-filter])]
-    [co/filter-input
-     {:id :repo-name-filter
-      :on-change (u/form-evt-handler [:org/repo-filter-changed])
-      :placeholder "Repository name"
-      :value @f}]))
-
-(defn- repos-action-bar
-  "Display a small form on top of the repositories overview to group and filter repos."
-  [org]
-  [:div.d-flex.flex-row.mb-2
-   [:div.row.row-cols-lg-auto.g-2.align-items-center
-    [:label.col {:for :group-by-label} "Repository overview"]
-    [:div.col
-     [label-selector]]
-    [:div.col
-     [repo-name-filter]]]
-   [:div.ms-auto
-    [co/reload-btn-sm [:org/load (:id org)]]]])
-
-(defn- repos-list [org]
-  (let [r (rf/subscribe [:org/grouped-repos])]
-    (into [:<> [repos-action-bar org]]
-          (if (= 1 (count @r))
-            [(repo-group-card org "All Repositories" (first (vals  @r)))]
-            (->> @r
-                 (sort-by first)
-                 (map (partial show-repo-group org)))))))
-
-(defn- org-repos
-  "Displays a list of org repositories, grouped by selected label"
-  []
-  (rf/dispatch [:org/load-latest-builds])
-  (let [c (rf/subscribe [:org/info])]
-    (if (empty? (:repos @c))
-      [:p "No repositories configured for this organization.  You can start by"
-       [:a.mx-1 (watch-repo-link (:id @c)) "watching one."]]
-      [repos-list @c])))
-
-(defn- with-recent-reload [id msg]
-  [:div.d-flex
-   [:p msg]
-   [:div.ms-auto [co/reload-btn-sm [:org/load-recent-builds id]]]])
-
-(defn- recent-builds [id]
-  (rf/dispatch [:org/load-recent-builds id])
-  (fn [id]
-    (let [loaded? (rf/subscribe [:loader/loaded? db/recent-builds])
-          recent (rf/subscribe [:org/recent-builds])
-          org-id (rf/subscribe [:route/org-id])]
-      (if (and @loaded? (empty? @recent))
-        [with-recent-reload id "No recent builds found for this organization."]
-        [:<>
-         (if @loaded?
-           [with-recent-reload id
-            [:<> "Recent " [co/docs-link "articles/builds" "builds"] " for all "
-             [co/docs-link "articles/repos" "repositories."]]]
-           [:p "Loading recent builds for all repositories..."])
-         [:div.card
-          [:div.card-body
-           [t/paged-table
-            {:id ::recent-builds
-             :items-sub [:org/recent-builds]
-             :columns (concat
-                       [{:label "Repository"
-                         :value (fn [b]
-                                  [:a {:href (r/path-for :page/repo {:org-id @org-id
-                                                                     :repo-id (:repo-id b)})}
-                                   (get-in b [:repo :name])])}]
-                       rv/table-columns)
-             :loading {:sub [:loader/init-loading? db/recent-builds]}}]]]]))))
-
-(defn- overview-tabs
-  "Displays tab pages for various organization overview screens"
-  [id]
-  [tabs/tabs ::overview
-   [{:id :activity
-     :header [:span [:span.me-2 [co/icon :activity]] "Activity"]
-     :contents [recent-builds id]
-     :current? true}
-    {:id :stats
-     :header [:span [:span.me-2 [co/icon :bar-chart]] "Statistics"]
-     :contents [org-stats id]}
-    {:id :repos
-     :header [:span [:span.me-2 co/repo-icon] "Repositories"]
-     :contents [org-repos]}]])
-
-(defn- repo-intro [id]
-  [:<>
-   [:p.mt-2
-    "Looks like you have not configured any repositories yet.  You can add a new "
-    "repository manually, or use the " [:a (watch-repo-link id) "Watch Repository"]
-    " button to find one in your repository manager."]
-   [add-repo-btn id]
-   [:p.mt-2
-    "A repository points to a remote git site, that contains a MonkeyCI script.  See "
-    [co/docs-link "articles/repos" "the documentation on repositories."] " Want to "
-    "learn how to write your first build script?  Check out "
-    [co/docs-link "categories/getting-started" "the getting started guide."]]])
 
 (defn- org-details [id]
   (let [o (rf/subscribe [:org/info])]
