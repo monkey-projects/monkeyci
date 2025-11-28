@@ -95,13 +95,13 @@
       (is (= [r] (st/list-user-orgs st (:id user)))))
 
     (let [org-id (:id r)]
-      (testing "creates subscription"
-        (is (= 1 (-> (st/list-org-credit-subscriptions st org-id)
-                     (count)))))
+      (testing "creates auto subscriptions"
+        (is (pos? (-> (st/list-org-credit-subscriptions st org-id)
+                      (count)))))
 
       (testing "issues credits"
         (let [cc (st/list-org-credits st org-id)]
-          (is (= 1 (count cc)))
+          (is (not-empty cc))
           (is (some? (->> cc
                           first
                           :subscription-id

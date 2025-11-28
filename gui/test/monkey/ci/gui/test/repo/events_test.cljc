@@ -338,13 +338,13 @@
        (is (= org (lo/get-value @app-db cdb/org))))
      
      (testing "sets repo for editing"
-       (is (= repo (-> (db/editing @app-db)
-                       (select-keys (keys repo))))))
+       (is (= (:id repo)
+              (:id (db/editing @app-db)))))
 
-     (testing "sets new github id"
+     (testing "sets new github id as string"
        (is (= "1234" (-> @app-db
                          (db/editing)
-                         :new-github-id)))))))
+                         :github-id)))))))
 
 (deftest repo-load+edit--failed
   (testing "sets error alert"
@@ -410,7 +410,13 @@
 (deftest repo-github-id-changed
   (testing "updates editing github id"
     (rf/dispatch-sync [:repo/github-id-changed "1234"])
-    (is (= "1234" (:new-github-id (db/editing @app-db))))))
+    (is (= "1234" (:github-id (db/editing @app-db))))))
+
+(deftest repo-unwatch-github
+  (testing "clears github id from editing"
+    (is (some? (reset! app-db (db/set-editing {} {:id "test-repo" :github-id 14334}))))
+    (rf/dispatch-sync [::sut/unwatch-github])
+    (is (nil? (:github-id (db/editing @app-db))))))
 
 (deftest repo-save
   (rft/run-test-sync
@@ -421,7 +427,7 @@
      (testing "existing repo"
        (swap! app-db #(-> %
                           (db/set-editing {:name "updated repo name"
-                                           :new-github-id "5678"})
+                                           :github-id "5678"})
                           (db/set-edit-alerts [{:type :warning}])))
 
        (is (not-empty (r/path-params (r/current @app-db))))
@@ -443,7 +449,7 @@
                (is (= org-id (:org-id body)))
                (is (= repo-id (:id body))))
              
-             (testing "sets github id"
+             (testing "sets github id as int"
                (is (= 5678 (:github-id body))))))
 
          (testing "adds org and repo id to params"
@@ -610,7 +616,7 @@
 (deftest repo-lookup-github-id--success
   (testing "sets editing id in repo"
     (rf/dispatch-sync [:repo/lookup-github-id--success {:id 3456}])
-    (is (= "3456" (:new-github-id (db/editing @app-db))))))
+    (is (= "3456" (:github-id (db/editing @app-db))))))
 
 (deftest repo-lookup-github-id--failed
   (testing "sets edit alert"

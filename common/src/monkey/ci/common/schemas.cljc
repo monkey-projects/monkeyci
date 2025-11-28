@@ -39,3 +39,21 @@
   {(s/optional-key :id) Id
    (s/optional-key :email) s/Str
    (s/optional-key :user-id) Id})
+
+(s/defschema UserCredits
+  {:amount s/Int
+   (s/optional-key :reason) s/Str
+   (s/optional-key :from-time) s/Int})
+
+(s/defschema AutoCredits
+  ;; ISO date format
+  {:date #"\d{4}-\d{2}-\d{2}"})
+
+(s/defschema CreditSubscription
+  {:amount s/Int
+   :valid-from s/Int
+   (s/optional-key :valid-until) s/Int
+   (s/optional-key :description) s/Str})
+
+(s/defschema DisableCreditSubscription
+  {(s/optional-key :valid-until) s/Int})

@@ -127,7 +127,7 @@
 
 (s/def :db/credit-subscription
   (-> (s/keys :req-un [:db/org-id :db/amount :db/valid-from]
-              :opt-un [:db/valid-until])
+              :opt-un [:db/valid-until :db/description])
       (s/merge :db/common)))
 
 (s/def :db/subscription-id int?)

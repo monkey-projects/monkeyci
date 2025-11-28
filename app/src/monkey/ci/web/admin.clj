@@ -14,29 +14,12 @@
   {:username s/Str
    :password s/Str})
 
-(s/defschema UserCredits
-  {:amount s/Int
-   (s/optional-key :reason) s/Str
-   (s/optional-key :from-time) s/Int})
-
-(s/defschema AutoCredits
-  ;; ISO date format
-  {:date #"\d{4}-\d{2}-\d{2}"})
-
-(s/defschema CreditSubscription
-  {:amount s/Int
-   :valid-from s/Int
-   (s/optional-key :valid-until) s/Int})
-
-(s/defschema DisableCreditSubscription
-  {(s/optional-key :valid-until) s/Int})
-
 (def credits-routes
   ["/credits"
    {:conflicting true}
    [["/issue"
      {:post api/issue-auto-credits
-      :parameters {:body AutoCredits}}]
+      :parameters {:body cs/AutoCredits}}]
     ["/:org-id"
      {:parameters {:path {:org-id c/Id}}}
      [[""
@@ -44,7 +27,7 @@
        {:get api/list-org-credits}]
       ["/issue"
        {:post api/issue-credits
-        :parameters {:body UserCredits}}]
+        :parameters {:body cs/UserCredits}}]
       ["/subscription"
        (c/generic-routes
         {:getter api/get-credit-subscription
@@ -52,8 +35,8 @@
          :deleter api/cancel-credit-subscription
          :searcher api/list-credit-subscriptions
          :id-key :subscription-id
-         :new-schema CreditSubscription
-         :delete-schema DisableCreditSubscription})]]]]])
+         :new-schema cs/CreditSubscription
+         :delete-schema cs/DisableCreditSubscription})]]]]])
 
 (def mailing-send-routes
   ["/send"

@@ -43,14 +43,27 @@
                           :saver save-org
                           :deleter st/delete-org})
 
+(defn auto-subs
+  "Automatically assigned subscriptions.  These can be temporary actions as well."
+  []
+  ;; TODO Make this configurable?
+  [{:amount config/free-credits
+    :from (t/now)
+    :description "Basic free subscription"}
+   {:amount 2000
+    :from (t/now)
+    :until (-> (jt/offset-date-time)
+               (jt/plus (jt/years 1))
+               (jt/to-millis-from-epoch))
+    :description "Year's end promotion"}])
+
 (defn create-org [req]
   (st/with-transaction (c/req->storage req) st
     (let [org-id (cuid/random-cuid)
           org (assoc (c/body req) :id org-id)
           res (st/init-org st {:org org
                                :user-id (-> req :identity :id)
-                               :credits [{:amount config/free-credits
-                                          :from (t/now)}]
+                               :credits (auto-subs)
                                :dek (:enc (crypto/generate-dek req org-id))})]
       (-> (st/find-org st (last res))
           (rur/response)
