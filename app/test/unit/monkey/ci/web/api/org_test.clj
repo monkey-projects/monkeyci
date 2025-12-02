@@ -4,7 +4,8 @@
             [monkey.ci
              [cuid :as cuid]
              [sid :as sid]
-             [storage :as st]]
+             [storage :as st]
+             [time :as t]]
             [monkey.ci.test
              [helpers :as h]
              [runtime :as trt]]
@@ -75,44 +76,61 @@
     (testing "assigns display id"
       (is (= "new-org" (:display-id r)))))
 
-  (let [user (-> (h/gen-user)
-                 (dissoc :orgs))
-        {st :storage :as rt} (trt/test-runtime)
-        _ (st/save-user st user)
-        r (-> rt
-              (trt/set-dek-generator (constantly {:enc "encrypted-key"
-                                                  :key "plain-key"}))
-              (h/->req)
-              (h/with-body {:name "another org"})
-              (h/with-identity user)
-              (sut/create-org)
-              :body)]
-    (is (some? r))
+  (with-redefs [sut/auto-subs (constantly
+                               [{:amount 100
+                                 :from (t/now)
+                                 :description "Test sub"}])]
+    (let [user (-> (h/gen-user)
+                   (dissoc :orgs))
+          {st :storage :as rt} (trt/test-runtime)
+          _ (st/save-user st user)
+          rt (-> rt
+                 (trt/set-dek-generator (constantly {:enc "encrypted-key"
+                                                     :key "plain-key"}))
+                 (h/->req)
+                 (h/with-body {:name "another org"})
+                 (h/with-identity user))
+          r (-> rt
+                (sut/create-org)
+                :body)]
+      (is (some? r))
 
-    (testing "links current user to org"
-      (is (= [(:id r)] (-> (st/find-user st (:id user))
-                           :orgs)))
-      (is (= [r] (st/list-user-orgs st (:id user)))))
+      (testing "links current user to org"
+        (is (= [(:id r)] (-> (st/find-user st (:id user))
+                             :orgs)))
+        (is (= [r] (st/list-user-orgs st (:id user)))))
 
-    (let [org-id (:id r)]
-      (testing "creates auto subscriptions"
-        (is (pos? (-> (st/list-org-credit-subscriptions st org-id)
-                      (count)))))
+      (let [org-id (:id r)]
+        (testing "creates auto subscriptions"
+          (let [s (st/list-org-credit-subscriptions st org-id)]
+            (is (= 1 (count s)))
+            (is (= "Test sub" (:description (first s))))))
 
-      (testing "issues credits"
-        (let [cc (st/list-org-credits st org-id)]
-          (is (not-empty cc))
-          (is (some? (->> cc
-                          first
-                          :subscription-id
-                          (vector org-id)
-                          (st/find-credit-subscription st))))))
+        (testing "ignores expired auto subscriptions"
+          (with-redefs [sut/auto-subs (constantly
+                                       [{:amount 200
+                                         :until (- (t/now) 10000)
+                                         :description "Expired sub"}])]
+            (let [org-id (-> (sut/create-org rt)
+                             :body
+                             :id)]
+              (is (some? org-id))
+              (is (empty? (st/list-org-credit-subscriptions st org-id))))))
 
-      (testing "generates data encryption key"
-        (let [c (st/find-crypto st org-id)]
-          (is (some? c))
-          (is (= "encrypted-key" (:dek c))
-              "stores encrypted key"))))))
+        (testing "issues credits"
+          (let [cc (st/list-org-credits st org-id)]
+            (is (not-empty cc))
+            (is (some? (->> cc
+                            first
+                            :subscription-id
+                            (vector org-id)
+                            (st/find-credit-subscription st))))))
+
+        (testing "generates data encryption key"
+          (let [c (st/find-crypto st org-id)]
+            (is (some? c))
+            (is (= "encrypted-key" (:dek c))
+                "stores encrypted key")))))))
 
 (deftest update-org
   (testing "returns org in body"

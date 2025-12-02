@@ -168,6 +168,21 @@
      (gui-image-config "gui-img" config/gui-img (config/image-version ctx) (config/archs ctx))
      ctx)))
 
+(defn- clojars-latest-version
+  "Fetches latest version from the lib declared in the `deps.edn` in given dir."
+  [dir ctx]
+  (->> [(m/checkout-dir ctx) dir "deps.edn"]
+       (cs/join "/")
+       (clojars/extract-lib)
+       (apply clojars/latest-version)))
+
+(defn- publish-env
+  "Creates clojars env vars for publishing a lib"
+  [ctx version]
+  (-> (api/build-params ctx)
+      (select-keys ["CLOJARS_USERNAME" "CLOJARS_PASSWORD"])
+      (mc/assoc-some "MONKEYCI_VERSION" version)))
+
 (defn publish 
   "Executes script in clojure container that has clojars publish env vars"
   [ctx id dir & [version]]
@@ -175,15 +190,9 @@
     ;; If this is a release, and it's already been deployed, then skip this.
     ;; This is to be able to re-run a release build when a job down the road has
     ;; previously failed.
-    (when (or (nil? v) (not= v (->> [(m/checkout-dir ctx) dir "deps.edn"]
-                                    (cs/join "/")
-                                    (clojars/extract-lib)
-                                    (apply clojars/latest-version))))
-      (let [env (-> (api/build-params ctx)
-                    (select-keys ["CLOJARS_USERNAME" "CLOJARS_PASSWORD"])
-                    (mc/assoc-some "MONKEYCI_VERSION" v))]
-        (-> (clj-container id dir "-X:jar:deploy")
-            (assoc :container/env env))))))
+    (when (or (nil? v) (not= v (clojars-latest-version dir ctx)))
+      (-> (clj-container id dir "-X:jar:deploy")
+          (assoc :container/env (publish-env ctx v))))))
 
 (defn publish-app [ctx]
   (when (p/publish-app? ctx)

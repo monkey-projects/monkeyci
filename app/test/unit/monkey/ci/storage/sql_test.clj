@@ -118,7 +118,8 @@
           res (st/init-org s {:org org
                               :user-id (:id user)
                               :credits [{:amount 1000
-                                         :from (t/now)}]
+                                         :from (t/now)
+                                         :description "Test sub"}]
                               :dek "test-dek"})]
       
       (testing "creates new org"
@@ -133,7 +134,8 @@
       (testing "creates credit subscription"
         (let [cs (st/list-org-credit-subscriptions s (:id org))]
           (is (= 1 (count cs)))
-          (is (= 1000M (-> cs first :amount)))))
+          (is (= 1000M (-> cs first :amount)))
+          (is (string? (-> cs first :description)))))
 
       (testing "creates initial credits"
         (let [c (st/list-org-credits s (:id org))]

@@ -60,11 +60,14 @@
 
 (defn create-org [req]
   (st/with-transaction (c/req->storage req) st
-    (let [org-id (cuid/random-cuid)
+    (let [expired? (fn [{:keys [until]}]
+                     (and until (< until (t/now))))
+          org-id (cuid/random-cuid)
           org (assoc (c/body req) :id org-id)
           res (st/init-org st {:org org
                                :user-id (-> req :identity :id)
-                               :credits (auto-subs)
+                               :credits (->> (auto-subs)
+                                             (remove expired?))
                                :dek (:enc (crypto/generate-dek req org-id))})]
       (-> (st/find-org st (last res))
           (rur/response)
