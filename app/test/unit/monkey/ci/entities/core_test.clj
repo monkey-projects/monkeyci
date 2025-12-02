@@ -506,3 +506,16 @@
 
       (testing "can select sent mailings by mailing id"
         (is (= 1 (count (sut/select-sent-mailings conn [:= :mailing-id (:id r)]))))))))
+
+(deftest ^:sql user-settings
+  (eh/with-prepared-db conn
+    (let [u (sut/insert-user conn (eh/gen-user))
+          s (-> (eh/gen-user-settings)
+                (assoc :user-id (:id u)
+                       :receive-mailing true))]
+      (testing "can insert and retrieve"
+        (is (number? (-> (sut/insert-user-setting conn s)
+                         :user-id)))
+
+        (is (= s (-> (sut/select-user-settings conn (sut/by-user (:id u)))
+                     first)))))))

@@ -561,3 +561,6 @@
    :before-update prepare-sent-mailing
    :after-update  convert-sent-mailing
    :after-select  convert-sent-mailing-select})
+
+(defaggregate user-setting
+  {:id-col :user-id})

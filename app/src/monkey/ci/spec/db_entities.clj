@@ -224,3 +224,9 @@
   (-> (s/keys :req-un [:db/mailing-id :db/sent-at]
               :opt-un [:mailing/mail-id :mailing/to-users :mailing/to-subscribers :db/other-dests])
       (s/merge :db/common)))
+
+(s/def :db/receive-mailing boolean?)
+
+(s/def :db/user-setting
+  (-> (s/keys :req-un [:db/user-id]
+              :opt-un [:db/receive-mailing])))

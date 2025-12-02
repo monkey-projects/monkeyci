@@ -126,6 +126,9 @@
 (defn gen-user-token []
   (gen-spec :db/user-token))
 
+(defn gen-user-settings []
+  (gen-spec :db/user-setting))
+
 (defn gen-org-token []
   (gen-spec :db/org-token))
 

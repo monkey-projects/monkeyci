@@ -240,3 +240,9 @@
   (-> (s/keys :req-un [:entity/mailing-id :entity/sent-at]
               :opt-un [:mailing/mail-id :mailing/to-users :mailing/to-subscribers :entity/other-dests])
       (s/merge :entity/common)))
+
+(s/def :entity/receive-mailing boolean?)
+
+(s/def :entity/user-setting
+  (s/keys :req-un [:entity/user-id]
+          :opt-un [:entity/receive-mailing]))

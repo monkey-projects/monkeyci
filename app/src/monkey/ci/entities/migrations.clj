@@ -706,7 +706,14 @@
     [{:alter-table :credit-subscriptions
       :add-column [:description [:varchar 300]]}]
     [{:alter-table :credit-subscriptions
-      :drop-column :description}])])
+      :drop-column :description}])
+
+   (table-migration
+    56 :user-settings
+    [[:user-id :integer [:not nil] [:primary-key]]
+     [:receive-mailing :boolean]
+     fk-user]
+    [(col-idx :user-settings :user-id)])])
 
 (defn prepare-migrations
   "Prepares all migrations by formatting to sql, creates a ragtime migration object from it."
