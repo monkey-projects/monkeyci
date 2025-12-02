@@ -133,7 +133,7 @@
   (when (p/publish-app? ctx)
     (kaniko/multi-platform-image
      {:dockerfile "docker/Dockerfile"
-      :args (config/archs ctx)
+      :archs (config/archs ctx)
       :target-img (config/app-image ctx)
       :image
       {:job-id "publish-app-img"
