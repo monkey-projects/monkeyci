@@ -1094,3 +1094,12 @@
      (-> (find-mailing st mid)
          :sent
          vals))))
+
+(def user-settings :user-settings)
+(def user-settings-sid (partial global-sid user-settings))
+
+(defn save-user-settings [st s]
+  (p/write-obj st (user-settings-sid (:user-id s)) s))
+
+(defn find-user-settings [st uid]
+  (p/read-obj st (user-settings-sid uid)))

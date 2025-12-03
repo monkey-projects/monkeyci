@@ -732,3 +732,14 @@
 
       (testing "can find by email"
         (is (= r (sut/find-email-registration-by-email st (:email r))))))))
+
+(deftest user-settings
+  (h/with-memory-store st
+    (let [u (h/gen-user)
+          s (-> (h/gen-user-settings)
+                (assoc :user-id (:id u)))]
+      (is (sid/sid? (sut/save-user st u)))
+
+      (testing "can save and find for user"
+        (is (sid/sid? (sut/save-user-settings st s)))
+        (is (= s (sut/find-user-settings st (:id u))))))))

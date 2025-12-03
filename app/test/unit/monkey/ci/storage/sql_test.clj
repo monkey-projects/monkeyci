@@ -1043,6 +1043,23 @@
           (testing "can update"
             (is (some? (st/save-sent-mailing st (assoc sm :to-users true))))))))))
 
+(deftest ^:sql user-settings
+  (with-storage conn st
+    (let [u (h/gen-user)
+          s (-> (h/gen-user-settings)
+                (assoc :user-id (:id u)
+                       :receive-mailing true))]
+      (is (sid/sid? (st/save-user st u)))
+
+      (testing "can save and find for user"
+        (is (sid/sid? (st/save-user-settings st s)))
+        (is (= s (st/find-user-settings st (:id u)))))
+
+      (testing "can update"
+        (is (sid/sid? (st/save-user-settings st (assoc s :receive-mailing false))))
+        (is (false? (-> (st/find-user-settings st (:id u))
+                        :receive-mailing)))))))
+
 (deftest pool-component
   (testing "creates sql connection pool using settings"
     (let [s (sut/pool-component {:type :sql

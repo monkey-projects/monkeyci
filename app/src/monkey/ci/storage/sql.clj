@@ -248,12 +248,10 @@
   (t sid))
 
 (def runner-details? (partial global-sid? st/runner-details))
-
 (def queued-task? (partial global-sid? st/queued-task))
-
 (def job-event? (partial global-sid? st/job-event))
-
 (def user-token? (partial global-sid? st/user-token))
+(def user-settings? (partial global-sid? st/user-settings))
 (def org-token? (partial global-sid? st/org-token))
 (def mailing? (partial global-sid? st/mailing))
 
@@ -299,7 +297,9 @@
         org-token?
         (sot/select-org-token conn (take-last 2 sid))
         mailing?
-        (sma/select-mailing conn (last sid)))))
+        (sma/select-mailing conn (last sid))
+        user-settings?
+        (su/select-user-setting conn (last sid)))))
   
   (write-obj [this sid obj]
     (let [conn (get-conn this)]
@@ -346,6 +346,8 @@
               (sot/upsert-org-token conn obj)
               mailing?
               (sma/upsert-mailing conn obj)
+              user-settings?
+              (su/upsert-user-setting conn obj)
               (log/warn "Unrecognized sid when writing:" sid))
         sid)))
 
