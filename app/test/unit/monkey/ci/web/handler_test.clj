@@ -686,7 +686,27 @@
             (is (= 204 (-> (mock/request :delete (str "/user/" (:id u)))
                            (app)
                            :status)))
-            (is (nil? (st/find-user st (:id u)))))))
+            (is (nil? (st/find-user st (:id u))))))
+
+        (let [user (st/find-user-by-type st (user->sid user))
+              user-id (:id user)]
+          (testing "`GET /orgs` retrieves orgs for user"
+            (let [org {:id (st/new-id)
+                       :name "test org"}]
+              (is (some? (st/save-org st org)))
+              (is (some? (st/save-user st (assoc user :orgs [(:id org)]))))
+              (is (= [org] (-> (mock/request :get (str "/user/" user-id "/orgs"))
+                               (app)
+                               (h/reply->json))))))
+
+          (testing "`GET /settings` retrieves user settings"
+            (let [s {:user-id user-id
+                     :receive-mailings true}]
+              (is (some? (st/save-user-settings st s)))
+              (let [r (-> (mock/request :get (str "/user/" user-id "/settings"))
+                          (app))]
+                (is (= 200 (:status r)))
+                (is (= s (h/reply->json r))))))))
 
       (testing "`GET /:type/:id` retrieves existing user"
         (let [r (-> (mock/request :get (str "/user/github/" (:type-id user)))
@@ -700,17 +720,6 @@
                     (app))]
           (is (= 200 (:status r)))
           (is (= "updated@monkeyci.com" (some-> r (h/reply->json) :email)))))
-
-      (testing "`GET /orgs` retrieves orgs for user"
-        (let [user (st/find-user-by-type st (user->sid user))
-              user-id (:id user)
-              org {:id (st/new-id)
-                   :name "test org"}]
-          (is (some? (st/save-org st org)))
-          (is (some? (st/save-user st (assoc user :orgs [(:id org)]))))
-          (is (= [org] (-> (mock/request :get (str "/user/" user-id "/orgs"))
-                           (app)
-                           (h/reply->json))))))
 
       (let [user (st/find-user-by-type st (user->sid user))
             user-id (:id user)]

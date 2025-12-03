@@ -307,23 +307,6 @@
                   :params)]
         (is (= ["key"] (keys p)))))))
 
-(deftest update-user
-  (testing "updates user in storage"
-    (let [{st :storage :as rt} (trt/test-runtime)]
-      (is (st/sid? (st/save-user st {:type "github"
-                                     :type-id 543
-                                     :name "test user"})))
-      (is (= 200 (-> (h/->req rt)
-                     (assoc :parameters {:path
-                                         {:user-type "github"
-                                          :type-id 543}
-                                         :body
-                                         {:name "updated user"}})
-                     (sut/update-user)
-                     :status)))
-      (is (= "updated user" (-> (st/find-user-by-type st [:github 543])
-                                :name))))))
-
 (deftest create-email-registration
   (testing "does not create same email twice"
     (let [{st :storage :as rt} (trt/test-runtime)

@@ -34,21 +34,6 @@
                           :saver save-webhook
                           :deleter st/delete-webhook})
 
-(c/make-entity-endpoints "user"
-                         {:get-id (c/id-getter (juxt :user-type :type-id))
-                          :getter st/find-user-by-type
-                          :saver st/save-user})
-
-(def delete-user
-  (c/entity-deleter (c/id-getter :user-id) st/delete-user))
-
-(defn get-user-orgs
-  "Retrieves all users linked to the org in the request path"
-  [req]
-  (let [user-id (get-in req [:parameters :path :user-id])
-        st (c/req->storage req)]
-    (rur/response (st/list-user-orgs st user-id))))
-
 ;; Override webhook creation
 (defn- assign-new-webhook-props
   "Updates the request body to assign a secret key, which is used to

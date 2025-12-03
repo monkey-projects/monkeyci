@@ -57,3 +57,6 @@
 
 (s/defschema DisableCreditSubscription
   {(s/optional-key :valid-until) s/Int})
+
+(s/defschema UserSettings
+  {:receive-mailings s/Bool})
