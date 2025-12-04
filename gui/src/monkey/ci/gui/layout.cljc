@@ -10,15 +10,7 @@
             #?(:cljs [reagent.core :as rc])
             [re-frame.core :as rf]))
 
-(defn user-info []  
-  (let [u (rf/subscribe [:login/user])]
-    (when @u
-      [:div
-       [co/user-avatar @u]
-       [:p (:name @u) 
-        " | "
-        [:a {:href "" :on-click (u/link-evt-handler [:login/sign-off])}
-         "sign off"]]])))
+(def user-info co/user-info)
 
 (defn header []
   (conj (t/generic-header t/config [user-info])

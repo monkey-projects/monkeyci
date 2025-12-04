@@ -79,6 +79,7 @@
     ["/o/:org-id/r/:repo-id/webhooks" :page/webhooks]
     ["/o/:org-id/r/:repo-id/b/:build-id" :page/build]
     ["/o/:org-id/r/:repo-id/b/:build-id/j/:job-id" :page/job]
+    ["/u/:user-id" :page/user]
     ["/github/callback" :page/github-callback]
     ["/bitbucket/callback" :page/bitbucket-callback]
     ["/email/unsubscribe" :page/unsubscribe-email]]))

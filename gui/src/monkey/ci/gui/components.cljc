@@ -1,5 +1,6 @@
 (ns monkey.ci.gui.components
   (:require [monkey.ci.gui.alerts :as a]
+            [monkey.ci.gui.routing :as r]
             [monkey.ci.gui.template :as templ]
             [monkey.ci.gui.time :as t]
             [monkey.ci.gui.subs]
@@ -19,6 +20,18 @@
   (when avatar-url
     [:span.avatar.avatar-sm.avatar-circle
      [:img.avatar-img {:src avatar-url :alt "Avatar"}]]))
+
+
+(defn user-info []  
+  (let [u (rf/subscribe [:login/user])]
+    (when @u
+      [:div
+       [:a {:href (r/path-for :page/user {:user-id (:id @u)})}
+        [user-avatar @u]]
+       [:p (:name @u) 
+        " | "
+        [:a {:href "" :on-click (u/link-evt-handler [:login/sign-off])}
+         "sign off"]]])))
 
 (defn icon [n]
   [:i {:class (str "bi bi-" (name n))}])
