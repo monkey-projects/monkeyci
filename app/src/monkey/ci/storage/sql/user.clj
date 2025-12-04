@@ -77,7 +77,8 @@
 (defn- insert-user-setting [conn s]
   (let [u (ec/select-user conn (ec/by-cuid (:user-id s)))]
     (->> (assoc s :user-id (:id u))
-         (ec/insert-user-setting conn))))
+         (ec/insert-user-setting conn))
+    s))
 
 (defn- update-user-setting [conn s {:keys [user-id]}]
   (ec/update-user-setting conn (assoc s :user-id user-id)))

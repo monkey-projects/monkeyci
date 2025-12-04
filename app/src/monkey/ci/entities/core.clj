@@ -35,6 +35,8 @@
                        :values recs}
                       sql-opts)]
     (log/trace "Executing insert:" sql)
+    ;; FIXME In MySQL, when there is no generated id (i.e. aggregate entities)
+    ;; this returns `nil`, but it should return the entities instead.
     (->> (jdbc/execute! ds
                         sql
                         insert-opts)

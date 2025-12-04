@@ -59,4 +59,4 @@
   {(s/optional-key :valid-until) s/Int})
 
 (s/defschema UserSettings
-  {:receive-mailings s/Bool})
+  {:receive-mailing s/Bool})

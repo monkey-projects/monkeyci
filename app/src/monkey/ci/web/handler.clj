@@ -454,7 +454,7 @@
 
 (def user-join-request-routes
   ["/join-request"
-   {:auth-chain [auth/current-user-checker]}
+   {:auth-chain ^:replace [auth/current-user-checker]}
    (c/generic-routes
     {:creator jr-api/create-join-request
      :getter jr-api/get-join-request
@@ -475,7 +475,7 @@
 
 (def user-settings-routes
   ["/settings"
-   {:auth-chain [auth/current-user-checker]}
+   {:auth-chain ^:replace [auth/current-user-checker]}
    [["" {:get {:handler user-api/get-user-settings}
          :put {:handler user-api/update-user-settings
                :parameters {:body schemas/UserSettings}}}]]])
