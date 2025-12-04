@@ -630,7 +630,9 @@
 
 (deftest ^:sql email-registrations
   (with-storage conn s
-    (let [er (h/gen-email-registration)]
+    (let [er (-> (h/gen-email-registration)
+                 (assoc :confirmed true
+                        :creation-time (t/now)))]
       (testing "can create and retrieve"
         (is (sid/sid? (st/save-email-registration s er)))
         (is (= er (st/find-email-registration s (:id er)))))

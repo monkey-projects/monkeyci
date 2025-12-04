@@ -372,7 +372,17 @@
        (insert-entities conn :org-param-values [:params-id :name :value])))
 
 (defentity join-request)
-(defentity email-registration)
+
+(def prepare-email-reg (partial int->time :creation-time))
+(def convert-email-reg (partial copy-prop :creation-time))
+(def convert-email-reg-select (partial time->int :creation-time))
+
+(defentity email-registration
+  {:before-insert prepare-email-reg
+   :after-insert  convert-email-reg
+   :before-update prepare-email-reg
+   :after-update  convert-email-reg
+   :after-select  convert-email-reg-select})
 
 (def prepare-credit-sub
   (comp (partial int->time :valid-from)

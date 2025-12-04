@@ -64,12 +64,12 @@
               :opt-un [:job/status :db/credit-multiplier])
       (s/merge :db/timed)))
 
-(s/def :webhook/creation-time ts?)
+(s/def :db/creation-time ts?)
 (s/def :webhook/last-inv-time ts?)
 
 (s/def :db/webhook
   (-> (s/keys :req-un [:build/repo-id :github/secret]
-              :opt-un [:webhook/creation-time :webhook/last-inv-time])
+              :opt-un [:db/creation-time :webhook/last-inv-time])
       (s/merge :db/common)))
 
 (s/def :db/ssh-key
@@ -114,8 +114,11 @@
               :opt-un [:join-request-db/request-msg :join-request-db/response-msg])
       (s/merge :db/common)))
 
+(s/def :email/confirmed boolean?)
+
 (s/def :db/email-registration
-  (-> (s/keys :req-un [:db/email])
+  (-> (s/keys :req-un [:db/email]
+              :opt-un [:db/creation-time :email/confirmed])
       (s/merge :db/common)))
 
 ;;; Credits

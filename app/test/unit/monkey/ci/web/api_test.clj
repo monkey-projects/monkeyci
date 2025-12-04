@@ -308,13 +308,17 @@
         (is (= ["key"] (keys p)))))))
 
 (deftest create-email-registration
-  (testing "does not create same email twice"
-    (let [{st :storage :as rt} (trt/test-runtime)
-          email "duplicate@monkeyci.com"
-          req (-> rt
-                  (h/->req)
-                  (h/with-body {:email email}))]
-      (is (some? (st/save-email-registration st {:email email})))
+  (let [{st :storage :as rt} (trt/test-runtime)
+        email "duplicate@monkeyci.com"
+        req (-> rt
+                (h/->req)
+                (h/with-body {:email email}))]
+    (testing "sets creation time"
+      (let [r (sut/create-email-registration req)]
+        (is (= 201 (:status r)))
+        (is (some? (get-in r [:body :creation-time])))))
+
+    (testing "does not create same email twice"
       (is (= 200 (:status (sut/create-email-registration req))))
       (is (= 1 (count (st/list-email-registrations st)))))))
 

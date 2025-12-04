@@ -272,7 +272,9 @@
   [req]
   (let [st (c/req->storage req)
         {:keys [email] :as body} (-> (c/body req)
-                                     (assoc :id (st/new-id)))]
+                                     (assoc :id (st/new-id)
+                                            :creation-time (t/now)
+                                            :confirmed false))]
     (if-let [existing (st/find-email-registration-by-email st email)]
       (rur/response existing)
       (when (st/save-email-registration st body)
