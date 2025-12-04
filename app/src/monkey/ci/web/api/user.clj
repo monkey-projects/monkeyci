@@ -27,12 +27,6 @@
   (let [st (c/req->storage req)]
     (rur/response (st/list-user-orgs st (user-id req)))))
 
-#_(c/make-entity-endpoints
- "user-settings"
- {:get-id (c/id-getter :user-id)
-  :getter st/find-user-settings
-  :saver st/save-user-settings})
-
 (defmacro require-user [req & body]
   `(if (st/find-user (c/req->storage ~req) (user-id ~req))
      ~@body
