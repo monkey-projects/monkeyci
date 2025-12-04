@@ -3,10 +3,18 @@
             [monkey.ci.web.common :as c]
             [ring.util.response :as rur]))
 
-(c/make-entity-endpoints "user"
-                         {:get-id (c/id-getter (juxt :user-type :type-id))
-                          :getter st/find-user-by-type
-                          :saver st/save-user})
+(defn- save-user [st u]
+  (st/with-transaction st trx
+    (when-let [r (st/save-user trx u)]
+      (st/save-user-settings trx {:user-id (:id u)
+                                  :receive-mailing true})
+      r)))
+
+(c/make-entity-endpoints
+ "user"
+ {:get-id (c/id-getter (juxt :user-type :type-id))
+  :getter st/find-user-by-type
+  :saver save-user})
 
 (def delete-user
   (c/entity-deleter (c/id-getter :user-id) st/delete-user))

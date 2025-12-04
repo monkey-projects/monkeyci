@@ -26,6 +26,7 @@
 (defrecord SqlMigration [id up down]
   Migratable
   (->migration [m opts]
+    ;; TODO Allow for different sql formats depending on dialect
     (-> (format-migration (:sql-opts opts) m)
         (rj/sql-migration))))
 
@@ -713,7 +714,20 @@
     [[:user-id :integer [:not nil] [:primary-key]]
      [:receive-mailing :boolean]
      fk-user]
-    [(col-idx :user-settings :user-id)])])
+    [(col-idx :user-settings :user-id)])
+
+   (migration
+    (mig-id 57 :email-reg-confirmation)
+    ;; Adding multiple columns at once has different syntax in h2 and mysql
+    ;; so we use multiple statements instead (bad for performance though).
+    [{:alter-table :email-registrations
+      :add-column [:creation-time :timestamp]}
+     {:alter-table :email-registrations
+      :add-column [:confirmed :boolean]}]
+    [{:alter-table :email-registrations
+      :drop-column :creation-time}
+     {:alter-table :email-registrations
+      :drop-column :confirmed}])])
 
 (defn prepare-migrations
   "Prepares all migrations by formatting to sql, creates a ragtime migration object from it."

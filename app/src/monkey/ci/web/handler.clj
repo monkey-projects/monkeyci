@@ -475,9 +475,10 @@
 
 (def user-settings-routes
   ["/settings"
-   {:get {:handler user-api/get-user-settings}
-    :put {:handler user-api/update-user-settings
-          :parameters {:body schemas/UserSettings}}}])
+   {:auth-chain [auth/current-user-checker]}
+   [["" {:get {:handler user-api/get-user-settings}
+         :put {:handler user-api/update-user-settings
+               :parameters {:body schemas/UserSettings}}}]]])
 
 (def user-routes
   ["/user"

@@ -6,6 +6,22 @@
              [runtime :as trt]]
             [monkey.ci.web.api.user :as sut]))
 
+(deftest create-user
+  (let [{st :storage :as rt} (trt/test-runtime)
+        r (-> (h/->req rt)
+              (assoc-in [:parameters :body] {:type "github"
+                                             :type-id 124
+                                             :name "new user"})
+              (sut/create-user))
+        uid (get-in r [:body :id])]
+    (testing "creates user in storage"
+      (is (= 201 (:status r)))
+      (is (= 1 (st/count-users st)))
+      (is (some? (st/find-user st uid))))
+
+    (testing "creates user settings"
+      (is (some? (st/find-user-settings st uid))))))
+
 (deftest update-user
   (testing "updates user in storage"
     (let [{st :storage :as rt} (trt/test-runtime)]

@@ -11,6 +11,15 @@
     (testing "valid user has been created"
       (is (some? u)))
 
+    (testing "user has settings"
+      (let [r (-> (c/request :get (str "/user/" (:id u) "/settings"))
+                  (c/set-token (c/user-token u))
+                  (c/accept-edn)
+                  (http/request)
+                  (deref))]
+        (is (= 200 (:status r)))
+        (is (not-empty (c/try-parse-body r)))))
+
     (let [org {:name (str "test-" (t/now))}
           token (c/user-token u)
           request (fn [method path & [body]]
