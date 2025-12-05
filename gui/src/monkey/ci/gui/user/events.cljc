@@ -26,7 +26,9 @@
 (rf/reg-event-db
  ::general-cancel
  (fn [db _]
-   (db/reset-general-edit db)))
+   (-> db
+       (db/reset-general-edit)
+       (db/reset-general-saving))))
 
 (rf/reg-event-db
  ::general-update
@@ -37,9 +39,10 @@
  ::general-save
  (fn [{:keys [db]} _]
    (let [s (db/get-general-edit-merged db)]
+     ;; TODO Also allow changing email address
      {:dispatch [:secure-request
                  :update-user-settings
-                 {:user-id (:user-id s)
+                 {:user-id (:id s)
                   :settings s}
                  [::general-save--success]
                  [::general-save--failure]]
@@ -52,9 +55,12 @@
  (fn [db [_ {r :body}]]
    (-> db
        (db/set-user-settings r)
-       (db/set-general-alerts [(a/user-general-save-success)]))))
+       (db/set-general-alerts [(a/user-general-save-success)])
+       (db/reset-general-saving))))
 
 (rf/reg-event-db
  ::general-save--failure
  (fn [db [_ err]]
-   (db/set-general-alerts db [(a/user-general-save-failed err)])))
+   (-> db
+       (db/set-general-alerts [(a/user-general-save-failed err)])
+       (db/reset-general-saving))))

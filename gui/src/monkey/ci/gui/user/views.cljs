@@ -35,7 +35,8 @@
          [co/page-title [:span.me-2 [co/icon :person-fill-gear]] "General Settings"]]
         [co/alerts [::s/general-alerts]]
         [:form.d-flex.flex-column.gap-2.mt-3
-         [form-control :name "Name" (:name @s) {:read-only true :default-value (:name @s)}]
+         [form-control :name "User" (str (name (:type @s)) " - " (:type-id @s))
+          {:read-only true}]
          [form-control :email "E-mail" (:email @s)]
          [:div.row
           [:div.offset-1.offset-md-2.col-11.col-md-10
@@ -43,6 +44,7 @@
             [:input.form-check-input
              {:type :checkbox
               :id :receive-mailing
+              :checked (:receive-mailing @s)
               :on-change (u/form-evt-handler [::e/general-update :receive-mailing]
                                              u/evt->checked)}]
             [:label.form-check-label {:for :receive-mailing} "Receive mailings"]]]]

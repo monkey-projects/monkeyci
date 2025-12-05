@@ -52,10 +52,16 @@
            (map :type (db/get-general-alerts @app-db))))))
 
 (deftest general-cancel
+  (is (some? (reset! app-db (-> {}
+                                (db/set-general-edit {:email "test"})
+                                (db/set-general-saving)))))
+  (rf/dispatch-sync [::sut/general-cancel])
+  
   (testing "resets general edit"
-    (is (some? (reset! app-db (db/set-general-edit {} {:email "test"}))))
-    (rf/dispatch-sync [::sut/general-cancel])
-    (is (nil? (db/get-general-edit @app-db)))))
+    (is (nil? (db/get-general-edit @app-db))))
+
+  (testing "unmarks saving"
+    (is (not (db/general-saving? @app-db)))))
 
 (deftest general-update
   (testing "updates property in general edit"
@@ -82,6 +88,7 @@
 
 (deftest general-save--success
   (let [s {:user-id "test-user"}]
+    (is (some? (reset! app-db (db/set-general-saving {}))))
     (rf/dispatch-sync [::sut/general-save--success {:body s}])
 
     (testing "updates settings in db"
@@ -89,11 +96,18 @@
 
     (testing "sets success alert"
       (is (= [:success]
-             (map :type (db/get-general-alerts @app-db)))))))
+             (map :type (db/get-general-alerts @app-db)))))
+
+    (testing "unmarks saving"
+      (is (not (db/general-saving? @app-db))))))
 
 (deftest general-save--failure
+  (is (some? (reset! app-db (db/set-general-saving {}))))
   (rf/dispatch-sync [::sut/general-save--failure {:message "test error"}])
   (testing "sets alert"
     (is (= [:danger]
-           (map :type (db/get-general-alerts @app-db))))))
+           (map :type (db/get-general-alerts @app-db)))))
+
+  (testing "unmarks saving"
+    (is (not (db/general-saving? @app-db)))))
 

@@ -346,7 +346,7 @@
 
    (api-route
     {:route-name :update-user-settings
-     :method :post
+     :method :put
      :path-parts (into user-path "/settings")
      :path-schema user-schema
      :body-schema {:settings cs/UserSettings}})])
