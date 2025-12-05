@@ -356,12 +356,26 @@
         (is (false? (-> (st/find-user-settings st (:id u))
                         :receive-mailing)))))
     
-    (testing "with `user-id`, updates user settings")
+    (testing "with `user-id`, updates user settings"
+      (let [u (h/gen-user)]
+        (is (some? (st/save-user st u)))
+        (is (= 200 (-> (h/->req rt)
+                       (assoc-in [:parameters :query :user-id] (:id u))
+                       (sut/unregister-email)
+                       :status)))
+        (is (false? (-> (st/find-user-settings st (:id u))
+                        :receive-mailing)))))
 
     (testing "returns status `204` when no matches found"
       (is (= 204
              (-> (h/->req rt)
                  (assoc-in [:parameters :query :id] "nonexisting")
+                 (sut/unregister-email)
+                 :status))))
+
+    (testing "returns status `204` when query params"
+      (is (= 204
+             (-> (h/->req rt)
                  (sut/unregister-email)
                  :status))))))
 

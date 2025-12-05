@@ -291,18 +291,19 @@
   (when-let [m (st/find-email-registration-by-email st email)]
     (st/delete-email-registration st (:id m))))
 
+(defn- unregister-settings [st u]
+  (let [s (st/find-user-settings st (:id u))]
+    (st/save-user-settings st (assoc s
+                                     :user-id (:id u)
+                                     :receive-mailing false))))
+
 (defn- unregister-users
   "Updates all user settings with given email to no longer receive mailings"
   [st email]
-  (letfn [(unregister [u]
-            (let [s (st/find-user-settings st (:id u))]
-              (st/save-user-settings st (assoc s
-                                               :user-id (:id u)
-                                               :receive-mailing false))))]
-    (->> (st/find-users-by-email st email)
-         (map unregister)
-         (not-empty)
-         (some?))))
+  (->> (st/find-users-by-email st email)
+       (map (partial unregister-settings st))
+       (not-empty)
+       (some?)))
 
 (defn- unregister-by-email [req]  
   (let [st (c/req->storage req)
@@ -310,6 +311,11 @@
     (->> [(delete-reg st email)
           (unregister-users st email)]
          (some true?))))
+
+(defn- unregister-user [req]
+  (let [st (c/req->storage req)]
+    (when-let [u (st/find-user st (get-in req [:parameters :query :user-id]))]
+      (unregister-settings st u))))
 
 (defn unregister-email
   "Multipurpose unregistration handler, meant to allow people to easily unsubscribe
@@ -321,6 +327,8 @@
             (some? (get-in req [:parameters :query p])))]
     (if (condp has-param? req
           :id (unregister-by-id req)
-          :email (unregister-by-email req))
+          :email (unregister-by-email req)
+          :user-id (unregister-user req)
+          false)
       (rur/status 200)
       (rur/status 204))))
