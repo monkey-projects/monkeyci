@@ -51,6 +51,7 @@
   [{:amount config/free-credits
     :from (t/now)
     :description "Basic free subscription"}
+   ;; TODO Also add start/end date, to indicate promotion periods
    {:amount 2000
     :from (t/now)
     :until (-> (jt/offset-date-time)

@@ -337,7 +337,19 @@
      :path-parts (into user-path "/join-request")
      :path-schema user-schema
      :body-schema {:join-request
-                   {:org-id s/Str}}})])
+                   {:org-id s/Str}}})
+
+   (api-route
+    {:route-name :get-user-settings
+     :path-parts (into user-path "/settings")
+     :path-schema user-schema})
+
+   (api-route
+    {:route-name :update-user-settings
+     :method :put
+     :path-parts (into user-path "/settings")
+     :path-schema user-schema
+     :body-schema {:settings cs/UserSettings}})])
 
 (def webhook-routes
   [(api-route

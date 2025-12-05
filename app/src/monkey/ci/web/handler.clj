@@ -32,7 +32,8 @@
              [params :as param-api]
              [repo :as repo-api]
              [ssh-keys :as ssh-api]
-             [token :as token-api]]
+             [token :as token-api]
+             [user :as user-api]]
             [reitit.coercion.schema]
             [reitit.ring :as ring]
             [ring.middleware.cors :as cors]
@@ -472,6 +473,13 @@
      :id-key :token-id
      :new-schema ApiToken})])
 
+(def user-settings-routes
+  ["/settings"
+   {:auth-chain [auth/current-user-checker]}
+   [["" {:get {:handler user-api/get-user-settings}
+         :put {:handler user-api/update-user-settings
+               :parameters {:body schemas/UserSettings}}}]]])
+
 (def user-routes
   ["/user"
    {:conflicting true
@@ -479,20 +487,21 @@
     :auth-chain [auth/deny-all auth/sysadmin-checker]}
    [[""
      {:post
-      {:handler api/create-user
+      {:handler user-api/create-user
        :parameters {:body User}}}]
-    ;; TODO Add endpoints that use the cuid instead for consistency
+    ;; TODO Add more endpoints that use the cuid instead for consistency
     ["/:user-id"
      {:parameters
       {:path {:user-id s/Str}}}
      [[""
-       {:delete {:handler api/delete-user}}]
+       {:delete {:handler user-api/delete-user}}]
       ["/orgs"
        {:auth-chain ^:replace []
         :get
-        {:handler api/get-user-orgs}}]
+        {:handler user-api/get-user-orgs}}]
       user-join-request-routes
-      user-token-routes]]
+      user-token-routes
+      user-settings-routes]]
     ["/:user-type/:type-id"
      {:parameters
       {:path {:user-type s/Str
@@ -500,9 +509,9 @@
       ;; Allow get requests
       :auth-chain [auth/readonly-checker]
       :get
-      {:handler api/get-user}
+      {:handler user-api/get-user}
       :put
-      {:handler api/update-user
+      {:handler user-api/update-user
        :parameters {:body User}}}]]])
 
 (def email-registration-routes

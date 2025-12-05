@@ -4,7 +4,7 @@
 
 (def delim "/")
 
-(def sid? vector?)
+(def sid? (every-pred vector? not-empty))
 (def ->sid vec)
 
 (defn parse-sid [s]

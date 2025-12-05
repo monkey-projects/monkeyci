@@ -118,8 +118,9 @@
          (map db->org-with-repos))))
 
 (defn select-orgs-by-id [st ids]
-  (->> (ec/select-orgs (sc/get-conn st) [:in :cuid (distinct ids)])
-       (map db->org)))
+  (when (not-empty ids)
+    (->> (ec/select-orgs (sc/get-conn st) [:in :cuid (distinct ids)])
+         (map db->org))))
 
 (defn count-orgs [st]
   (ec/count-entities (sc/get-conn st) :orgs))

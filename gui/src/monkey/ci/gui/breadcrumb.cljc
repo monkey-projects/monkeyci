@@ -61,6 +61,11 @@
         {:url (r/path-for :page/add-repo (r/path-params (r/current db)))
          :name "Watch Repo"}))
 
+(defn- user-breadcrumb [db]
+  [home
+   {:url (r/path-for :page/user (r/path-params (r/current db)))
+    :name "User Preferences"}])
+
 (defn- credits-breadcrumb [db]
   (conj (default-breadcrumb db)
         {:url (r/path-for :admin/credits)
@@ -104,6 +109,7 @@
    :page/org-settings org-settings-breadcrumb
    :page/repo-settings repo-settings-breadcrumb
    :page/add-repo org-watch-repo
+   :page/user user-breadcrumb
    :admin/credits credits-breadcrumb
    :admin/org-credits org-credits-breadcrumb
    :admin/clean-builds clean-builds-breadcrumb

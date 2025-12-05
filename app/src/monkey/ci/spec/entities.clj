@@ -73,13 +73,12 @@
       (s/merge :entity/timed)))
 
 (s/def :entity/secret-key string?)
-
-(s/def :webhook/creation-time ts?)
+(s/def :entity/creation-time ts?)
 (s/def :webhook/last-inv-time ts?)
 
 (s/def :entity/webhook
   (-> (s/keys :req-un [:entity/org-id :entity/repo-id :entity/secret-key]
-              :opt-un [:webhook/creation-time :webhook/last-inv-time])
+              :opt-un [:db/creation-time :webhook/last-inv-time])
       (s/merge :entity/common)))
 
 (s/def :label-filter/label string?)
@@ -131,8 +130,11 @@
 
 ;; Email registrations are created then an anonymous user registers their email
 ;; in order to receive mailing updates.
+(s/def :email/confirmed boolean?)
+
 (s/def :entity/email-registration
-  (-> (s/keys :req-un [:entity/email])
+  (-> (s/keys :req-un [:entity/email]
+              :opt-un [:entity/creation-time :email/confirmed])
       (s/merge :entity/common)))
 
 (s/def :entity/amount (s/int-in 0 1000000))
@@ -240,3 +242,9 @@
   (-> (s/keys :req-un [:entity/mailing-id :entity/sent-at]
               :opt-un [:mailing/mail-id :mailing/to-users :mailing/to-subscribers :entity/other-dests])
       (s/merge :entity/common)))
+
+(s/def :entity/receive-mailing boolean?)
+
+(s/def :entity/user-setting
+  (s/keys :req-un [:entity/user-id]
+          :opt-un [:entity/receive-mailing]))

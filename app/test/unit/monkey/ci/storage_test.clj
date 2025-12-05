@@ -373,6 +373,9 @@
       (testing "can find user by cuid"
         (is (= u (sut/find-user st (:id u))) "can retrieve user by id"))
 
+      (testing "can find by email"
+        (is (= [u] (sut/find-users-by-email st (:email u)))))
+
       (testing "can count"
         (is (= 1 (sut/count-users st))))
 
@@ -732,3 +735,14 @@
 
       (testing "can find by email"
         (is (= r (sut/find-email-registration-by-email st (:email r))))))))
+
+(deftest user-settings
+  (h/with-memory-store st
+    (let [u (h/gen-user)
+          s (-> (h/gen-user-settings)
+                (assoc :user-id (:id u)))]
+      (is (sid/sid? (sut/save-user st u)))
+
+      (testing "can save and find for user"
+        (is (sid/sid? (sut/save-user-settings st s)))
+        (is (= s (sut/find-user-settings st (:id u))))))))

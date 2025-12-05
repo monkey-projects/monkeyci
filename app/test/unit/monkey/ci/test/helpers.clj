@@ -297,6 +297,9 @@
 (defn gen-sent-mailing []
   (gen-entity :entity/sent-mailing))
 
+(defn gen-user-settings []
+  (gen-entity :entity/user-setting))
+
 (defn gen-build-sid []
   (repeatedly 3 cuid/random-cuid))
 
