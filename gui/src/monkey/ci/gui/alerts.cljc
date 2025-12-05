@@ -233,3 +233,12 @@
 
 (def unregister-email-failed
   (error-msg "Failed unregister your email"))
+
+(def user-general-load-failed
+  (error-msg "Failed to retrieve general settings"))
+
+(def user-general-save-success
+  (alert-msg :success (constantly "General settings have been updated.")))
+
+(def user-general-save-failed
+  (error-msg "Failed to update general settings"))
