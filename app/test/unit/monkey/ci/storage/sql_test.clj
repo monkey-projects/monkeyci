@@ -391,6 +391,9 @@
 
       (testing "can find orgs"
         (is (not-empty (st/list-user-orgs s (:id user)))))
+
+      (testing "can find by email"
+        (is (= [user] (st/find-users-by-email s (:email user)))))
       
       (testing "can unlink from org"
         (is (sid/sid? (st/save-user s (dissoc user :orgs))))

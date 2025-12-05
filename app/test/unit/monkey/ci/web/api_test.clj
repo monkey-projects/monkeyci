@@ -344,8 +344,19 @@
                        :status)))
         (is (nil? (st/find-email-registration st (:id reg))))))
     
-    (testing "with `email` of user, updates user notification configuration")
-    (testing "with `user-id`, updates user notification configuration")
+    (testing "with `email` of user, updates user settings"
+      (let [email "testuser@monkeyci.com"
+            u (-> (h/gen-user)
+                  (assoc :email email))]
+        (is (some? (st/save-user st u)))
+        (is (= 200 (-> (h/->req rt)
+                       (assoc-in [:parameters :query :email] email)
+                       (sut/unregister-email)
+                       :status)))
+        (is (false? (-> (st/find-user-settings st (:id u))
+                        :receive-mailing)))))
+    
+    (testing "with `user-id`, updates user settings")
 
     (testing "returns status `204` when no matches found"
       (is (= 204

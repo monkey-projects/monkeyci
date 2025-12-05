@@ -68,6 +68,10 @@
   (->> (eu/select-user-emails (sc/get-conn st))
        (map :email)))
 
+(defn select-by-email [st email]
+  (->> (eu/select-by-email (sc/get-conn st) email)
+       (map db->user)))
+
 (defn count-users [st]
   (ec/count-entities (sc/get-conn st) :users))
 

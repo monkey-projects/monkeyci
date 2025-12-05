@@ -580,20 +580,30 @@
      (when id
        (p/read-obj s (user-sid id))))))
 
+(defn- list-users [s]
+  ;; Very slow for many users.  Use dedicated query in override.
+  (letfn [(find-typed-users [t]
+               (->> (p/list-obj s [global users t])
+                    (map #(find-user-by-type s [(keyword t) %]))))]
+    (->> (p/list-obj s [global users])
+         (mapcat find-typed-users))))
+
 (def find-user
   "Find user by cuid"
   (override-or
    [:user :find]
    (fn [s id]
-     ;; Very slow for many users.  Use dedicated query in override.
-     (letfn [(find-typed-users [t]
-               (->> (p/list-obj s [global users t])
-                    (map #(find-user-by-type s [(keyword t) %]))))]
-       (when id
-         (->> (p/list-obj s [global users])
-              (mapcat find-typed-users)
-              (filter (comp (partial = id) :id))
-              (first)))))))
+     (when id
+       (->> (list-users s)
+            (filter (comp (partial = id) :id))
+            (first))))))
+
+(def find-users-by-email
+  (override-or
+   [:user :find-by-email]
+   (fn [s email]
+     (->> (list-users s)
+          (filter (comp (partial = email) :email))))))
 
 (def delete-user
   (override-or

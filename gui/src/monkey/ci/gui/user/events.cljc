@@ -43,7 +43,7 @@
      {:dispatch [:secure-request
                  :update-user-settings
                  {:user-id (:id s)
-                  :settings s}
+                  :settings (select-keys s [:receive-mailing])}
                  [::general-save--success]
                  [::general-save--failure]]
       :db (-> db

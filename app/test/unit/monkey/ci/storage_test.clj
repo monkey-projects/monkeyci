@@ -373,6 +373,9 @@
       (testing "can find user by cuid"
         (is (= u (sut/find-user st (:id u))) "can retrieve user by id"))
 
+      (testing "can find by email"
+        (is (= [u] (sut/find-users-by-email st (:email u)))))
+
       (testing "can count"
         (is (= 1 (sut/count-users st))))
 

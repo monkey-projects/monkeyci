@@ -284,10 +284,32 @@
   (st/delete-email-registration (c/req->storage req)
                                 (get-in req [:parameters :query :id])))
 
-(defn- unregister-by-email [req]
-  (let [st (c/req->storage req)]
-    (when-let [m (st/find-email-registration-by-email st (get-in req [:parameters :query :email]))]
-      (st/delete-email-registration st (:id m)))))
+(defn- delete-reg
+  "Deletes email registration for given email"
+  [st email]
+  ;; TODO Just delete them all, no need to lookup
+  (when-let [m (st/find-email-registration-by-email st email)]
+    (st/delete-email-registration st (:id m))))
+
+(defn- unregister-users
+  "Updates all user settings with given email to no longer receive mailings"
+  [st email]
+  (letfn [(unregister [u]
+            (let [s (st/find-user-settings st (:id u))]
+              (st/save-user-settings st (assoc s
+                                               :user-id (:id u)
+                                               :receive-mailing false))))]
+    (->> (st/find-users-by-email st email)
+         (map unregister)
+         (not-empty)
+         (some?))))
+
+(defn- unregister-by-email [req]  
+  (let [st (c/req->storage req)
+        email (get-in req [:parameters :query :email])]
+    (->> [(delete-reg st email)
+          (unregister-users st email)]
+         (some true?))))
 
 (defn unregister-email
   "Multipurpose unregistration handler, meant to allow people to easily unsubscribe

@@ -463,6 +463,7 @@
     :count sr/count-repos}
    :user
    {:find su/select-user
+    :find-by-email su/select-by-email
     :orgs su/select-user-orgs
     :count su/count-users
     :delete su/delete-user
