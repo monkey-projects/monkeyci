@@ -80,7 +80,7 @@
 (def arch-credits
   "Credits per cpu for each arch"
   {arch-arm 1
-   arch-amd 2})
+   arch-amd 1})
 
 (defn credit-multiplier
   "Calculates the credit multiplier that needs to be applied for the container
