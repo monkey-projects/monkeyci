@@ -60,3 +60,8 @@
 
 (s/defschema UserSettings
   {:receive-mailing s/Bool})
+
+(s/defschema InvoiceSearchFilter
+  {(s/optional-key :from-date) s/Str
+   (s/optional-key :until-date) s/Str
+   (s/optional-key :invoice-nr) s/Str})

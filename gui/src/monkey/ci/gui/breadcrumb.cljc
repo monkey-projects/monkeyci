@@ -71,6 +71,13 @@
         {:url (r/path-for :admin/credits)
          :name "Credits"}))
 
+(defn- invoice-breadcrumb [db]
+  (mc/insert-nth
+   1
+   {:url (r/path-for :admin/invoicing)
+    :name "Invoices"}
+   (default-breadcrumb db)))
+
 (defn- org-credits-breadcrumb [db]
   (mc/insert-nth
    1
@@ -115,7 +122,9 @@
    :admin/clean-builds clean-builds-breadcrumb
    :admin/mailings mailings-breadcrumb
    :admin/new-mailing new-mailing-breadcrumb
-   :admin/mailing-edit edit-mailing-breadcrumb})
+   :admin/mailing-edit edit-mailing-breadcrumb
+   :admin/invoicing invoice-breadcrumb
+   :admin/org-invoices invoice-breadcrumb})
 
 (rf/reg-sub
  :breadcrumb/path
