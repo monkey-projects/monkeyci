@@ -1,6 +1,7 @@
 (ns monkey.ci.mailing.scw
   "Scaleway implementation of the Mailer, that uses transactional emails to send mails."
   (:require [com.stuartsierra.component :as co]
+            [manifold.deferred :as md]
             [martian.core :as mc]
             [medley.core :as m]
             [monkey.ci
@@ -22,6 +23,22 @@
     (b rcpt)
     b))
 
+(defn- send-one [rcpt {uh :unsubscribe :as config} ctx {:keys [subject text-body html-body destinations]}]
+  (md/chain
+   (->> (select-keys config [:project-id :from :bcc])
+        (merge (cond-> (->> [subject text-body html-body]
+                            (map #(apply-rcpt % rcpt))
+                            (zipmap [:subject :text :html])
+                            (merge 
+                             {:to (map (partial hash-map :email) [rcpt])}))
+                 uh (assoc :additional-headers
+                           [{:key "list-unsubscribe"
+                             :value (format uh rcpt)}])))
+        (m/filter-vals some?)
+        (hash-map :region (:region config) :body)
+        (send-with-retry ctx))
+   :body))
+
 (defrecord ScwMailer [config]
   co/Lifecycle
   (start [this]
@@ -31,21 +48,13 @@
     (dissoc this :ctx))
   
   p/Mailer
-  (send-mail [this {:keys [subject text-body html-body destinations]}]
+  (send-mail [this {:keys [destinations] :as mail}]
     (let [uh (:unsubscribe config)]
-      (-> (for [rcpt destinations]
-            (->> (select-keys config [:project-id :from :bcc])
-                 (merge (cond-> (->> [subject text-body html-body]
-                                     (map #(apply-rcpt % rcpt))
-                                     (zipmap [:subject :text :html])
-                                     (merge 
-                                      {:to (map (partial hash-map :email) [rcpt])}))
-                          uh (assoc :additional-headers
-                                    [{:key "list-unsubscribe"
-                                      :value (format uh rcpt)}])))
-                 (m/filter-vals some?)
-                 (hash-map :region (:region config) :body)
-                 (send-with-retry (:ctx this))
-                 (deref)
-                 :body))
-          (doall)))))
+      (md/loop [d destinations
+                r []]
+        (if (empty? d)
+          r
+          (md/chain
+           (send-one (first d) config (:ctx this) mail)
+           #(md/recur (rest d)
+                      (conj r %))))))))

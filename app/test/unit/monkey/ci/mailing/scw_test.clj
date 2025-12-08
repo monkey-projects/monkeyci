@@ -26,6 +26,7 @@
             (is (= "test-mail"
                    (-> (p/send-mail m {:subject "test mail"
                                        :destinations ["test@monkeyci.com"]})
+                       deref
                        first
                        :id))))
 
@@ -44,23 +45,23 @@
 
           (testing "sends separate mail to each recipient"
             (is (empty? (reset! inv [])))
-            (is (some? (p/send-mail m {:subject "another mail"
-                                       :text-body "Test mail body"
-                                       :destinations ["dest1@monkeyci.com"
-                                                      "dest2@monkeyci.com"]})))
+            (is (some? @(p/send-mail m {:subject "another mail"
+                                        :text-body "Test mail body"
+                                        :destinations ["dest1@monkeyci.com"
+                                                       "dest2@monkeyci.com"]})))
             (is (= 2 (count @inv))))
 
           (testing "applies destination to subject if fn"
             (is (empty? (reset! inv [])))
-            (is (some? (p/send-mail m {:subject (partial str "hello ")
-                                       :destinations ["John"]})))
+            (is (some? @(p/send-mail m {:subject (partial str "hello ")
+                                        :destinations ["John"]})))
             (is (= ["hello John"]
                    (map (comp :subject :body) @inv))))
 
           (testing "applies destination to body if fn"
             (is (empty? (reset! inv [])))
-            (is (some? (p/send-mail m {:text-body (partial str "hello ")
-                                       :destinations ["John"]})))
+            (is (some? @(p/send-mail m {:text-body (partial str "hello ")
+                                        :destinations ["John"]})))
             (is (= ["hello John"]
                    (map (comp :text :body) @inv))))
 
@@ -68,7 +69,7 @@
             (let [m (-> (sut/->ScwMailer {:unsubscribe "http://unsubscibe?email=%s"})
                         (co/start))]
               (is (empty? (reset! inv [])))
-              (is (some? (p/send-mail m {:destinations ["test@monkeyci.com"]})))
+              (is (some? @(p/send-mail m {:destinations ["test@monkeyci.com"]})))
               (is (= "http://unsubscibe?email=test@monkeyci.com"
                      (-> @inv
                          first

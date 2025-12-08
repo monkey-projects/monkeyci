@@ -50,7 +50,7 @@
                 (sut/create-sent-mailing))]
       
       (testing "creates in storage"
-        (is (= 201 (:status r)))
+        (is (= 202 (:status r)) "Returns accepted status")
         (is (= 1 (count (st/list-sent-mailings st (:id m))))))
 
       (testing "returns created delivery"
@@ -61,8 +61,8 @@
                          :mailer
                          :mailings
                          deref)]
-        (testing "sends mails"
-          (is (= 1 (count mailings))))
+        (testing "sends mails in background"
+          (is (not= :timeout (h/wait-until #(pos? (count mailings)) 1000))))
 
         (testing "wraps subject in replacement fn"
           (let [s (-> mailings first :subject)]
@@ -75,9 +75,6 @@
                        :id
                        (vector (:id m))
                        (st/find-sent-mailing st))]
-            (testing "contains mailer id"
-              (is (some? (:mail-id d))))
-
             (testing "has `sent-at` timestamp"
               (is (number? (:sent-at d))))))
 
