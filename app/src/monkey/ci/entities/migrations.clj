@@ -727,7 +727,14 @@
     [{:alter-table :email-registrations
       :drop-column :creation-time}
      {:alter-table :email-registrations
-      :drop-column :confirmed}])])
+      :drop-column :confirmed}])
+
+   (migration
+    (mig-id 58 :drop-sent-mail-id)
+    [{:alter-table :sent-mailings
+      :drop-column :mail-id}]
+    [{:alter-table :sent-mailings
+      :add-column [:mail-id [:varchar 100]]}])])
 
 (defn prepare-migrations
   "Prepares all migrations by formatting to sql, creates a ragtime migration object from it."
