@@ -365,7 +365,10 @@
    [[""
      {:get {:handler inv-api/search-invoices
             :parameters
-            {:query schemas/InvoiceSearchFilter}}}]
+            {:query schemas/InvoiceSearchFilter}}
+      :post {:handler inv-api/create-invoice
+             :parameters
+             {:body schemas/NewInvoice}}}]
     ["/:invoice-id"
      {:get {:handler inv-api/get-invoice
             :parameters

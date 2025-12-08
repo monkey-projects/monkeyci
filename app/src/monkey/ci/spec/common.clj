@@ -58,7 +58,10 @@
 (s/def :bb/workspace string?)
 (s/def :bb/repo-slug string?)
 
-(s/def :invoice/invoice-nr string?)
+;; Invoice numbers are strings, but should only consist of digits
+(s/def :invoice/invoice-nr (s/with-gen
+                             (partial re-matches #"\d+")
+                             #(gen/return (str (int (* 100000 (rand)))))))
 (s/def :invoice/net-amount (s/and decimal? pos?))
 (s/def :invoice/vat-perc (s/and decimal? pos?))
 (s/def :invoice/currency string?)

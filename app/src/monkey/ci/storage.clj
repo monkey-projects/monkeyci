@@ -873,20 +873,34 @@
 (defn invoice-sid [& parts]
   (into [global (name invoice)] parts))
 
-(defn save-invoice [st invoice]
-  (p/write-obj st (invoice-sid (:org-id invoice) (:id invoice)) invoice))
-
 (defn find-invoice [st sid]
   (p/read-obj st (apply invoice-sid sid)))
+
+(defn- next-invoice-nr
+  "Just adds one to the highest found invoice nr"
+  [st]
+  (->> (p/list-obj st (invoice-sid))
+       (map (comp :invoice-nr (partial find-invoice st)))
+       (remove nil?)
+       (map (memfn Integer/parseInt))
+       (apply max 0)
+       inc))
+
+(def save-invoice
+  (override-or
+   [:invoice :save]
+   (fn [st invoice]
+     (cond-> invoice
+       (nil? (:invoice-nr invoice)) (assoc :invoice-nr (next-invoice-nr st))
+       true (as-> i (p/write-obj st (invoice-sid (:org-id invoice) (:id invoice)) i))))))
 
 (def list-invoices-for-org
   (override-or
    [:invoice :list-for-org]
-   (fn [st cust-id]
-     (->> (p/list-obj st (invoice-sid cust-id))
-          (map (partial vector cust-id))
+   (fn [st org-id]
+     (->> (p/list-obj st (invoice-sid org-id))
+          (map (partial vector org-id))
           (map (partial find-invoice st))))))
-
 
 (def runner-details :runner-details)
 (defn runner-details-sid [build-sid]

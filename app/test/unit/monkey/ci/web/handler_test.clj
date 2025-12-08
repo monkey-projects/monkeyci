@@ -485,16 +485,26 @@
 
         (testing "`/invoice`"
           (let [inv (-> (h/gen-invoice)
-                        (assoc :org-id (:id org)))]
-            (is (some? (st/save-invoice st inv)))
+                        (assoc :org-id (:id org))
+                        (dissoc :org-id :id :invoice-nr))
+                base-path (str "/org/" (:id org) "/invoice")
+                r (-> (h/json-request :post base-path inv)
+                      (app))
+                b (h/reply->json r)]
+
+            (testing "`POST` creates new invoice"
+              (is (= 201 (:status r)))
+              (is (some? (:id b)))
+              (is (= 1 (count (st/list-invoices-for-org st (:id org)))))
+              (is (some? (st/find-invoice st [(:id org) (:id b)]))))
             
             (testing "`GET` searches invoices"
-              (is (= 200 (-> (mock/request :get (str "/org/" (:id org) "/invoice"))
+              (is (= 200 (-> (mock/request :get base-path)
                              (app)
                              :status))))
 
             (testing "`GET /:id` retrieves by id"
-              (is (= 200 (-> (mock/request :get (str "/org/" (:id org) "/invoice/" (:id inv)))
+              (is (= 200 (-> (mock/request :get (str base-path "/" (:id b)))
                              (app)
                              :status)))))))))
 

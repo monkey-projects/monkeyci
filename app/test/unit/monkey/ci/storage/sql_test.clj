@@ -899,7 +899,9 @@
       (testing "can update"
         (let [upd (assoc inv :currency "USD")]
           (is (some? (st/save-invoice st upd)))
-          (is (= upd (st/find-invoice st [(:id org) (:id inv)]))))))))
+          (is (= upd (st/find-invoice st [(:id org) (:id inv)])))))
+
+      (testing "assigns invoice nr"))))
 
 (deftest ^:sql runner-details
   (with-storage conn st

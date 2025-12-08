@@ -10,6 +10,12 @@
  {:get-id invoice-sid
   :getter st/find-invoice})
 
+(defn create-invoice [req]
+  (let [s (c/entity-creator st/save-invoice c/default-id)]
+    (-> req
+        (assoc-in [:parameters :body :org-id] (c/org-id req))
+        (s))))
+
 (defn search-invoices
   "Searches org invoices"
   [req]

@@ -15,7 +15,6 @@
              [core :as ec]
              [credit-cons :as eccon]
              [credit-subs :as ecsub]
-             [invoice :as ei]
              [job :as ej]
              [migrations :as emig]
              [org :as ecu]
@@ -27,6 +26,7 @@
              [credit-cons :as scco]
              [credit-sub :as scs]
              [email-registration :as ser]
+             [invoice :as si]
              [job :as sj]
              [join-request :as sjr]
              [mailing :as sma]
@@ -147,38 +147,6 @@
   (some-> (eu/select-sysadmin-by-user-cuid conn user-cuid)
           (assoc :user-id user-cuid)))
 
-(def invoice? (partial global-sid? st/invoice))
-
-(defn- db->invoice [inv]
-  (-> inv
-      (cuid->id)
-      (assoc :org-id (:org-cuid inv))
-      (dissoc :org-cuid)))
-
-(defn- select-invoice [conn cuid]
-  (some-> (ei/select-invoice-with-org conn cuid)
-          db->invoice))
-
-(defn- select-invoices-for-org [st org-cuid]
-  (->> (ei/select-invoices-for-org (get-conn st) org-cuid)
-       (map db->invoice)))
-
-(defn- insert-invoice [conn inv]
-  (when-let [org (ec/select-org conn (ec/by-cuid (:org-id inv)))]
-    (ec/insert-invoice conn (-> inv
-                                (id->cuid)
-                                (assoc :org-id (:id org))))))
-
-(defn- update-invoice [conn inv existing]
-  (ec/update-invoice conn (merge existing
-                                 (-> inv
-                                     (dissoc :id :org-id)))))
-
-(defn- upsert-invoice [conn inv]
-  (if-let [existing (ec/select-invoice conn (ec/by-cuid (:id inv)))]
-    (update-invoice conn inv existing)
-    (insert-invoice conn inv)))
-
 (defn- runner-details-sid->build-sid [sid]
   (take-last (count st/build-sid-keys) sid))
 
@@ -254,6 +222,7 @@
 (def user-settings? (partial global-sid? st/user-settings))
 (def org-token? (partial global-sid? st/org-token))
 (def mailing? (partial global-sid? st/mailing))
+(def invoice? (partial global-sid? st/invoice))
 
 (defrecord SqlStorage [pool]
   p/Storage
@@ -289,7 +258,7 @@
         sysadmin?
         (select-sysadmin conn (last sid))
         invoice?
-        (select-invoice conn (last sid))
+        (si/select-invoice conn (last sid))
         runner-details?
         (select-runner-details conn (runner-details-sid->build-sid sid))
         user-token?
@@ -333,7 +302,7 @@
               sysadmin?
               (upsert-sysadmin conn obj)
               invoice?
-              (upsert-invoice conn obj)
+              (si/upsert-invoice conn obj)
               runner-details?
               (upsert-runner-details conn (runner-details-sid->build-sid sid) obj)
               queued-task?
@@ -494,7 +463,7 @@
    {:find-for-webhook select-bb-webhook-for-webhook
     :search-webhooks select-bb-webhooks-by-filter}
    :invoice
-   {:list-for-org select-invoices-for-org}
+   {:list-for-org si/select-invoices-for-org}
    :queued-task
    {:list select-queued-tasks}
    :mailing

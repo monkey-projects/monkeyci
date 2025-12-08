@@ -65,3 +65,21 @@
   {(s/optional-key :from-date) s/Str
    (s/optional-key :until-date) s/Str
    (s/optional-key :invoice-nr) s/Str})
+
+(def invoice-kind (s/enum :invoice :creditnote))
+
+(s/defschema InvoiceDetail
+  {:description s/Str
+   :net-amount s/Num
+   :vat-perc s/Num})
+
+(s/defschema NewInvoice
+  {:kind invoice-kind
+   (s/optional-key :date) s/Int
+   :details [InvoiceDetail]
+   :net-amount s/Num
+   :vat-perc s/Num
+   :currency s/Str})
+
+(s/defschema UpdateInvoice
+  (assoc NewInvoice :id Id))
