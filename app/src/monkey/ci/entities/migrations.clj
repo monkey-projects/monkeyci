@@ -734,7 +734,18 @@
     [{:alter-table :sent-mailings
       :drop-column :mail-id}]
     [{:alter-table :sent-mailings
-      :add-column [:mail-id [:varchar 100]]}])])
+      :add-column [:mail-id [:varchar 100]]}])
+
+   (migration
+    (mig-id 59 :invoices-ext-id)
+    [{:alter-table :invoices
+      :alter-column [:invoice-nr [:varchar 50] nil]}
+     {:alter-table :invoices
+      :add-column [:ext-id [:varchar 20]]}]
+    [{:alter-table :invoices
+      :alter-column [:invoice-nr [:varchar 50] [:not nil]]}
+     {:alter-table :invoices
+      :drop-column :ext-id}])])
 
 (defn prepare-migrations
   "Prepares all migrations by formatting to sql, creates a ragtime migration object from it."

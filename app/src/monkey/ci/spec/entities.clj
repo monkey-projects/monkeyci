@@ -186,9 +186,10 @@
   (s/keys :req-un [:entity/user-id :entity/password]))
 
 (s/def :entity/invoice
-  (-> (s/keys :req-un [:entity/org-id :invoice/kind :invoice/invoice-nr :invoice/date
+  (-> (s/keys :req-un [:entity/org-id :invoice/kind :invoice/date
                        :invoice/net-amount :invoice/vat-perc :invoice/currency
-                       :invoice/details])
+                       :invoice/details]
+              :opt-un [:invoice/invoice-nr :invoice/ext-id])
       (s/merge :entity/common)))
 
 (s/def :invoice/details

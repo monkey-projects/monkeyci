@@ -876,23 +876,11 @@
 (defn find-invoice [st sid]
   (p/read-obj st (apply invoice-sid sid)))
 
-(defn- next-invoice-nr
-  "Just adds one to the highest found invoice nr"
-  [st]
-  (->> (p/list-obj st (invoice-sid))
-       (map (comp :invoice-nr (partial find-invoice st)))
-       (remove nil?)
-       (map (memfn Integer/parseInt))
-       (apply max 0)
-       inc))
-
 (def save-invoice
   (override-or
    [:invoice :save]
    (fn [st invoice]
-     (cond-> invoice
-       (nil? (:invoice-nr invoice)) (assoc :invoice-nr (next-invoice-nr st))
-       true (as-> i (p/write-obj st (invoice-sid (:org-id invoice) (:id invoice)) i))))))
+     (p/write-obj st (invoice-sid (:org-id invoice) (:id invoice)) invoice))))
 
 (def list-invoices-for-org
   (override-or

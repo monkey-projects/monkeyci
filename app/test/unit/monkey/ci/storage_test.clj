@@ -619,15 +619,7 @@
         (is (= inv (sut/find-invoice st [(:id org) (:id inv)]))))
 
       (testing "can list for org"
-        (is (= [inv] (sut/list-invoices-for-org st (:id org)))))
-
-      (testing "assigns invoice nr"
-        (let [inv (-> (h/gen-invoice)
-                      (assoc :org-id (:id org))
-                      (dissoc :invoice-nr))]
-          (is (sid/sid? (sut/save-invoice st inv)))
-          (is (some? (-> (sut/find-invoice st [(:id org) (:id inv)])
-                         :invoice-nr))))))))
+        (is (= [inv] (sut/list-invoices-for-org st (:id org))))))))
 
 (deftest runner-details
   (h/with-memory-store st

@@ -878,6 +878,8 @@
                          :currency "EUR"
                          :net-amount 100M
                          :vat-perc 21M
+                         :ext-id "1234"
+                         :invoice-nr "5689"
                          :details
                          [{:net-amount 20M
                            :vat-perc 21M

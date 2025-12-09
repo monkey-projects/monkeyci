@@ -172,9 +172,10 @@
   (s/keys :req-un [:db/user-id :db/password]))
 
 (s/def :db/invoice
-  (-> (s/keys :req-un [:db/org-id :invoice/kind :invoice/invoice-nr :invoice/date
+  (-> (s/keys :req-un [:db/org-id :invoice/kind :invoice/date
                        :invoice/currency :invoice/net-amount :invoice/vat-perc
-                       :db-invoice/details])
+                       :db-invoice/details]
+              :opt-un [:invoice/invoice-nr :invoice/ext-id])
       (s/merge :db/common)))
 
 (s/def :db-invoice/details
