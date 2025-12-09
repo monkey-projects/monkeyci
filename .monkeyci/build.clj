@@ -190,9 +190,10 @@
     ;; If this is a release, and it's already been deployed, then skip this.
     ;; This is to be able to re-run a release build when a job down the road has
     ;; previously failed.
-    (when (or (nil? v) (not= v (clojars-latest-version dir ctx)))
+    (if (or (nil? v) (not= v (clojars-latest-version dir ctx)))
       (-> (clj-container id dir "-X:jar:deploy")
-          (assoc :container/env (publish-env ctx v))))))
+          (assoc :container/env (publish-env ctx v)))
+      (m/action-job id (constantly (m/with-message m/success "Version was already published"))))))
 
 (defn publish-app [ctx]
   (when (p/publish-app? ctx)
