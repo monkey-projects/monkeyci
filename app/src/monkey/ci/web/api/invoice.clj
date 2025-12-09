@@ -11,6 +11,7 @@
   :getter st/find-invoice})
 
 (defn create-invoice [req]
+  ;; TODO Create invoice externally, then update this invoice with ext-id and invoice-nr
   (let [s (c/entity-creator st/save-invoice c/default-id)]
     (-> req
         (assoc-in [:parameters :body :org-id] (c/org-id req))
