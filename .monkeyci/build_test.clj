@@ -97,7 +97,7 @@
                     (mt/with-git-ref "refs/tags/1.2.3")
                     (sut/publish "publish" "app"))
               e (m/env p)]
-          (testing "creates container job"
+          (testing "creates container job if not published yet"
             (is (m/container-job? p)))
 
           (testing "passes clojars credits to env"
@@ -107,10 +107,15 @@
           (testing "passes tag version"
             (is (= "1.2.3" (get e "MONKEYCI_VERSION")))))
 
-        (testing "`nil` if version already published"
-          (is (nil? (-> ctx
+        (testing "if version already published"
+          (let [job (-> ctx
                         (mt/with-git-ref "refs/tags/1.0.0")
-                        (sut/publish "publish-app" "app")))))
+                        (sut/publish "publish-app" "app"))]
+            (testing "creates action job"
+              (is (m/action-job? job)))
+
+            (testing "is succesful"
+              (is (bc/success? (mt/execute-job job ctx))))))
 
         (testing "always publish snapshots"
           (is (m/container-job? (sut/publish ctx "publish-app" "app"))))))))

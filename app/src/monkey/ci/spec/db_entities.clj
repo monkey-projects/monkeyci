@@ -18,7 +18,7 @@
 (s/def :github/secret string?)
 (s/def :db/name (s/and string? not-empty))
 (s/def :db/description string?)
-(s/def :db/display-id string?)
+(s/def :db/display-id (s/and string? not-empty))
 
 (s/def :db/common
   (s/keys :req-un [:db/cuid]
