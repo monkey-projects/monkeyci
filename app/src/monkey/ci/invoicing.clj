@@ -26,15 +26,37 @@
       (http/request)
       (md/chain wc/parse-body)))
 
-(defn list-customers
+(defn make-client
+  "Creates a new invoicing client with given config.  The client is a 1-arity
+   function that accepts request options, and executes an async http request."
+  [conf]
+  (fn [req]
+    (do-req conf req)))
+
+(defn- inv-req [builder]
+  (fn [client & args]
+    (client (apply builder args))))
+
+(def list-customers
   "Lists all registered invoicing customers.  Returns a deferred with the
    http response."
-  [client]
-  (do-req client {:method :get
-                  :path "/customer"}))
+  (inv-req (constantly {:method :get
+                        :path "/customer"})))
 
-(defn create-customer
-  [client cust]
-  (do-req client {:method :post
-                  :path "/customer"
-                  :body cust}))
+(def create-customer
+  (inv-req (fn [cust]
+             {:method :post
+              :path "/customer"
+              :body cust})))
+
+(def list-invoices
+  "Lists all invoices.  Returns a deferred with the http response."
+  ;; TODO Filtering
+  (inv-req (constantly {:method :get
+                        :path "/invoice"})))
+
+(def create-invoice
+  (inv-req (fn [inv]
+             {:method :post
+              :path "/invoice"
+              :body inv})))

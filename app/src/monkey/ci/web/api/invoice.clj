@@ -3,6 +3,10 @@
             [monkey.ci.web.common :as c]
             [ring.util.response :as rur]))
 
+(def req->client
+  "Gets the invoicing client from the request runtime"
+  (comp :client :invoicing c/req->rt))
+
 (def invoice-sid (juxt c/org-id (comp :invoice-id :path :parameters)))
 
 (c/make-entity-endpoints

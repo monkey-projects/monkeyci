@@ -58,8 +58,11 @@
   [id up down]
   (->SqlMigration id up down))
 
+(defn as-pk [col]
+  (conj col [:primary-key]))
+
 ;;; Common column definitions
-(def id-col [:id :integer [:not nil] :auto-increment [:primary-key]])
+(def id-col (as-pk [:id :integer [:not nil] :auto-increment]))
 (def cuid-col [:cuid [:char 24] [:not nil]])
 (def description-col [:description [:varchar 300]])
 (def label-filters-col [:label-filters :text])
@@ -711,7 +714,7 @@
 
    (table-migration
     56 :user-settings
-    [[:user-id :integer [:not nil] [:primary-key]]
+    [(as-pk user-col)
      [:receive-mailing :boolean]
      fk-user]
     [(col-idx :user-settings :user-id)])
@@ -745,7 +748,16 @@
     [{:alter-table :invoices
       :alter-column [:invoice-nr [:varchar 50] [:not nil]]}
      {:alter-table :invoices
-      :drop-column :ext-id}])])
+      :drop-column :ext-id}])
+
+   (table-migration
+    60 :org-invoicings
+    [(as-pk org-col)
+     [:vat-nr [:varchar 50]]
+     [:currency [:varchar 3]]
+     [:ext-id [:varchar 20]]
+     fk-org]
+    [(col-idx :org-invoicings :org-id)])])
 
 (defn prepare-migrations
   "Prepares all migrations by formatting to sql, creates a ragtime migration object from it."

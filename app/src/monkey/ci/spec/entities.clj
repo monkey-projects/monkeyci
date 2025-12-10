@@ -198,6 +198,11 @@
 (s/def :invoice/detail
   (s/keys :req-un [:invoice/net-amount :invoice/vat-perc :entity/description]))
 
+(s/def :entity/vat-nr string?)
+
+(s/def :entity/org-invoicing
+  (s/keys :req-un [:entity/org-id :invoice/currency :invoice/ext-id :entity/vat-nr]))
+
 (s/def :entity/runner keyword?)
 (s/def :runner/details map?)
 

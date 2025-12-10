@@ -137,3 +137,6 @@
 
 (defn gen-sent-mailing []
   (gen-spec :db/sent-mailing))
+
+(defn gen-org-invoicing []
+  (gen-spec :db/org-invoicing))
