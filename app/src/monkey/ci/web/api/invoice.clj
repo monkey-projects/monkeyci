@@ -1,7 +1,14 @@
 (ns monkey.ci.web.api.invoice
-  (:require [monkey.ci.storage :as st]
+  (:require [clojure.tools.logging :as log]
+            [monkey.ci
+             [invoicing :as i]
+             [storage :as st]]
             [monkey.ci.web.common :as c]
             [ring.util.response :as rur]))
+
+(def req->client
+  "Gets the invoicing client from the request runtime"
+  (comp :client :invoicing c/req->rt))
 
 (def invoice-sid (juxt c/org-id (comp :invoice-id :path :parameters)))
 
@@ -10,6 +17,34 @@
  {:get-id invoice-sid
   :getter st/find-invoice})
 
+(defn create-invoice [req]
+  (st/with-transaction (c/req->storage req) st
+    (let [org-id (c/org-id req)
+          inv (-> (c/body req)
+                  (assoc :id (st/new-id)
+                         :org-id org-id))
+          client (req->client req)]
+      ;; First create the invoice without external info.  Then create it
+      ;; in the invoice service, and then complete the invoice.  This is
+      ;; to avoid creating the invoice externally if it could not be created
+      ;; in the local db.  Ideally, we'd have 2-phase-commit but it's not
+      ;; supported in the invoice service.
+      (if (st/save-invoice st inv)
+        (let [ext-cust-id (some-> (st/find-org-invoicing st org-id)
+                                  :ext-id)]
+          (if-let [inv-cust @(i/get-customer client ext-cust-id)]
+            (let [ext-inv (:body @(i/create-invoice client inv))
+                  upd (assoc inv
+                             :ext-id (str (:id ext-inv))
+                             :invoice-nr (:invoice-nr ext-inv))]
+              (log/debug "External invoice created:" (:invoice-nr ext-inv))
+              (if (st/save-invoice st upd)
+                (-> (rur/response upd)
+                    (rur/status 201))
+                (c/error-response "Unable to save invoice" 500)))
+            (c/error-response (str "Invoice customer not found: " ext-cust-id))))
+        (c/error-response "Unable to create invoice" 500)))))
+
 (defn search-invoices
   "Searches org invoices"
   [req]
@@ -17,3 +52,14 @@
   (let [inv (st/list-invoices-for-org (c/req->storage req)
                                       (c/org-id req))]
     (rur/response inv)))
+
+(defn update-org-settings [req]
+  (let [s (-> (c/body req)
+              (assoc :org-id (c/org-id req)))]
+    (if (st/save-org-invoicing (c/req->storage req) s)
+      (rur/response s)
+      (c/error-response "Unable to save org invoice settings" 500))))
+
+(defn get-org-settings [req]
+  (-> (st/find-org-invoicing (c/req->storage req) (c/org-id req))
+      (rur/response)))

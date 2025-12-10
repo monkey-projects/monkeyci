@@ -56,6 +56,9 @@
 (defn set-mailer [rt m]
   (assoc rt :mailer m))
 
+(defn set-invoicing-client [rt c]
+  (assoc-in rt [:invoicing :client] c))
+
 (defn test-runtime []
   (-> empty-runtime
       (set-artifacts (h/fake-blob-store))
@@ -71,4 +74,7 @@
       (set-dek-generator (constantly nil))
       (set-decrypter (constantly nil))
       (set-encrypter (constantly nil))
-      (set-mailer (h/fake-mailer))))
+      (set-mailer (h/fake-mailer))
+      (set-invoicing-client (constantly
+                             (md/success-deferred {:status 200
+                                                   :body nil})))))

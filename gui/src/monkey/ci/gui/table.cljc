@@ -15,7 +15,9 @@
     :columns [{:label "Id"
                :value :id}
               {:label "Name"
-               :value (comp :name :org)}]}])
+               :value (comp :name :org)}]
+    :loading {:sub [:test/loading?]
+              :rows 5}}])
 
 (defn nav-link [item-opts link-opts content]
   [:li.page-item item-opts

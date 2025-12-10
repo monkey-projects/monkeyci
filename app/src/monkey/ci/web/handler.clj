@@ -360,19 +360,24 @@
                                   (s/optional-key :repo-slug) s/Str
                                   (s/optional-key :bitbucket-id) s/Str}}}}]]])
 
-(s/defschema InvoiceSearchFilter
-  {(s/optional-key :from-date) s/Str
-   (s/optional-key :until-date) s/Str
-   (s/optional-key :invoice-nr) s/Str})
-
 (def invoice-routes
   ["/invoice"
    [[""
      {:get {:handler inv-api/search-invoices
             :parameters
-            {:query InvoiceSearchFilter}}}]
+            {:query schemas/InvoiceSearchFilter}}
+      :post {:handler inv-api/create-invoice
+             :parameters
+             {:body schemas/NewInvoice}}}]
+    ["/settings"
+     {:conflicting true
+      :put {:handler inv-api/update-org-settings
+            :parameters
+            {:body schemas/OrgInvoicing}}
+      :get {:handler inv-api/get-org-settings}}]
     ["/:invoice-id"
-     {:get {:handler inv-api/get-invoice
+     {:conflicting true
+      :get {:handler inv-api/get-invoice
             :parameters
             {:path {:invoice-id Id}}}}]]])
 

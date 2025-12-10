@@ -44,7 +44,7 @@
          (zipmap recs)
          (map (fn [[r id]]
                 (-> (zipmap cols r)
-                    (assoc :id id)))))))
+                    (mc/assoc-some :id id)))))))
 
 (defn insert-entity [{:keys [ds sql-opts] :as conn} table rec]
   ;; Both work, maybe the first is a little bit more efficient.
@@ -467,6 +467,10 @@
    :before-update prepare-inv
    :after-update  convert-inv
    :after-select  convert-inv-select})
+
+;; Invoicing settings for orgs
+(defaggregate org-invoicing
+  {:id-col :org-id})
 
 (def prepare-runner-details (comp (partial prop->edn :details)
                                   (partial keyword->str :runner)))

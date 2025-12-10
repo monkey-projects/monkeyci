@@ -39,7 +39,7 @@
      [:<>
       [:div.d-flex
        [:div.flex-grow-1
-        [:h3 "Mailing"]]
+        [co/page-title "Mailing"]]
        [:a.btn.btn-primary.align-self-start
         {:href (r/path-for :admin/new-mailing)}
         [co/icon-text :plus-square "New Mailing"]]]
@@ -183,7 +183,8 @@
     (rf/dispatch [::e/load-mailing id])
     [l/default
      [:<>
-      [:h3.card-title [co/icon-text :envelope-plus "Edit Mailing"]]
+      [:div.card-title
+       [co/page-title [co/icon-text :envelope-plus "Edit Mailing"]]]
       [:p "Edit mailing settings, or send it out."]
       [tabs/tabs ::edit
        [{:header "General"

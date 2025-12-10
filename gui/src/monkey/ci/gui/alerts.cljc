@@ -242,3 +242,6 @@
 
 (def user-general-save-failed
   (error-msg "Failed to update general settings"))
+
+(def invoice-load-failed
+  (error-msg "Failed to retrieve organization invoices"))

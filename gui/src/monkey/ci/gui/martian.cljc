@@ -534,6 +534,14 @@
      :path-parts ["/email-registration/unregister"]
      :query-schema cs/EmailUnregistrationQuery})])
 
+(def invoicing-routes
+  [(api-route
+    {:route-name :get-org-invoices
+     :method :get
+     :path-parts (into org-path ["/invoice"])
+     :path-schema org-schema
+     :query-schema cs/InvoiceSearchFilter})])
+
 (def routes
   (concat
    org-routes
@@ -551,7 +559,8 @@
    reaper-routes
    mailing-routes
    general-routes
-   login-routes))
+   login-routes
+   invoicing-routes))
 
 ;; The api url.  This should be configured in a `config.js`.
 (def url #?(:clj "http://localhost:3000"

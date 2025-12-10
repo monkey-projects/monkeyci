@@ -300,6 +300,9 @@
 (defn gen-user-settings []
   (gen-entity :entity/user-setting))
 
+(defn gen-org-invoicing []
+  (gen-entity :entity/org-invoicing))
+
 (defn gen-build-sid []
   (repeatedly 3 cuid/random-cuid))
 
