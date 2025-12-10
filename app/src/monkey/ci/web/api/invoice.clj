@@ -24,6 +24,11 @@
                   (assoc :id (st/new-id)
                          :org-id org-id))
           client (req->client req)]
+      ;; First create the invoice without external info.  Then create it
+      ;; in the invoice service, and then complete the invoice.  This is
+      ;; to avoid creating the invoice externally if it could not be created
+      ;; in the local db.  Ideally, we'd have 2-phase-commit but it's not
+      ;; supported in the invoice service.
       (if (st/save-invoice st inv)
         (let [ext-cust-id (some-> (st/find-org-invoicing st org-id)
                                   :ext-id)]
