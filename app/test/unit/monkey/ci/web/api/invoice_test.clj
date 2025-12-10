@@ -81,3 +81,30 @@
         (is (some? inv))
         (is (= "123" (:ext-id inv)))
         (is (= "INV1234" (:invoice-nr inv)))))))
+
+(deftest update-org-settings
+  (let [{st :storage :as rt} (-> (trt/test-runtime)
+                                 (trt/set-invoicing-client
+                                  (fn [req]
+                                    (if (= "/customer" (:path req))
+                                      (md/success-deferred {:body {:id 567}})
+                                      (md/error-deferred (ex-info "Unexpected request" req))))))
+        org (h/gen-org)]
+    (is (some? (st/save-org st org)))
+    
+    (let [r (-> (h/->req rt)
+                (assoc :parameters {:path {:org-id (:id org)}
+                                    :body {:vat-nr "TEST1234"
+                                           :currency "EUR"}})
+                (sut/update-org-settings))]
+      (testing "creates org settings in db"
+        (is (= "TEST1234" (-> (st/find-org-invoicing st (:id org))
+                              :vat-nr))))
+      
+      (testing "creates new customer in invoice service"
+        (is (= "567" (-> (st/find-org-invoicing st (:id org))
+                         :ext-id))))
+
+      (testing "updates customer in invoice service")
+
+      (testing "status `404` if org not found"))))

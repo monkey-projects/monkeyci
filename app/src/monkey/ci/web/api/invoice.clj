@@ -48,15 +48,32 @@
 (defn search-invoices
   "Searches org invoices"
   [req]
-  ;; TODO Apply filter
+  ;; TODO Allow filtering
   (let [inv (st/list-invoices-for-org (c/req->storage req)
                                       (c/org-id req))]
     (rur/response inv)))
 
-(defn update-org-settings [req]
-  (let [s (-> (c/body req)
-              (assoc :org-id (c/org-id req)))]
-    (if (st/save-org-invoicing (c/req->storage req) s)
+(defn update-org-settings
+  "Updates organizational invoicing settings.  This also creates or updates the
+   associated customer in the invoicing service."
+  [req]
+  (let [org-id (c/org-id req)
+        in (-> (c/body req)
+               (assoc :org-id org-id))
+        st (c/req->storage req)
+        org (st/find-org st org-id)
+        i (st/find-org-invoicing st org-id)
+        ext-id (when-not (:ext-id i)
+                 (-> @(i/create-customer (req->client req) {:name (:name org)
+                                                            ;; TODO
+                                                            :address []
+                                                            :vat-nr (:vat-nr in)})
+                     :body
+                     :id
+                     str))
+        s (cond-> in
+            ext-id (assoc :ext-id ext-id))]
+    (if (st/save-org-invoicing st s)
       (rur/response s)
       (c/error-response "Unable to save org invoice settings" 500))))
 
