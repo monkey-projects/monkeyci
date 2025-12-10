@@ -369,8 +369,15 @@
       :post {:handler inv-api/create-invoice
              :parameters
              {:body schemas/NewInvoice}}}]
+    ["/settings"
+     {:conflicting true
+      :put {:handler inv-api/update-org-settings
+            :parameters
+            {:body schemas/OrgInvoicing}}
+      :get {:handler inv-api/get-org-settings}}]
     ["/:invoice-id"
-     {:get {:handler inv-api/get-invoice
+     {:conflicting true
+      :get {:handler inv-api/get-invoice
             :parameters
             {:path {:invoice-id Id}}}}]]])
 

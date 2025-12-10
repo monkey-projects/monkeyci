@@ -485,45 +485,70 @@
               (is (empty? (search "?repo-id=nonexisting"))))))
 
         (testing "`/invoice`"
-          (is (some? (st/save-org-invoicing st {:org-id (:id org)
-                                                :ext-id "1"})))
-          (let [rt (-> (test-rt)
-                       (trt/set-storage st)
-                       (trt/set-invoicing-client
-                        (fn [req]
-                          (condp = (:path req)
-                            "/customer"
-                            (md/success-deferred
-                             {:body [{:id 1
-                                      :name (:name org)}]})
-                            "/invoice"
-                            (md/success-deferred
-                             {:body {:id 2
-                                     :invoice-nr "INV001"}})))))
-                app (sut/make-app rt)
-                inv (-> (h/gen-invoice)
-                        (assoc :org-id (:id org))
-                        (dissoc :org-id :id :invoice-nr :ext-id))
-                base-path (str "/org/" (:id org) "/invoice")
-                r (-> (h/json-request :post base-path inv)
-                      (app))
-                b (h/reply->json r)]
+          (let [base-path (str "/org/" (:id org) "/invoice")]
+            (is (some? (st/save-org-invoicing st {:org-id (:id org)
+                                                  :ext-id "1"})))
+            (let [rt (-> (test-rt)
+                         (trt/set-storage st)
+                         (trt/set-invoicing-client
+                          (fn [req]
+                            (condp = (:path req)
+                              "/customer"
+                              (md/success-deferred
+                               {:body [{:id 1
+                                        :name (:name org)}]})
+                              "/invoice"
+                              (md/success-deferred
+                               {:body {:id 2
+                                       :invoice-nr "INV001"}})))))
+                  app (sut/make-app rt)
+                  inv (-> (h/gen-invoice)
+                          (assoc :org-id (:id org))
+                          (dissoc :org-id :id :invoice-nr :ext-id))
+                  r (-> (h/json-request :post base-path inv)
+                        (app))
+                  b (h/reply->json r)]
 
-            (testing "`POST` creates new invoice"
-              (is (= 201 (:status r)) b)
-              (is (some? (:id b)))
-              (is (= 1 (count (st/list-invoices-for-org st (:id org)))))
-              (is (some? (st/find-invoice st [(:id org) (:id b)]))))
-            
-            (testing "`GET` searches invoices"
-              (is (= 200 (-> (mock/request :get base-path)
-                             (app)
-                             :status))))
+              (testing "`POST` creates new invoice"
+                (is (= 201 (:status r)) b)
+                (is (some? (:id b)))
+                (is (= 1 (count (st/list-invoices-for-org st (:id org)))))
+                (is (some? (st/find-invoice st [(:id org) (:id b)]))))
+              
+              (testing "`GET` searches invoices"
+                (is (= 200 (-> (mock/request :get base-path)
+                               (app)
+                               :status))))
 
-            (testing "`GET /:id` retrieves by id"
-              (is (= 200 (-> (mock/request :get (str base-path "/" (:id b)))
-                             (app)
-                             :status)))))))))
+              (testing "`GET /:id` retrieves by id"
+                (is (= 200 (-> (mock/request :get (str base-path "/" (:id b)))
+                               (app)
+                               :status)))))
+
+            (testing "`/settings`"
+              (let [base-path (str base-path "/settings")]
+                (testing "`PUT` creates or updates invoicing settings"
+                  (is (= 200 (-> (h/json-request :put base-path
+                                                 {:vat-nr "1234"
+                                                  :currency "EUR"})
+                                 (app)
+                                 :status)))
+                  (is (= "EUR" (-> (st/find-org-invoicing st (:id org))
+                                   :currency)))
+                  (is (= 200 (-> (h/json-request :put base-path
+                                                 {:vat-nr "1234"
+                                                  :currency "USD"})
+                                 (app)
+                                 :status)))
+                  (is (= "USD" (-> (st/find-org-invoicing st (:id org))
+                                   :currency))))
+
+                (testing "`GET` retrieves invoicing settings"
+                  (let [r (-> (mock/request :get base-path)
+                              (app))
+                        b (h/reply->json r)]
+                    (is (= 200 (:status r)))
+                    (is (= (:id org) (:org-id b))))))))))))
 
   (h/with-memory-store st
     (let [org-id (st/new-id)]

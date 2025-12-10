@@ -83,3 +83,7 @@
 
 (s/defschema UpdateInvoice
   (assoc NewInvoice :id Id))
+
+(s/defschema OrgInvoicing
+  {(s/optional-key :currency) s/Str
+   (s/optional-key :vat-nr) s/Str})

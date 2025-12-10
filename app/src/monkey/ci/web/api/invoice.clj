@@ -52,3 +52,14 @@
   (let [inv (st/list-invoices-for-org (c/req->storage req)
                                       (c/org-id req))]
     (rur/response inv)))
+
+(defn update-org-settings [req]
+  (let [s (-> (c/body req)
+              (assoc :org-id (c/org-id req)))]
+    (if (st/save-org-invoicing (c/req->storage req) s)
+      (rur/response s)
+      (c/error-response "Unable to save org invoice settings" 500))))
+
+(defn get-org-settings [req]
+  (-> (st/find-org-invoicing (c/req->storage req) (c/org-id req))
+      (rur/response)))
