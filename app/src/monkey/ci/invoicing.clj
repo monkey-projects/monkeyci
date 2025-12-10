@@ -49,6 +49,13 @@
               :path "/customer"
               :body cust})))
 
+(defn get-customer [client id]
+  (md/chain
+   (list-customers client)
+   :body
+   (partial filter (comp (partial = id) str :id))
+   first))
+
 (def list-invoices
   "Lists all invoices.  Returns a deferred with the http response."
   ;; TODO Filtering

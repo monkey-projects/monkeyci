@@ -61,11 +61,13 @@
         org (-> (h/gen-org)
                 (assoc :name "test org"))
         _ (st/save-org st org)
+        _ (st/save-org-invoicing st {:org-id (:id org)
+                                     :ext-id "1"})
         res (-> (h/->req rt)
                 (assoc-in [:parameters :path :org-id] (:id org))
                 (assoc-in [:parameters :body] {:amount 10M})
                 (sut/create-invoice))]
-    (is (= 201 (:status res)))
+    (is (= 201 (:status res)) (:body res))
     
     (testing "creates invoice in db"
       (is (= 1 (-> (st/list-invoices-for-org st (:id org))

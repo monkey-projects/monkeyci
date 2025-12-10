@@ -1,5 +1,8 @@
 (ns monkey.ci.web.api.invoice
-  (:require [monkey.ci.storage :as st]
+  (:require [clojure.tools.logging :as log]
+            [monkey.ci
+             [invoicing :as i]
+             [storage :as st]]
             [monkey.ci.web.common :as c]
             [ring.util.response :as rur]))
 
@@ -15,11 +18,27 @@
   :getter st/find-invoice})
 
 (defn create-invoice [req]
-  ;; TODO Create invoice externally, then update this invoice with ext-id and invoice-nr
-  (let [s (c/entity-creator st/save-invoice c/default-id)]
-    (-> req
-        (assoc-in [:parameters :body :org-id] (c/org-id req))
-        (s))))
+  (st/with-transaction (c/req->storage req) st
+    (let [org-id (c/org-id req)
+          inv (-> (c/body req)
+                  (assoc :id (st/new-id)
+                         :org-id org-id))
+          client (req->client req)]
+      (if (st/save-invoice st inv)
+        (let [ext-cust-id (some-> (st/find-org-invoicing st org-id)
+                                  :ext-id)]
+          (if-let [inv-cust @(i/get-customer client ext-cust-id)]
+            (let [ext-inv (:body @(i/create-invoice client inv))
+                  upd (assoc inv
+                             :ext-id (str (:id ext-inv))
+                             :invoice-nr (:invoice-nr ext-inv))]
+              (log/debug "External invoice created:" (:invoice-nr ext-inv))
+              (if (st/save-invoice st upd)
+                (-> (rur/response upd)
+                    (rur/status 201))
+                (c/error-response "Unable to save invoice" 500)))
+            (c/error-response (str "Invoice customer not found: " ext-cust-id))))
+        (c/error-response "Unable to create invoice" 500)))))
 
 (defn search-invoices
   "Searches org invoices"

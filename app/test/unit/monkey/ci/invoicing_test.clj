@@ -1,7 +1,9 @@
 (ns monkey.ci.invoicing-test
   (:require [clojure.test :refer [deftest testing is]]
             [monkey.ci.invoicing :as sut]
-            [monkey.ci.test.aleph-test :as at]))
+            [monkey.ci.test
+             [aleph-test :as at]
+             [helpers :as h]]))
 
 (deftest list-customers
   (let [client (sut/make-client {:url "http://test-invoice"})]
@@ -26,6 +28,20 @@
         (is (= 200 (-> (sut/create-customer client {:name "test customer"})
                        (deref)
                        :status)))))))
+
+(deftest get-customer
+  (testing "matches customer by id"
+    (let [client (sut/make-client {:url "http://test"})]
+      (at/with-fake-http ["http://test/customer"
+                          {:status 200
+                           :body (h/to-json [{:id 1 :name "customer 1"}
+                                             {:id 2 :name "customer 2"}])
+                           :headers
+                           {"Content-Type" "application/json"}}]
+        (is (= "customer 1"
+               (-> (sut/get-customer client "1")
+                   (deref)
+                   :name)))))))
 
 (deftest list-invoices
   (let [client (sut/make-client {:url "http://test-invoice"})]

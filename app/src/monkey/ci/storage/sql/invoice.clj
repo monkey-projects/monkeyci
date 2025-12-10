@@ -35,3 +35,20 @@
   (if-let [existing (ec/select-invoice conn (ec/by-cuid (:id inv)))]
     (update-invoice conn inv existing)
     (insert-invoice conn inv)))
+
+(defn- insert-org-invoicing [conn inv]
+  (when-let [org (ec/select-org conn (ec/by-cuid (:org-id inv)))]
+    (ec/insert-org-invoicing conn (assoc inv :org-id (:id org)))
+    inv))
+
+(defn- update-org-invoicing [conn inv e]
+  (ec/update-org-invoicing conn (merge e (dissoc inv :org-id))))
+
+(defn upsert-org-invoicing [conn inv]
+  (if-let [e (ei/select-org-invoicing-for-org conn (:org-id inv))]
+    (update-org-invoicing conn inv e)
+    (insert-org-invoicing conn inv)))
+
+(defn select-org-invoicing [conn org-cuid]
+  (some-> (ei/select-org-invoicing-for-org conn org-cuid)
+          (assoc :org-id org-cuid)))

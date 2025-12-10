@@ -5,6 +5,7 @@
             [clojure
              [string :as cs]
              [test :refer [deftest is testing]]]
+            [manifold.deferred :as md]
             [meta-merge.core :as mm]
             [monkey.ci
              [artifacts :as a]
@@ -421,8 +422,8 @@
                          :status))))))))
 
     (h/with-memory-store st
-      (let [app (make-test-app st)
-            org (h/gen-org)]
+      (let [org (h/gen-org)
+            app (make-test-app st)]
         (is (some? (st/save-org st org)))
         
         (testing "`/builds`"
@@ -484,16 +485,32 @@
               (is (empty? (search "?repo-id=nonexisting"))))))
 
         (testing "`/invoice`"
-          (let [inv (-> (h/gen-invoice)
+          (is (some? (st/save-org-invoicing st {:org-id (:id org)
+                                                :ext-id "1"})))
+          (let [rt (-> (test-rt)
+                       (trt/set-storage st)
+                       (trt/set-invoicing-client
+                        (fn [req]
+                          (condp = (:path req)
+                            "/customer"
+                            (md/success-deferred
+                             {:body [{:id 1
+                                      :name (:name org)}]})
+                            "/invoice"
+                            (md/success-deferred
+                             {:body {:id 2
+                                     :invoice-nr "INV001"}})))))
+                app (sut/make-app rt)
+                inv (-> (h/gen-invoice)
                         (assoc :org-id (:id org))
-                        (dissoc :org-id :id :invoice-nr))
+                        (dissoc :org-id :id :invoice-nr :ext-id))
                 base-path (str "/org/" (:id org) "/invoice")
                 r (-> (h/json-request :post base-path inv)
                       (app))
                 b (h/reply->json r)]
 
             (testing "`POST` creates new invoice"
-              (is (= 201 (:status r)))
+              (is (= 201 (:status r)) b)
               (is (some? (:id b)))
               (is (= 1 (count (st/list-invoices-for-org st (:id org)))))
               (is (some? (st/find-invoice st [(:id org) (:id b)]))))

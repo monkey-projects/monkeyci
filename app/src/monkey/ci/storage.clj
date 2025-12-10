@@ -1115,3 +1115,12 @@
 
 (defn find-user-settings [st uid]
   (p/read-obj st (user-settings-sid uid)))
+
+(def org-invoicing :org-invoicing)
+(def org-invoicing-sid (partial global-sid org-invoicing))
+
+(defn save-org-invoicing [st s]
+  (p/write-obj st (org-invoicing-sid (:org-id s)) s))
+
+(defn find-org-invoicing [st uid]
+  (p/read-obj st (org-invoicing-sid uid)))

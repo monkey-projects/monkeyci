@@ -16,7 +16,7 @@
   (testing "has orgs table"
     (eh/with-prepared-db*
       (fn [conn]
-        (is (number? (-> (jdbc/execute-one! (:ds conn) ["select count(*) as c from orgs"]
+        (is (number? (-> (jdbc/execute-one! (:ds conn) ["select count(*) as c from \"orgs\""]
                                             {:builder-fn rs/as-unqualified-lower-maps})
                          :c)))))))
 

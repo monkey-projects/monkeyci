@@ -223,6 +223,7 @@
 (def org-token? (partial global-sid? st/org-token))
 (def mailing? (partial global-sid? st/mailing))
 (def invoice? (partial global-sid? st/invoice))
+(def org-invoicing? (partial global-sid? st/org-invoicing))
 
 (defrecord SqlStorage [pool]
   p/Storage
@@ -268,7 +269,9 @@
         mailing?
         (sma/select-mailing conn (last sid))
         user-settings?
-        (su/select-user-setting conn (last sid)))))
+        (su/select-user-setting conn (last sid))
+        org-invoicing?
+        (si/select-org-invoicing conn (last sid)))))
   
   (write-obj [this sid obj]
     (let [conn (get-conn this)]
@@ -317,6 +320,8 @@
               (sma/upsert-mailing conn obj)
               user-settings?
               (su/upsert-user-setting conn obj)
+              org-invoicing?
+              (si/upsert-org-invoicing conn obj)
               (log/warn "Unrecognized sid when writing:" sid))
         sid)))
 

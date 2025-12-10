@@ -746,3 +746,14 @@
       (testing "can save and find for user"
         (is (sid/sid? (sut/save-user-settings st s)))
         (is (= s (sut/find-user-settings st (:id u))))))))
+
+(deftest org-invoicing
+  (h/with-memory-store st
+    (let [org (h/gen-org)
+          s (-> (h/gen-org-invoicing)
+                (assoc :org-id (:id org)))]
+      (is (sid/sid? (sut/save-org st org)))
+
+      (testing "can save and find for org"
+        (is (sid/sid? (sut/save-org-invoicing st s)))
+        (is (= s (sut/find-org-invoicing st (:id org))))))))
