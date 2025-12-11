@@ -78,5 +78,7 @@
       (c/error-response "Unable to save org invoice settings" 500))))
 
 (defn get-org-settings [req]
+  ;; TODO Return 404 if org does not exist
   (-> (st/find-org-invoicing (c/req->storage req) (c/org-id req))
+      (or {})
       (rur/response)))

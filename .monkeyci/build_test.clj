@@ -203,10 +203,11 @@
                       "test-secret"]
                      @client)))
 
-            (testing "adds version to file"
+            (testing "adds version and tags to file"
               (is (= ["test-bucket"
                       "monkeyci/release-1.2.3.jar"
-                      "app/target/monkeyci-standalone.jar"]
+                      "app/target/monkeyci-standalone.jar"
+                      {"env" "prod"}]
                      @inv)))))))))
 
 (deftest prepare-install-script

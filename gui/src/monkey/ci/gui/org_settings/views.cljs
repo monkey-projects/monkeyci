@@ -9,6 +9,9 @@
   [{:id ::general
     :header "General"
     :link :page/org-settings}
+   {:id ::billing
+    :header "Billing"
+    :link :page/org-billing}
    {:id ::params
     :header "Parameters"
     :link :page/org-params}
