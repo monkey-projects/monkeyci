@@ -10,8 +10,8 @@
     :header "General"
     :link :page/org-settings}
    {:id ::billing
-    :header "Billing"
-    :link :page/org-billing}
+    :header "Plan & Billing"
+    :link :page/billing}
    {:id ::params
     :header "Parameters"
     :link :page/org-params}

@@ -61,6 +61,11 @@
         {:url (r/path-for :page/add-repo (r/path-params (r/current db)))
          :name "Watch Repo"}))
 
+(defn- billing-breadcrumb [db]
+  (conj (default-breadcrumb db)
+        {:url (r/path-for :page/billing (r/path-params (r/current db)))
+         :name "Plan & Billing"}))
+
 (defn- user-breadcrumb [db]
   [home
    {:url (r/path-for :page/user (r/path-params (r/current db)))
@@ -114,6 +119,7 @@
    :page/org-ssh-keys ssh-keys-breadcrumb
    :page/org-api-keys org-api-keys-breadcrumb
    :page/org-settings org-settings-breadcrumb
+   :page/billing billing-breadcrumb
    :page/repo-settings repo-settings-breadcrumb
    :page/add-repo org-watch-repo
    :page/user user-breadcrumb

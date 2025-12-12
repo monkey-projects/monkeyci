@@ -73,13 +73,15 @@
    :net-amount s/Num
    :vat-perc s/Num})
 
+(def currencies ["EUR" "USD" "GBP"])
+
 (s/defschema NewInvoice
   {:kind invoice-kind
    (s/optional-key :date) s/Int
    :details [InvoiceDetail]
    :net-amount s/Num
    :vat-perc s/Num
-   :currency s/Str})
+   :currency (apply s/enum currencies)})
 
 (s/defschema UpdateInvoice
   (assoc NewInvoice :id Id))
