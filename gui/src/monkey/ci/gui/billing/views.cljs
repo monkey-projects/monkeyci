@@ -2,7 +2,9 @@
   "Org billing overview.  This allows the user to choose their plan (free or commercial)
    and modify the org billing details."
   (:require [monkey.ci.common.schemas :as cs]
+            [monkey.ci.gui.alerts :as a]
             [monkey.ci.gui.billing.events :as e]
+            [monkey.ci.gui.billing.subs :as s]
             [monkey.ci.gui.components :as co]
             [monkey.ci.gui.countries :as countries]
             [monkey.ci.gui.forms :as f]
@@ -16,52 +18,59 @@
     [:h4.text-primary.card-title "Usage Plan"]
     [:p "This is still in development, please check again later."]]])
 
-(defn- select [id lbl items v]
+(defn- select [id lbl items sel]
   [:<>
    [:label.form-label {:for id} lbl]
    (->> items
         (map (fn [[k v]]
-               [:option {:value k} v]))
+               [:option
+                (cond-> {:value k}
+                  (= k sel) (assoc :selected true))
+                v]))
         (into [:select.form-select
                {:aria-label lbl
                 :id id
                 :name id}
                [:option]]))])
 
-(defn- currency-select []
-  [select :currency "Currency" (map (partial repeat 2) cs/currencies)])
+(defn- currency-select [v]
+  [select :currency "Currency" (map (partial repeat 2) cs/currencies ) v])
 
 (def countries (map (juxt :code :name) countries/countries))
 
-(defn- country-select []
-  [select :country "Country" countries])
+(defn- country-select [v]
+  [select :country "Country" countries v])
 
 (defn- billing-form []
-  [:form
-   [:div.row
-    [:div.col.col-md-6
-     [f/form-input {:id :vat-nr
-                    :label "VAT Number"
-                    :value ""
-                    :help-msg "Only for organizations that are VAT mandatory"}]]]
-   (->> (range 3)
-        (map (fn [i]
-               [:div.row.mt-2
-                [:div.col
-                 [f/form-input {:id (keyword (str "address-" i))
-                                :label (str "Invoice Address " (inc i)) 
-                                :value ""}]]]))
-        (into [:<>]))
-   [:div.row.mt-2
-    [:div.col.col-md-6
-     [country-select]]]
-   [:div.row.mt-2
-    [:div.col.col-md-4
-     [currency-select]]]   
-   [:div.row.mt-2.mt-md-4
-    [:div.col.d-flex.gap-2
-     [:button.btn.btn-primary [co/icon-text :floppy "Save"]]
-     [co/cancel-btn]]]])
+  (let [l? (rf/subscribe [::s/billing-loading?])
+        v (rf/subscribe [::s/invoicing-settings])]
+    [:form
+     [:div.row
+      [:div.col.col-md-6
+       [f/form-input {:id :vat-nr
+                      :label "VAT Number"
+                      :value (:vat-nr @v)
+                      :help-msg "Only for organizations that are VAT mandatory"
+                      :disabled @l?}]]]
+     (->> (range 3)
+          (map (fn [i]
+                 [:div.row.mt-2
+                  [:div.col
+                   [f/form-input {:id (keyword (str "address-" i))
+                                  :label (str "Invoice Address " (inc i)) 
+                                  :value (get (:address-lines @v) i)
+                                  :disabled @l?}]]]))
+          (into [:<>]))
+     [:div.row.mt-2
+      [:div.col.col-md-6
+       [country-select (:country @v)]]]
+     [:div.row.mt-2
+      [:div.col.col-md-4
+       [currency-select (:currency @v)]]]   
+     [:div.row.mt-2.mt-md-4
+      [:div.col.d-flex.gap-2
+       [:button.btn.btn-primary [co/icon-text :floppy "Save"]]
+       [co/cancel-btn]]]]))
 
 (defn- billing []
   (rf/dispatch [::e/load-invoicing])
@@ -69,7 +78,8 @@
     [:div.card
      [:div.card-body
       [:h4.text-primary.card-title "Billing"]
-      [:p "Configure billing details for your organization."]
+      [:p.mb-2 "Configure billing details for your organization."]
+      [a/component [::s/billing-alerts]]
       [billing-form]]]))
 
 (defn page [_]

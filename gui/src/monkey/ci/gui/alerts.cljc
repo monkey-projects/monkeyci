@@ -245,3 +245,6 @@
 
 (def invoice-load-failed
   (error-msg "Failed to retrieve organization invoices"))
+
+(def invoice-settings-load-failed
+  (error-msg "Failed to retrieve billing settings"))

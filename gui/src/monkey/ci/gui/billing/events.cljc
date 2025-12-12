@@ -1,5 +1,7 @@
 (ns monkey.ci.gui.billing.events
-  (:require [monkey.ci.gui.billing.db :as db]
+  (:require [clojure.string :as cs]
+            [monkey.ci.gui.alerts :as a]
+            [monkey.ci.gui.billing.db :as db]
             [monkey.ci.gui.loader :as lo]
             [monkey.ci.gui.martian]
             [monkey.ci.gui.routing :as r]
@@ -16,14 +18,16 @@
      [::load-invoicing--success]
      [::load-invoicing--failure]])))
 
+(defn- split-address-lines [v]
+  (assoc v :address-lines (cs/split-lines (:address v))))
+
 (rf/reg-event-db
  ::load-invoicing--success
- (fn [db [_ {:keys [body]}]]
-   ;; TODO
-   ))
+ (fn [db [_ resp]]
+   (-> (lo/on-success db db/billing-id resp)
+       (db/update-invoicing-settings split-address-lines))))
 
 (rf/reg-event-db
  ::load-invoicing--failure
  (fn [db [_ err]]
-   ;; TODO
-   ))
+   (lo/on-failure db db/billing-id a/invoice-settings-load-failed err)))
