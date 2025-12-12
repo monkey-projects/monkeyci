@@ -201,7 +201,8 @@
 (s/def :entity/vat-nr string?)
 
 (s/def :entity/org-invoicing
-  (s/keys :req-un [:entity/org-id :invoice/currency :invoice/ext-id :entity/vat-nr]))
+  (s/keys :req-un [:entity/org-id :invoice/currency :invoice/ext-id :entity/vat-nr
+                   :invoice/address :invoice/country]))
 
 (s/def :entity/runner keyword?)
 (s/def :runner/details map?)

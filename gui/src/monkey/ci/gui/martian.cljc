@@ -540,7 +540,20 @@
      :method :get
      :path-parts (into org-path ["/invoice"])
      :path-schema org-schema
-     :query-schema cs/InvoiceSearchFilter})])
+     :query-schema cs/InvoiceSearchFilter})
+
+   (api-route
+    {:route-name :get-org-invoicing-settings
+     :method :get
+     :path-parts (into org-path ["/invoice/settings"])
+     :path-schema org-schema})
+
+   (api-route
+    {:route-name :update-org-invoicing-settings
+     :method :put
+     :path-parts (into org-path ["/invoice/settings"])
+     :path-schema org-schema
+     :body-schema {:settings cs/OrgInvoicing}})])
 
 (def routes
   (concat

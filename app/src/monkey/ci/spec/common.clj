@@ -70,6 +70,10 @@
 (s/def :invoice/ext-id (s/with-gen
                          string?
                          #(sg/fixed-string 5)))
+(s/def :invoice/address string?)
+(s/def :invoice/country (s/with-gen
+                          string?
+                          #(sg/fixed-string 3)))
 
 (s/def :queued-task/creation-time ts?)
 (s/def :queued-task/task map?)

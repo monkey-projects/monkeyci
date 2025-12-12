@@ -187,8 +187,8 @@
 (s/def :db/vat-nr string?)
 
 (s/def :db/org-invoicing
-  (s/keys :req-un [:db/org-id]
-          :opt-un [:db/vat-nr :invoice/currency :invoice/ext-id]))
+  (s/keys :req-un [:db/org-id :invoice/currency :invoice/address :invoice/country]
+          :opt-un [:db/vat-nr :invoice/ext-id]))
 
 (s/def :db/runner keyword?)
 (s/def :runner/details map?)

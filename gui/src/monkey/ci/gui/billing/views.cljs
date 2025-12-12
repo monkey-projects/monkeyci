@@ -2,10 +2,13 @@
   "Org billing overview.  This allows the user to choose their plan (free or commercial)
    and modify the org billing details."
   (:require [monkey.ci.common.schemas :as cs]
+            [monkey.ci.gui.billing.events :as e]
             [monkey.ci.gui.components :as co]
+            [monkey.ci.gui.countries :as countries]
             [monkey.ci.gui.forms :as f]
             [monkey.ci.gui.layout :as l]
-            [monkey.ci.gui.org-settings.views :as settings]))
+            [monkey.ci.gui.org-settings.views :as settings]
+            [re-frame.core :as rf]))
 
 (defn- plans []
   [:div.card
@@ -28,7 +31,7 @@
 (defn- currency-select []
   [select :currency "Currency" (map (partial repeat 2) cs/currencies)])
 
-(def countries [["BE" "Belgium"]])
+(def countries (map (juxt :code :name) countries/countries))
 
 (defn- country-select []
   [select :country "Country" countries])
@@ -61,11 +64,13 @@
      [co/cancel-btn]]]])
 
 (defn- billing []
-  [:div.card
-   [:div.card-body
-    [:h4.text-primary.card-title "Billing"]
-    [:p "Configure billing details for your organization."]
-    [billing-form]]])
+  (rf/dispatch [::e/load-invoicing])
+  (fn []
+    [:div.card
+     [:div.card-body
+      [:h4.text-primary.card-title "Billing"]
+      [:p "Configure billing details for your organization."]
+      [billing-form]]]))
 
 (defn page [_]
   (settings/settings-page

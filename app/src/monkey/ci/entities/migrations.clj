@@ -756,6 +756,8 @@
      [:vat-nr [:varchar 50]]
      [:currency [:varchar 3]]
      [:ext-id [:varchar 20]]
+     [:country [:char 3]]
+     [:address [:text]]
      fk-org]
     [(col-idx :org-invoicings :org-id)])])
 
