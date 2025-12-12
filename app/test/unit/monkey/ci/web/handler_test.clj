@@ -530,14 +530,18 @@
                 (testing "`PUT` creates or updates invoicing settings"
                   (is (= 200 (-> (h/json-request :put base-path
                                                  {:vat-nr "1234"
-                                                  :currency "EUR"})
+                                                  :currency "EUR"
+                                                  :address ""
+                                                  :country "BEL"})
                                  (app)
                                  :status)))
                   (is (= "EUR" (-> (st/find-org-invoicing st (:id org))
                                    :currency)))
                   (is (= 200 (-> (h/json-request :put base-path
                                                  {:vat-nr "1234"
-                                                  :currency "USD"})
+                                                  :currency "USD"
+                                                  :address ""
+                                                  :country "USA"})
                                  (app)
                                  :status)))
                   (is (= "USD" (-> (st/find-org-invoicing st (:id org))
