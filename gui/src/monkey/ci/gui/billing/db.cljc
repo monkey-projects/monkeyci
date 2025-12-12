@@ -15,6 +15,9 @@
 (defn set-billing-alerts [db a]
   (lo/set-alerts db billing-id a))
 
+(defn reset-billing-alerts [db]
+  (lo/reset-alerts db billing-id))
+
 (defn get-billing-alerts [db]
   (lo/get-alerts db billing-id))
 

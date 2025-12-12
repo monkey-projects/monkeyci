@@ -24,6 +24,11 @@
                                (take 3)
                                (vec))))
 
+(defn- join-address-lines [v]
+  (-> v
+      (dissoc :address-lines)
+      (assoc :address (cs/trim (cs/join "\n" (:address-lines v))))))
+
 (rf/reg-event-db
  ::load-invoicing--success
  (fn [db [_ resp]]
@@ -43,4 +48,30 @@
 (rf/reg-event-db
  ::invoicing-address-changed
  (fn [db [_ idx v]]
-   (db/update-invoicing-settings db update :address-lines (partial mc/replace-nth idx v))))
+   (db/update-invoicing-settings db update :address-lines (comp vec (partial mc/replace-nth idx v))))) 
+
+(rf/reg-event-fx
+ ::save-invoicing
+ (fn [{:keys [db]} _]
+   {:dispatch [:secure-request
+               :update-org-invoicing-settings
+               {:org-id (r/org-id db)
+                :settings (-> (db/get-invoicing-settings db)
+                              (join-address-lines))}
+               [::save-invoicing--success]
+               [::save-invoicing--failure]]
+    :db (db/reset-billing-alerts db)}))
+
+(rf/reg-event-db
+ ::save-invoicing--success
+ (fn [db [_ {:keys [body]}]]
+   (-> db
+       (db/set-invoicing-settings body)
+       (db/update-invoicing-settings split-address-lines)
+       (db/set-billing-alerts [(a/invoice-settings-save-success)]))))
+
+(rf/reg-event-db
+ ::save-invoicing--failure
+ (fn [db [_ err]]
+   (-> db
+       (db/set-billing-alerts [(a/invoice-settings-save-failed err)]))))

@@ -58,3 +58,54 @@
     (rf/dispatch-sync [::sut/invoicing-address-changed 1 "updated"])
     (is (= ["first" "updated" "third"]
            (:address-lines (db/get-invoicing-settings @app-db))))))
+
+(deftest save-invoicing
+  (rf-test/run-test-sync
+   (let [c (h/catch-fx :martian.re-frame/request)]
+     (h/initialize-martian {:update-org-invoicing-settings
+                            {:body {}
+                             :error-code :no-error}})
+     (is (some? (swap! app-db (fn [db]
+                                (-> db
+                                    (r/set-current {:parameters
+                                                    {:path
+                                                     {:org-id "test-org"}}})
+                                    (db/set-invoicing-settings {:address-lines ["line 1" "line 2"]})
+                                    (db/set-billing-alerts [{:type :info :message "test alert"}]))))))
+     (rf/dispatch [::sut/save-invoicing])
+
+     (testing "saves invoicing settings in backend"
+       (is (= 1 (count @c)))
+       (is (= :update-org-invoicing-settings (-> @c first (nth 2)))))
+
+     (testing "passes org id"
+       (is (= "test-org" (-> @c first (nth 3) :org-id))))
+
+     (testing "joins address lines"
+       (is (= "line 1\nline 2" (-> @c first (nth 3) :settings :address)))
+       (is (not (contains? (-> @c first (nth 3) :settings) :address-lines))))
+
+     (testing "clears alerts"
+       (is (empty? (db/get-billing-alerts @app-db)))))))
+
+(deftest save-invoicing--success
+  (rf/dispatch-sync [::sut/save-invoicing--success {:body {:vat-nr "VAT12342"
+                                                           :address "line 1\nline 2"}}])
+
+  (testing "sets invoicing settings in db"
+    (is (= "VAT12342" (:vat-nr (db/get-invoicing-settings @app-db)))))
+
+  (testing "splits address lines up to 3 items"
+    (is (= ["line 1" "line 2" ""]
+           (-> (db/get-invoicing-settings @app-db)
+               :address-lines))))
+
+  (testing "sets success alert"
+    (is (= [:success] (->> (db/get-billing-alerts @app-db)
+                           (map :type))))))
+
+(deftest save-invoicing--failure
+  (testing "sets error in alerts"
+    (rf/dispatch-sync [::sut/save-invoicing--failure {:message "test error"}])
+    (is (= [:danger] (->> (db/get-billing-alerts @app-db)
+                          (map :type))))))

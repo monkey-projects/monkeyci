@@ -248,3 +248,9 @@
 
 (def invoice-settings-load-failed
   (error-msg "Failed to retrieve billing settings"))
+
+(def invoice-settings-save-success
+  (alert-msg :success (constantly "Billing settings have been updated.")))
+
+(def invoice-settings-save-failed
+  (error-msg "Failed to update billing settings"))

@@ -52,9 +52,10 @@
        [f/form-input {:id :vat-nr
                       :label "VAT Number"
                       :value (:vat-nr @v)
-                      :on-change (u/form-evt-handler [::e/invoicing-settings-changed :vat-nr])
                       :help-msg "Only for organizations that are VAT mandatory"
-                      :disabled @l?}]]]
+                      :extra-opts
+                      {:on-change (u/form-evt-handler [::e/invoicing-settings-changed :vat-nr])
+                       :disabled @l?}}]]]
      (->> (range 3)
           (map (fn [i]
                  [:div.row.mt-2
@@ -62,7 +63,9 @@
                    [f/form-input {:id (keyword (str "address-" i))
                                   :label (str "Invoice Address " (inc i)) 
                                   :value (get (:address-lines @v) i)
-                                  :disabled @l?}]]]))
+                                  :extra-opts
+                                  {:disabled @l?
+                                   :on-change (u/form-evt-handler [::e/invoicing-address-changed i])}}]]]))
           (into [:<>]))
      [:div.row.mt-2
       [:div.col.col-md-6
@@ -77,7 +80,7 @@
      [:div.row.mt-2.mt-md-4
       [:div.col.d-flex.gap-2
        [:button.btn.btn-primary
-        {:on-click (u/link-evt-handler [::e/save-invoicing-settings])}
+        {:on-click (u/link-evt-handler [::e/save-invoicing])}
         [co/icon-text :floppy "Save"]]
        [co/cancel-btn]]]]))
 
