@@ -10,6 +10,7 @@
             [monkey.ci.gui.forms :as f]
             [monkey.ci.gui.layout :as l]
             [monkey.ci.gui.org-settings.views :as settings]
+            [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
 
 (defn- plans []
@@ -18,7 +19,7 @@
     [:h4.text-primary.card-title "Usage Plan"]
     [:p "This is still in development, please check again later."]]])
 
-(defn- select [id lbl items sel]
+(defn- select [id lbl items sel opts]
   [:<>
    [:label.form-label {:for id} lbl]
    (->> items
@@ -28,18 +29,19 @@
                   (= k sel) (assoc :selected true))
                 v]))
         (into [:select.form-select
-               {:aria-label lbl
-                :id id
-                :name id}
+               (merge {:aria-label lbl
+                       :id id
+                       :name id}
+                      opts)
                [:option]]))])
 
-(defn- currency-select [v]
-  [select :currency "Currency" (map (partial repeat 2) cs/currencies ) v])
+(defn- currency-select [v opts]
+  [select :currency "Currency" (map (partial repeat 2) cs/currencies ) v opts])
 
 (def countries (map (juxt :code :name) countries/countries))
 
-(defn- country-select [v]
-  [select :country "Country" countries v])
+(defn- country-select [v opts]
+  [select :country "Country" countries v opts])
 
 (defn- billing-form []
   (let [l? (rf/subscribe [::s/billing-loading?])
@@ -50,6 +52,7 @@
        [f/form-input {:id :vat-nr
                       :label "VAT Number"
                       :value (:vat-nr @v)
+                      :on-change (u/form-evt-handler [::e/invoicing-settings-changed :vat-nr])
                       :help-msg "Only for organizations that are VAT mandatory"
                       :disabled @l?}]]]
      (->> (range 3)
@@ -63,13 +66,19 @@
           (into [:<>]))
      [:div.row.mt-2
       [:div.col.col-md-6
-       [country-select (:country @v)]]]
+       [country-select (:country @v)
+        {:disabled @l?
+         :on-change (u/form-evt-handler [::e/invoicing-settings-changed :country])}]]]
      [:div.row.mt-2
       [:div.col.col-md-4
-       [currency-select (:currency @v)]]]   
+       [currency-select (:currency @v)
+        {:disabled @l?
+         :on-change (u/form-evt-handler [::e/invoicing-settings-changed :currency])}]]]
      [:div.row.mt-2.mt-md-4
       [:div.col.d-flex.gap-2
-       [:button.btn.btn-primary [co/icon-text :floppy "Save"]]
+       [:button.btn.btn-primary
+        {:on-click (u/link-evt-handler [::e/save-invoicing-settings])}
+        [co/icon-text :floppy "Save"]]
        [co/cancel-btn]]]]))
 
 (defn- billing []

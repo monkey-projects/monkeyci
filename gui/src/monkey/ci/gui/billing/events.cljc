@@ -1,5 +1,6 @@
 (ns monkey.ci.gui.billing.events
   (:require [clojure.string :as cs]
+            [medley.core :as mc]
             [monkey.ci.gui.alerts :as a]
             [monkey.ci.gui.billing.db :as db]
             [monkey.ci.gui.loader :as lo]
@@ -19,7 +20,9 @@
      [::load-invoicing--failure]])))
 
 (defn- split-address-lines [v]
-  (assoc v :address-lines (cs/split-lines (:address v))))
+  (assoc v :address-lines (->> (concat (cs/split-lines (:address v)) (repeat ""))
+                               (take 3)
+                               (vec))))
 
 (rf/reg-event-db
  ::load-invoicing--success
@@ -31,3 +34,13 @@
  ::load-invoicing--failure
  (fn [db [_ err]]
    (lo/on-failure db db/billing-id a/invoice-settings-load-failed err)))
+
+(rf/reg-event-db
+ ::invoicing-settings-changed
+ (fn [db [_ prop v]]
+   (db/update-invoicing-settings db assoc prop v)))
+
+(rf/reg-event-db
+ ::invoicing-address-changed
+ (fn [db [_ idx v]]
+   (db/update-invoicing-settings db update :address-lines (partial mc/replace-nth idx v))))

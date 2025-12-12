@@ -36,8 +36,8 @@
   (testing "sets invoicing settings in db"
     (is (= "VAT12342" (:vat-nr (db/get-invoicing-settings @app-db)))))
 
-  (testing "splits address lines"
-    (is (= ["line 1" "line 2"]
+  (testing "splits address lines up to 3 items"
+    (is (= ["line 1" "line 2" ""]
            (-> (db/get-invoicing-settings @app-db)
                :address-lines)))))
 
@@ -46,3 +46,15 @@
     (rf/dispatch-sync [::sut/load-invoicing--failure {:message "test error"}])
     (is (= [:danger] (->> (db/get-billing-alerts @app-db)
                           (map :type))))))
+
+(deftest invoicing-settings-changed
+  (testing "updates property"
+    (rf/dispatch-sync [::sut/invoicing-settings-changed :vat-nr "updated"])
+    (is (= "updated" (:vat-nr (db/get-invoicing-settings @app-db))))))
+
+(deftest invoicing-address-changed
+  (testing "updates address line at index"
+    (is (some? (reset! app-db (db/set-invoicing-settings {} {:address-lines ["first" "second" "third"]}))))
+    (rf/dispatch-sync [::sut/invoicing-address-changed 1 "updated"])
+    (is (= ["first" "updated" "third"]
+           (:address-lines (db/get-invoicing-settings @app-db))))))
