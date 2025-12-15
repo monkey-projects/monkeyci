@@ -70,7 +70,7 @@
 (s/def :invoice/ext-id (s/with-gen
                          string?
                          #(sg/fixed-string 5)))
-(s/def :invoice/address string?)
+(s/def :invoice/address (s/coll-of string?))
 (s/def :invoice/country (s/with-gen
                           string?
                           #(sg/fixed-string 3)))

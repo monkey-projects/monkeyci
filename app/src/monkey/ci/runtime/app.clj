@@ -273,7 +273,6 @@
   (make-mailer mailing))
 
 (defn new-invoicing [{:keys [invoicing]}]
-  ;; TODO
   {:client (inv/make-client invoicing)})
 
 (defn make-server-system

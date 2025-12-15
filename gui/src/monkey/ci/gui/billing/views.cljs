@@ -62,7 +62,7 @@
                   [:div.col
                    [f/form-input {:id (keyword (str "address-" i))
                                   :label (str "Invoice Address " (inc i)) 
-                                  :value (get (:address-lines @v) i)
+                                  :value (get (:address @v) i)
                                   :extra-opts
                                   {:disabled @l?
                                    :on-change (u/form-evt-handler [::e/invoicing-address-changed i])}}]]]))

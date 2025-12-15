@@ -51,4 +51,5 @@
 
 (defn select-org-invoicing [conn org-cuid]
   (some-> (ei/select-org-invoicing-for-org conn org-cuid)
-          (assoc :org-id org-cuid)))
+          (assoc :org-id org-cuid)
+          (ec/convert-org-inv-select)))

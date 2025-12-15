@@ -531,4 +531,10 @@
         (is (some? (sut/insert-org-invoicing conn inv))))
 
       (testing "can retrieve for org"
-        (is (some? (sut/select-org-invoicing conn (sut/by-org (:id org)))))))))
+        (is (some? (sut/select-org-invoicing conn (sut/by-org (:id org))))))
+
+      (testing "splits and joins address lines"
+        (is (some? (sut/update-org-invoicing conn (assoc inv :address ["line 1" "line 2"]))))
+        (is (= ["line 1" "line 2"]
+               (-> (sut/select-org-invoicing conn (sut/by-org (:id org)))
+                   :address)))))))

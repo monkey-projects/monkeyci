@@ -88,6 +88,6 @@
 
 (s/defschema OrgInvoicing
   {:currency s/Str
-   :address s/Str
+   :address [s/Str]
    :country s/Str
    (s/optional-key :vat-nr) s/Str})

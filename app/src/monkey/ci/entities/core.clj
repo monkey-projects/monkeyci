@@ -469,8 +469,25 @@
    :after-select  convert-inv-select})
 
 ;; Invoicing settings for orgs
+(defn- split-lines [p]
+  (fn [r]
+    (mc/update-existing r p cs/split-lines)))
+
+(defn- join-lines [p]
+  (fn [r]
+    (mc/update-existing r p (partial cs/join "\n"))))
+
+(def prepare-org-inv (join-lines :address))
+(def convert-org-inv (partial copy-prop :address))
+(def convert-org-inv-select (split-lines :address))
+
 (defaggregate org-invoicing
-  {:id-col :org-id})
+  {:id-col :org-id
+   :before-insert prepare-org-inv
+   :after-insert convert-org-inv
+   :before-update prepare-org-inv
+   :after-update convert-org-inv
+   :after-select convert-org-inv-select})
 
 (def prepare-runner-details (comp (partial prop->edn :details)
                                   (partial keyword->str :runner)))
