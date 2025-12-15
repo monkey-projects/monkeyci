@@ -531,7 +531,7 @@
                   (is (= 200 (-> (h/json-request :put base-path
                                                  {:vat-nr "1234"
                                                   :currency "EUR"
-                                                  :address ""
+                                                  :address ["test address"]
                                                   :country "BEL"})
                                  (app)
                                  :status)))
@@ -540,7 +540,7 @@
                   (is (= 200 (-> (h/json-request :put base-path
                                                  {:vat-nr "1234"
                                                   :currency "USD"
-                                                  :address ""
+                                                  :address ["test address"]
                                                   :country "USA"})
                                  (app)
                                  :status)))
