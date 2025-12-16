@@ -33,4 +33,6 @@
 (def job-filter ::ss/filter)
 
 (defn set-job-filter [c f]
-  (assoc c job-filter f))
+  (cond-> c
+    true (dissoc job-filter)
+    (not-empty f) (assoc job-filter f)))
