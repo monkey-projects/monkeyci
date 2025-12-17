@@ -111,8 +111,8 @@
   [url]
   (some->> url
            (re-matches
-            #"^(https://|git@)github.com/([^/]+)/([^/\.]+)(\.git)?$")
-           (drop 2)
+            #"^(https://|git@)github.com(/|:)([^/]+)/([^/\.]+)(\.git)?$")
+           (drop 3)
            (zipmap [:owner :repo])))
 
 (rf/reg-event-fx
@@ -125,7 +125,7 @@
                     :path (str "/repos/" (:owner r) "/" (:repo r))
                     :on-success (or on-success [:github/get-repo--success])
                     :on-failure (or on-failure [:github/get-repo--failed])})}
-     {:dispatch (into on-failure {:message "Invalid github url" :url github-url})})))
+     {:dispatch (conj on-failure {:message "Invalid github url" :url github-url})})))
 
 (rf/reg-event-db
  :github/get-repo--success
