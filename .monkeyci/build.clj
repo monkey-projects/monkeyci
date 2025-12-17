@@ -104,7 +104,8 @@
             ctx
             #(minio/put-s3-file %1 %2
                                 (format "monkeyci/%s.jar" (config/image-version ctx))
-                                (m/in-work ctx (:path uberjar-artifact))))))
+                                (m/in-work ctx (:path uberjar-artifact))
+                                {"env" (if (p/release? ctx) "prod" "staging")}))))
         (m/depends-on ["app-uberjar"])
         (m/restore-artifacts [(as-dir uberjar-artifact)]))))
 

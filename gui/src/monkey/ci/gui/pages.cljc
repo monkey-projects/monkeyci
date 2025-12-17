@@ -3,6 +3,7 @@
   (:require [monkey.ci.gui.logging :as log]
             [monkey.ci.gui.routing :as r]
             [monkey.ci.gui.api-keys.views :as api-keys]
+            [monkey.ci.gui.billing.views :as billing]
             [monkey.ci.gui.build.views :as build]
             [monkey.ci.gui.home.views :as home]
             [monkey.ci.gui.job.views :as job]
@@ -29,6 +30,7 @@
    :page/org-join home/page-join
    :page/org-params params/page
    :page/org-ssh-keys ssh-keys/page
+   :page/billing billing/page
    :page/add-repo repo/new
    :page/add-github-repo org/add-github-repo-page
    :page/add-bitbucket-repo org/add-bitbucket-repo-page

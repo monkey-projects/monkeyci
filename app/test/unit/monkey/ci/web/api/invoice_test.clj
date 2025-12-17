@@ -1,5 +1,6 @@
 (ns monkey.ci.web.api.invoice-test
   (:require [clojure.test :refer [deftest is testing]]
+            [manifold.deferred :as md]
             [monkey.ci.storage :as st]
             [monkey.ci.test
              [helpers :as h]
@@ -19,23 +20,91 @@
 
 (deftest search-invoices
   (let [{st :storage :as rt} (trt/test-runtime)
-        cust (h/gen-cust)
+        org (h/gen-org)
         [a b c :as inv] (->> [{:kind :invoice
                                :currency "EUR"
                                :net-amount 100M
                                :vat-perc 21M}]
                              (map (partial merge (h/gen-invoice)))
-                             (map #(assoc % :org-id (:id cust)))
+                             (map #(assoc % :org-id (:id org)))
                              (remove nil?))]
-    (is (some? (st/save-org st cust)))
+    (is (some? (st/save-org st org)))
     (is (some? (->> inv
                     (map (partial st/save-invoice st))
                     (doall))))
     
     (testing "when no filter given, returns all org invoices"
       (is (= inv (-> (h/->req rt)
-                     (assoc-in [:parameters :path :org-id] (:id cust))
+                     (assoc-in [:parameters :path :org-id] (:id org))
                      (sut/search-invoices)
                      :body))))
 
     (testing "parses filter dates")))
+
+(deftest create-invoice
+  (let [ext-inv (atom [])
+        fake-client (fn [req]
+                      (swap! ext-inv conj req)
+                      (condp = (:path req)
+                        "/invoice"
+                        (md/success-deferred
+                         {:status 201
+                          :body {:id 123
+                                 :invoice-nr "INV1234"}})
+                        "/customer"
+                        (md/success-deferred
+                         {:status 200
+                          :body [{:id 1 :name "test org"}]})
+                        (md/error-deferred (ex-info "Invalid request" req))))
+        {st :storage :as rt} (-> (trt/test-runtime)
+                                 (trt/set-invoicing-client fake-client))
+        org (-> (h/gen-org)
+                (assoc :name "test org"))
+        _ (st/save-org st org)
+        _ (st/save-org-invoicing st {:org-id (:id org)
+                                     :ext-id "1"})
+        res (-> (h/->req rt)
+                (assoc-in [:parameters :path :org-id] (:id org))
+                (assoc-in [:parameters :body] {:amount 10M})
+                (sut/create-invoice))]
+    (is (= 201 (:status res)) (:body res))
+    
+    (testing "creates invoice in db"
+      (is (= 1 (-> (st/list-invoices-for-org st (:id org))
+                   (count)))))
+
+    (testing "creates invoice externally"
+      (is (= 2 (count @ext-inv))))
+
+    (testing "set external id and invoice nr in db"
+      (let [inv (st/find-invoice st [(:id org) (get-in res [:body :id])])]
+        (is (some? inv))
+        (is (= "123" (:ext-id inv)))
+        (is (= "INV1234" (:invoice-nr inv)))))))
+
+(deftest update-org-settings
+  (let [{st :storage :as rt} (-> (trt/test-runtime)
+                                 (trt/set-invoicing-client
+                                  (fn [req]
+                                    (if (= "/customer" (:path req))
+                                      (md/success-deferred {:body {:id 567}})
+                                      (md/error-deferred (ex-info "Unexpected request" req))))))
+        org (h/gen-org)]
+    (is (some? (st/save-org st org)))
+    
+    (let [r (-> (h/->req rt)
+                (assoc :parameters {:path {:org-id (:id org)}
+                                    :body {:vat-nr "TEST1234"
+                                           :currency "EUR"}})
+                (sut/update-org-settings))]
+      (testing "creates org settings in db"
+        (is (= "TEST1234" (-> (st/find-org-invoicing st (:id org))
+                              :vat-nr))))
+      
+      (testing "creates new customer in invoice service"
+        (is (= "567" (-> (st/find-org-invoicing st (:id org))
+                         :ext-id))))
+
+      (testing "updates customer in invoice service")
+
+      (testing "status `404` if org not found"))))

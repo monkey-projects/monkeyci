@@ -73,6 +73,7 @@
     ["/o/:org-id/params" :page/org-params]
     ["/o/:org-id/ssh-keys" :page/org-ssh-keys]
     ["/o/:org-id/api-keys" :page/org-api-keys]
+    ["/o/:org-id/billing" :page/billing]
     ["/o/:org-id/r/:repo-id" :page/repo]
     ["/o/:org-id/r/:repo-id/edit" :page/repo-edit]
     ["/o/:org-id/r/:repo-id/settings" :page/repo-settings]
@@ -94,6 +95,7 @@
     ["/forget" :admin/forget-users]
     ["/invoicing" :admin/invoicing]
     ["/invoicing/:org-id" :admin/org-invoices]
+    ["/invoicing/:org-id/new" :admin/invoice-new]
     ["/mailings" :admin/mailings]
     ["/mailings/new" :admin/new-mailing]
     ["/mailings/edit/:mailing-id" :admin/mailing-edit]]))

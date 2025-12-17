@@ -172,9 +172,10 @@
   (s/keys :req-un [:db/user-id :db/password]))
 
 (s/def :db/invoice
-  (-> (s/keys :req-un [:db/org-id :invoice/kind :invoice/invoice-nr :invoice/date
+  (-> (s/keys :req-un [:db/org-id :invoice/kind :invoice/date
                        :invoice/currency :invoice/net-amount :invoice/vat-perc
-                       :db-invoice/details])
+                       :db-invoice/details]
+              :opt-un [:invoice/invoice-nr :invoice/ext-id])
       (s/merge :db/common)))
 
 (s/def :db-invoice/details
@@ -182,6 +183,12 @@
 
 (s/def :db-invoice/detail
   (s/keys :req-un [:invoice/net-amount :invoice/vat-perc :db/description]))
+
+(s/def :db/vat-nr string?)
+
+(s/def :db/org-invoicing
+  (s/keys :req-un [:db/org-id :invoice/currency :invoice/address :invoice/country]
+          :opt-un [:db/vat-nr :invoice/ext-id]))
 
 (s/def :db/runner keyword?)
 (s/def :runner/details map?)

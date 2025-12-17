@@ -873,20 +873,22 @@
 (defn invoice-sid [& parts]
   (into [global (name invoice)] parts))
 
-(defn save-invoice [st invoice]
-  (p/write-obj st (invoice-sid (:org-id invoice) (:id invoice)) invoice))
-
 (defn find-invoice [st sid]
   (p/read-obj st (apply invoice-sid sid)))
+
+(def save-invoice
+  (override-or
+   [:invoice :save]
+   (fn [st invoice]
+     (p/write-obj st (invoice-sid (:org-id invoice) (:id invoice)) invoice))))
 
 (def list-invoices-for-org
   (override-or
    [:invoice :list-for-org]
-   (fn [st cust-id]
-     (->> (p/list-obj st (invoice-sid cust-id))
-          (map (partial vector cust-id))
+   (fn [st org-id]
+     (->> (p/list-obj st (invoice-sid org-id))
+          (map (partial vector org-id))
           (map (partial find-invoice st))))))
-
 
 (def runner-details :runner-details)
 (defn runner-details-sid [build-sid]
@@ -1113,3 +1115,12 @@
 
 (defn find-user-settings [st uid]
   (p/read-obj st (user-settings-sid uid)))
+
+(def org-invoicing :org-invoicing)
+(def org-invoicing-sid (partial global-sid org-invoicing))
+
+(defn save-org-invoicing [st s]
+  (p/write-obj st (org-invoicing-sid (:org-id s)) s))
+
+(defn find-org-invoicing [st uid]
+  (p/read-obj st (org-invoicing-sid uid)))

@@ -58,8 +58,11 @@
   [id up down]
   (->SqlMigration id up down))
 
+(defn as-pk [col]
+  (conj col [:primary-key]))
+
 ;;; Common column definitions
-(def id-col [:id :integer [:not nil] :auto-increment [:primary-key]])
+(def id-col (as-pk [:id :integer [:not nil] :auto-increment]))
 (def cuid-col [:cuid [:char 24] [:not nil]])
 (def description-col [:description [:varchar 300]])
 (def label-filters-col [:label-filters :text])
@@ -711,7 +714,7 @@
 
    (table-migration
     56 :user-settings
-    [[:user-id :integer [:not nil] [:primary-key]]
+    [(as-pk user-col)
      [:receive-mailing :boolean]
      fk-user]
     [(col-idx :user-settings :user-id)])
@@ -734,7 +737,29 @@
     [{:alter-table :sent-mailings
       :drop-column :mail-id}]
     [{:alter-table :sent-mailings
-      :add-column [:mail-id [:varchar 100]]}])])
+      :add-column [:mail-id [:varchar 100]]}])
+
+   (migration
+    (mig-id 59 :invoices-ext-id)
+    [{:alter-table :invoices
+      :alter-column [:invoice-nr [:varchar 50] nil]}
+     {:alter-table :invoices
+      :add-column [:ext-id [:varchar 20]]}]
+    [{:alter-table :invoices
+      :alter-column [:invoice-nr [:varchar 50] [:not nil]]}
+     {:alter-table :invoices
+      :drop-column :ext-id}])
+
+   (table-migration
+    60 :org-invoicings
+    [(as-pk org-col)
+     [:vat-nr [:varchar 50]]
+     [:currency [:varchar 3]]
+     [:ext-id [:varchar 20]]
+     [:country [:char 3]]
+     [:address :text]
+     fk-org]
+    [(col-idx :org-invoicings :org-id)])])
 
 (defn prepare-migrations
   "Prepares all migrations by formatting to sql, creates a ragtime migration object from it."

@@ -16,7 +16,7 @@
   (testing "has orgs table"
     (eh/with-prepared-db*
       (fn [conn]
-        (is (number? (-> (jdbc/execute-one! (:ds conn) ["select count(*) as c from orgs"]
+        (is (number? (-> (jdbc/execute-one! (:ds conn) ["select count(*) as c from \"orgs\""]
                                             {:builder-fn rs/as-unqualified-lower-maps})
                          :c)))))))
 
@@ -401,7 +401,9 @@
                          :vat-perc 21M
                          :details [{:net-amount 100M
                                     :vat-perc 21M
-                                    :description "Test invoice detail"}]))]
+                                    :description "Test invoice detail"}]
+                         :invoice-nr "1342"
+                         :ext-id "10"))]
       
       (testing "can insert"
         (is (number? (:id (sut/insert-invoice conn inv)))))
@@ -519,3 +521,20 @@
 
         (is (= s (-> (sut/select-user-settings conn (sut/by-user (:id u)))
                      first)))))))
+
+(deftest ^:sql org-invoicing
+  (eh/with-prepared-db conn
+    (let [org (sut/insert-org conn (eh/gen-org))
+          inv (-> (eh/gen-org-invoicing)
+                  (assoc :org-id (:id org)))]
+      (testing "can save"
+        (is (some? (sut/insert-org-invoicing conn inv))))
+
+      (testing "can retrieve for org"
+        (is (some? (sut/select-org-invoicing conn (sut/by-org (:id org))))))
+
+      (testing "splits and joins address lines"
+        (is (some? (sut/update-org-invoicing conn (assoc inv :address ["line 1" "line 2"]))))
+        (is (= ["line 1" "line 2"]
+               (-> (sut/select-org-invoicing conn (sut/by-org (:id org)))
+                   :address)))))))

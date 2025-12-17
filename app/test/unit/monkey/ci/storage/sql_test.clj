@@ -878,6 +878,8 @@
                          :currency "EUR"
                          :net-amount 100M
                          :vat-perc 21M
+                         :ext-id "1234"
+                         :invoice-nr "5689"
                          :details
                          [{:net-amount 20M
                            :vat-perc 21M
@@ -1064,6 +1066,24 @@
         (is (sid/sid? (st/save-user-settings st (assoc s :receive-mailing false))))
         (is (false? (-> (st/find-user-settings st (:id u))
                         :receive-mailing)))))))
+
+(deftest ^:sql org-invoicing
+  (with-storage conn st
+    (let [org (h/gen-org)
+          i (-> (h/gen-org-invoicing)
+                (assoc :org-id (:id org)
+                       :currency "USD"))]
+      (is (sid/sid? (st/save-org st org)))
+
+      (testing "can save"
+        (is (sid/sid? (st/save-org-invoicing st i))))
+
+      (testing "can find by org"
+        (is (= i (st/find-org-invoicing st (:id org)))))
+
+      (testing "can update"
+        (is (some? (st/save-org-invoicing st (assoc i :currency "EUR"))))
+        (is (= "EUR" (:currency (st/find-org-invoicing st (:id org)))))))))
 
 (deftest pool-component
   (testing "creates sql connection pool using settings"

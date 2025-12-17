@@ -86,6 +86,7 @@
    :admin/org-credits credits/org-credits
    :admin/invoicing inv/page
    :admin/org-invoices inv/org-invoices
+   :admin/invoice-new inv/new-invoice
    :admin/clean-builds clean/page
    :admin/mailings mailing/overview
    :admin/new-mailing mailing/new-mailing

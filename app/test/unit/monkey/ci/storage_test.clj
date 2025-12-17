@@ -611,15 +611,15 @@
 
 (deftest invoices
   (h/with-memory-store st
-    (let [cust (h/gen-org)
+    (let [org (h/gen-org)
           inv (-> (h/gen-invoice)
-                  (assoc :org-id (:id cust)))]
+                  (assoc :org-id (:id org)))]
       (testing "can save and find by id"
         (is (sid/sid? (sut/save-invoice st inv)))
-        (is (= inv (sut/find-invoice st [(:id cust) (:id inv)]))))
+        (is (= inv (sut/find-invoice st [(:id org) (:id inv)]))))
 
       (testing "can list for org"
-        (is (= [inv] (sut/list-invoices-for-org st (:id cust))))))))
+        (is (= [inv] (sut/list-invoices-for-org st (:id org))))))))
 
 (deftest runner-details
   (h/with-memory-store st
@@ -746,3 +746,14 @@
       (testing "can save and find for user"
         (is (sid/sid? (sut/save-user-settings st s)))
         (is (= s (sut/find-user-settings st (:id u))))))))
+
+(deftest org-invoicing
+  (h/with-memory-store st
+    (let [org (h/gen-org)
+          s (-> (h/gen-org-invoicing)
+                (assoc :org-id (:id org)))]
+      (is (sid/sid? (sut/save-org st org)))
+
+      (testing "can save and find for org"
+        (is (sid/sid? (sut/save-org-invoicing st s)))
+        (is (= s (sut/find-org-invoicing st (:id org))))))))

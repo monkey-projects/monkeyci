@@ -7,6 +7,7 @@
             [monkey.ci
              [blob :as blob]
              [build :as b]
+             [invoicing :as inv]
              [oci :as oci]
              [protocols :as p]
              [reporting :as rep]
@@ -271,6 +272,9 @@
 (defn new-mailer [{:keys [mailing]}]
   (make-mailer mailing))
 
+(defn new-invoicing [{:keys [invoicing]}]
+  {:client (inv/make-client invoicing)})
+
 (defn make-server-system
   "Creates a component system that can be used to start an application server."
   [config]
@@ -289,7 +293,7 @@
    :runtime   (co/using
                (new-server-runtime config)
                [:artifacts :metrics :storage :jwk :process-reaper :vault :mailman :update-bus
-                :crypto :mailer])
+                :crypto :mailer :invoicing])
    :pool      (new-db-pool config)
    :migrator  (co/using
                (new-db-migrator config)
@@ -322,7 +326,8 @@
    :otlp (co/using
           (new-otlp-client config)
           [:metrics])
-   :mailer (new-mailer config)))
+   :mailer (new-mailer config)
+   :invoicing (new-invoicing config)))
 
 (defn with-server-system [config f]
   (rc/with-system (make-server-system config) f))
