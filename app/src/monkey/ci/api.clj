@@ -129,9 +129,9 @@
 
 (defn dir-artifact
   "Converts artifact that points to a file, to one that points to its parent
-   directory."
+   directory.  If there is no parent directory, uses the current directory."
   [art]
-  (update art :path (comp str fs/parent)))
+  (update art :path (comp str #(or % ".") fs/parent)))
 
 (defn save-artifacts
   "Configures the artifacts to save on a job."

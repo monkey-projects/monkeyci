@@ -123,6 +123,9 @@
    argument, only the files that match the regex are extracted.  Closes the
    input stream."
   [src dest & [re]]
+  ;; FIXME When the archive only contains one file, and it's name is the same name as
+  ;; the archive file (without tgz extension), it should be extracted in the same
+  ;; location, and not in a subdirectory.
   (with-open [in (io/input-stream src)
               ds (decompress in)]
     (unarchive ds

@@ -174,6 +174,17 @@
                     (sut/restore-artifacts art))]
         (is (= [art] (:restore-artifacts (job test-ctx))))))))
 
+(deftest dir-artifact
+  (testing "converts artifact to parent dir"
+    (is (= (sut/artifact "test" "a/b")
+           (-> (sut/artifact "test" "a/b/c")
+               (sut/dir-artifact)))))
+
+  (testing "when no dir, uses current"
+    (is (= (sut/artifact "test" ".")
+           (-> (sut/artifact "test" "test.txt")
+               (sut/dir-artifact))))))
+
 (deftest caches
   (let [art (sut/cache "test-artifact" "/test/path")]
     (testing "sets caches on job"
