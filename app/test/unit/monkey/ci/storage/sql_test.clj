@@ -1072,7 +1072,8 @@
     (let [org (h/gen-org)
           i (-> (h/gen-org-invoicing)
                 (assoc :org-id (:id org)
-                       :currency "USD"))]
+                       :currency "USD"
+                       :address ["test street"]))]
       (is (sid/sid? (st/save-org st org)))
 
       (testing "can save"
