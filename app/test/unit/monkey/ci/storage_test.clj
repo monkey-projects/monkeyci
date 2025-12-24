@@ -659,7 +659,7 @@
                   (merge (select-keys job [:org-id :repo-id :build-id])))
           job-sid (conj (vec (b/sid job)) (:id job))]
       (is (= 4 (count job-sid)))
-      (is (= 5 (count (sut/job-event->sid evt))))
+      (is (= 5 (count (sut/job-event->sid evt))) "includes time in sid")
       
       (testing "can save and list for job"
         (is (sid/sid? (sut/save-job-event st evt)))

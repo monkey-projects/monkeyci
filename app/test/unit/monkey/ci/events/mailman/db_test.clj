@@ -193,6 +193,32 @@
         (testing "creates job event"
           (is (= 1 (count (st/list-job-events s (conj (b/sid build) (:id job)))))))))))
 
+(deftest load-job-events
+  (h/with-memory-store s
+    (let [job (h/gen-job)
+          build (-> (h/gen-build)
+                    (dissoc :sid)
+                    (assoc-in [:script :jobs] {(:id job) job}))
+          sid (sut/build->sid build)
+          evt (-> (select-keys build [:org-id :repo-id :build-id])
+                  (assoc :job-id (:id job)
+                         :time 100
+                         :type :job/initializing))
+          {:keys [enter] :as i} sut/load-job-events]
+      (is (keyword? (:name i)))
+      (is (some? (st/save-build s build)))
+      (is (some? (st/save-job-event s evt)))
+
+      (testing "loads events for job into ctx"
+        (is (= [:job/initializing]
+               (-> {:event {:type :job/start
+                            :sid sid
+                            :job-id (:id job)}}
+                   (emi/set-db s)
+                   (enter)
+                   (sut/get-job-events)
+                   (as-> e (map :type e)))))))))
+
 (deftest save-credit-consumption
   (let [{:keys [leave] :as i} sut/save-credit-consumption]
     (is (keyword? (:name i)))
@@ -443,7 +469,8 @@
 
 (deftest job-end
   (let [job (-> (h/gen-job)
-                (assoc :status :running))
+                (assoc :status :running)
+                (dissoc :credit-multiplier))
         build (-> (h/gen-build)
                   (assoc-in [:script :jobs] {(:id job) job}))
         r (-> {:event {:type :job/end
@@ -454,6 +481,9 @@
                        :time 1000}}
               (sut/set-build build)
               (sut/set-job job)
+              (sut/set-job-events [{:type :job/initializing
+                                    :time 900
+                                    :credit-multiplier 2}])
               (sut/job-end))]
     (testing "returns `build/updated` event"
       (validate-spec ::se/event r)
@@ -467,7 +497,10 @@
         (is (= 1000 (:end-time res))))
       
       (testing "sets result if specified"
-        (is (= ::test-result (:result res)))))))
+        (is (= ::test-result (:result res))))
+
+      (testing "merges job events"
+        (is (= 2 (:credit-multiplier res)))))))
 
 (deftest job-skipped
   (let [job (-> (h/gen-job)

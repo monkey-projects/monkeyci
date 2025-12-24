@@ -28,7 +28,15 @@
 (defn set-job [ctx job]
   (assoc ctx ::job job))
 
+(def get-job-events ::job-events)
+
+(defn set-job-events [ctx evt]
+  (assoc ctx ::job-events evt))
+
 (def build->sid b/sid)
+
+(defn job-sid [{{:keys [sid job-id]} :event}]
+  (vec (concat sid [job-id])))
 
 (defn- without-jobs
   "Removes the jobs from the build, ensuring they are not updated.  This eliminates
@@ -111,8 +119,8 @@
 
 (def load-job
   {:name ::load-job
-   :enter (fn [{{:keys [sid job-id]} :event :as ctx}]
-            (set-job ctx (st/find-job (get-db ctx) (concat sid [job-id]))))})
+   :enter (fn [ctx]
+            (set-job ctx (st/find-job (get-db ctx) (job-sid ctx))))})
 
 (def save-job
   "Saves the job found in the result build by id specified in the event."
@@ -138,6 +146,12 @@
   {:name ::with-job
    :enter (:enter load-job)
    :leave (:leave save-job)})
+
+(def load-job-events
+  {:name ::load-job-events
+   :enter (fn [ctx]
+            (println "job events:" (st/list-job-events (get-db ctx) (job-sid ctx)))
+            (set-job-events ctx (st/list-job-events (get-db ctx) (job-sid ctx))))})
 
 (def save-credit-consumption
   "Assuming the result contains a build with credits, creates a credit consumption for
@@ -268,9 +282,20 @@
                            :start-time (:time event))
                     (merge (select-keys event [:credit-multiplier]))))))
 
+(defn- merge-history
+  "Merges job event history into a single object.  Newer events overwrite older ones."
+  [ctx]
+  (->> ctx
+       (get-job-events)
+       (sort-by :time)
+       (apply merge)))
+
 (def job-end
-  (job-update (fn [job {:keys [event]}]
-                (-> job
+  ;; TODO List job events and merge the data into one.  This to fix any missing data due to
+  ;; concurrent updates.
+  (job-update (fn [job {:keys [event] :as ctx}]
+                (-> (merge-history ctx)
+                    (merge job)
                     (assoc :end-time (:time event))
                     (merge (select-keys event [:status :result]))))))
 
@@ -343,7 +368,7 @@
 
      [:job/end
       [{:handler job-end
-        :interceptors job-int}]]
+        :interceptors (conj job-int load-job-events)}]]
 
      [:job/skipped
       [{:handler job-skipped
