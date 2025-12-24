@@ -26,9 +26,9 @@
   ;; when query cache is cleared.  We take the time period extra large
   ;; to ensure logs that have been committed later are also found.
   (cond-> {:query (query->str (job-query sid id))
-           :start (millis->nanos (- start-time 10000))
+           :start (millis->nanos (- start-time 60000))
            :direction "forward"}
-    end-time (assoc :end (millis->nanos (+ end-time 30000)))))
+    end-time (assoc :end (millis->nanos (+ end-time 60000)))))
 
 (defn with-query
   "Sets given query on the job request"

@@ -368,10 +368,13 @@
 
 ;;; Event handlers
 
+(defn podman-src [evt]
+  (assoc evt :src :podman))
+
 (def container-end-evt
   "Creates a `container/end` event, specifically for podman containers.  This is used
    as an intermediate step to save artifacts."
-  (partial j/job-status-evt :container/end))
+  (comp podman-src (partial j/job-status-evt :container/end)))
 
 (defn prepare-child-cmd
   "Prepares podman command to execute as child process"
@@ -405,12 +408,12 @@
   (let [{:keys [job-id sid]} (:event ctx)]
     ;; Ideally the container notifies us when it's running by means of a script,
     ;; similar to the oci sidecar.
-    [(j/job-start-evt job-id sid)]))
+    [(podman-src (j/job-start-evt job-id sid))]))
 
 (defn job-exec
   "Invoked after the podman container has exited.  Posts a job/executed event."
   [{{:keys [job-id sid status result]} :event}]
-  [(j/job-executed-evt job-id sid (assoc result :status status))])
+  [(podman-src (j/job-executed-evt job-id sid (assoc result :status status)))])
 
 (defn- make-job-ctx [conf]
   (-> (select-keys conf [:artifacts :cache])
