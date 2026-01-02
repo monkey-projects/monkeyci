@@ -79,7 +79,8 @@
   (with-redefs [sut/auto-subs (constantly
                                [{:amount 100
                                  :from (t/now)
-                                 :description "Test sub"}])]
+                                 :description "Test sub"
+                                 :period "P1Y"}])]
     (let [user (-> (h/gen-user)
                    (dissoc :orgs))
           {st :storage :as rt} (trt/test-runtime)
@@ -120,11 +121,13 @@
         (testing "issues credits"
           (let [cc (st/list-org-credits st org-id)]
             (is (not-empty cc))
-            (is (some? (->> cc
+            (let [sub (->> cc
                             first
                             :subscription-id
                             (vector org-id)
-                            (st/find-credit-subscription st))))))
+                            (st/find-credit-subscription st))]
+              (is (some? sub))
+              (is (= "P1Y" (:valid-period sub))))))
 
         (testing "generates data encryption key"
           (let [c (st/find-crypto st org-id)]

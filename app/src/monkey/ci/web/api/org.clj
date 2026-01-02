@@ -50,14 +50,16 @@
   ;; could introduce some kind of template entity for this.
   [{:amount config/free-credits
     :from (t/now)
-    :description "Basic free subscription"}
+    :description "Basic free subscription"
+    :period "P1Y"}
    ;; TODO Also add start/end date, to indicate promotion periods
    {:amount 2000
     :from (t/now)
     :until (-> (jt/offset-date-time)
                (jt/plus (jt/years 1))
                (jt/to-millis-from-epoch))
-    :description "Year's end promotion"}])
+    :description "Year's end promotion"
+    :period "P1Y"}])
 
 (defn create-org [req]
   (st/with-transaction (c/req->storage req) st

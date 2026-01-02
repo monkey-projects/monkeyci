@@ -969,13 +969,14 @@
        (when-let [uid (:user-id opts)]
          (let [u (find-user s uid)]
            (save-user s (update u :orgs (comp vec conj) org-id))))
-       (doseq [{:keys [amount from until] :as conf} (:credits opts)]
+       (doseq [{:keys [amount from until period] :as conf} (:credits opts)]
          (let [cs (-> conf
-                      (dissoc :from :until)
+                      (dissoc :from :until :period)
                       (assoc :id (cuid/random-cuid)
                              :org-id org-id
                              :valid-from from
-                             :valid-until until))]
+                             :valid-until until
+                             :valid-period period))]
            (when (save-credit-subscription s cs)
              (save-org-credit s {:id (cuid/random-cuid)
                                  :org-id org-id

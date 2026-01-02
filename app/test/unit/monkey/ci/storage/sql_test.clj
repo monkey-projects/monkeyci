@@ -119,7 +119,8 @@
                               :user-id (:id user)
                               :credits [{:amount 1000
                                          :from (t/now)
-                                         :description "Test sub"}]
+                                         :description "Test sub"
+                                         :period "P2Y"}]
                               :dek "test-dek"})]
       
       (testing "creates new org"
@@ -135,7 +136,8 @@
         (let [cs (st/list-org-credit-subscriptions s (:id org))]
           (is (= 1 (count cs)))
           (is (= 1000M (-> cs first :amount)))
-          (is (string? (-> cs first :description)))))
+          (is (string? (-> cs first :description)))
+          (is (= "P2Y" (-> cs first :valid-period)))))
 
       (testing "creates initial credits"
         (let [c (st/list-org-credits s (:id org))]

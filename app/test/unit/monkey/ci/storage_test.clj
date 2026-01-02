@@ -51,7 +51,8 @@
       (let [res (sut/init-org st {:org org
                                   :user-id (:id user)
                                   :credits [{:amount 1000
-                                             :from (t/now)}]
+                                             :from (t/now)
+                                             :period "P2Y"}]
                                   :dek "test-dek"})]
         (is (sid/sid? res))
 
@@ -69,7 +70,8 @@
         (testing "creates credit subscriptions"
           (let [cs (sut/list-org-credit-subscriptions st (:id org))]
             (is (= 1 (count cs)))
-            (is (= 1000 (-> cs first :amount)))))
+            (is (= 1000 (-> cs first :amount)))
+            (is (= "P2Y" (-> cs first :valid-period)))))
 
         (testing "creates starting credit"
           (let [c (sut/list-org-credits st (:id org))]

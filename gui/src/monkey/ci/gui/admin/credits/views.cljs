@@ -72,6 +72,9 @@
     :columns (-> [{:label "Available from"
                    :value (formatted-time :valid-from)
                    :sorter (t/prop-sorter :valid-from)}
+                  {:label "Available until"
+                   :value (formatted-time :valid-until)
+                   :sorter (t/prop-sorter :valid-until)}
                   {:label "Amount"
                    :value :amount
                    :sorter (t/prop-sorter :amount)}
@@ -110,6 +113,7 @@
    [form-input :amount "Credit amount" :number]
    [form-input :reason "Reason" :text "Optional informational message for the org."]
    [form-input :valid-from "Available from" :date "The date the credits become available for use."]
+   [form-input :valid-until "Available until" :date "The date the credits expire."]
    [:div.d-flex.gap-2
     [issue-save-btn]
     [co/cancel-btn [:credits/cancel-issue]]]])
@@ -166,6 +170,9 @@
                   {:label "Valid until"
                    :value (formatted-time :valid-until)
                    :sorter (t/prop-sorter :valid-until)}
+                  {:label "Period"
+                   :value :valid-period
+                   :sorter (t/prop-sorter :valid-period)}
                   {:label "Amount"
                    :value :amount
                    :sorter (t/prop-sorter :amount)}]
@@ -181,6 +188,7 @@
    [form-input :amount "Credit amount" :number]
    [form-input :valid-from "Valid from" :date "The date the subscription becomes active."]
    [form-input :valid-until "Valid until" :date "Optional date the subscription ends."]
+   [form-input :valid-period "Period" :text "Optional period the credits remain available (format: PnY)."]
    [:div.d-flex.gap-2
     [sub-save-btn]
     [co/cancel-btn [:credits/cancel-sub]]]])
