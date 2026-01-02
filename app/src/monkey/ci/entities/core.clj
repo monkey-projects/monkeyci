@@ -408,15 +408,18 @@
 (defentity credit-subscription credit-sub-conversions)
 
 (def prepare-credit
-  (comp (partial int->time :from-time)
+  (comp (partial int->time :valid-from)
+        (partial int->time :valid-until)
         (partial keyword->str :type)))
 
 (def convert-credit
-  (comp (partial copy-prop :from-time)
+  (comp (partial copy-prop :valid-from)
+        (partial copy-prop :valid-until)
         (partial copy-prop :type)))
 
 (def convert-credit-select
-  (comp (partial time->int :from-time)
+  (comp (partial time->int :valid-from)
+        (partial time->int :valid-until)
         (partial str->keyword :type)))
 
 (def cust-credit-conversions

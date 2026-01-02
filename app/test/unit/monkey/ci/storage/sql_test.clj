@@ -696,7 +696,9 @@
                    (assoc :repos {(:id repo) repo}))
           cred (-> (h/gen-org-credit)
                    (assoc :org-id (:id org)
-                          :amount 100M)
+                          :amount 100M
+                          :valid-from 100
+                          :valid-until 200)
                    (dissoc :user-id :subscription-id))]
       (is (sid/sid? (st/save-org s org)))
       
@@ -707,15 +709,15 @@
       (testing "for org"
         (let [other-org (h/gen-org)
               _ (st/save-org s other-org)
-              sids (->> [(assoc cred :from-time 1000)
+              sids (->> [(assoc cred :valid-from 1000)
                          (-> (h/gen-org-credit)
                              (assoc :org-id (:id org)
-                                    :from-time 2000
+                                    :valid-from 2000
                                     :amount 200M)
                              (dissoc :user-id :subscription-id))
                          (-> (h/gen-org-credit)
                              (assoc :org-id (:id other-org)
-                                    :from-time 1000)
+                                    :valid-from 1000)
                              (dissoc :user-id :subscription-id))]
                         (mapv (partial st/save-org-credit s)))]
           (is (some? sids))

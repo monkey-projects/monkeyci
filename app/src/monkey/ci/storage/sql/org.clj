@@ -77,7 +77,7 @@
           (ec/insert-org-credit conn {:cuid (st/new-id)
                                       :org-id org-id
                                       :amount amount
-                                      :from-time from
+                                      :valid-from from
                                       :type :subscription
                                       :subscription-id (:id cs)}))))
     (when-let [dek (:dek opts)]

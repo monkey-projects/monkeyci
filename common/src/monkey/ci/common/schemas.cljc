@@ -43,17 +43,21 @@
 (s/defschema UserCredits
   {:amount s/Int
    (s/optional-key :reason) s/Str
-   (s/optional-key :from-time) s/Int})
+   (s/optional-key :valid-from) s/Int
+   (s/optional-key :valid-until) s/Int})
 
 (s/defschema AutoCredits
   ;; ISO date format
   {:date #"\d{4}-\d{2}-\d{2}"})
 
+(def period-pattern #"^P(\d+Y)?(\d+M)?(\d+D)?$")
+
 (s/defschema CreditSubscription
   {:amount s/Int
    :valid-from s/Int
    (s/optional-key :valid-until) s/Int
-   (s/optional-key :description) s/Str})
+   (s/optional-key :description) s/Str
+   (s/optional-key :valid-period) period-pattern})
 
 (s/defschema DisableCreditSubscription
   {(s/optional-key :valid-until) s/Int})

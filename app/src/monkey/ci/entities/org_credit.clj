@@ -11,7 +11,7 @@
 
 (defn select-org-credits [conn f]
   (->> (assoc base-query
-              :select [:cc.amount :cc.from-time :cc.type :cc.reason
+              :select [:cc.amount :cc.valid-from :cc.valid-until :cc.type :cc.reason
                        [:cc.cuid :id]
                        [:c.cuid :org-id]
                        [:cs.cuid :subscription-id]
@@ -41,7 +41,7 @@
 (defn select-avail-credits [conn org-id]
   (->> (ec/select
         conn
-        {:select [:cc.amount :cc.from-time :cc.type :cc.reason
+        {:select [:cc.amount :cc.valid-from :cc.valid-until :cc.type :cc.reason
                   [:cc.cuid :id]
                   [:c.cuid :org-id]
                   [:cs.cuid :subscription-id]
@@ -69,6 +69,5 @@
   [:and
    (by-org org-id)
    [:or
-    [:is :cc.from-time nil]
-    [:<= :cc.from-time (ec/->ts ts)]]])
-
+    [:is :cc.valid-from nil]
+    [:<= :cc.valid-from (ec/->ts ts)]]])

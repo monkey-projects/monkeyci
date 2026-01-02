@@ -70,8 +70,8 @@
     :items-sub [:credits/issues]
     :loading {:sub [:credits/issues-loading?]}
     :columns (-> [{:label "Available from"
-                   :value (formatted-time :from-time)
-                   :sorter (t/prop-sorter :from-time)}
+                   :value (formatted-time :valid-from)
+                   :sorter (t/prop-sorter :valid-from)}
                   {:label "Amount"
                    :value :amount
                    :sorter (t/prop-sorter :amount)}
@@ -109,7 +109,7 @@
    {:on-submit (f/submit-handler [:credits/save-issue])}
    [form-input :amount "Credit amount" :number]
    [form-input :reason "Reason" :text "Optional informational message for the org."]
-   [form-input :from-time "Available from" :date "The date the credits become available for use."]
+   [form-input :valid-from "Available from" :date "The date the credits become available for use."]
    [:div.d-flex.gap-2
     [issue-save-btn]
     [co/cancel-btn [:credits/cancel-issue]]]])

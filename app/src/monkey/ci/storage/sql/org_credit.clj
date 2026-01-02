@@ -26,7 +26,7 @@
                                           :user-id (:id user))))))
 
 (defn- update-org-credit [conn cred existing]
-  (ec/update-org-credit conn (merge existing (select-keys cred [:amount :from-time]))))
+  (ec/update-org-credit conn (merge existing (select-keys cred [:amount :valid-from :valid-until]))))
 
 (defn upsert-org-credit [conn cred]
   (if-let [existing (ec/select-org-credit conn (ec/by-cuid (:id cred)))]

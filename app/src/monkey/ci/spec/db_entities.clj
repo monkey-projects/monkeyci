@@ -123,14 +123,14 @@
 
 ;;; Credits
 
-(s/def :db/from-time ts?)
 (s/def :db/valid-from ts?)
 (s/def :db/valid-until ts?)
+(s/def :db/valid-period string?)
 (s/def :db/amount (s/int-in 0 1000000))
 
 (s/def :db/credit-subscription
   (-> (s/keys :req-un [:db/org-id :db/amount :db/valid-from]
-              :opt-un [:db/valid-until :db/description])
+              :opt-un [:db/valid-until :db/description :db/valid-period])
       (s/merge :db/common)))
 
 (s/def :db/subscription-id int?)
@@ -138,7 +138,7 @@
 
 (s/def :db/org-credit
   (-> (s/keys :req-un [:db/org-id :db/amount :credit/type]
-              :opt-un [:db/from-time :db/user-id :db/subscription-id :db/reason])
+              :opt-un [:db/valid-from :db/valid-until :db/user-id :db/subscription-id :db/reason])
       (s/merge :db/common)))
 
 (s/def :db/credit-id int?)

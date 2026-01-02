@@ -486,7 +486,7 @@
      (col-idx :credit-consumptions :build-id)])
 
    (entity-table-migration
-    ;; Caching table that holds the current available credits value for each customer
+    ;; Caching table that holds the current available credits value for each org
     24 :available-credits
     [customer-col
      amount-col
@@ -759,7 +759,25 @@
      [:country [:char 3]]
      [:address :text]
      fk-org]
-    [(col-idx :org-invoicings :org-id)])])
+    [(col-idx :org-invoicings :org-id)])
+
+   (migration
+    (mig-id 61 :org-credits-valid-until)
+    [{:alter-table :org-credits
+      :rename-column [:from-time :valid-from]}
+     {:alter-table :org-credits
+      :add-column [:valid-until :timestamp]}]
+    [{:alter-table :org-credits
+      :rename-column [:valid-from :from-time]}
+     {:alter-table :org-credits
+      :drop-column :valid-until}])
+
+   (migration
+    (mig-id 62 :subs-valid-period)
+    [{:alter-table :credit-subscriptions
+      :add-column [:valid-period [:varchar 20]]}]
+    [{:alter-table :credit-subscriptions
+      :drop-column :valid-period}])])
 
 (defn prepare-migrations
   "Prepares all migrations by formatting to sql, creates a ragtime migration object from it."

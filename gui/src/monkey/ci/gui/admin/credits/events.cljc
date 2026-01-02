@@ -91,9 +91,9 @@
    {:dispatch [:secure-request
                :create-credit-issue
                {:credits
-                (-> (select-keys params [:reason :amount :from-time])
+                (-> (select-keys params [:reason :amount :valid-from])
                     (as-> t (mc/map-vals first t))
-                    (mc/update-existing :from-time date->epoch))
+                    (mc/update-existing :valid-from date->epoch))
                 :org-id (r/org-id db)}
                [:credits/save-issue--success]
                [:credits/save-issue--failed]]

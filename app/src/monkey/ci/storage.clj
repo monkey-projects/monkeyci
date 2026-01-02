@@ -744,13 +744,13 @@
 
 (def list-org-credits-since
   "Lists all org credits for the org since given timestamp.  
-   This includes those without a `from-time`."
+   This includes those without a `valid-from`."
   (override-or
    [:org :list-credits-since]
    (fn [s cust-id ts]
      (->> (list-org-credits s cust-id)
           (filter (every-pred (cp/prop-pred :org-id cust-id)
-                              (comp (some-fn nil? (partial <= ts)) :from-time)))))))
+                              (comp (some-fn nil? (partial <= ts)) :valid-from)))))))
 
 (def credit-subscriptions :credit-subscriptions)
 (defn credit-sub-sid [& parts]
@@ -980,7 +980,7 @@
              (save-org-credit s {:id (cuid/random-cuid)
                                  :org-id org-id
                                  :amount amount
-                                 :from-time from
+                                 :valid-from from
                                  :type :subscription
                                  :subscription-id (:id cs)}))))
        (when-let [dek (:dek opts)]

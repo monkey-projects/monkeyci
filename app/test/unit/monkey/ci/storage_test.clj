@@ -525,7 +525,7 @@
   (h/with-memory-store st
     (let [now (t/now)
           cred (-> (h/gen-org-credit)
-                   (assoc :from-time now
+                   (assoc :valid-from now
                           :amount 100M))
           cid (:org-id cred)
           repo (h/gen-repo)
