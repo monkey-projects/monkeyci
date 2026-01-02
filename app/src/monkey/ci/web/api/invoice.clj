@@ -63,15 +63,19 @@
         st (c/req->storage req)
         org (st/find-org st org-id)
         i (st/find-org-invoicing st org-id)
-        ;; TODO Update customer in invoicing
-        ext-id (when-not (:ext-id i)
-                 (-> @(i/create-customer (req->client req)
-                                         (-> in
-                                             (select-keys [:vat-nr :address])
-                                             (assoc :name (:name org))))
-                     :body
-                     :id
-                     str))
+        inv-cust (-> in
+                     (select-keys [:vat-nr :address])
+                     (assoc :name (:name org)))
+        ext-id (-> (if-let [inv-id  (:ext-id i)]
+                     (i/update-customer (req->client req)
+                                        inv-id
+                                        inv-cust)
+                     (i/create-customer (req->client req)
+                                        inv-cust))
+                   deref
+                   :body
+                   :id
+                   str)
         s (cond-> in
             ext-id (assoc :ext-id ext-id))]
     (if (st/save-org-invoicing st s)

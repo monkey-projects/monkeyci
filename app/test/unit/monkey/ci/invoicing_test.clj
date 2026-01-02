@@ -29,6 +29,18 @@
                        (deref)
                        :status)))))))
 
+(deftest update-customer
+  (let [client (sut/make-client {:url "http://test-invoice"})]
+    (at/with-fake-http [{:url "http://test-invoice/customer/1234"
+                         :method :put}
+                        {:status 200
+                         :headers
+                         {"Content-Type" "application/json"}}]
+      (testing "invokes `PUT /customer/:id`"
+        (is (= 200 (-> (sut/update-customer client "1234" {:name "test customer"})
+                       (deref)
+                       :status)))))))
+
 (deftest get-customer
   (testing "matches customer by id"
     (let [client (sut/make-client {:url "http://test"})]

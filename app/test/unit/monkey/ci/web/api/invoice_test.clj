@@ -83,28 +83,39 @@
         (is (= "INV1234" (:invoice-nr inv)))))))
 
 (deftest update-org-settings
-  (let [{st :storage :as rt} (-> (trt/test-runtime)
+  (let [inv-req (atom [])
+        {st :storage :as rt} (-> (trt/test-runtime)
                                  (trt/set-invoicing-client
                                   (fn [req]
-                                    (if (= "/customer" (:path req))
+                                    (swap! inv-req conj req)
+                                    (cond
+                                      (= "/customer" (:path req))
                                       (md/success-deferred {:body {:id 567}})
+                                      (= "/customer/567" (:path req))
+                                      (md/success-deferred {:body {:id 567 :name "Updated customer"}})
+                                      :else
                                       (md/error-deferred (ex-info "Unexpected request" req))))))
         org (h/gen-org)]
     (is (some? (st/save-org st org)))
     
-    (let [r (-> (h/->req rt)
-                (assoc :parameters {:path {:org-id (:id org)}
-                                    :body {:vat-nr "TEST1234"
-                                           :currency "EUR"}})
-                (sut/update-org-settings))]
+    (let [req (-> (h/->req rt)
+                  (assoc :parameters {:path {:org-id (:id org)}
+                                      :body {:vat-nr "TEST1234"
+                                             :currency "EUR"}}))
+          reply (sut/update-org-settings req)]
+      (is (= 200 (:status reply)))
+      
       (testing "creates org settings in db"
         (is (= "TEST1234" (-> (st/find-org-invoicing st (:id org))
                               :vat-nr))))
       
       (testing "creates new customer in invoice service"
+        (is (= 1 (count @inv-req)))
         (is (= "567" (-> (st/find-org-invoicing st (:id org))
                          :ext-id))))
 
-      (testing "updates customer in invoice service")
+      (testing "updates customer in invoice service"
+        (is (= 200 (:status (sut/update-org-settings req))))
+        (is (= 2 (count @inv-req))))
 
       (testing "status `404` if org not found"))))

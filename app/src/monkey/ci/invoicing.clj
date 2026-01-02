@@ -49,6 +49,12 @@
               :path "/customer"
               :body cust})))
 
+(def update-customer
+  (inv-req (fn [id cust]
+             {:method :put
+              :path (str "/customer/" id)
+              :body cust})))
+
 (defn get-customer [client id]
   (md/chain
    (list-customers client)
