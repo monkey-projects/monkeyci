@@ -711,10 +711,11 @@
       (testing "for org"
         (let [other-org (h/gen-org)
               _ (st/save-org s other-org)
-              sids (->> [(assoc cred :valid-from 1000)
+              sids (->> [(assoc cred :valid-from 1000 :valid-until nil)
                          (-> (h/gen-org-credit)
                              (assoc :org-id (:id org)
                                     :valid-from 2000
+                                    :valid-until 3000
                                     :amount 200M)
                              (dissoc :user-id :subscription-id))
                          (-> (h/gen-org-credit)
@@ -734,24 +735,31 @@
                    (->> (st/list-org-credits s (:id org))
                         (map :id)))))))
 
-      (testing "calculates available credits using credit consumptions"
-        (let [build (-> (h/gen-build)
-                        (assoc :org-id (:id org)
-                               :repo-id (:id repo)
-                               :credits 25M))
-              ccons {:org-id (:id org)
-                     :repo-id (:id repo)
-                     :build-id (:build-id build)
-                     :credit-id (:id cred)
-                     :amount 30M}]
-          (is (sid/sid? (st/save-build s build)))
-          (is (sid/sid? (st/save-credit-consumption s ccons)))
-          (is (= 270M (st/calc-available-credits s (:id org))))))
+      (testing "available credits"
+        (testing "calculates using credit consumptions"
+          (let [build (-> (h/gen-build)
+                          (assoc :org-id (:id org)
+                                 :repo-id (:id repo)
+                                 :credits 25M))
+                ccons {:org-id (:id org)
+                       :repo-id (:id repo)
+                       :build-id (:build-id build)
+                       :credit-id (:id cred)
+                       :amount 30M}]
+            (is (sid/sid? (st/save-build s build)))
+            (is (sid/sid? (st/save-credit-consumption s ccons)))
+            (is (= 270M (st/calc-available-credits s (:id org) 2100)))))
+        
+        (testing "ignores credits that are not active yet"
+          (is (= 70M (st/calc-available-credits s (:id org) 1100))))
 
-      (testing "lists available credits"
-        (is (= [(:id cred)]
-               (->> (st/list-available-credits s (:id org))
-                    (map :id))))))))
+        (testing "ignores expired credits"
+          (is (= 70M (st/calc-available-credits s (:id org) 3100))))
+
+        (testing "can list"
+          (is (= [(:id cred)]
+                 (->> (st/list-available-credits s (:id org))
+                      (map :id)))))))))
 
 (deftest ^:sql credit-consumptions
   (with-storage conn s

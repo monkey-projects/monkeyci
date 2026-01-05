@@ -46,9 +46,9 @@
   (->> (ecc/select-org-credits (sc/get-conn st) (ecc/by-org org-id))
        (map db->org-credit)))
 
-(defn select-avail-credits-amount [st org-id]
+(defn select-avail-credits-amount [st org-id ts]
   ;; TODO Use the available-credits table for faster lookup
-  (ecc/select-avail-credits-amount (sc/get-conn st) org-id))
+  (ecc/select-avail-credits-amount (sc/get-conn st) org-id ts))
 
 (defn select-avail-credits [st org-id]
   (->> (ecc/select-avail-credits (sc/get-conn st) org-id)

@@ -194,5 +194,5 @@
   [req]
   (let [s (c/req->storage req)
         org-id (c/org-id req)
-        avail (st/calc-available-credits s org-id)]
+        avail (st/calc-available-credits s org-id (t/now))]
     (rur/response {:available avail})))

@@ -836,18 +836,25 @@
             (filter avail?))))))
 
 (def calc-available-credits
-  "Calculates the available credits for the org.  Basically this is the
-   amount of provisioned credits, substracted by the consumed credits."
+  "Calculates the available credits for the org at given timestamp.  
+   Basically this is the amount of provisioned credits, substracted by 
+   the consumed credits.  The timestamp is used to exclude credits that
+   are not active yet, or have already expired."
   (override-or
    [:org :get-available-credits]
-   (fn [s cust-id]
+   (fn [s org-id at]
      ;; Naive implementation: sum up all provisioned credits and all
      ;; credits from all builds
-     (let [avail (->> (list-org-credits s cust-id)
+     (let [active? (fn [{s :valid-from e :valid-until}]
+                     (or (nil? at)
+                         (and (some? s) (<= s at)
+                              (some? e) (<= at e))))
+           avail (->> (list-org-credits s org-id)
+                      (filter active?)
                       (sum-amount))
-           used  (->> (list-org-credit-consumptions s cust-id)
+           used  (->> (list-org-credit-consumptions s org-id)
                       (sum-amount))]
-       (- avail used)))))
+       (max 0M (- avail used))))))
 
 (def crypto :crypto)
 (defn crypto-sid [& parts]

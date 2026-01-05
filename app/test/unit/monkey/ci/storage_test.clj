@@ -528,6 +528,7 @@
     (let [now (t/now)
           cred (-> (h/gen-org-credit)
                    (assoc :valid-from now
+                          :valid-until (+ now 10000)
                           :amount 100M))
           cid (:org-id cred)
           repo (h/gen-repo)
@@ -553,7 +554,11 @@
                         :amount 20M})))
         
         (testing "can calculate total"
-          (is (= 80M (sut/calc-available-credits st cid))))
+          (is (= 80M (sut/calc-available-credits st cid (+ now 100)))))
+
+        (testing "ignores inactive credits"
+          (is (= 0M (sut/calc-available-credits st cid (- now 50))))
+          (is (= 0M (sut/calc-available-credits st cid (+ now 10250)))))
 
         (testing "can list credit entities"
           (let [avail (sut/list-available-credits st cid)]

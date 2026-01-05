@@ -20,12 +20,20 @@
        (ec/select conn)
        (map ec/convert-credit-select)))
 
-(defn select-avail-credits-amount [conn org-id]
-  (let [avail (-> (ec/select
+(defn select-avail-credits-amount [conn org-id ts]
+  (let [at (when ts (ec/->ts ts))
+        avail (-> (ec/select
                    conn
                    (assoc base-query
                           :select [[[:sum :cc.amount] :avail]]
-                          :where [:= :c.cuid org-id]))
+                          :where (cond->> [:= :c.cuid org-id]
+                                   at (conj [:and
+                                             [:or
+                                              [:= :cc.valid-from nil]
+                                              [:<= :cc.valid-from at]]
+                                             [:or
+                                              [:= :cc.valid-until nil]
+                                              [:<= at :cc.valid-until]]]))))
                   (first)
                   :avail
                   (or 0M))
@@ -36,7 +44,7 @@
                               :where (ecc/by-org org-id))))
                   (first)
                   :used)]
-    (- (or avail 0) (or used 0))))
+    (max 0M (- (or avail 0) (or used 0)))))
 
 (defn select-avail-credits [conn org-id]
   (->> (ec/select
