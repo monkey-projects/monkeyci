@@ -4,21 +4,26 @@
             [aleph.http.client-middleware :as mw]
             [camel-snake-kebab.core :as csk]
             [cheshire.core :as json]
+            [clojure.tools.logging :as log]
             [manifold.deferred :as md]
             [monkey.ci.web.common :as wc]))
 
-(def ^:private middleware
-  (comp mw/wrap-method
+(defn- middleware [h]
+  (comp h
+        mw/wrap-method
         mw/wrap-accept
-        mw/wrap-content-type))
+        mw/wrap-content-type
+        mw/wrap-url))
 
 (defn- make-request [client {:keys [body path] :as opt}]
-  (merge client
-         (dissoc opt :path)
-         (cond-> {:url (str (:url client) path)
-                  :middleware middleware}
-           body (assoc :content-type "application/json"
-                       :body (json/generate-string body {:key-fn (comp csk/->camelCase name)})))))
+  (merge 
+   ;; User agent is required, otherwise 403
+   (assoc-in client [:headers "user-agent"] "MonkeyCI")
+   (dissoc opt :path)         
+   (cond-> {:url (str (:url client) path)
+            :middleware middleware}
+     body (assoc :content-type "application/json"
+                 :body (json/generate-string body {:key-fn (comp csk/->camelCase name)})))))
 
 (defn- do-req [client opts]
   (-> client
