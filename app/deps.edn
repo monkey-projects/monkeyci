@@ -19,7 +19,7 @@
         com.github.loki4j/loki-logback-appender {:mvn/version "2.0.2"}
         com.github.seancorfield/honeysql {:mvn/version "2.7.1350"}
         com.github.seancorfield/next.jdbc {:mvn/version "1.3.1070"}
-        com.monkeyci/common {:mvn/version "0.22.2"}
+        com.monkeyci/common {:mvn/version "0.22.3"}
         com.monkeyprojects/aero-ext {:mvn/version "0.3.1"}
         com.monkeyprojects/clj-scw-client {:mvn/version "0.1.4"}
         com.monkeyprojects/clompress {:mvn/version "0.1.3"}
@@ -154,7 +154,7 @@
    :exec-fn monkey.build/jar
    :exec-args {:jar "target/monkeyci.jar"
                :lib com.monkeyci/app
-               :version [[:env "MONKEYCI_VERSION"] "0.22.2-SNAPSHOT"]
+               :version [[:env "MONKEYCI_VERSION"] "0.22.4-SNAPSHOT"]
                :main "monkey.ci.core"
                :scm {:url "https://github.com/monkey-projects/monkeyci"}
                :pom-data [[:licenses
