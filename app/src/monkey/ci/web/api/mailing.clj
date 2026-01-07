@@ -64,6 +64,7 @@
                      (assoc :destinations (list-destinations st b)))]
         (log/debug "Sending mailing" mid "to" (count (:destinations mail)) "destinations")
         ;; Send in background, because this may take a while
+        ;; TODO Switch to event-driven approach, maybe with cloud functions?
         (p/send-mail mailer mail))
       (log/warn "No mailer configured, emails will not be sent."))
     (if-let [sid (st/save-sent-mailing st r)]
