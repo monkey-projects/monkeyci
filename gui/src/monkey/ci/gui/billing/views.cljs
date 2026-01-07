@@ -43,6 +43,16 @@
 (defn- country-select [v opts]
   [select :country "Country" countries v opts])
 
+(defn- save-btn []
+  (let [s? (rf/subscribe [::s/saving?])]
+    [:button.btn.btn-primary
+     (cond-> {:on-click (u/link-evt-handler [::e/save-invoicing])}
+       @s? (assoc :disabled true))
+     (if @s?
+       [:span.me-2.spinner-border.spinner-border-sm]
+       [:span.me-2 [co/icon :floppy]])
+     "Save"]))
+
 (defn- billing-form []
   (let [l? (rf/subscribe [::s/billing-loading?])
         v (rf/subscribe [::s/invoicing-settings])]
@@ -79,9 +89,7 @@
          :on-change (u/form-evt-handler [::e/invoicing-settings-changed :currency])}]]]
      [:div.row.mt-2.mt-md-4
       [:div.col.d-flex.gap-2
-       [:button.btn.btn-primary
-        {:on-click (u/link-evt-handler [::e/save-invoicing])}
-        [co/icon-text :floppy "Save"]]
+       [save-btn]
        [co/cancel-btn]]]]))
 
 (defn- billing []

@@ -80,9 +80,13 @@
        (is (= ["line 1" "line 2"] (-> @c first (nth 3) :settings :address))))
 
      (testing "clears alerts"
-       (is (empty? (db/get-billing-alerts @app-db)))))))
+       (is (empty? (db/get-billing-alerts @app-db))))
+
+     (testing "marks saving"
+       (is (true? (db/saving? @app-db)))))))
 
 (deftest save-invoicing--success
+  (is (some? (reset! app-db (db/set-saving {}))))
   (rf/dispatch-sync [::sut/save-invoicing--success {:body {:vat-nr "VAT12342"
                                                            :address ["line 1" "line 2"]}}])
 
@@ -91,10 +95,18 @@
 
   (testing "sets success alert"
     (is (= [:success] (->> (db/get-billing-alerts @app-db)
-                           (map :type))))))
+                           (map :type)))))
+
+  (testing "resets saving"
+    (is (not (db/saving? @app-db)))))
 
 (deftest save-invoicing--failure
+  (is (some? (reset! app-db (db/set-saving {}))))
+  (rf/dispatch-sync [::sut/save-invoicing--failure {:message "test error"}])
+  
   (testing "sets error in alerts"
-    (rf/dispatch-sync [::sut/save-invoicing--failure {:message "test error"}])
     (is (= [:danger] (->> (db/get-billing-alerts @app-db)
-                          (map :type))))))
+                          (map :type)))))
+
+  (testing "resets saving"
+    (is (not (db/saving? @app-db)))))

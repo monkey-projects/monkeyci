@@ -26,3 +26,11 @@
 
 (defn billing-loading? [db]
   (lo/loading? db billing-id))
+
+(def saving? (comp true? ::saving))
+
+(defn set-saving [db]
+  (assoc db ::saving true))
+
+(defn reset-saving [db]
+  (dissoc db ::saving))
