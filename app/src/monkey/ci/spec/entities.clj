@@ -140,7 +140,7 @@
 (s/def :entity/amount (s/int-in 0 1000000))
 (s/def :entity/valid-from ts?)
 (s/def :entity/valid-until ts?)
-(s/def :entity/valid-period string?)
+(s/def :entity/valid-period (s/with-gen string? #(sg/fixed-string 10)))
 
 (s/def :entity/credit-subscription
   (-> (s/keys :req-un [:entity/org-id :entity/amount :entity/valid-from]

@@ -15,7 +15,7 @@
 
   :watch
   ;; clj -X:test:watch
-  {:extra-deps {org.clojure/tools.namespace {:mvn/version "1.5.0"}}
+  {:extra-deps {org.clojure/tools.namespace {:mvn/version "1.5.1"}}
    :exec-fn monkey.test/watch}
 
   ;; clj -X:jar

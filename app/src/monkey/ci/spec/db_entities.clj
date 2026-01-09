@@ -125,7 +125,7 @@
 
 (s/def :db/valid-from ts?)
 (s/def :db/valid-until ts?)
-(s/def :db/valid-period string?)
+(s/def :db/valid-period (s/with-gen string? #(sg/fixed-string 10)))
 (s/def :db/amount (s/int-in 0 1000000))
 
 (s/def :db/credit-subscription
