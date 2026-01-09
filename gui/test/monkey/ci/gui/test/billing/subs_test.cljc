@@ -21,3 +21,6 @@
 
 (deftest invoicing-settings
   (h/verify-sub [::sut/invoicing-settings] #(db/set-invoicing-settings % ::settings) ::settings nil))
+
+(deftest saving?
+  (h/verify-sub [::sut/saving?] db/set-saving true false))

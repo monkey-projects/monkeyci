@@ -47,17 +47,20 @@
                 :settings (db/get-invoicing-settings db)}
                [::save-invoicing--success]
                [::save-invoicing--failure]]
-    :db (db/reset-billing-alerts db)}))
+    :db (-> (db/reset-billing-alerts db)
+            (db/set-saving))}))
 
 (rf/reg-event-db
  ::save-invoicing--success
  (fn [db [_ {:keys [body]}]]
    (-> db
        (db/set-invoicing-settings body)
-       (db/set-billing-alerts [(a/invoice-settings-save-success)]))))
+       (db/set-billing-alerts [(a/invoice-settings-save-success)])
+       (db/reset-saving))))
 
 (rf/reg-event-db
  ::save-invoicing--failure
  (fn [db [_ err]]
    (-> db
-       (db/set-billing-alerts [(a/invoice-settings-save-failed err)]))))
+       (db/set-billing-alerts [(a/invoice-settings-save-failed err)])
+       (db/reset-saving))))
