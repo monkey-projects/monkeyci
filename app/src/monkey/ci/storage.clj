@@ -847,8 +847,8 @@
      ;; credits from all builds
      (let [active? (fn [{s :valid-from e :valid-until}]
                      (or (nil? at)
-                         (and (some? s) (<= s at)
-                              (some? e) (<= at e))))
+                         (and (or (nil? s) (<= s at))
+                              (or (nil? e) (<= at e)))))
            avail (->> (list-org-credits s org-id)
                       (filter active?)
                       (sum-amount))
