@@ -231,9 +231,10 @@
   "Queues all jobs that have no dependencies"
   [ctx]
   (let [jobs (get-jobs ctx)
-        build-sid (b/sid (get-build ctx))]
+        build-sid (b/sid (get-build ctx))
+        next-jobs (j/next-jobs (vals jobs))]
     (log/debug "Starting script with" (count jobs) "job(s):" (keys jobs))
-    (if (empty? jobs)
+    (if (empty? next-jobs)
       ;; TODO Should be warning instead of error      
       [(-> (script-end-evt ctx :error)
            (bc/with-message "No jobs to run"))]

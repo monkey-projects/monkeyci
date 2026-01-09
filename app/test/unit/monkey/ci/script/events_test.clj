@@ -390,10 +390,23 @@
           (is (= [(get jobs "start")]
                  (map :job r)))))))
 
-  (testing "returns `script/end` when no jobs"
-    (let [r (sut/script-start {:event {:script {:jobs []}}})]
-      (is (= [:script/end] (map :type r)))
-      (is (bc/failed? (first r))))))
+  (testing "returns `script/end`"
+    (testing "when no jobs"
+      (let [r (sut/script-start {:event {:script {:jobs []}}})]
+        (is (= [:script/end] (map :type r)))
+        (is (bc/failed? (first r)))))
+
+    (testing "when no start jobs found"
+      (let [jobs [{:id "start"
+                   :status :pending
+                   :dependencies ["nonexisting"]}]
+            r (-> {:event
+                   {:script
+                    {:jobs jobs}}}
+                  (sut/set-jobs (jobs->map jobs))
+                  (sut/script-start))]
+        (is (= [:script/end] (map :type r)))
+        (is (bc/failed? (first r)))))))
 
 (deftest script-end
   (testing "sets event in result for realization"
@@ -524,6 +537,20 @@
                  (sut/job-end)
                  first
                  :status))))
+
+    (testing "ends script if remaining jobs have nonexisting dependencies"
+      (is (= :script/end
+             (-> {:event
+                  {:job-id "success"
+                   :status :success}}
+                 (sut/set-jobs (jobs->map [{:id "success"
+                                            :status :success}
+                                           {:id "unreachable"
+                                            :status :pending
+                                            :dependencies ["nonexisting"]}]))
+                 (sut/job-end)
+                 first
+                 :type))))
     
     (testing "marks remaining pending jobs as skipped"
       (let [jobs (jobs->map [{:id "first"
