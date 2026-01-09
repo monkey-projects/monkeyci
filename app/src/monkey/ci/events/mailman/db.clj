@@ -52,8 +52,10 @@
    Assumes that the db is in the context."
   {:name ::org-credits
    :enter (fn [ctx]
+            ;; TODO Ignore any credits that have expired, or are not active yet
             (set-credits ctx (st/calc-available-credits (get-db ctx)
-                                                        (get-in ctx [:event :build :org-id]))))})
+                                                        (get-in ctx [:event :build :org-id])
+                                                        (t/now))))})
 
 (def load-build
   {:name ::load-build

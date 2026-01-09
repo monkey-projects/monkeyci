@@ -105,7 +105,8 @@
                       (assoc :org-id (:id org)
                              :amount 200M
                              :valid-from from
-                             :valid-until until))]
+                             :valid-until until
+                             :valid-period "P1Y"))]
         
         (is (st/save-org st org))
         (is (st/save-credit-subscription st sub))
@@ -115,11 +116,14 @@
           (is (= 200 (:status resp)))
           (is (not-empty (get-in resp [:body :credits]))
               "expected credits to have been issued"))
-        
-        (testing "creates credit for each subscription"
-          (let [cc (st/list-org-credits-since st (:id org) 0)]
+
+        (let [cc (st/list-org-credits-since st (:id org) 0)]
+          (testing "creates credit for each subscription"
             (is (= 1 (count cc)))
-            (is (= [200M] (map :amount cc)))))
+            (is (= [200M] (map :amount cc))))
+
+          (testing "credits have expiration date if period is specified"
+            (is (some? (-> cc first :valid-until)))))
 
         (testing "does not issue credits if subscription date is on another day of the month"
           (is (empty? (-> (issue-at (ts->date-str (+ now (t/hours->millis 24))))
@@ -179,7 +183,8 @@
                                                   (assoc :org-id (:id org)
                                                          :amount 300M
                                                          :valid-from from
-                                                         :valid-until until))))
+                                                         :valid-until until
+                                                         :valid-period "P1Y"))))
           (is (not-empty (->> (issue-at (ts->date-str now)) 
                               :body
                               :credits))))

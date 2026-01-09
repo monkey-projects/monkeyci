@@ -62,9 +62,12 @@
                      ;; TODO Filter in the query
                      (filter (cp/prop-pred :type :subscription))
                      (group-by :subscription-id))]
-    (letfn [(issue-credits-for-sub [sub]
+    (letfn [(calc-expiration-time [{p :valid-period} ts]
+              (when p
+                (t/plus-period ts (jt/period p))))
+            (issue-credits-for-sub [sub]
               (let [sc (->> (get credits (:id sub))
-                            (filter (comp (partial t/same-date? ts) :from-time)))]
+                            (filter (comp (partial t/same-date? ts) :valid-from)))]
                 (when (empty? sc)
                   (log/info "Creating new org credit for sub" (:id sub) ", amount" (:amount sub))
                   (s/save-org-credit st (-> sub
@@ -72,7 +75,8 @@
                                             (assoc :id (cuid/random-cuid)
                                                    :type :subscription
                                                    :subscription-id (:id sub)
-                                                   :from-time ts))))))]
+                                                   :valid-from ts
+                                                   :valid-until (calc-expiration-time sub ts)))))))]
       (->> cust-subs
            (map issue-credits-for-sub)
            (remove nil?)

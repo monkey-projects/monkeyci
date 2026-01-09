@@ -140,19 +140,20 @@
 (s/def :entity/amount (s/int-in 0 1000000))
 (s/def :entity/valid-from ts?)
 (s/def :entity/valid-until ts?)
+(s/def :entity/valid-period string?)
 
 (s/def :entity/credit-subscription
   (-> (s/keys :req-un [:entity/org-id :entity/amount :entity/valid-from]
-              :opt-un [:entity/valid-until :entity/description])
+              :opt-un [:entity/valid-until :entity/description :entity/valid-period])
       (s/merge :entity/common)))
 
-(s/def :entity/from-time ts?)
 (s/def :entity/reason string?)
 (s/def :entity/subscription-id ::c/cuid)
 
 (s/def :entity/org-credit
   (-> (s/keys :req-un [:entity/org-id :entity/amount :credit/type]
-              :opt-un [:entity/from-time :entity/user-id :entity/subscription-id :entity/reason])
+              :opt-un [:entity/valid-from :entity/valid-until
+                       :entity/user-id :entity/subscription-id :entity/reason])
       (s/merge :entity/common)))
 
 (s/def :entity/credit-id ::c/cuid)

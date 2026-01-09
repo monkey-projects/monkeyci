@@ -556,11 +556,14 @@
                        (assoc :org-id (:id org)))
               creds {:id (cuid/random-cuid)
                      :org-id (:id org)
-                     :amount 100M}]
+                     :amount 100M
+                     :valid-from nil
+                     :valid-until nil}
+              time 1000]
           (is (some? (st/save-org st org)))
           (is (some? (st/save-org-credit st creds)))
           (is (some? (st/save-repo st repo)))
-          
+
           (let [res (-> {:type :build/triggered
                          :build (-> (h/gen-build)
                                     (assoc :org-id (:id org)

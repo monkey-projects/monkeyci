@@ -744,13 +744,13 @@
 
 (def list-org-credits-since
   "Lists all org credits for the org since given timestamp.  
-   This includes those without a `from-time`."
+   This includes those without a `valid-from`."
   (override-or
    [:org :list-credits-since]
    (fn [s cust-id ts]
      (->> (list-org-credits s cust-id)
           (filter (every-pred (cp/prop-pred :org-id cust-id)
-                              (comp (some-fn nil? (partial <= ts)) :from-time)))))))
+                              (comp (some-fn nil? (partial <= ts)) :valid-from)))))))
 
 (def credit-subscriptions :credit-subscriptions)
 (defn credit-sub-sid [& parts]
@@ -836,18 +836,25 @@
             (filter avail?))))))
 
 (def calc-available-credits
-  "Calculates the available credits for the org.  Basically this is the
-   amount of provisioned credits, substracted by the consumed credits."
+  "Calculates the available credits for the org at given timestamp.  
+   Basically this is the amount of provisioned credits, substracted by 
+   the consumed credits.  The timestamp is used to exclude credits that
+   are not active yet, or have already expired."
   (override-or
    [:org :get-available-credits]
-   (fn [s cust-id]
+   (fn [s org-id at]
      ;; Naive implementation: sum up all provisioned credits and all
      ;; credits from all builds
-     (let [avail (->> (list-org-credits s cust-id)
+     (let [active? (fn [{s :valid-from e :valid-until}]
+                     (or (nil? at)
+                         (and (or (nil? s) (<= s at))
+                              (or (nil? e) (<= at e)))))
+           avail (->> (list-org-credits s org-id)
+                      (filter active?)
                       (sum-amount))
-           used  (->> (list-org-credit-consumptions s cust-id)
+           used  (->> (list-org-credit-consumptions s org-id)
                       (sum-amount))]
-       (- avail used)))))
+       (max 0M (- avail used))))))
 
 (def crypto :crypto)
 (defn crypto-sid [& parts]
@@ -969,18 +976,19 @@
        (when-let [uid (:user-id opts)]
          (let [u (find-user s uid)]
            (save-user s (update u :orgs (comp vec conj) org-id))))
-       (doseq [{:keys [amount from until] :as conf} (:credits opts)]
+       (doseq [{:keys [amount from until period] :as conf} (:credits opts)]
          (let [cs (-> conf
-                      (dissoc :from :until)
+                      (dissoc :from :until :period)
                       (assoc :id (cuid/random-cuid)
                              :org-id org-id
                              :valid-from from
-                             :valid-until until))]
+                             :valid-until until
+                             :valid-period period))]
            (when (save-credit-subscription s cs)
              (save-org-credit s {:id (cuid/random-cuid)
                                  :org-id org-id
                                  :amount amount
-                                 :from-time from
+                                 :valid-from from
                                  :type :subscription
                                  :subscription-id (:id cs)}))))
        (when-let [dek (:dek opts)]
