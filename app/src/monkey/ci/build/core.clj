@@ -5,10 +5,7 @@
    application that executes the script.
 
    This namespace provides low-level functions.  For more user-friendly functionality,
-   check out the `monkey.ci.build.v2` namespace."
-  (:require [clojure.spec.alpha :as s]
-            [medley.core :as mc]
-            [monkey.ci.build.spec]))
+   check out the `monkey.ci.api` namespace.")
 
 (defn status [v]
   {:status v})
