@@ -120,6 +120,23 @@
   ([job s]
    (try-unwrap job assoc :size s)))
 
+(defn blocked
+  "Gets or sets job blocked status.  A blocked job will be marked as `blocked` once it
+   is eligible for execution.  An explicity action is required to unblock it."
+  [job]
+  (assoc job :blocked true))
+
+(defn unblocked
+  "Unmarks a previously blocked job as unblocked.  Note that this has no effect if the
+   job lifecycle status is already blocked, it only affects the job `blocked` status 
+   before the script is started."
+  [job]
+  (dissoc job :blocked))
+
+(def blocked?
+  "Checks if given job is marked as blocked"
+  (comp true? :blocked))
+
 (defn artifact
   "Defines a new artifact with given id, located at given `path`.  This can be passed
    to `save-artifacts` or `restore-artifacts`."

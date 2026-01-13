@@ -521,6 +521,25 @@
       (testing "marks job skipped"
         (is (= :skipped (:status res)))))))
 
+(deftest job-blocked
+  (let [job (-> (h/gen-job)
+                (assoc :status :running))
+        build (-> (h/gen-build)
+                  (assoc-in [:script :jobs] {(:id job) job}))
+        r (-> {:event {:type :job/blocked
+                       :sid (sut/build->sid build)
+                       :job-id (:id job)}}
+              (sut/set-build build)
+              (sut/set-job job)
+              (sut/job-blocked))]
+    (testing "returns `build/updated` event"
+      (validate-spec ::se/event r)
+      (is (= :build/updated (:type r))))
+
+    (let [res (get-in r [:build :script :jobs (:id job)])]
+      (testing "marks job blocked"
+        (is (= :blocked (:status res)))))))
+
 (deftest routes
   (let [routes (->> (sut/make-routes (st/make-memory-storage)
                                      (mb/event-bus))
@@ -537,7 +556,8 @@
                      :job/initializing
                      :job/start
                      :job/end
-                     :job/skipped]]
+                     :job/skipped
+                     :job/blocked]]
     (doseq [t event-types]
       (testing (format "`%s` is handled" (str t))
         (is (contains? routes t))))))

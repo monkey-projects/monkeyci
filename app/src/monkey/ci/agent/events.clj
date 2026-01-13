@@ -212,7 +212,7 @@
                 (when (:cleanup? conf) "--rm")
                 "--network=host" ; Host network, otherwise can't access build api
                 "-v" (str checkout ":" lwd ":Z")
-                ;; m2 cache is common for the all repo builds
+                ;; m2 cache is common for all repo builds
                 "-v" (str (m2-cache (fs/parent wd)) ":" m2-cache-path ":Z")
                 ;; Resource limits
                 "--cpus=0.5"

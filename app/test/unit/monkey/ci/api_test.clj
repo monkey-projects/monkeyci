@@ -290,6 +290,19 @@
 
   (testing "`nil` on action job"))
 
+(deftest blocked
+  (testing "sets job blocked status"
+    (is (true? (-> (sut/container-job "test-job")
+                   (sut/blocked)
+                   (sut/blocked?))))))
+
+(deftest unblocked
+  (testing "unblocks blocked job"
+    (is (false? (-> (sut/container-job "test-job")
+                    (sut/blocked)
+                    (sut/unblocked)
+                    (sut/blocked?))))))
+
 (deftest checkout-dir
   (testing "returns build checkout dir"
     (is (= "/test/dir" (sut/checkout-dir

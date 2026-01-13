@@ -1,7 +1,7 @@
 (ns ^:no-doc monkey.ci.build.api-server
   "Functions for setting up a build script API.  The build runner starts its own
-   API server, which is only accessible by the build script and any containers it
-   starts.  This is for security reasons, since the build script is untrusted code.
+   API server, which is only accessible by the build script.  This is for security
+   reasons, since the build script is untrusted code.
    Restricting access to the API server is done on infra level, by setting up network
    security rules.  Piping all traffic through the build runner also ensures that
    the global API will not be overloaded by malfunctioning (or misbehaving) builds."
@@ -110,9 +110,7 @@
   []
   (->> (enumeration-seq (java.net.NetworkInterface/getNetworkInterfaces))
        (remove (some-fn (memfn isLoopback) (memfn isVirtual)))
-       (mapcat (comp enumeration-seq (memfn getInetAddresses)))
-       #_(filter (partial instance? java.net.Inet4Address))
-       #_(map (memfn getHostAddress))))
+       (mapcat (comp enumeration-seq (memfn getInetAddresses)))))
 
 (defn get-ip-addr
   "Determines the ip address of this VM"
@@ -292,9 +290,7 @@
               workspace-routes
               artifact-routes
               cache-routes
-              crypto-routes
-              ;; TODO Log uploads
-              ]])
+              crypto-routes]])
 
 (defn security-middleware
   "Middleware that checks if the authorization header matches the specified token"

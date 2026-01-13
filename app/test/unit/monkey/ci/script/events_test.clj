@@ -497,6 +497,22 @@
                   (sut/job-end))]
         (is (empty? r))))
 
+    (testing "marks blocked jobs as blocked"
+      (let [jobs (jobs->map
+                  [{:id "first"
+                    :status :success}
+                   {:id "blocked"
+                    :dependencies ["first"]
+                    :blocked true
+                    :status :pending}])
+            r (-> {:event
+                   {:job-id "first"
+                    :status :success}}
+                  (sut/set-jobs jobs)
+                  (sut/job-end))]
+        (is (= [:job/blocked] (map :type r)))
+        (is (= "blocked" (-> r first :job-id)))))
+
     (testing "returns `script/end` with status `canceled` if build canceled"
       (let [r (-> {:event
                    {:type :job/end

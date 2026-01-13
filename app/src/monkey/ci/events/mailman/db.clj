@@ -305,6 +305,10 @@
   (job-update (fn [job _]
                 (assoc job :status :skipped))))
 
+(def job-blocked
+  (job-update (fn [job _]
+                (assoc job :status :blocked))))
+
 ;;; Event routing configuration
 
 (defn make-routes [storage bus]
@@ -374,4 +378,8 @@
 
      [:job/skipped
       [{:handler job-skipped
+        :interceptors job-int}]]
+
+     [:job/blocked
+      [{:handler job-blocked
         :interceptors job-int}]]]))

@@ -84,6 +84,9 @@
 (defmethod event-type :job/skipped [_]
   ::job-event)
 
+(defmethod event-type :job/blocked [_]
+  ::job-event)
+
 (s/def ::job-status-event
   (->> (s/keys :req-un [:job/status]
                :opt-un [::result])

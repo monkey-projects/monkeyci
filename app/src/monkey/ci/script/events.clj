@@ -227,6 +227,11 @@
     (-> (base-event (get-build ctx) :script/start)
         (assoc :jobs (map (comp mark-pending eb/job->event) (vals (get-jobs ctx)))))))
 
+(defn make-job-queued-evt [job build-sid]
+  (if (j/blocked? job)
+    (j/job-blocked-evt (j/job-id job) build-sid)
+    (j/job-queued-evt job build-sid)))
+
 (defn script-start
   "Queues all jobs that have no dependencies"
   [ctx]
@@ -239,7 +244,7 @@
       [(-> (script-end-evt ctx :error)
            (bc/with-message "No jobs to run"))]
       (let [next-jobs (j/next-jobs (vals jobs))]
-        (map #(j/job-queued-evt % build-sid) next-jobs)))))
+        (map #(make-job-queued-evt % build-sid) next-jobs)))))
 
 (defn script-end [ctx]
   (log/debug "Script ended, realizing deferred")
@@ -281,7 +286,8 @@
 
 (defn job-end
   "Queues jobs that have their dependencies resolved, or ends the script
-   if all jobs have been executed, or the build has been canceled."
+   if all jobs have been executed, or the build has been canceled.  Blocked
+   jobs are not queued, but marked as blocked."
   [ctx]
   ;; Enqueue jobs that have become ready to run
   (let [all-jobs (vals (get-jobs ctx))
@@ -295,7 +301,7 @@
            (map #(j/job-skipped-evt (j/job-id %) (build-sid ctx)))
            (into [(script-end-evt ctx (script-status ctx))]))
       ;; Otherwise, enqueue next jobs
-      (map #(j/job-queued-evt % (build-sid ctx)) next-jobs))))
+      (map #(make-job-queued-evt % (build-sid ctx)) next-jobs))))
 
 (defn make-job-ctx
   "Constructs job context object from the route configuration"
