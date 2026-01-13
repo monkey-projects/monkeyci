@@ -55,6 +55,9 @@
 (defn job-blocked-evt [job-id build-sid]
   (job-event :job/blocked job-id build-sid))
 
+(defn job-unblocked-evt [job-id build-sid]
+  (job-event :job/unblocked job-id build-sid))
+
 (defn job-initializing-evt [job-id build-sid cm]
   (-> (job-event :job/initializing job-id build-sid)
       (assoc :credit-multiplier cm)))
