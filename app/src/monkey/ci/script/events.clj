@@ -228,7 +228,7 @@
         (assoc :jobs (map (comp mark-pending eb/job->event) (vals (get-jobs ctx)))))))
 
 (defn make-job-queued-evt [job build-sid]
-  (if (j/blocked? job)
+  (if (j/should-block? job)
     (j/job-blocked-evt (j/job-id job) build-sid)
     (j/job-queued-evt job build-sid)))
 
@@ -282,12 +282,30 @@
 (defn- script-status
   "Determines script status according to the status of all jobs"
   [ctx]
-  (if (some bc/failed? (vals (get-jobs ctx))) :error :success))
+  (cond
+    (build-canceled? ctx)
+    :canceled
+    (some bc/failed? (vals (get-jobs ctx)))
+    :error
+    :else
+    :success))
 
-(defn- pending-jobs [ctx]
+(defn- filter-jobs [ctx pred]
   (->> (get-jobs ctx)
        vals
-       (filter j/pending?)))
+       (filter pred)))
+
+(defn- pending-jobs [ctx]
+  (filter-jobs ctx j/pending?))
+
+(defn- pending-or-blocked-jobs [ctx]
+  (filter-jobs ctx (some-fn j/pending? j/blocked?)))
+
+(defn- active-jobs [ctx]
+  (filter-jobs ctx j/active?))
+
+(defn- make-jobs-skipped-evts [ctx jobs]
+  (map #(j/job-skipped-evt (j/job-id %) (build-sid ctx)) jobs))
 
 (defn job-end
   "Queues jobs that have their dependencies resolved, or ends the script
@@ -303,10 +321,18 @@
             (and (empty? next-jobs) (empty? active-jobs)))
       ;; No more jobs eligible for execution, end the script
       (->> (pending-jobs ctx)
-           (map #(j/job-skipped-evt (j/job-id %) (build-sid ctx)))
+           (make-jobs-skipped-evts ctx)
            (into [(script-end-evt ctx (script-status ctx))]))
       ;; Otherwise, enqueue next jobs
       (map #(make-job-queued-evt % (build-sid ctx)) next-jobs))))
+
+(defn build-canceled
+  "Marks all pending or blocked jobs in the script as skipped.  If no other jobs remain,
+   the script is ended."
+  [ctx]
+  (cond-> (->> (pending-or-blocked-jobs ctx)
+               (make-jobs-skipped-evts ctx))
+    (empty? (active-jobs ctx)) (into [(script-end-evt ctx :canceled)])))
 
 (defn make-job-ctx
   "Constructs job context object from the route configuration"
@@ -368,6 +394,6 @@
                        set-job-result]}]]
 
      [:build/canceled
-      [{:handler (constantly nil)
+      [{:handler build-canceled
         :interceptors [state
                        mark-canceled]}]]]))

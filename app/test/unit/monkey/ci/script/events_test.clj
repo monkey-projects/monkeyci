@@ -590,3 +590,32 @@
                         (sut/job-end))
                     (filter (comp (partial = :job/skipped) :type))
                     (map :job-id))))))))
+
+(deftest build-canceled
+  (testing "marks all pending and blocked jobs as skipped"
+    (let [jobs (jobs->map [{:id "pending"
+                            :status :pending}
+                           {:id "blocked"
+                            :status :blocked}
+                           {:id "running"
+                            :status :running}])
+          r (-> {:event
+                 {:type :build/canceled}}
+                (sut/set-jobs jobs)
+                (sut/build-canceled))]
+      (is (every? (comp (partial = :job/skipped) :type) r))
+      (is (= #{"pending" "blocked"}
+             (->> (map :job-id r)
+                  set)))))
+
+  (testing "when no active jobs, marks script end"
+    (let [jobs (jobs->map [{:id "pending"
+                            :status :pending}])
+          r (-> {:event
+                 {:type :build/canceled}}
+                (sut/set-jobs jobs)
+                (sut/build-canceled))
+          e (->> (filter (comp (partial = :script/end) :type) r)
+                 (first))]
+      (is (some? e))
+      (is (= :canceled (:status e))))))
