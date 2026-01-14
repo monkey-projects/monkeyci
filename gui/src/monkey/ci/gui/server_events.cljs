@@ -1,6 +1,6 @@
 (ns monkey.ci.gui.server-events
   "Read server-sent events from the API and dispatch events"
-  (:require [clojure.tools.reader.edn :as edn]
+  (:require [monkey.ci.gui.edn :as edn]
             [monkey.ci.gui.martian :as m]
             [monkey.ci.gui.logging :as log]
             [re-frame.core :as rf]))

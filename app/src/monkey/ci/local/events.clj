@@ -64,6 +64,11 @@
 (defn set-child-opts [ctx e]
   (assoc ctx ::child-opts e))
 
+(def get-build-opts ::build-opts)
+
+(defn set-build-opts [ctx bo]
+  (assoc ctx ::build-opts bo))
+
 ;;; Interceptors
 
 (def checkout-src
@@ -115,6 +120,13 @@
   {:name ::add-child-opts
    :enter #(set-child-opts % child-opts)})
 
+(defn add-build-opts
+  "Adds additional build options to the context, which should be passed to the script."
+  [config]
+  {:name ::add-build-opts
+   :enter (fn [ctx]
+            (set-build-opts ctx (select-keys config [:filter])))})
+
 (defn update-job-in-state [ctx job-id f & args]
   (apply emi/update-state ctx update-in [:jobs job-id] f args))
 
@@ -142,7 +154,8 @@
     (-> sc/empty-config
         (sc/set-build (absolutize-script-dir build))
         (sc/set-api {:url (str "http://localhost:" port)
-                     :token token}))))
+                     :token token})
+        (sc/set-job-filter (:filter (get-build-opts ctx))))))
 
 (defn generate-deps [script-dir {:keys [lib-coords log-config m2-cache-dir]}]
   (cond-> (p/generate-deps script-dir nil)

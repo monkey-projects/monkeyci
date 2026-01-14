@@ -71,15 +71,9 @@
 (defn add-inv-interceptor [ctx kind]
   (add-interceptor ctx (invocation-interceptor kind)))
 
-(defn too-many-requests? [r]
-  (= 429 (:status r)))
+(def too-many-requests? retry/too-many-requests?)
 
-(defn with-retry
-  "Invokes `f` with async retry"
-  [f]
-  (retry/async-retry f {:max-retries 10
-                        :retry-if too-many-requests?
-                        :backoff (retry/with-max (retry/exponential-delay 1000) 60000)}))
+(def with-retry retry/throttle)
 
 (defn retry-fn [f]
   (fn [& args]

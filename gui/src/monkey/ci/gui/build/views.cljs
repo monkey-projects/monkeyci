@@ -117,9 +117,11 @@
         (into [:tbody]))])
 
 (defn- build-jobs []
-  (let [jobs (rf/subscribe [:build/jobs])]
+  (let [jobs (rf/subscribe [:build/jobs])
+        build (rf/subscribe [:build/current])]
     (cond
-      (nil? @jobs)
+      (or (= :initializing (:status @build))
+          (nil? @jobs))
       [:p "Waiting for the build jobs to be loaded..."]
       (empty? @jobs)
       [:p "This build does not contain any jobs."]

@@ -63,3 +63,11 @@
 
 (defn clear-expanded [db]
   (dissoc db ::expanded))
+
+(def unblocking? (comp true? ::unblocking))
+
+(defn set-unblocking [db]
+  (assoc db ::unblocking true))
+
+(defn reset-unblocking [db]
+  (dissoc db ::unblocking))

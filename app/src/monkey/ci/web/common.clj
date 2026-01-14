@@ -3,16 +3,18 @@
             [clojure.string :as cs]
             [clojure.tools.logging :as log]
             [monkey.ci
+             [edn :as edn]
              [labels :as lbl]
              [storage :as st]
              [time :as t]
              [utils :as u]]
+            [monkey.ci.common.schemas :as schemas]
             [muuntaja.core :as mc]
             [reitit.ring :as ring]
             [ring.util.response :as rur]
             [schema.core :as s]))
 
-(def not-empty-str (s/constrained s/Str not-empty))
+(def not-empty-str schemas/not-empty-str)
 (def Id not-empty-str)
 (def Name not-empty-str)
 
@@ -223,6 +225,9 @@
         ;; Convert keys to kebab-case
         [:formats "application/json" :decoder-opts]
         {:decode-key-fn csk/->kebab-case-keyword})
+       (assoc-in
+        [:formats "application/edn" :decoder-opts]
+        edn/default-opts)
        (assoc-in
         [:formats "application/json" :encoder-opts]
         {:encode-key-fn (comp csk/->camelCase name)}))))

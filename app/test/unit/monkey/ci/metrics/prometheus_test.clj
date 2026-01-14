@@ -32,7 +32,14 @@
                                                   :labels ["domain"]})]
       (is (= "test-domain" (.. c
                                (collect) (getDataPoints) (get 0)
-                               (getLabels) (getValue 0)))))))
+                               (getLabels) (getValue 0))))))
+
+  (testing "has datapoints initially"
+    (let [dp (-> (sut/make-counter "empty_counter" (sut/make-registry))
+                 (.collect)
+                 (.getDataPoints))]
+      (is (not-empty dp))
+      (is (double? (-> dp first (.getValue)))))))
 
 (deftest push-gw
   (testing "creates push gateway"

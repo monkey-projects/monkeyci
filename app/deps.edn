@@ -1,10 +1,10 @@
-{:deps {org.clojure/clojure {:mvn/version "1.12.3"}
+{:deps {org.clojure/clojure {:mvn/version "1.12.4"}
         aleph/aleph {:mvn/version "0.9.3"} ; For http SSE receiving
-        babashka/process {:mvn/version "0.6.23"}
+        babashka/process {:mvn/version "0.6.25"}
         buddy/buddy-auth {:mvn/version "3.0.323"}
         buddy/buddy-core {:mvn/version "1.12.0-430"}
         camel-snake-kebab/camel-snake-kebab {:mvn/version "0.4.3"}
-        ch.qos.logback/logback-classic {:mvn/version "1.5.19"}
+        ch.qos.logback/logback-classic {:mvn/version "1.5.24"}
         clansi/clansi {:mvn/version "1.0.0"}
         clj-commons/clj-yaml {:mvn/version "1.0.29"}
         cli-matic/cli-matic {:mvn/version "0.5.4"}
@@ -14,19 +14,19 @@
                                         org.bouncycastle/bcprov-jdk18on
                                         org.bouncycastle/bcpkix-jdk18on
                                         org.bouncycastle/bcutil-jdk18on]}
-        clj-kondo/clj-kondo {:mvn/version "2025.09.22"}
+        clj-kondo/clj-kondo {:mvn/version "2025.12.23"}
         clojure.java-time/clojure.java-time {:mvn/version "1.4.3"}
-        com.github.loki4j/loki-logback-appender {:mvn/version "2.0.0"}
-        com.github.seancorfield/honeysql {:mvn/version "2.7.1350"}
-        com.github.seancorfield/next.jdbc {:mvn/version "1.3.1070"}
-        com.monkeyci/common {:mvn/version "0.20.3"}
+        com.github.loki4j/loki-logback-appender {:mvn/version "2.0.2"}
+        com.github.seancorfield/honeysql {:mvn/version "2.7.1364"}
+        com.github.seancorfield/next.jdbc {:mvn/version "1.3.1086"}
+        com.monkeyci/common {:mvn/version "0.23.0-SNAPSHOT"}
         com.monkeyprojects/aero-ext {:mvn/version "0.3.1"}
-        com.monkeyprojects/clj-scw-client {:mvn/version "0.1.2"}
+        com.monkeyprojects/clj-scw-client {:mvn/version "0.1.4"}
         com.monkeyprojects/clompress {:mvn/version "0.1.3"}
-        com.monkeyprojects/mailman-core {:mvn/version "0.3.0"}
-        com.monkeyprojects/mailman-jms {:mvn/version "0.3.0"}
-        com.monkeyprojects/mailman-manifold {:mvn/version "0.3.0"}
-        com.monkeyprojects/mailman-nats {:mvn/version "0.3.0"
+        com.monkeyprojects/mailman-core {:mvn/version "0.3.1"}
+        com.monkeyprojects/mailman-jms {:mvn/version "0.3.1"}
+        com.monkeyprojects/mailman-manifold {:mvn/version "0.3.1"}
+        com.monkeyprojects/mailman-nats {:mvn/version "0.3.1"
                                          ;; Conflicts with other versions
                                          :exclusions [org.bouncycastle/bcprov-lts8on
                                                       org.slf4j/slf4j-api]}
@@ -35,34 +35,34 @@
         com.monkeyprojects/oci-os {:mvn/version "0.4.1"}
         com.monkeyprojects/oci-sign {:mvn/version "0.1.5"}
         com.monkeyprojects/oci-vault {:mvn/version "0.2.1"}
-        com.mysql/mysql-connector-j {:mvn/version "9.4.0"}
-        com.squareup.okhttp3/okhttp-jvm {:mvn/version "5.1.0"}
-        com.stuartsierra/component {:mvn/version "1.1.0"}
-        com.taoensso/telemere {:mvn/version "1.1.0"}
+        com.mysql/mysql-connector-j {:mvn/version "9.5.0"}
+        com.squareup.okhttp3/okhttp-jvm {:mvn/version "5.3.2"}
+        com.stuartsierra/component {:mvn/version "1.2.0"}
+        com.taoensso/telemere {:mvn/version "1.2.1"}
         com.zaxxer/HikariCP {:mvn/version "7.0.2"}
-        commons-io/commons-io {:mvn/version "2.20.0"}
+        commons-io/commons-io {:mvn/version "2.21.0"}
         dev.weavejester/ragtime {:mvn/version "0.12.1"}
         io.minio/minio {:mvn/version "8.6.0"}
-        io.prometheus/prometheus-metrics-core {:mvn/version "1.4.1"}
-        io.prometheus/prometheus-metrics-exporter-opentelemetry {:mvn/version "1.4.1"}
-        io.prometheus/prometheus-metrics-exporter-pushgateway {:mvn/version "1.4.1"}
-        io.prometheus/prometheus-metrics-instrumentation-jvm {:mvn/version "1.4.1"}
-        io.prometheus/prometheus-metrics-tracer-initializer {:mvn/version "1.4.1"}
+        io.prometheus/prometheus-metrics-core {:mvn/version "1.4.3"}
+        io.prometheus/prometheus-metrics-exporter-opentelemetry {:mvn/version "1.4.3"}
+        io.prometheus/prometheus-metrics-exporter-pushgateway {:mvn/version "1.4.3"}
+        io.prometheus/prometheus-metrics-instrumentation-jvm {:mvn/version "1.4.3"}
+        io.prometheus/prometheus-metrics-tracer-initializer {:mvn/version "1.4.3"}
         lambdaisland/kaocha {:mvn/version "1.91.1392"} ; Used for running build tests
         medley/medley {:mvn/version "1.4.0"}
-        metosin/reitit-middleware {:mvn/version "0.9.1"}
-        metosin/reitit-ring {:mvn/version "0.9.1"}
-        metosin/reitit-schema {:mvn/version "0.9.1"}
-        metosin/reitit-swagger {:mvn/version "0.9.1"}
+        metosin/reitit-middleware {:mvn/version "0.10.0"}
+        metosin/reitit-ring {:mvn/version "0.10.0"}
+        metosin/reitit-schema {:mvn/version "0.10.0"}
+        metosin/reitit-swagger {:mvn/version "0.10.0"}
         ;; Disabled until martian update is merged in
         ;; nubank/k8s-api {:mvn/version "1.0.0"}
-        org.apache.activemq/artemis-server {:mvn/version "2.42.0"}
-        org.apache.activemq/artemis-amqp-protocol {:mvn/version "2.42.0"}
+        org.apache.activemq/artemis-server {:mvn/version "2.44.0"}
+        org.apache.activemq/artemis-amqp-protocol {:mvn/version "2.44.0"}
         org.clojure/core.async {:mvn/version "1.8.741"}
-        org.clojure/core.cache {:mvn/version "1.1.234"}
-        org.clojure/tools.logging {:mvn/version "1.3.0"}
-        org.eclipse.jgit/org.eclipse.jgit {:mvn/version "7.3.0.202506031305-r"}
-        prismatic/schema {:mvn/version "1.4.1"}
+        org.clojure/core.cache {:mvn/version "1.2.249"}
+        org.clojure/tools.logging {:mvn/version "1.3.1"}
+        org.eclipse.jgit/org.eclipse.jgit {:mvn/version "7.5.0.202512021534-r"}
+        org.slf4j/jul-to-slf4j {:mvn/version "2.0.17"}
         ring-cors/ring-cors {:mvn/version "0.1.13"}
         yogthos/config {:mvn/version "1.2.1"}}
 
@@ -70,10 +70,11 @@
  
  :aliases
  {:dev
-  {:extra-deps {org.clojure/test.check {:mvn/version "1.1.1"}
-                org.clojure/tools.namespace {:mvn/version "1.5.0"}}
+  {:extra-deps {org.clojure/test.check {:mvn/version "1.1.3"}
+                org.clojure/tools.namespace {:mvn/version "1.5.1"}}
    :extra-paths ["dev-resources" "env/dev"]
-   :override-deps {com.monkeyci/common {:local/root "../common"}}}
+   :override-deps {com.monkeyci/common {:local/root "../common"}}
+   :jvm-opts ["-Djava.util.logging.config.file=dev-resources/logging.properties"]}
 
   :test-paths ["test/unit" "test/integration" "test/e2e"]
 
@@ -82,7 +83,7 @@
   {:extra-paths [:test-paths]
    :extra-deps {com.monkeyprojects/build {:mvn/version "0.3.1"}
                 com.h2database/h2 {:mvn/version "2.4.240"}
-                org.clojure/test.check {:mvn/version "1.1.1"}
+                org.clojure/test.check {:mvn/version "1.1.3"}
                 ring/ring-mock {:mvn/version "0.6.2"}}
    :override-deps {com.monkeyci/common {:local/root "../common"}}
    :exec-fn monkey.test/all}
@@ -100,6 +101,7 @@
    :jvm-opts ["-Dlogback.configurationFile=resources/logback.xml"]}
 
   ;; clj -M:test:e2e
+  ;; Set MONKEYCI_URL env
   :e2e
   {:main-opts ["-m" "kaocha.runner"
                "-c" "kaocha/e2e.edn"]
@@ -115,7 +117,7 @@
   :watch
   ;; clj -X:test:watch
   ;; Use in combination with :test, watches for changes
-  {:extra-deps {org.clojure/tools.namespace {:mvn/version "1.5.0"}}
+  {:extra-deps {org.clojure/tools.namespace {:mvn/version "1.5.1"}}
    :exec-fn monkey.test/watch
    ;; Skip integration and slow tests
    :exec-args {:kaocha.filter/skip-meta [:integration :slow]
@@ -152,7 +154,7 @@
    :exec-fn monkey.build/jar
    :exec-args {:jar "target/monkeyci.jar"
                :lib com.monkeyci/app
-               :version [[:env "MONKEYCI_VERSION"] "0.20.6-SNAPSHOT"]
+               :version [[:env "MONKEYCI_VERSION"] "0.23.0-SNAPSHOT"]
                :main "monkey.ci.core"
                :scm {:url "https://github.com/monkey-projects/monkeyci"}
                :pom-data [[:licenses
@@ -170,7 +172,8 @@
 
   :uber
   {:exec-fn monkey.build/uberjar
-   :exec-args {:jar "target/monkeyci-standalone.jar"}}
+   :exec-args {:jar "target/monkeyci-standalone.jar"}
+   :override-deps {com.monkeyci/common {:local/root "../common"}}}
 
   :json-logging
   {:extra-deps {ch.qos.logback.contrib/logback-json-classic {:mvn/version "0.1.5"}}

@@ -5,7 +5,8 @@
             [clojure.test :refer [deftest testing is]]
             [com.stuartsierra.component :as co]
             [monkey.ci.events.mailman :as em]
-            [monkey.ci.events.mailman.nats :as sut]))
+            [monkey.ci.events.mailman.nats :as sut]
+            [monkey.ci.spec.events :as se]))
 
 (deftest types-to-subjects
   (let [f (sut/types-to-subjects "monkeyci.test")]
@@ -15,43 +16,28 @@
                     (str "should map " t))))]
       (testing "returns a subject for each event type"
         (testing "build types"
-          (verify-types [:build/triggered
-                         :build/pending
-                         :build/queued
-                         :build/initializing
-                         :build/start
-                         :build/end
-                         :build/canceled
-                         :build/updated])
+          (verify-types se/build-event-types)
 
           (testing "maps `build/queued` to separate subject"
             (is (not= (f :build/queued) (f :build/end)))))
 
         (testing "script types"
-          (verify-types [:script/initializing
-                         :script/start
-                         :script/end]))
+          (verify-types se/script-event-types))
 
         (testing "job types"
-          (verify-types [:job/pending
-                         :job/queued
-                         :job/initializing
-                         :job/start
-                         :job/end
-                         :job/skipped
-                         :job/executed]))
+          (verify-types se/job-event-types))
 
         (testing "container types"
-          (verify-types [:container/pending
-                         :container/initializing
-                         :container/job-queued]))))))
+          (verify-types se/container-event-types))))))
 
 (deftest nats-component
   (with-redefs [nats/make-connection (constantly ::nats)]
     (testing "`start`"
       (let [s (co/start (sut/map->NatsComponent {:config {:prefix "test"
                                                           :stream "test-stream"
-                                                          :consumer "test-consumer"}}))]
+                                                          :consumer "test-consumer"
+                                                          :serializer ::test-serializer
+                                                          :deserializer ::test-deserializer}}))]
         (testing "creates connection"
           (is (= ::nats (get-in s [:broker :nats])))
           (is (= ::nats (:conn s))))
@@ -63,7 +49,13 @@
           (is (= "test-stream" (get-in s [:broker :config :stream]))))
 
         (testing "configures consumer"
-          (is (= "test-consumer" (get-in s [:broker :config :consumer]))))))
+          (is (= "test-consumer" (get-in s [:broker :config :consumer]))))
+
+        (testing "configures serializer"
+          (is (= ::test-serializer (get-in s [:broker :config :serializer]))))
+
+        (testing "configures deserializer"
+          (is (= ::test-deserializer (get-in s [:broker :config :deserializer]))))))
 
     (testing "`stop`"
       (let [stopped? (atom false)

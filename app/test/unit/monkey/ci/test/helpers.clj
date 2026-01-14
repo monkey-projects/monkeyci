@@ -291,6 +291,18 @@
 (defn gen-org-token []
   (gen-entity :entity/org-token))
 
+(defn gen-mailing []
+  (gen-entity :entity/mailing))
+
+(defn gen-sent-mailing []
+  (gen-entity :entity/sent-mailing))
+
+(defn gen-user-settings []
+  (gen-entity :entity/user-setting))
+
+(defn gen-org-invoicing []
+  (gen-entity :entity/org-invoicing))
+
 (defn gen-build-sid []
   (repeatedly 3 cuid/random-cuid))
 
@@ -312,3 +324,15 @@
 
 (defmethod v/make-vault :noop [_]
   (fake-vault))
+
+(defrecord FakeMailer [mailings]
+  p/Mailer
+  (send-mail [_ mail]
+    (swap! mailings conj mail)
+    (md/success-deferred
+     {:type :fake
+      :id (str (random-uuid))
+      :mail mail})))
+
+(defn fake-mailer []
+  (->FakeMailer (atom [])))

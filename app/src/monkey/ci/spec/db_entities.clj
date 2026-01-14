@@ -18,7 +18,7 @@
 (s/def :github/secret string?)
 (s/def :db/name (s/and string? not-empty))
 (s/def :db/description string?)
-(s/def :db/display-id string?)
+(s/def :db/display-id (s/and string? not-empty))
 
 (s/def :db/common
   (s/keys :req-un [:db/cuid]
@@ -64,12 +64,12 @@
               :opt-un [:job/status :db/credit-multiplier])
       (s/merge :db/timed)))
 
-(s/def :webhook/creation-time ts?)
+(s/def :db/creation-time ts?)
 (s/def :webhook/last-inv-time ts?)
 
 (s/def :db/webhook
-  (-> (s/keys :req-un [:db/repo-id :github/secret]
-              :opt-un [:webhook/creation-time :webhook/last-inv-time])
+  (-> (s/keys :req-un [:build/repo-id :github/secret]
+              :opt-un [:db/creation-time :webhook/last-inv-time])
       (s/merge :db/common)))
 
 (s/def :db/ssh-key
@@ -114,20 +114,23 @@
               :opt-un [:join-request-db/request-msg :join-request-db/response-msg])
       (s/merge :db/common)))
 
+(s/def :email/confirmed boolean?)
+
 (s/def :db/email-registration
-  (-> (s/keys :req-un [:db/email])
+  (-> (s/keys :req-un [:db/email]
+              :opt-un [:db/creation-time :email/confirmed])
       (s/merge :db/common)))
 
 ;;; Credits
 
-(s/def :db/from-time ts?)
 (s/def :db/valid-from ts?)
 (s/def :db/valid-until ts?)
+(s/def :db/valid-period (s/with-gen string? #(sg/fixed-string 10)))
 (s/def :db/amount (s/int-in 0 1000000))
 
 (s/def :db/credit-subscription
   (-> (s/keys :req-un [:db/org-id :db/amount :db/valid-from]
-              :opt-un [:db/valid-until])
+              :opt-un [:db/valid-until :db/description :db/valid-period])
       (s/merge :db/common)))
 
 (s/def :db/subscription-id int?)
@@ -135,7 +138,7 @@
 
 (s/def :db/org-credit
   (-> (s/keys :req-un [:db/org-id :db/amount :credit/type]
-              :opt-un [:db/from-time :db/user-id :db/subscription-id :db/reason])
+              :opt-un [:db/valid-from :db/valid-until :db/user-id :db/subscription-id :db/reason])
       (s/merge :db/common)))
 
 (s/def :db/credit-id int?)
@@ -169,9 +172,10 @@
   (s/keys :req-un [:db/user-id :db/password]))
 
 (s/def :db/invoice
-  (-> (s/keys :req-un [:db/org-id :invoice/kind :invoice/invoice-nr :invoice/date
+  (-> (s/keys :req-un [:db/org-id :invoice/kind :invoice/date
                        :invoice/currency :invoice/net-amount :invoice/vat-perc
-                       :db-invoice/details])
+                       :db-invoice/details]
+              :opt-un [:invoice/invoice-nr :invoice/ext-id])
       (s/merge :db/common)))
 
 (s/def :db-invoice/details
@@ -179,6 +183,12 @@
 
 (s/def :db-invoice/detail
   (s/keys :req-un [:invoice/net-amount :invoice/vat-perc :db/description]))
+
+(s/def :db/vat-nr string?)
+
+(s/def :db/org-invoicing
+  (s/keys :req-un [:db/org-id :invoice/currency :invoice/address :invoice/country]
+          :opt-un [:db/vat-nr :invoice/ext-id]))
 
 (s/def :db/runner keyword?)
 (s/def :runner/details map?)
@@ -208,3 +218,25 @@
   (-> (s/keys :req-un [::c/token :db/org-id]
               :opt-un [:db/valid-until :db/description])
       (s/merge :db/common)))
+
+(s/def :mailing/creation-time ts?)
+
+(s/def :db/mailing
+  (-> (s/keys :req-un [:mailing/subject :mailing/creation-time]
+              :opt-un [:mailing/text-body :mailing/html-body])
+      (s/merge :db/common)))
+
+(s/def :db/mailing-id id?)
+(s/def :db/sent-at ts?)
+(s/def :db/other-dests string?)
+
+(s/def :db/sent-mailing
+  (-> (s/keys :req-un [:db/mailing-id :db/sent-at]
+              :opt-un [:mailing/to-users :mailing/to-subscribers :db/other-dests])
+      (s/merge :db/common)))
+
+(s/def :db/receive-mailing boolean?)
+
+(s/def :db/user-setting
+  (-> (s/keys :req-un [:db/user-id]
+              :opt-un [:db/receive-mailing])))

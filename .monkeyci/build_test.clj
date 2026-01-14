@@ -1,6 +1,8 @@
 (ns build-test
   (:require [clojure.test :refer [deftest testing is]]
             [build :as sut]
+            [config :as config]
+            [clojars :as clojars]
             [minio :as minio]
             [clojure.string :as cs]
             [monkey.ci.api :as m]
@@ -10,15 +12,15 @@
 (deftest tag-version
   (testing "returns valid version"
     (is (= "0.1.0"
-           (sut/tag-version {:build
-                             {:git
-                              {:ref "refs/tags/0.1.0"}}}))))
+           (config/tag-version {:build
+                                {:git
+                                 {:ref "refs/tags/0.1.0"}}}))))
 
   (testing "`nil` if not a version number"
     (is (nil?
-         (sut/tag-version {:build
-                           {:git
-                            {:ref "refs/tags/other"}}})))))
+         (config/tag-version {:build
+                              {:git
+                               {:ref "refs/tags/other"}}})))))
 
 (deftest test-app
   (testing "creates job if app files changed"
@@ -27,12 +29,12 @@
              (mt/with-changes (mt/modified ["app/deps.edn"]))
              (sut/test-app)))))
 
-  (testing "is dependent on `publish-common` if included"
-    (is (= ["publish-common"]
+  (testing "is dependent on `test-common` if included"
+    (is (= ["test-common"]
            (-> mt/test-ctx
                (mt/with-changes (mt/modified ["app/deps.edn"
                                               "common/deps.edn"]))
-               (mt/with-git-ref ["refs/heads/main"])
+               (mt/with-git-ref "refs/heads/main")
                (sut/test-app)
                :dependencies)))))
 
@@ -75,7 +77,70 @@
       (is (= "clojure -X:gen-admin"
              (-> (sut/build-gui-release ctx)
                  :script
-                 second))))))
+                 second)))))
+
+  (testing "generates 404 error page for release"
+    (let [ctx (-> mt/test-ctx
+                  (mt/with-git-ref "refs/tags/0.1.0"))]
+      (is (= "clojure -X:gen-404"
+             (-> (sut/build-gui-release ctx)
+                 :script
+                 (nth 2)))))))
+
+(deftest publish
+  (with-redefs [clojars/latest-version (constantly "1.0.0")]
+    (let [ctx (-> mt/test-ctx
+                  (mt/with-checkout-dir ".."))]
+      (mt/with-build-params {"CLOJARS_USERNAME" "testuser"
+                             "CLOJARS_PASSWORD" "testpass"}
+        (let [p (-> ctx
+                    (mt/with-git-ref "refs/tags/1.2.3")
+                    (sut/publish "publish" "app"))
+              e (m/env p)]
+          (testing "creates container job if not published yet"
+            (is (m/container-job? p)))
+
+          (testing "passes clojars credits to env"
+            (is (= "testuser" (get e "CLOJARS_USERNAME")))
+            (is (= "testpass" (get e "CLOJARS_PASSWORD"))))
+
+          (testing "passes tag version"
+            (is (= "1.2.3" (get e "MONKEYCI_VERSION")))))
+
+        (testing "if version already published"
+          (let [job (-> ctx
+                        (mt/with-git-ref "refs/tags/1.0.0")
+                        (sut/publish "publish-app" "app"))]
+            (testing "creates action job"
+              (is (m/action-job? job)))
+
+            (testing "is succesful"
+              (is (bc/success? (mt/execute-job job ctx))))))
+
+        (testing "always publish snapshots"
+          (is (m/container-job? (sut/publish ctx "publish-app" "app"))))))))
+
+(deftest publish-app
+  (let [ctx (-> mt/test-ctx
+                (mt/with-changes (mt/modified ["app/deps.edn"]))
+                (mt/with-git-ref "refs/heads/main"))]
+    (testing "depends on `test-app`"
+      (is (contains?
+           (-> ctx
+               (sut/publish-app)
+               :dependencies
+               (set))
+           "test-app")))
+
+    (testing "is dependent on `publish-common` if included"
+      (is (contains?
+           (-> ctx
+               (mt/with-changes (mt/modified ["app/deps.edn"
+                                              "common/deps.edn"]))
+               (sut/publish-app)
+               :dependencies
+               (set))
+           "publish-common")))))
 
 (deftest scw-images
   (testing "`nil` if no images published"
@@ -138,10 +203,11 @@
                       "test-secret"]
                      @client)))
 
-            (testing "adds version to file"
+            (testing "adds version and tags to file"
               (is (= ["test-bucket"
                       "monkeyci/release-1.2.3.jar"
-                      "app/target/monkeyci-standalone.jar"]
+                      "app/target/monkeyci-standalone.jar"
+                      {"env" "prod"}]
                      @inv)))))))))
 
 (deftest prepare-install-script
@@ -152,26 +218,41 @@
                 (sut/prepare-install-script))]
       (is (cs/includes? r "VERSION=0.16.4")))))
 
+(deftest upload-install-script
+  (testing "`nil` if no release"
+    (is (nil? (sut/upload-install-script mt/test-ctx)))
+    (is (nil? (-> mt/test-ctx
+                  (mt/with-git-ref "refs/heads/main")
+                  (mt/with-changes (mt/modified ["app/deps.edn"]))
+                  (sut/upload-install-script)))))
+
+  (testing "action job on release"
+    (is (m/action-job? (-> mt/test-ctx
+                           (mt/with-git-ref "refs/tags/0.1.2")
+                           (sut/upload-install-script))))))
+
 (deftest jobs
-  (mt/with-build-params {}
-    (testing "with release tag"
-      (let [jobs (mt/resolve-jobs
-                  sut/jobs
-                  (-> mt/test-ctx
-                      (mt/with-git-ref "refs/tags/0.16.4")
-                      (assoc :archs [:amd])))
-            ids (set (map m/job-id jobs))]
-        (testing "contains pushover job"
-          (is (contains? ids "pushover")))
+  (with-redefs [clojars/latest-version (constantly "1.0.0")]
+    (mt/with-build-params {}
+      (testing "with release tag"
+        (let [jobs (mt/resolve-jobs
+                    sut/jobs
+                    (-> mt/test-ctx
+                        (mt/with-checkout-dir "..")
+                        (mt/with-git-ref "refs/tags/0.16.4")
+                        (assoc :archs [:amd])))
+              ids (set (map m/job-id jobs))]
+          (testing "contains pushover job"
+            (is (contains? ids "pushover")))
 
-        (testing "contains gui img publishing job"
-          (is (contains? ids "publish-gui-img-amd")))
+          (testing "contains gui img publishing job"
+            (is (contains? ids "publish-gui-img-amd")))
 
-        (testing "contains gui img manifest job"
-          (is (contains? ids "gui-img-manifest")))
+          (testing "contains gui img manifest job"
+            (is (contains? ids "gui-img-manifest")))
 
-        (testing "contains common test job"
-          (is (contains? ids "test-common")))
+          (testing "contains common test job"
+            (is (contains? ids "test-common")))
 
-        (testing "contains common publish job"
-          (is (contains? ids "publish-common")))))))
+          (testing "contains common publish job"
+            (is (contains? ids "publish-common"))))))))

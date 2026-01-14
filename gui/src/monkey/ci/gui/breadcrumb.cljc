@@ -61,10 +61,27 @@
         {:url (r/path-for :page/add-repo (r/path-params (r/current db)))
          :name "Watch Repo"}))
 
+(defn- billing-breadcrumb [db]
+  (conj (default-breadcrumb db)
+        {:url (r/path-for :page/billing (r/path-params (r/current db)))
+         :name "Plan & Billing"}))
+
+(defn- user-breadcrumb [db]
+  [home
+   {:url (r/path-for :page/user (r/path-params (r/current db)))
+    :name "User Preferences"}])
+
 (defn- credits-breadcrumb [db]
   (conj (default-breadcrumb db)
         {:url (r/path-for :admin/credits)
          :name "Credits"}))
+
+(defn- invoice-breadcrumb [db]
+  (mc/insert-nth
+   1
+   {:url (r/path-for :admin/invoicing)
+    :name "Invoices"}
+   (default-breadcrumb db)))
 
 (defn- org-credits-breadcrumb [db]
   (mc/insert-nth
@@ -73,6 +90,28 @@
     :name "Credits"}
    (default-breadcrumb db)))
 
+(defn- clean-builds-breadcrumb [db]
+  (mc/insert-nth
+   1
+   {:url (r/path-for :admin/clean-builds)
+    :name "Dangling Builds"}
+   (default-breadcrumb db)))
+
+(defn- mailings-breadcrumb [db]
+  (conj (default-breadcrumb db)
+        {:url (r/path-for :admin/mailings)
+         :name "Mailings"}))
+
+(defn- new-mailing-breadcrumb [db]
+  (conj (mailings-breadcrumb db)
+        {:url (r/path-for :admin/new-mailing)
+         :name "New"}))
+
+(defn- edit-mailing-breadcrumb [db]
+  (conj (mailings-breadcrumb db)
+        {:url (r/path-for :admin/mailing-edit (r/path-params (r/current db)))
+         :name "Edit"}))
+
 (def routes
   "Breadcrumb configuration per route.  If no match is found, the default behaviour
    is applied."
@@ -80,10 +119,18 @@
    :page/org-ssh-keys ssh-keys-breadcrumb
    :page/org-api-keys org-api-keys-breadcrumb
    :page/org-settings org-settings-breadcrumb
+   :page/billing billing-breadcrumb
    :page/repo-settings repo-settings-breadcrumb
    :page/add-repo org-watch-repo
+   :page/user user-breadcrumb
    :admin/credits credits-breadcrumb
-   :admin/org-credits org-credits-breadcrumb})
+   :admin/org-credits org-credits-breadcrumb
+   :admin/clean-builds clean-builds-breadcrumb
+   :admin/mailings mailings-breadcrumb
+   :admin/new-mailing new-mailing-breadcrumb
+   :admin/mailing-edit edit-mailing-breadcrumb
+   :admin/invoicing invoice-breadcrumb
+   :admin/org-invoices invoice-breadcrumb})
 
 (rf/reg-sub
  :breadcrumb/path

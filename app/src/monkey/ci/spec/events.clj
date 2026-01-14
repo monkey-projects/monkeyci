@@ -1,11 +1,49 @@
 (ns monkey.ci.spec.events
   "Spec definitions for events"
-  (:require [clojure.spec.alpha :as s]
+  (:require [clojure.set :as set]
+            [clojure.spec.alpha :as s]
             [monkey.ci.spec
              [build]
              [common :as c]]))
 
-(s/def ::type keyword?)
+(def build-event-types
+  #{:build/triggered :build/queued :build/pending :build/initializing
+    :build/start :build/end :build/canceled :build/updated})
+
+(def script-event-types
+  #{:script/initializing :script/start :script/end})
+
+(def job-event-types
+  #{:job/pending :job/queued :job/initializing :job/start :job/end :job/skipped
+    :job/executed :job/blocked :job/unblocked})
+
+(def container-event-types
+  #{:container/pending :container/initializing :container/start :container/end
+    :container/job-queued})
+
+(def sidecar-event-types
+  #{:sidecar/start :sidecar/end})
+
+(def command-event-types
+  #{:command/start :command/end})
+
+(def oci-event-types
+  #{:oci/build-scheduled :oci/job-scheduled})
+
+(def k8s-event-types
+  #{:k8s/build-scheduled :k8s/job-scheduled})
+
+(def event-types
+  (set/union build-event-types
+             script-event-types
+             job-event-types
+             container-event-types
+             sidecar-event-types
+             command-event-types
+             oci-event-types
+             k8s-event-types))
+
+(s/def ::type event-types)
 (s/def ::message string?)
 (s/def ::time int?)
 (s/def ::src keyword?)
@@ -82,6 +120,9 @@
   ::job-event)
 
 (defmethod event-type :job/skipped [_]
+  ::job-event)
+
+(defmethod event-type :job/blocked [_]
   ::job-event)
 
 (s/def ::job-status-event

@@ -3,13 +3,16 @@
    can be used to simulate a MonkeyCI build environment."
   (:require [babashka.fs :as fs]
             [monkey.ci
+             [api :as a]
              [build :as b]
              [jobs :as j]]
             [monkey.ci.build.api :as ba]
             [monkey.ci.protocols :as p]))
 
 (defn with-build-params* [params f]
-  (with-redefs [ba/build-params (constantly params)]
+  (with-redefs [a/build-params (constantly params)
+                ;; For backwards compatibility
+                ba/build-params (constantly params)]
     (f)))
 
 (defmacro with-build-params
@@ -121,3 +124,9 @@
   "Sets build trigger source (e.g. `:api`, `:github-webhook`)"
   [ctx src]
   (assoc-in ctx [:build :source] src))
+
+(defn set-main-branch
+  "Sets the configured main branch for the repo in the context.  See also 
+   `monkey.ci.api/main-branch`."
+  [ctx b]
+  (assoc-in ctx [:build :git :main-branch] b))

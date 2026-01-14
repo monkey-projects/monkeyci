@@ -73,14 +73,17 @@
     ["/o/:org-id/params" :page/org-params]
     ["/o/:org-id/ssh-keys" :page/org-ssh-keys]
     ["/o/:org-id/api-keys" :page/org-api-keys]
+    ["/o/:org-id/billing" :page/billing]
     ["/o/:org-id/r/:repo-id" :page/repo]
     ["/o/:org-id/r/:repo-id/edit" :page/repo-edit]
     ["/o/:org-id/r/:repo-id/settings" :page/repo-settings]
     ["/o/:org-id/r/:repo-id/webhooks" :page/webhooks]
     ["/o/:org-id/r/:repo-id/b/:build-id" :page/build]
     ["/o/:org-id/r/:repo-id/b/:build-id/j/:job-id" :page/job]
+    ["/u/:user-id" :page/user]
     ["/github/callback" :page/github-callback]
-    ["/bitbucket/callback" :page/bitbucket-callback]]))
+    ["/bitbucket/callback" :page/bitbucket-callback]
+    ["/email/unsubscribe" :page/unsubscribe-email]]))
 
 (defonce admin-router
   (f/router
@@ -91,13 +94,17 @@
     ["/builds/clean" :admin/clean-builds]
     ["/forget" :admin/forget-users]
     ["/invoicing" :admin/invoicing]
-    ["/invoicing/:org-id" :admin/org-invoices]]))
+    ["/invoicing/:org-id" :admin/org-invoices]
+    ["/invoicing/:org-id/new" :admin/invoice-new]
+    ["/mailings" :admin/mailings]
+    ["/mailings/new" :admin/new-mailing]
+    ["/mailings/edit/:mailing-id" :admin/mailing-edit]]))
 
 (defonce router (atom main-router))
 
 (def public?
-  "Route names that are publicly accessible."
-  #{:page/login :page/github-callback :page/bitbucket-callback})
+  "Route names that are publicly accessible"
+  #{:page/login :page/github-callback :page/bitbucket-callback :page/unsubscribe-email})
 
 (defn on-route-change [match _]
   (log/debug "Route changed:" match)

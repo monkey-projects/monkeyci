@@ -29,13 +29,16 @@
     (map #(cc/script (format "/js/%s.js" (name %1)))
          (:modules config)))])
 
-(defn gen-idx [{:keys [output] :as conf}]
-  (let [html (str (h/html (base-page conf)))]
+(defn gen-page [page {:keys [output] :as conf}]
+  (let [html (str (h/html page))]
     (if output
       (do
         (.mkdirs (.getParentFile (io/file output)))
         (spit output html))
       (println html))))
+
+(defn gen-idx [conf]
+  (gen-page (base-page conf) conf))
 
 (defn gen-main
   "Generates the index.html file for the main website.
@@ -47,3 +50,8 @@
   "Generates the index.html file for the admin page."
   [conf]
   (gen-idx (assoc conf :modules ["common" "admin"])))
+
+(defn gen-404
+  "Generates the generic 404 not found page, to be used by nginx"
+  [conf]
+  (gen-page (cc/not-found-page conf) conf))

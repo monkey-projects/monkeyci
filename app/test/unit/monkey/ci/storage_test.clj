@@ -50,8 +50,9 @@
 
       (let [res (sut/init-org st {:org org
                                   :user-id (:id user)
-                                  :credits {:amount 1000
-                                            :from (t/now)}
+                                  :credits [{:amount 1000
+                                             :from (t/now)
+                                             :period "P2Y"}]
                                   :dek "test-dek"})]
         (is (sid/sid? res))
 
@@ -66,10 +67,11 @@
           (is (= [(:id org)] (->> (sut/list-user-orgs st (:id user))
                                   (map :id)))))
 
-        (testing "creates credit subscription"
+        (testing "creates credit subscriptions"
           (let [cs (sut/list-org-credit-subscriptions st (:id org))]
             (is (= 1 (count cs)))
-            (is (= 1000 (-> cs first :amount)))))
+            (is (= 1000 (-> cs first :amount)))
+            (is (= "P2Y" (-> cs first :valid-period)))))
 
         (testing "creates starting credit"
           (let [c (sut/list-org-credits st (:id org))]
@@ -373,6 +375,9 @@
       (testing "can find user by cuid"
         (is (= u (sut/find-user st (:id u))) "can retrieve user by id"))
 
+      (testing "can find by email"
+        (is (= [u] (sut/find-users-by-email st (:email u)))))
+
       (testing "can count"
         (is (= 1 (sut/count-users st))))
 
@@ -522,7 +527,8 @@
   (h/with-memory-store st
     (let [now (t/now)
           cred (-> (h/gen-org-credit)
-                   (assoc :from-time now
+                   (assoc :valid-from now
+                          :valid-until (+ now 10000)
                           :amount 100M))
           cid (:org-id cred)
           repo (h/gen-repo)
@@ -548,7 +554,11 @@
                         :amount 20M})))
         
         (testing "can calculate total"
-          (is (= 80M (sut/calc-available-credits st cid))))
+          (is (= 80M (sut/calc-available-credits st cid (+ now 100)))))
+
+        (testing "ignores inactive credits"
+          (is (= 0M (sut/calc-available-credits st cid (- now 50))))
+          (is (= 0M (sut/calc-available-credits st cid (+ now 10250)))))
 
         (testing "can list credit entities"
           (let [avail (sut/list-available-credits st cid)]
@@ -608,15 +618,15 @@
 
 (deftest invoices
   (h/with-memory-store st
-    (let [cust (h/gen-org)
+    (let [org (h/gen-org)
           inv (-> (h/gen-invoice)
-                  (assoc :org-id (:id cust)))]
+                  (assoc :org-id (:id org)))]
       (testing "can save and find by id"
         (is (sid/sid? (sut/save-invoice st inv)))
-        (is (= inv (sut/find-invoice st [(:id cust) (:id inv)]))))
+        (is (= inv (sut/find-invoice st [(:id org) (:id inv)]))))
 
       (testing "can list for org"
-        (is (= [inv] (sut/list-invoices-for-org st (:id cust))))))))
+        (is (= [inv] (sut/list-invoices-for-org st (:id org))))))))
 
 (deftest runner-details
   (h/with-memory-store st
@@ -656,7 +666,7 @@
                   (merge (select-keys job [:org-id :repo-id :build-id])))
           job-sid (conj (vec (b/sid job)) (:id job))]
       (is (= 4 (count job-sid)))
-      (is (= 5 (count (sut/job-event->sid evt))))
+      (is (= 5 (count (sut/job-event->sid evt))) "includes time in sid")
       
       (testing "can save and list for job"
         (is (sid/sid? (sut/save-job-event st evt)))
@@ -693,3 +703,64 @@
 
       (testing "can delete"
         (is (true? (sut/delete-org-token st [(:org-id t) (:id t)])))))))
+
+(deftest mailings
+  (h/with-memory-store st
+    (let [m (h/gen-mailing)]
+      (testing "can save and find"
+        (is (sid/sid? (sut/save-mailing st m)))
+        (is (= m (sut/find-mailing st (:id m)))))
+
+      (testing "can list"
+        (is (= [m] (sut/list-mailings st))))
+
+      (testing "can delete"
+        (is (true? (sut/delete-mailing st (:id m)))))
+
+      (testing "sent mailings"
+        (is (sid/sid? (sut/save-mailing st m)))
+        (let [sm {:id (cuid/random-cuid)
+                  :mailing-id (:id m)
+                  :sent-at (t/now)}]
+          (testing "can save and find"
+            (let [sid (sut/save-sent-mailing st sm)]
+              (is (sid/sid? sid))
+              (is (= sm (sut/find-sent-mailing st sid)))))
+
+          (testing "can list for mailing"
+            (is (= [sm] (sut/list-sent-mailings st (:id m))))))))))
+
+(deftest email-registrations
+  (h/with-memory-store st
+    (let [r (h/gen-email-registration)]
+      (testing "can save and find"
+        (is (sid/sid? (sut/save-email-registration st r)))
+        (is (= r (sut/find-email-registration st (:id r)))))
+
+      (testing "can list"
+        (is (= [r] (sut/list-email-registrations st))))
+
+      (testing "can find by email"
+        (is (= r (sut/find-email-registration-by-email st (:email r))))))))
+
+(deftest user-settings
+  (h/with-memory-store st
+    (let [u (h/gen-user)
+          s (-> (h/gen-user-settings)
+                (assoc :user-id (:id u)))]
+      (is (sid/sid? (sut/save-user st u)))
+
+      (testing "can save and find for user"
+        (is (sid/sid? (sut/save-user-settings st s)))
+        (is (= s (sut/find-user-settings st (:id u))))))))
+
+(deftest org-invoicing
+  (h/with-memory-store st
+    (let [org (h/gen-org)
+          s (-> (h/gen-org-invoicing)
+                (assoc :org-id (:id org)))]
+      (is (sid/sid? (sut/save-org st org)))
+
+      (testing "can save and find for org"
+        (is (sid/sid? (sut/save-org-invoicing st s)))
+        (is (= s (sut/find-org-invoicing st (:id org))))))))

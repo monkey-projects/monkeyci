@@ -30,3 +30,22 @@
                    :where [:= :u.cuid cuid]})
        (first)))
 
+(defn select-user-emails [conn]
+  (ec/select conn
+             {:select [:u.email]
+              :from [[:users :u]]
+              :where [:is-not :u.email nil]}))
+
+(defn select-by-email [conn email]
+  (ec/select conn
+             {:select [:u.*]
+              :from [[:users :u]]
+              :where [:like :u.email email]}))
+
+(defn select-user-setting-by-cuid [conn cuid]
+  (->> {:select [:s.*]
+        :from [[:user-settings :s]]
+        :join [[:users :u] [:= :u.id :s.user-id]]
+        :where [:= :u.cuid cuid]}
+       (ec/select conn)
+       first))

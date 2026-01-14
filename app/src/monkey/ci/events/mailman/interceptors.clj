@@ -76,7 +76,7 @@
   {:name ::handle-job-error
    :error (fn [ctx ex]
             (let [{:keys [job-id sid] :as e} (:event ctx)]
-              (log/error "Got error while handling event" e ex)
+              (log/error "Got error while handling event" e "for job" job-id ex)
               (set-result ctx
                           [(eb/job-end-evt job-id sid (-> bc/failure
                                                           (bc/with-message (ex-message ex))))])))})

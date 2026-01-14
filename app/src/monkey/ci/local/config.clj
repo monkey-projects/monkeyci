@@ -44,6 +44,11 @@
 (defn set-quiet [conf v]
   (assoc conf :quiet v))
 
+(def get-job-filter :filter)
+
+(defn set-job-filter [conf f]
+  (assoc conf :filter f))
+
 (def get-ending
   "Retrieves the result deferred, that is used to pass build result to the caller."
   :ending)

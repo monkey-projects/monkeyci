@@ -2,6 +2,7 @@
   (:require [babashka.fs :as fs]
             [buddy.core.codecs :as bcc]
             [clojure.test :refer [deftest is testing]]
+            [clojure.tools.logging :as log]
             [io.pedestal.interceptor :as i]
             [io.pedestal.interceptor.chain :as pi]
             [manifold.deferred :as md]
@@ -170,7 +171,8 @@
 
 (deftest make-routes
   (h/with-tmp-dir dir
-    (let [routes (sut/make-routes {:work-dir dir})
+    (let [state (atom nil)
+          routes (sut/make-routes {:work-dir dir :state state})
           expected [:container/job-queued
                     :job/initializing
                     :container/end]]
@@ -178,18 +180,66 @@
         (testing (format "handles `%s`" t)
           (is (contains? (set (map first routes)) t))))
 
-      (testing "`container/job-queued` results in `job/initializing`"
-        (let [fake-proc {:name ::emi/start-process
-                         :leave identity}
-              r (-> routes
-                    (mmc/router)
-                    (mmc/replace-interceptors [fake-proc]))
-              res (r {:type :container/job-queued
-                      :sid ["test" "build"]
-                      :job-id "test-job"})]
-          (is (= [:job/initializing] (->> res
-                                          (mapcat :result)
-                                          (map :type)))))))))
+      (let [fake-proc {:name ::emi/start-process
+                       :leave identity}
+            router (-> routes
+                       (mmc/router)
+                       (mmc/replace-interceptors [fake-proc]))
+            sid ["test" "build"]
+            job-id "test-job"]
+
+        (testing "`container/job-queued`"
+          (testing "results in `job/initializing`"
+            (let [res (router
+                       {:type :container/job-queued
+                        :sid sid
+                        :job-id job-id
+                        :job {:id job-id}})]
+              (is (= [:job/initializing]
+                     (->> res
+                          (mapcat :result)
+                          (map :type))))))
+
+          (testing "increases job count in state"
+            (is (= 1 (:job-count @state)))))
+
+        (testing "`container/end`"
+          (testing "ignores unknown jobs"
+            (is (empty? (->> (router {:type :container/end
+                                      :sid sid
+                                      :job-id "unknown"})
+                             (mapcat :result)))))
+          
+          (let [res (router
+                     {:type :container/end
+                      :sid sid
+                      :job-id job-id})]
+            (testing "results in job-executed event"
+              (is (= [:job/executed]
+                     (->> res
+                          (mapcat :result)
+                          (map :type)))))
+            
+            (testing "decreases job count"
+              (is (zero? (:job-count @state))))
+
+            (testing "removes job from state"
+              (is (empty? (:jobs @state)))))
+
+          (testing "when error, still decreases job count"
+            (let [job-id "failing-job"
+                  failing-art {:name :monkey.ci.artifacts/save-artifacts
+                               :leave (fn [_]
+                                        (throw (ex-info "Test error" {})))}
+                  router (-> routes
+                             (mmc/router)
+                             (mmc/replace-interceptors [fake-proc failing-art]))]
+              (is (some? (swap! state update :job-count inc)))
+              (is (some? (swap! state update :jobs assoc-in [sid job-id] {:id job-id})))
+              (is (some? (router {:type :container/end
+                                  :sid sid
+                                  :job-id job-id})))
+              (is (zero? (:job-count @state))))))))))
 
 (deftest add-job-dir
   (let [{:keys [enter] :as i} (sut/add-job-dir "/test/dir")]

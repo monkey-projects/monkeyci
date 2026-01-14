@@ -73,13 +73,12 @@
       (s/merge :entity/timed)))
 
 (s/def :entity/secret-key string?)
-
-(s/def :webhook/creation-time ts?)
+(s/def :entity/creation-time ts?)
 (s/def :webhook/last-inv-time ts?)
 
 (s/def :entity/webhook
   (-> (s/keys :req-un [:entity/org-id :entity/repo-id :entity/secret-key]
-              :opt-un [:webhook/creation-time :webhook/last-inv-time])
+              :opt-un [:db/creation-time :webhook/last-inv-time])
       (s/merge :entity/common)))
 
 (s/def :label-filter/label string?)
@@ -131,26 +130,30 @@
 
 ;; Email registrations are created then an anonymous user registers their email
 ;; in order to receive mailing updates.
+(s/def :email/confirmed boolean?)
+
 (s/def :entity/email-registration
-  (-> (s/keys :req-un [:entity/email])
+  (-> (s/keys :req-un [:entity/email]
+              :opt-un [:entity/creation-time :email/confirmed])
       (s/merge :entity/common)))
 
 (s/def :entity/amount (s/int-in 0 1000000))
 (s/def :entity/valid-from ts?)
 (s/def :entity/valid-until ts?)
+(s/def :entity/valid-period (s/with-gen string? #(sg/fixed-string 10)))
 
 (s/def :entity/credit-subscription
   (-> (s/keys :req-un [:entity/org-id :entity/amount :entity/valid-from]
-              :opt-un [:entity/valid-until])
+              :opt-un [:entity/valid-until :entity/description :entity/valid-period])
       (s/merge :entity/common)))
 
-(s/def :entity/from-time ts?)
 (s/def :entity/reason string?)
 (s/def :entity/subscription-id ::c/cuid)
 
 (s/def :entity/org-credit
   (-> (s/keys :req-un [:entity/org-id :entity/amount :credit/type]
-              :opt-un [:entity/from-time :entity/user-id :entity/subscription-id :entity/reason])
+              :opt-un [:entity/valid-from :entity/valid-until
+                       :entity/user-id :entity/subscription-id :entity/reason])
       (s/merge :entity/common)))
 
 (s/def :entity/credit-id ::c/cuid)
@@ -184,9 +187,10 @@
   (s/keys :req-un [:entity/user-id :entity/password]))
 
 (s/def :entity/invoice
-  (-> (s/keys :req-un [:entity/org-id :invoice/kind :invoice/invoice-nr :invoice/date
+  (-> (s/keys :req-un [:entity/org-id :invoice/kind :invoice/date
                        :invoice/net-amount :invoice/vat-perc :invoice/currency
-                       :invoice/details])
+                       :invoice/details]
+              :opt-un [:invoice/invoice-nr :invoice/ext-id])
       (s/merge :entity/common)))
 
 (s/def :invoice/details
@@ -194,6 +198,12 @@
 
 (s/def :invoice/detail
   (s/keys :req-un [:invoice/net-amount :invoice/vat-perc :entity/description]))
+
+(s/def :entity/vat-nr string?)
+
+(s/def :entity/org-invoicing
+  (s/keys :req-un [:entity/org-id :invoice/currency :invoice/ext-id :entity/vat-nr
+                   :invoice/address :invoice/country]))
 
 (s/def :entity/runner keyword?)
 (s/def :runner/details map?)
@@ -224,3 +234,25 @@
   (-> (s/keys :req-un [::c/token :entity/org-id]
               :opt-un [:entity/valid-until :entity/description])
       (s/merge :entity/common)))
+
+(s/def :mailing/creation-time ts?)
+
+(s/def :entity/mailing
+  (-> (s/keys :req-un [:mailing/subject :mailing/creation-time]
+              :opt-un [:mailing/text-body :mailing/html-body])
+      (s/merge :entity/common)))
+
+(s/def :entity/mailing-id string?)
+(s/def :entity/sent-at ts?)
+(s/def :entity/other-dests (s/coll-of string?))
+
+(s/def :entity/sent-mailing
+  (-> (s/keys :req-un [:entity/mailing-id :entity/sent-at]
+              :opt-un [:mailing/to-users :mailing/to-subscribers :entity/other-dests])
+      (s/merge :entity/common)))
+
+(s/def :entity/receive-mailing boolean?)
+
+(s/def :entity/user-setting
+  (s/keys :req-un [:entity/user-id]
+          :opt-un [:entity/receive-mailing]))

@@ -5,9 +5,11 @@
             [clojure
              [string :as cs]
              [test :refer [deftest is testing]]]
+            [manifold.deferred :as md]
             [meta-merge.core :as mm]
             [monkey.ci
              [artifacts :as a]
+             [build :as b]
              [cuid :as cuid]
              [logging :as l]
              [storage :as st]
@@ -421,8 +423,8 @@
                          :status))))))))
 
     (h/with-memory-store st
-      (let [app (make-test-app st)
-            org (h/gen-org)]
+      (let [org (h/gen-org)
+            app (make-test-app st)]
         (is (some? (st/save-org st org)))
         
         (testing "`/builds`"
@@ -484,19 +486,74 @@
               (is (empty? (search "?repo-id=nonexisting"))))))
 
         (testing "`/invoice`"
-          (let [inv (-> (h/gen-invoice)
-                        (assoc :org-id (:id org)))]
-            (is (some? (st/save-invoice st inv)))
-            
-            (testing "`GET` searches invoices"
-              (is (= 200 (-> (mock/request :get (str "/org/" (:id org) "/invoice"))
-                             (app)
-                             :status))))
+          (let [base-path (str "/org/" (:id org) "/invoice")]
+            (is (some? (st/save-org-invoicing st {:org-id (:id org)
+                                                  :ext-id "1"})))
+            (let [rt (-> (test-rt)
+                         (trt/set-storage st)
+                         (trt/set-invoicing-client
+                          (fn [req]
+                            (condp = (:path req)
+                              "/customer"
+                              (md/success-deferred
+                               {:body [{:id 1
+                                        :name (:name org)}]})
+                              "/invoice"
+                              (md/success-deferred
+                               {:body {:id 2
+                                       :invoice-nr "INV001"}})))))
+                  app (sut/make-app rt)
+                  inv (-> (h/gen-invoice)
+                          (assoc :org-id (:id org))
+                          (dissoc :org-id :id :invoice-nr :ext-id))
+                  r (-> (h/json-request :post base-path inv)
+                        (app))
+                  b (h/reply->json r)]
 
-            (testing "`GET /:id` retrieves by id"
-              (is (= 200 (-> (mock/request :get (str "/org/" (:id org) "/invoice/" (:id inv)))
-                             (app)
-                             :status)))))))))
+              (testing "`POST` creates new invoice"
+                (is (= 201 (:status r)) b)
+                (is (some? (:id b)))
+                (is (= 1 (count (st/list-invoices-for-org st (:id org)))))
+                (is (some? (st/find-invoice st [(:id org) (:id b)]))))
+              
+              (testing "`GET` searches invoices"
+                (is (= 200 (-> (mock/request :get base-path)
+                               (app)
+                               :status))))
+
+              (testing "`GET /:id` retrieves by id"
+                (is (= 200 (-> (mock/request :get (str base-path "/" (:id b)))
+                               (app)
+                               :status)))))
+
+            (testing "`/settings`"
+              (let [base-path (str base-path "/settings")]
+                (testing "`PUT` creates or updates invoicing settings"
+                  (is (= 200 (-> (h/json-request :put base-path
+                                                 {:vat-nr "1234"
+                                                  :currency "EUR"
+                                                  :address ["test address"]
+                                                  :country "BEL"})
+                                 (app)
+                                 :status)))
+                  (is (= "EUR" (-> (st/find-org-invoicing st (:id org))
+                                   :currency)))
+                  (is (= 200 (-> (h/json-request :put base-path
+                                                 {:vat-nr "1234"
+                                                  :currency "USD"
+                                                  :address ["test address"]
+                                                  :country "USA"})
+                                 (app)
+                                 :status)))
+                  (is (= "USD" (-> (st/find-org-invoicing st (:id org))
+                                   :currency))))
+
+                (testing "`GET` retrieves invoicing settings"
+                  (let [r (-> (mock/request :get base-path)
+                              (app))
+                        b (h/reply->json r)]
+                    (is (= 200 (:status r)))
+                    (is (= (:id org) (:org-id b))))))))))))
 
   (h/with-memory-store st
     (let [org-id (st/new-id)]
@@ -686,7 +743,27 @@
             (is (= 204 (-> (mock/request :delete (str "/user/" (:id u)))
                            (app)
                            :status)))
-            (is (nil? (st/find-user st (:id u)))))))
+            (is (nil? (st/find-user st (:id u))))))
+
+        (let [user (st/find-user-by-type st (user->sid user))
+              user-id (:id user)]
+          (testing "`GET /orgs` retrieves orgs for user"
+            (let [org {:id (st/new-id)
+                       :name "test org"}]
+              (is (some? (st/save-org st org)))
+              (is (some? (st/save-user st (assoc user :orgs [(:id org)]))))
+              (is (= [org] (-> (mock/request :get (str "/user/" user-id "/orgs"))
+                               (app)
+                               (h/reply->json))))))
+
+          (testing "`GET /settings` retrieves user settings"
+            (let [s {:user-id user-id
+                     :receive-mailings true}]
+              (is (some? (st/save-user-settings st s)))
+              (let [r (-> (mock/request :get (str "/user/" user-id "/settings"))
+                          (app))]
+                (is (= 200 (:status r)))
+                (is (= s (h/reply->json r))))))))
 
       (testing "`GET /:type/:id` retrieves existing user"
         (let [r (-> (mock/request :get (str "/user/github/" (:type-id user)))
@@ -700,17 +777,6 @@
                     (app))]
           (is (= 200 (:status r)))
           (is (= "updated@monkeyci.com" (some-> r (h/reply->json) :email)))))
-
-      (testing "`GET /orgs` retrieves orgs for user"
-        (let [user (st/find-user-by-type st (user->sid user))
-              user-id (:id user)
-              org {:id (st/new-id)
-                   :name "test org"}]
-          (is (some? (st/save-org st org)))
-          (is (some? (st/save-user st (assoc user :orgs [(:id org)]))))
-          (is (= [org] (-> (mock/request :get (str "/user/" user-id "/orgs"))
-                           (app)
-                           (h/reply->json))))))
 
       (let [user (st/find-user-by-type st (user->sid user))
             user-id (:id user)]
@@ -1091,6 +1157,41 @@
                        (secure-app-req {:storage st :org-id org-id})
                        :status)))))))
 
+(deftest job-endpoints
+  (h/with-memory-store st
+    (let [repo (h/gen-repo)
+          org (-> (h/gen-org)
+                  (assoc :repos {(:id repo) repo}))
+          build (-> (h/gen-build)
+                    (assoc :org-id (:id org)
+                           :repo-id (:id repo)))
+          job {:type :container
+               :id "test-job"}]
+      (is (some? (st/save-org st org)))
+      (is (some? (st/save-build st build)))
+      (is (some? (st/save-job st (b/sid build) job)))
+      
+      (testing "`/:job-id`"
+        (testing "`GET`"
+          (testing "retrieves job details"
+            (let [r (-> (mock/request :get (str (build-path (b/sid build)) "/job/" (:id job)))
+                        (secure-app-req {:storage st :org-id (:id org)}))]
+              (is (= 200 (:status r)))
+              (is (= {:id "test-job"
+                      :type "container"}
+                     (h/reply->json r)))))
+
+          (testing "`404` when job does not exist"
+            (is (= 404 (-> (mock/request :get (str (build-path (b/sid build)) "/job/nonexisting"))
+                           (secure-app-req {:storage st :org-id (:id org)})
+                           :status)))))
+
+        (testing "`POST /unblock` unblocks job"
+          (is (some? (st/save-job st (b/sid build) (assoc job :blocked true))))
+          (let [r (-> (mock/request :post (str (build-path (b/sid build)) "/job/" (:id job) "/unblock"))
+                      (secure-app-req {:storage st :org-id (:id org)}))]
+            (is (= 202 (:status r)))))))))
+
 (deftest event-stream
   (testing "`GET /org/:org-id/events` exists"
     (is (not= 404
@@ -1383,7 +1484,18 @@
                             :base-entity {:email "test@monkeyci.com"}
                             :creator st/save-email-registration
                             :can-update? false
-                            :can-delete? true}))
+                            :can-delete? true})
+
+  (testing "POST `/email-registration/unregister`"
+    (testing "returns 200 if matching user"
+      (h/with-memory-store st
+        (let [app (make-test-app st)
+              email "existing@monkeyci.com"]
+          (is (some? (st/save-email-registration st {:email email})))
+          (is (= 200
+                 (-> (mock/request :post (str "/email-registration/unregister?email=" email))
+                     (app)
+                     :status))))))))
 
 (deftest admin-routes
   (testing "`/admin`"
@@ -1474,7 +1586,32 @@
                                        {:username "test-admin"
                                         :password "test-pass"})
                        (app)
-                       :status)))))))
+                       :status)))))
+
+    (let [m {:subject "test mailing"}]
+      (verify-entity-endpoints {:path "/admin/mailing"
+                                :name "mailing"
+                                :creator st/save-mailing
+                                :base-entity m
+                                :updated-entity (assoc m :subject "updated subject")
+                                :can-delete? true}))
+
+    (testing "`/mailing`"
+      (testing "`GET` lists all mailings"
+        (is (= 204 (-> (mock/request :get "/admin/mailing")
+                       (test-app)
+                       :status))))
+
+      (testing "`/:mailing-id/send`"
+        (let [{:keys [id] :as m} (h/gen-mailing)
+              {st :storage :as rt} (test-rt)
+              app (sut/make-app rt)
+              path (str "/admin/mailing/" id "/send")]
+          (is (some? (st/save-mailing st m)))
+          (testing "`GET` lists all for mailing"
+            (is (= 204 (-> (mock/request :get path)
+                           (app)
+                           :status)))))))))
 
 (deftest crypto-endpoints
   (testing "`POST /:org-id/crypto/decrypt-key` decrypts encrypted key"

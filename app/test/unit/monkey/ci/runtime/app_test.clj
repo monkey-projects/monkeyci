@@ -68,7 +68,13 @@
             (is (fn? (get-in rt [:crypto :encrypter]))))
 
           (testing "provides decrypter"
-            (is (fn? (get-in rt [:crypto :decrypter]))))))
+            (is (fn? (get-in rt [:crypto :decrypter]))))
+
+          (testing "has mailer"
+            (is (some? (:mailer rt))))
+
+          (testing "has invoicing client"
+            (is (fn? (get-in rt [:invoicing :client]))))))
 
       (testing "provides metrics routes"
         (is (some? (:metrics-routes sys))))

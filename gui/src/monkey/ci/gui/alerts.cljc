@@ -212,3 +212,51 @@
 
 (def token-delete-failed
   (error-msg "Failed to delete API key"))
+
+(def mailing-load-failed
+  (error-msg "Failed to retrieve mailings"))
+
+(def mailing-save-success
+  (alert-msg :success (constantly "New mailing has been created.")))
+
+(def mailing-save-failed
+  (error-msg "Failed to save mailing"))
+
+(def sent-mailing-load-failed
+  (error-msg "Failed to retrieve sent mailings"))
+
+(def delivery-save-success
+  (alert-msg :success (constantly "New delivery has been created.")))
+
+(def delivery-save-failed
+  (error-msg "Failed to create new delivery"))
+
+(def unregister-email-failed
+  (error-msg "Failed unregister your email"))
+
+(def user-general-load-failed
+  (error-msg "Failed to retrieve general settings"))
+
+(def user-general-save-success
+  (alert-msg :success (constantly "General settings have been updated.")))
+
+(def user-general-save-failed
+  (error-msg "Failed to update general settings"))
+
+(def invoice-load-failed
+  (error-msg "Failed to retrieve organization invoices"))
+
+(def invoice-settings-load-failed
+  (error-msg "Failed to retrieve billing settings"))
+
+(def invoice-settings-save-success
+  (alert-msg :success (constantly "Billing settings have been updated.")))
+
+(def invoice-settings-save-failed
+  (error-msg "Failed to update billing settings"))
+
+(def job-fetch-logs-failed
+  (error-msg "Failed to fetch logs"))
+
+(def job-unblock-failed
+  (error-msg "Failed to continue job"))

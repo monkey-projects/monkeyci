@@ -7,6 +7,7 @@ EXPOSE 18080
 ADD nginx.conf /etc/nginx/
 
 ADD resources/public/ /var/www/html/
-ADD target/js/frontend/ /var/www/html/
+ADD target/js/frontend/js/*.js /var/www/html/js/
 ADD target/index.html /var/www/html/
 ADD target/admin/ /var/www/html/admin/
+ADD target/error-404.html /var/www/html/

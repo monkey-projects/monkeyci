@@ -43,14 +43,34 @@
                           :saver save-org
                           :deleter st/delete-org})
 
+(defn auto-subs
+  "Automatically assigned subscriptions.  These can be temporary actions as well."
+  []
+  ;; TODO Make this configurable.  Initially read it from app config, later we
+  ;; could introduce some kind of template entity for this.
+  [{:amount config/free-credits
+    :from (t/now)
+    :description "Basic free subscription"
+    :period "P1Y"}
+   ;; TODO Also add start/end date, to indicate promotion periods
+   {:amount 2000
+    :from (t/now)
+    :until (-> (jt/offset-date-time)
+               (jt/plus (jt/years 1))
+               (jt/to-millis-from-epoch))
+    :description "Year's end promotion"
+    :period "P1Y"}])
+
 (defn create-org [req]
   (st/with-transaction (c/req->storage req) st
-    (let [org-id (cuid/random-cuid)
+    (let [expired? (fn [{:keys [until]}]
+                     (and until (< until (t/now))))
+          org-id (cuid/random-cuid)
           org (assoc (c/body req) :id org-id)
           res (st/init-org st {:org org
                                :user-id (-> req :identity :id)
-                               :credits {:amount config/free-credits
-                                         :from (t/now)}
+                               :credits (->> (auto-subs)
+                                             (remove expired?))
                                :dek (:enc (crypto/generate-dek req org-id))})]
       (-> (st/find-org st (last res))
           (rur/response)
@@ -174,5 +194,5 @@
   [req]
   (let [s (c/req->storage req)
         org-id (c/org-id req)
-        avail (st/calc-available-credits s org-id)]
+        avail (st/calc-available-credits s org-id (t/now))]
     (rur/response {:available avail})))

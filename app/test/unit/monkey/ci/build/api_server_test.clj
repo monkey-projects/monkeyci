@@ -5,7 +5,9 @@
             [clojure.test :refer [deftest is testing]]
             [manifold.deferred :as md]
             [monkey.ci.build.api-server :as sut]
-            [monkey.ci.protocols :as p]
+            [monkey.ci
+             [edn :as edn]
+             [protocols :as p]]
             [monkey.ci.spec.api-server :as aspec]
             [monkey.ci.test
              [aleph-test :as at]
@@ -268,13 +270,23 @@
         (is (= 200 (:status r))
             (bs/to-string (:body r)))))
 
-    (testing "`POST /events` dispatches events"
-      (is (= 202 (-> (mock/request :post "/events")
-                     (mock/body (pr-str [{:type ::test-event}]))
-                     (mock/content-type "application/edn")
-                     (auth)
-                     (app)
-                     :status))))
+    (testing "`POST /events`"
+      (testing "dispatches events"
+        (is (= 202 (-> (mock/request :post "/events")
+                       (mock/body (pr-str [{:type ::test-event}]))
+                       (mock/content-type "application/edn")
+                       (auth)
+                       (app)
+                       :status))))
+
+      (testing "can process regexes in body"
+        (is (= 202 (-> (mock/request :post "/events")
+                       (mock/body (edn/->edn [{:type ::test-event
+                                               :regex #"test-regex"}]))
+                       (mock/content-type "application/edn")
+                       (auth)
+                       (app)
+                       :status)))))
 
     (testing "`GET /events` receives events"
       (is (= 200 (-> (mock/request :get "/events")

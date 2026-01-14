@@ -16,7 +16,7 @@
   (testing "has orgs table"
     (eh/with-prepared-db*
       (fn [conn]
-        (is (number? (-> (jdbc/execute-one! (:ds conn) ["select count(*) as c from orgs"]
+        (is (number? (-> (jdbc/execute-one! (:ds conn) ["select count(*) as c from \"orgs\""]
                                             {:builder-fn rs/as-unqualified-lower-maps})
                          :c)))))))
 
@@ -248,7 +248,19 @@
 
       (testing "can delete"
         (is (= 1 (sut/delete-jobs conn (sut/by-id (:id job)))))
-        (is (empty? (sut/select-jobs conn (sut/by-build (:id build)))))))))
+        (is (empty? (sut/select-jobs conn (sut/by-build (:id build))))))
+
+      (testing "can store regexes in edn"
+        (let [job (sut/insert-job
+                   conn
+                   (-> (eh/gen-job)
+                       (assoc :build-id (:id build)
+                              :details {:test-regex #"some regex"})))]
+          (is (= "some regex"
+                 (some-> (sut/select-job conn (sut/by-id (:id job)))
+                         :details
+                         :test-regex
+                         str))))))))
 
 (deftest ^:sql users
   (eh/with-prepared-db conn
@@ -389,7 +401,9 @@
                          :vat-perc 21M
                          :details [{:net-amount 100M
                                     :vat-perc 21M
-                                    :description "Test invoice detail"}]))]
+                                    :description "Test invoice detail"}]
+                         :invoice-nr "1342"
+                         :ext-id "10"))]
       
       (testing "can insert"
         (is (number? (:id (sut/insert-invoice conn inv)))))
@@ -477,3 +491,50 @@
                (-> (sut/select-org-tokens conn (sut/by-cuid (:cuid token)))
                    first
                    (select-keys (keys token)))))))))
+
+(deftest ^:sql mailings
+  (eh/with-prepared-db conn
+    (let [m (eh/gen-mailing)
+          r (sut/insert-mailing conn m)]
+      (testing "can insert and retrieve"
+        (is (number? (:id r)))
+        (is (= 1 (count (sut/select-mailings conn (sut/by-cuid (:cuid m)))))))
+
+      (testing "can insert sent mailing"
+        (let [sm (-> (eh/gen-sent-mailing)
+                     (assoc :mailing-id (:id r)
+                            :other-dests ["test@monkeyci.com"]))]
+          (is (number? (:id (sut/insert-sent-mailing conn sm))))))
+
+      (testing "can select sent mailings by mailing id"
+        (is (= 1 (count (sut/select-sent-mailings conn [:= :mailing-id (:id r)]))))))))
+
+(deftest ^:sql user-settings
+  (eh/with-prepared-db conn
+    (let [u (sut/insert-user conn (eh/gen-user))
+          s (-> (eh/gen-user-settings)
+                (assoc :user-id (:id u)
+                       :receive-mailing true))]
+      (testing "can insert and retrieve"
+        (is (number? (-> (sut/insert-user-setting conn s)
+                         :user-id)))
+
+        (is (= s (-> (sut/select-user-settings conn (sut/by-user (:id u)))
+                     first)))))))
+
+(deftest ^:sql org-invoicing
+  (eh/with-prepared-db conn
+    (let [org (sut/insert-org conn (eh/gen-org))
+          inv (-> (eh/gen-org-invoicing)
+                  (assoc :org-id (:id org)))]
+      (testing "can save"
+        (is (some? (sut/insert-org-invoicing conn inv))))
+
+      (testing "can retrieve for org"
+        (is (some? (sut/select-org-invoicing conn (sut/by-org (:id org))))))
+
+      (testing "splits and joins address lines"
+        (is (some? (sut/update-org-invoicing conn (assoc inv :address ["line 1" "line 2"]))))
+        (is (= ["line 1" "line 2"]
+               (-> (sut/select-org-invoicing conn (sut/by-org (:id org)))
+                   :address)))))))

@@ -34,21 +34,6 @@
                           :saver save-webhook
                           :deleter st/delete-webhook})
 
-(c/make-entity-endpoints "user"
-                         {:get-id (c/id-getter (juxt :user-type :type-id))
-                          :getter st/find-user-by-type
-                          :saver st/save-user})
-
-(def delete-user
-  (c/entity-deleter (c/id-getter :user-id) st/delete-user))
-
-(defn get-user-orgs
-  "Retrieves all users linked to the org in the request path"
-  [req]
-  (let [user-id (get-in req [:parameters :path :user-id])
-        st (c/req->storage req)]
-    (rur/response (st/list-user-orgs st user-id))))
-
 ;; Override webhook creation
 (defn- assign-new-webhook-props
   "Updates the request body to assign a secret key, which is used to
@@ -287,8 +272,63 @@
   [req]
   (let [st (c/req->storage req)
         {:keys [email] :as body} (-> (c/body req)
-                                     (assoc :id (st/new-id)))]
+                                     (assoc :id (st/new-id)
+                                            :creation-time (t/now)
+                                            :confirmed false))]
     (if-let [existing (st/find-email-registration-by-email st email)]
       (rur/response existing)
       (when (st/save-email-registration st body)
         (rur/created (:id body) body)))))
+
+(defn- unregister-by-id [req]
+  (st/delete-email-registration (c/req->storage req)
+                                (get-in req [:parameters :query :id])))
+
+(defn- delete-reg
+  "Deletes email registration for given email"
+  [st email]
+  ;; TODO Just delete them all, no need to lookup
+  (when-let [m (st/find-email-registration-by-email st email)]
+    (st/delete-email-registration st (:id m))))
+
+(defn- unregister-settings [st u]
+  (let [s (st/find-user-settings st (:id u))]
+    (st/save-user-settings st (assoc s
+                                     :user-id (:id u)
+                                     :receive-mailing false))))
+
+(defn- unregister-users
+  "Updates all user settings with given email to no longer receive mailings"
+  [st email]
+  (->> (st/find-users-by-email st email)
+       (map (partial unregister-settings st))
+       (not-empty)
+       (some?)))
+
+(defn- unregister-by-email [req]  
+  (let [st (c/req->storage req)
+        email (get-in req [:parameters :query :email])]
+    (->> [(delete-reg st email)
+          (unregister-users st email)]
+         (some true?))))
+
+(defn- unregister-user [req]
+  (let [st (c/req->storage req)]
+    (when-let [u (st/find-user st (get-in req [:parameters :query :user-id]))]
+      (unregister-settings st u))))
+
+(defn unregister-email
+  "Multipurpose unregistration handler, meant to allow people to easily unsubscribe
+   from the mailing list.  It accepts a subscription id, an email or a user id.  If
+   it's an email subscription, the record is deleted.  If it's a user id or email,
+   the user settings are updated to no longer receive mailings."
+  [req]
+  (letfn [(has-param? [p req]
+            (some? (get-in req [:parameters :query p])))]
+    (if (condp has-param? req
+          :id (unregister-by-id req)
+          :email (unregister-by-email req)
+          :user-id (unregister-user req)
+          false)
+      (rur/status 200)
+      (rur/status 204))))

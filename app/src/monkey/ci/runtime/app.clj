@@ -7,7 +7,9 @@
             [monkey.ci
              [blob :as blob]
              [build :as b]
+             [invoicing :as inv]
              [oci :as oci]
+             [protocols :as p]
              [reporting :as rep]
              [storage :as s]
              [vault :as v]]
@@ -16,6 +18,7 @@
              [db :as emd]
              [interceptors :as emi]
              [jms :as emj]]
+            [monkey.ci.mailing.scw :as mailing-scw]
             [monkey.ci.metrics
              [core :as m]
              [events :as me]
@@ -253,6 +256,25 @@
     (->OtlpClient otlp nil)
     {}))
 
+(defrecord NoopMailer []
+  p/Mailer
+  (send-mail [_ _]
+    nil))
+
+(defmulti make-mailer :type)
+
+(defmethod make-mailer :default [_]
+  (->NoopMailer))
+
+(defmethod make-mailer :scw [conf]
+  (mailing-scw/->ScwMailer conf))
+
+(defn new-mailer [{:keys [mailing]}]
+  (make-mailer mailing))
+
+(defn new-invoicing [{:keys [invoicing]}]
+  {:client (inv/make-client invoicing)})
+
 (defn make-server-system
   "Creates a component system that can be used to start an application server."
   [config]
@@ -271,7 +293,7 @@
    :runtime   (co/using
                (new-server-runtime config)
                [:artifacts :metrics :storage :jwk :process-reaper :vault :mailman :update-bus
-                :crypto])
+                :crypto :mailer :invoicing])
    :pool      (new-db-pool config)
    :migrator  (co/using
                (new-db-migrator config)
@@ -303,7 +325,9 @@
    :update-bus (mb/event-bus)
    :otlp (co/using
           (new-otlp-client config)
-          [:metrics])))
+          [:metrics])
+   :mailer (new-mailer config)
+   :invoicing (new-invoicing config)))
 
 (defn with-server-system [config f]
   (rc/with-system (make-server-system config) f))

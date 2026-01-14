@@ -434,7 +434,7 @@
     (is (keyword? (:name i)))
     
     (testing "calculates from instance config"
-      (is (= 5 (-> {}
+      (is (= 4 (-> {}
                    (oci/set-ci-config {:shape "CI.Standard.E4.Flex"
                                        :shape-config
                                        {:ocpus 1

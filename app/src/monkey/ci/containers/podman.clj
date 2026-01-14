@@ -356,12 +356,25 @@
    :enter (fn [ctx]
             (set-podman-opts ctx opts))})
 
+(defn job-queued [conf ctx]
+  (let [{:keys [job-id sid]} (:event ctx)]
+    [(-> (j/job-initializing-evt job-id sid (:credit-multiplier conf))
+         (assoc :local-dir (get-job-dir ctx)))]))
+
+(defn job-queued-result [conf]
+  {:name ::job-queued
+   :leave (fn [ctx]
+            (emi/set-result ctx (job-queued conf ctx)))})
+
 ;;; Event handlers
+
+(defn podman-src [evt]
+  (assoc evt :src :podman))
 
 (def container-end-evt
   "Creates a `container/end` event, specifically for podman containers.  This is used
    as an intermediate step to save artifacts."
-  (partial j/job-status-evt :container/end))
+  (comp podman-src (partial j/job-status-evt :container/end)))
 
 (defn prepare-child-cmd
   "Prepares podman command to execute as child process"
@@ -384,28 +397,23 @@
                      (mc/filter-keys (complement reserved?)))
      :exit-fn (proc/exit-fn
                (fn [{:keys [exit]}]
-                 (log/info "Container job exited with code" exit)
+                 (log/info "Container job" job-id "exited with code" exit)
                  (try
                    (em/post-events (emi/get-mailman ctx)
                                    [(container-end-evt job-id sid (if (= 0 exit) bc/success bc/failure))])
                    (catch Exception ex
                      (log/error "Failed to post job/executed event" ex)))))}))
 
-(defn job-queued [conf ctx]
-  (let [{:keys [job-id sid]} (:event ctx)]
-    [(-> (j/job-initializing-evt job-id sid (:credit-multiplier conf))
-         (assoc :local-dir (get-job-dir ctx)))]))
-
 (defn job-init [ctx]
   (let [{:keys [job-id sid]} (:event ctx)]
     ;; Ideally the container notifies us when it's running by means of a script,
     ;; similar to the oci sidecar.
-    [(j/job-start-evt job-id sid)]))
+    [(podman-src (j/job-start-evt job-id sid))]))
 
 (defn job-exec
   "Invoked after the podman container has exited.  Posts a job/executed event."
   [{{:keys [job-id sid status result]} :event}]
-  [(j/job-executed-evt job-id sid (assoc result :status status))])
+  [(podman-src (j/job-executed-evt job-id sid (assoc result :status status)))])
 
 (defn- make-job-ctx [conf]
   (-> (select-keys conf [:artifacts :cache])
@@ -420,7 +428,7 @@
     [[:container/job-queued
       [{:handler prepare-child-cmd
         :interceptors [emi/handle-job-error
-                       emi/no-result
+                       (job-queued-result conf)
                        state
                        save-job
                        inc-job-count
@@ -433,9 +441,7 @@
                        (art/restore-interceptor emi/get-job-ctx)
                        decrypt-env
                        emi/start-process
-                       (add-podman-opts (:podman conf))]}
-       {:handler (partial job-queued conf)
-        :interceptors [(add-job-dir wd)]}]]
+                       (add-podman-opts (:podman conf))]}]]
 
      [:job/initializing
       ;; TODO Start polling for events from events.edn?
@@ -446,11 +452,14 @@
 
      [:container/end
       [{:handler job-exec
-        :interceptors [emi/handle-job-error
-                       state
+        :interceptors [state
                        require-job
                        remove-job
                        dec-job-count
+                       ;; Handle any errors before decreasing job count, to make sure that's
+                       ;; being executed.
+                       emi/handle-job-error
+                       ;; In case of error, don't clean up.  Useful for debugging.
                        (cleanup conf)
                        (add-job-dir wd)
                        (add-job-ctx job-ctx)

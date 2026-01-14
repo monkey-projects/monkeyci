@@ -15,7 +15,6 @@
              [core :as ec]
              [credit-cons :as eccon]
              [credit-subs :as ecsub]
-             [invoice :as ei]
              [job :as ej]
              [migrations :as emig]
              [org :as ecu]
@@ -27,8 +26,10 @@
              [credit-cons :as scco]
              [credit-sub :as scs]
              [email-registration :as ser]
+             [invoice :as si]
              [job :as sj]
              [join-request :as sjr]
+             [mailing :as sma]
              [org :as so]
              [org-credit :as soc]
              [org-token :as sot]
@@ -146,38 +147,6 @@
   (some-> (eu/select-sysadmin-by-user-cuid conn user-cuid)
           (assoc :user-id user-cuid)))
 
-(def invoice? (partial global-sid? st/invoice))
-
-(defn- db->invoice [inv]
-  (-> inv
-      (cuid->id)
-      (assoc :org-id (:org-cuid inv))
-      (dissoc :org-cuid)))
-
-(defn- select-invoice [conn cuid]
-  (some-> (ei/select-invoice-with-org conn cuid)
-          db->invoice))
-
-(defn- select-invoices-for-org [st org-cuid]
-  (->> (ei/select-invoices-for-org (get-conn st) org-cuid)
-       (map db->invoice)))
-
-(defn- insert-invoice [conn inv]
-  (when-let [org (ec/select-org conn (ec/by-cuid (:org-id inv)))]
-    (ec/insert-invoice conn (-> inv
-                                (id->cuid)
-                                (assoc :org-id (:id org))))))
-
-(defn- update-invoice [conn inv existing]
-  (ec/update-invoice conn (merge existing
-                                 (-> inv
-                                     (dissoc :id :org-id)))))
-
-(defn- upsert-invoice [conn inv]
-  (if-let [existing (ec/select-invoice conn (ec/by-cuid (:id inv)))]
-    (update-invoice conn inv existing)
-    (insert-invoice conn inv)))
-
 (defn- runner-details-sid->build-sid [sid]
   (take-last (count st/build-sid-keys) sid))
 
@@ -247,13 +216,14 @@
   (t sid))
 
 (def runner-details? (partial global-sid? st/runner-details))
-
 (def queued-task? (partial global-sid? st/queued-task))
-
 (def job-event? (partial global-sid? st/job-event))
-
 (def user-token? (partial global-sid? st/user-token))
+(def user-settings? (partial global-sid? st/user-settings))
 (def org-token? (partial global-sid? st/org-token))
+(def mailing? (partial global-sid? st/mailing))
+(def invoice? (partial global-sid? st/invoice))
+(def org-invoicing? (partial global-sid? st/org-invoicing))
 
 (defrecord SqlStorage [pool]
   p/Storage
@@ -289,13 +259,19 @@
         sysadmin?
         (select-sysadmin conn (last sid))
         invoice?
-        (select-invoice conn (last sid))
+        (si/select-invoice conn (last sid))
         runner-details?
         (select-runner-details conn (runner-details-sid->build-sid sid))
         user-token?
         (sut/select-user-token conn (take-last 2 sid))
         org-token?
-        (sot/select-org-token conn (take-last 2 sid)))))
+        (sot/select-org-token conn (take-last 2 sid))
+        mailing?
+        (sma/select-mailing conn (last sid))
+        user-settings?
+        (su/select-user-setting conn (last sid))
+        org-invoicing?
+        (si/select-org-invoicing conn (last sid)))))
   
   (write-obj [this sid obj]
     (let [conn (get-conn this)]
@@ -329,7 +305,7 @@
               sysadmin?
               (upsert-sysadmin conn obj)
               invoice?
-              (upsert-invoice conn obj)
+              (si/upsert-invoice conn obj)
               runner-details?
               (upsert-runner-details conn (runner-details-sid->build-sid sid) obj)
               queued-task?
@@ -340,6 +316,12 @@
               (sut/upsert-user-token conn obj)
               org-token?
               (sot/upsert-org-token conn obj)
+              mailing?
+              (sma/upsert-mailing conn obj)
+              user-settings?
+              (su/upsert-user-setting conn obj)
+              org-invoicing?
+              (si/upsert-org-invoicing conn obj)
               (log/warn "Unrecognized sid when writing:" sid))
         sid)))
 
@@ -370,6 +352,8 @@
          (sut/delete-user-token conn (last sid))
          org-token?
          (sot/delete-org-token conn (last sid))
+         mailing?
+         (sma/delete-mailing conn (last sid))
          (log/warn "Deleting entity" sid "is not supported")))))
 
   (list-obj [this sid]
@@ -453,11 +437,13 @@
     :count sr/count-repos}
    :user
    {:find su/select-user
+    :find-by-email su/select-by-email
     :orgs su/select-user-orgs
     :count su/count-users
     :delete su/delete-user
     :list-tokens sut/select-user-tokens
-    :find-token sut/select-user-token-by-token}
+    :find-token sut/select-user-token-by-token
+    :list-emails su/select-emails}
    :join-request
    {:list-user sjr/select-user-join-requests}
    :build
@@ -482,9 +468,14 @@
    {:find-for-webhook select-bb-webhook-for-webhook
     :search-webhooks select-bb-webhooks-by-filter}
    :invoice
-   {:list-for-org select-invoices-for-org}
+   {:list-for-org si/select-invoices-for-org}
    :queued-task
-   {:list select-queued-tasks}})
+   {:list select-queued-tasks}
+   :mailing
+   {:list sma/select-mailings
+    :save-sent sma/upsert-sent-mailing
+    :find-sent sma/select-sent-mailing
+    :list-sent sma/select-sent-mailings}})
 
 (defn make-storage [conn-fn]
   (map->SqlStorage {:get-conn conn-fn

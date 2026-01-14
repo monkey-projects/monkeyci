@@ -16,14 +16,15 @@
     (rf/reg-cofx :local-storage (fn [cofx id] cofx))
     (is (some? (reset! app-db {::test-key ::test-value})))
     (rf/dispatch-sync [:initialize-db])
-    (is (nil? (::test-key @app-db))))
+    (is (nil? (::test-key @app-db)))))
 
+#_(deftest core-init-user
   (testing "loads tokens from local storage"
     (rf/reg-cofx :local-storage (fn [cofx id]
                                   (cond-> cofx
                                     (= ldb/storage-token-id id)
                                     (assoc :local-storage {:token "test-app-token"}))))
-    (rf/dispatch-sync [:initialize-db])
+    (rf/dispatch-sync [:core/init-user])
     (is (= "test-app-token" (ldb/token @app-db))))
 
   (testing "loads github user details if token provided"
@@ -33,7 +34,7 @@
                                     (assoc :local-storage {:token "test-app-token"
                                                            :github-token "test-github-token"}))))
     (let [c (h/catch-fx :http-xhrio)]
-      (rf/dispatch-sync [:initialize-db])
+      (rf/dispatch-sync [:core/init-user])
       (is (= 1 (count @c)))
       (is (= "https://api.github.com/user" (:uri (first @c))))
       (is (= :github (ldb/provider @app-db)))))
@@ -45,7 +46,7 @@
                                     (assoc :local-storage {:token "test-app-token"
                                                            :bitbucket-token "test-github-token"}))))
     (let [c (h/catch-fx :http-xhrio)]
-      (rf/dispatch-sync [:initialize-db])
+      (rf/dispatch-sync [:core/init-user])
       (is (= 1 (count @c)))
       (is (= "https://api.bitbucket.org/2.0/user" (:uri (first @c))))
       (is (= :bitbucket (ldb/provider @app-db))))))

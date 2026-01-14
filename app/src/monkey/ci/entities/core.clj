@@ -35,6 +35,8 @@
                        :values recs}
                       sql-opts)]
     (log/trace "Executing insert:" sql)
+    ;; FIXME In MySQL, when there is no generated id (i.e. aggregate entities)
+    ;; this returns `nil`, but it should return the entities instead.
     (->> (jdbc/execute! ds
                         sql
                         insert-opts)
@@ -42,7 +44,7 @@
          (zipmap recs)
          (map (fn [[r id]]
                 (-> (zipmap cols r)
-                    (assoc :id id)))))))
+                    (mc/assoc-some :id id)))))))
 
 (defn insert-entity [{:keys [ds sql-opts] :as conn} table rec]
   ;; Both work, maybe the first is a little bit more efficient.
@@ -372,7 +374,17 @@
        (insert-entities conn :org-param-values [:params-id :name :value])))
 
 (defentity join-request)
-(defentity email-registration)
+
+(def prepare-email-reg (partial int->time :creation-time))
+(def convert-email-reg (partial copy-prop :creation-time))
+(def convert-email-reg-select (partial time->int :creation-time))
+
+(defentity email-registration
+  {:before-insert prepare-email-reg
+   :after-insert  convert-email-reg
+   :before-update prepare-email-reg
+   :after-update  convert-email-reg
+   :after-select  convert-email-reg-select})
 
 (def prepare-credit-sub
   (comp (partial int->time :valid-from)
@@ -396,15 +408,18 @@
 (defentity credit-subscription credit-sub-conversions)
 
 (def prepare-credit
-  (comp (partial int->time :from-time)
+  (comp (partial int->time :valid-from)
+        (partial int->time :valid-until)
         (partial keyword->str :type)))
 
 (def convert-credit
-  (comp (partial copy-prop :from-time)
+  (comp (partial copy-prop :valid-from)
+        (partial copy-prop :valid-until)
         (partial copy-prop :type)))
 
 (def convert-credit-select
-  (comp (partial time->int :from-time)
+  (comp (partial time->int :valid-from)
+        (partial time->int :valid-until)
         (partial str->keyword :type)))
 
 (def cust-credit-conversions
@@ -455,6 +470,27 @@
    :before-update prepare-inv
    :after-update  convert-inv
    :after-select  convert-inv-select})
+
+;; Invoicing settings for orgs
+(defn- split-lines [p]
+  (fn [r]
+    (mc/update-existing r p cs/split-lines)))
+
+(defn- join-lines [p]
+  (fn [r]
+    (mc/update-existing r p (partial cs/join "\n"))))
+
+(def prepare-org-inv (join-lines :address))
+(def convert-org-inv (partial copy-prop :address))
+(def convert-org-inv-select (split-lines :address))
+
+(defaggregate org-invoicing
+  {:id-col :org-id
+   :before-insert prepare-org-inv
+   :after-insert convert-org-inv
+   :before-update prepare-org-inv
+   :after-update convert-org-inv
+   :after-select convert-org-inv-select})
 
 (def prepare-runner-details (comp (partial prop->edn :details)
                                   (partial keyword->str :runner)))
@@ -530,3 +566,37 @@
    :before-update prepare-token
    :after-update  convert-token
    :after-select  convert-token})
+
+(def prepare-mailing
+  (partial int->time :creation-time))
+(def convert-mailing
+  (partial time->int :creation-time))
+
+(defentity mailing
+  {:before-insert prepare-mailing
+   :after-insert  convert-mailing
+   :before-update prepare-mailing
+   :after-update  convert-mailing
+   :after-select  convert-mailing})
+
+(def prepare-sent-mailing
+  (comp (partial int->time :sent-at)
+        (partial prop->edn :other-dests)))
+
+(def convert-sent-mailing
+  (comp (partial time->int :sent-at)
+        (partial copy-prop :other-dests)))
+
+(def convert-sent-mailing-select
+  (comp (partial time->int :sent-at)
+        (partial edn->prop :other-dests)))
+
+(defentity sent-mailing
+  {:before-insert prepare-sent-mailing
+   :after-insert  convert-sent-mailing
+   :before-update prepare-sent-mailing
+   :after-update  convert-sent-mailing
+   :after-select  convert-sent-mailing-select})
+
+(defaggregate user-setting
+  {:id-col :user-id})

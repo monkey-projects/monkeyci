@@ -580,20 +580,30 @@
      (when id
        (p/read-obj s (user-sid id))))))
 
+(defn- list-users [s]
+  ;; Very slow for many users.  Use dedicated query in override.
+  (letfn [(find-typed-users [t]
+               (->> (p/list-obj s [global users t])
+                    (map #(find-user-by-type s [(keyword t) %]))))]
+    (->> (p/list-obj s [global users])
+         (mapcat find-typed-users))))
+
 (def find-user
   "Find user by cuid"
   (override-or
    [:user :find]
    (fn [s id]
-     ;; Very slow for many users.  Use dedicated query in override.
-     (letfn [(find-typed-users [t]
-               (->> (p/list-obj s [global users t])
-                    (map #(find-user-by-type s [(keyword t) %]))))]
-       (when id
-         (->> (p/list-obj s [global users])
-              (mapcat find-typed-users)
-              (filter (comp (partial = id) :id))
-              (first)))))))
+     (when id
+       (->> (list-users s)
+            (filter (comp (partial = id) :id))
+            (first))))))
+
+(def find-users-by-email
+  (override-or
+   [:user :find-by-email]
+   (fn [s email]
+     (->> (list-users s)
+          (filter (comp (partial = email) :email))))))
 
 (def delete-user
   (override-or
@@ -608,6 +618,18 @@
    (fn [s]
      (-> (p/list-obj s [global users])
          (count)))))
+
+(def list-user-emails
+  (override-or
+   [:user :list-emails]
+   (fn [s]
+     (->> (p/list-obj s [global users])
+          (mapcat (fn [t]
+                    (->> (p/list-obj s [global users t])
+                         (map (partial vector t)))))
+          (map (partial find-user-by-type s))
+          (map :email)
+          (remove nil?)))))
 
 (def list-user-orgs
   (override-or
@@ -722,13 +744,13 @@
 
 (def list-org-credits-since
   "Lists all org credits for the org since given timestamp.  
-   This includes those without a `from-time`."
+   This includes those without a `valid-from`."
   (override-or
    [:org :list-credits-since]
    (fn [s cust-id ts]
      (->> (list-org-credits s cust-id)
           (filter (every-pred (cp/prop-pred :org-id cust-id)
-                              (comp (some-fn nil? (partial <= ts)) :from-time)))))))
+                              (comp (some-fn nil? (partial <= ts)) :valid-from)))))))
 
 (def credit-subscriptions :credit-subscriptions)
 (defn credit-sub-sid [& parts]
@@ -814,18 +836,25 @@
             (filter avail?))))))
 
 (def calc-available-credits
-  "Calculates the available credits for the org.  Basically this is the
-   amount of provisioned credits, substracted by the consumed credits."
+  "Calculates the available credits for the org at given timestamp.  
+   Basically this is the amount of provisioned credits, substracted by 
+   the consumed credits.  The timestamp is used to exclude credits that
+   are not active yet, or have already expired."
   (override-or
    [:org :get-available-credits]
-   (fn [s cust-id]
+   (fn [s org-id at]
      ;; Naive implementation: sum up all provisioned credits and all
      ;; credits from all builds
-     (let [avail (->> (list-org-credits s cust-id)
+     (let [active? (fn [{s :valid-from e :valid-until}]
+                     (or (nil? at)
+                         (and (or (nil? s) (<= s at))
+                              (or (nil? e) (<= at e)))))
+           avail (->> (list-org-credits s org-id)
+                      (filter active?)
                       (sum-amount))
-           used  (->> (list-org-credit-consumptions s cust-id)
+           used  (->> (list-org-credit-consumptions s org-id)
                       (sum-amount))]
-       (- avail used)))))
+       (max 0M (- avail used))))))
 
 (def crypto :crypto)
 (defn crypto-sid [& parts]
@@ -851,20 +880,22 @@
 (defn invoice-sid [& parts]
   (into [global (name invoice)] parts))
 
-(defn save-invoice [st invoice]
-  (p/write-obj st (invoice-sid (:org-id invoice) (:id invoice)) invoice))
-
 (defn find-invoice [st sid]
   (p/read-obj st (apply invoice-sid sid)))
+
+(def save-invoice
+  (override-or
+   [:invoice :save]
+   (fn [st invoice]
+     (p/write-obj st (invoice-sid (:org-id invoice) (:id invoice)) invoice))))
 
 (def list-invoices-for-org
   (override-or
    [:invoice :list-for-org]
-   (fn [st cust-id]
-     (->> (p/list-obj st (invoice-sid cust-id))
-          (map (partial vector cust-id))
+   (fn [st org-id]
+     (->> (p/list-obj st (invoice-sid org-id))
+          (map (partial vector org-id))
           (map (partial find-invoice st))))))
-
 
 (def runner-details :runner-details)
 (defn runner-details-sid [build-sid]
@@ -945,16 +976,19 @@
        (when-let [uid (:user-id opts)]
          (let [u (find-user s uid)]
            (save-user s (update u :orgs (comp vec conj) org-id))))
-       (when-let [{:keys [amount from]} (:credits opts)]
-         (let [cs {:id (cuid/random-cuid)
-                   :org-id org-id
-                   :amount amount
-                   :valid-from from}]
+       (doseq [{:keys [amount from until period] :as conf} (:credits opts)]
+         (let [cs (-> conf
+                      (dissoc :from :until :period)
+                      (assoc :id (cuid/random-cuid)
+                             :org-id org-id
+                             :valid-from from
+                             :valid-until until
+                             :valid-period period))]
            (when (save-credit-subscription s cs)
              (save-org-credit s {:id (cuid/random-cuid)
                                  :org-id org-id
                                  :amount amount
-                                 :from-time from
+                                 :valid-from from
                                  :type :subscription
                                  :subscription-id (:id cs)}))))
        (when-let [dek (:dek opts)]
@@ -1032,3 +1066,69 @@
 
 (defn delete-org-token [st sid]
   (p/delete-obj st (apply token-sid org-token sid)))
+
+(def mailing :mailing)
+(def mailing-sid (partial global-sid mailing))
+
+(defn save-mailing [st m]
+  (p/write-obj st (mailing-sid (:id m)) m))
+
+(defn find-mailing [st id]
+  (p/read-obj st (mailing-sid id)))
+
+(defn delete-mailing [st id]
+  (p/delete-obj st (mailing-sid id)))
+
+(def list-mailings
+  (override-or
+   [:mailing :list]
+   (fn [st]
+     ;; TODO Allow filtering
+     (->> (p/list-obj st (mailing-sid))
+          (map (partial find-mailing st))))))
+
+(def sent-mailing-sid mailing-sid)
+
+(def sent-mailing->sid (comp sent-mailing-sid (juxt :mailing-id :id)))
+
+(def save-sent-mailing
+  (override-or
+   [:mailing :save-sent]
+   (fn [st sm]
+     (let [m (-> (find-mailing st (:mailing-id sm))
+                 (assoc-in [:sent (:id sm)] sm))]
+       (save-mailing st m)
+       [(:mailing-id sm) (:id sm)]))))
+
+(def find-sent-mailing
+  (override-or
+   [:mailing :find-sent]
+   (fn [st sid]
+     (-> (find-mailing st (first sid))
+         (get-in [:sent (last sid)])))))
+
+(def list-sent-mailings
+  (override-or
+   [:mailing :list-sent]
+   (fn [st mid]
+     (-> (find-mailing st mid)
+         :sent
+         vals))))
+
+(def user-settings :user-settings)
+(def user-settings-sid (partial global-sid user-settings))
+
+(defn save-user-settings [st s]
+  (p/write-obj st (user-settings-sid (:user-id s)) s))
+
+(defn find-user-settings [st uid]
+  (p/read-obj st (user-settings-sid uid)))
+
+(def org-invoicing :org-invoicing)
+(def org-invoicing-sid (partial global-sid org-invoicing))
+
+(defn save-org-invoicing [st s]
+  (p/write-obj st (org-invoicing-sid (:org-id s)) s))
+
+(defn find-org-invoicing [st uid]
+  (p/read-obj st (org-invoicing-sid uid)))

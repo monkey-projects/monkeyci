@@ -22,7 +22,7 @@
 
 (s/def :job/id id?)
 (s/def :job/type #{:action :container})
-(s/def :job/status #{:pending :starting :running :stopping :error :failure :success :skipped})
+(s/def :job/status #{:pending :starting :running :stopping :error :failure :success :skipped :blocked})
 
 (s/def :blob/id id?)
 (s/def :blob/path path?)
@@ -43,12 +43,13 @@
 
 (s/def :job/command string?)
 (s/def :job/script (s/coll-of :job/command))
+(s/def :job/blocked boolean?)
 
 (s/def :script/job
   (s/keys :req-un [:job/id]
           :opt-un [:job/type :job/dependencies :job/caches :job/save-artifacts :job/restore-artifacts
                    :job/script :job/memory :job/cpus :job/size :job/arch :job/status ::c/timeout
-                   :job/credit-multiplier]))
+                   :job/credit-multiplier :job/blocked]))
 
 (s/def :script/jobs (s/coll-of :script/job))
 

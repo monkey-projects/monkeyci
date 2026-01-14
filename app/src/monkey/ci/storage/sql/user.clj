@@ -64,8 +64,34 @@
   (->> (eu/select-user-orgs (sc/get-conn st) id)
        (map so/db->org-with-repos)))
 
+(defn select-emails [st]
+  (->> (eu/select-user-emails (sc/get-conn st))
+       (map :email)))
+
+(defn select-by-email [st email]
+  (->> (eu/select-by-email (sc/get-conn st) email)
+       (map db->user)))
+
 (defn count-users [st]
   (ec/count-entities (sc/get-conn st) :users))
 
 (defn delete-user [st id]
   (pos? (ec/delete-entities (sc/get-conn st) :users (ec/by-cuid id))))
+
+(defn- insert-user-setting [conn s]
+  (let [u (ec/select-user conn (ec/by-cuid (:user-id s)))]
+    (->> (assoc s :user-id (:id u))
+         (ec/insert-user-setting conn))
+    s))
+
+(defn- update-user-setting [conn s {:keys [user-id]}]
+  (ec/update-user-setting conn (assoc s :user-id user-id)))
+
+(defn upsert-user-setting [conn s]
+  (if-let [e (eu/select-user-setting-by-cuid conn (:user-id s))]
+    (update-user-setting conn s e)
+    (insert-user-setting conn s)))
+
+(defn select-user-setting [conn uid]
+  (some-> (eu/select-user-setting-by-cuid conn uid)
+          (assoc :user-id uid)))

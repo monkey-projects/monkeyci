@@ -32,7 +32,7 @@
 (defn with-test-db*
   ([f conf]
    (let [conn {:ds (conn/->pool HikariDataSource conf)
-               :sql-opts {:dialect :mysql :quoted-snake true}}]
+               :sql-opts {:dialect :ansi :quoted-snake true}}]
      (try
        (f conn)
        (finally
@@ -126,5 +126,17 @@
 (defn gen-user-token []
   (gen-spec :db/user-token))
 
+(defn gen-user-settings []
+  (gen-spec :db/user-setting))
+
 (defn gen-org-token []
   (gen-spec :db/org-token))
+
+(defn gen-mailing []
+  (gen-spec :db/mailing))
+
+(defn gen-sent-mailing []
+  (gen-spec :db/sent-mailing))
+
+(defn gen-org-invoicing []
+  (gen-spec :db/org-invoicing))

@@ -57,7 +57,9 @@
 (defn- new-routes [conf] 
   (letfn [(make-routes [c]
             (se/make-routes (assoc c
+                                   ;; XXX Perhaps just pass the entire config?
                                    :build (sc/build conf)
+                                   :filter (sc/job-filter conf)
                                    :result (sc/result conf)
                                    :archs (sc/archs conf))))]
     (em/map->RouteComponent {:make-routes make-routes})))
