@@ -264,6 +264,11 @@
       (when (bc/container-job? job)
         [(job-queued-evt :container/job-queued job dek)]))))
 
+(defn job-unblocked
+  "Received when a blocked job becomes unblocked: schedule it immediately."
+  [ctx]
+  [(j/job-queued-evt (get-job-from-state ctx) (b/sid (get-build ctx)))])
+
 (defn job-executed
   "Runs any extensions for the job in interceptors, then ends the job."
   [ctx]
@@ -340,6 +345,12 @@
                        with-job-ctx
                        ext/before-interceptor
                        execute-action]}]]
+
+     [:job/unblocked
+      [{:handler job-unblocked
+        :interceptors [emi/handle-job-error
+                       state
+                       add-job-ctx]}]]
 
      [:job/executed
       ;; Handle this for both container and action jobs

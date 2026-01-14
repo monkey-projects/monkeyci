@@ -269,6 +269,7 @@
                :job/queued
                :job/executed
                :job/end
+               :job/unblocked
                :build/canceled]
         routes (->> (sut/make-routes {})
                     (into {}))]
@@ -462,6 +463,14 @@
                (sut/job-executed)
                first
                :status)))))
+
+(deftest job-unblocked
+  (testing "returns `job/queued` event"
+    (let [r (->> {:event
+                  {:job-id "test-job"}}
+                 (sut/job-unblocked))]
+      (is (= [:job/queued]
+             (map :type r))))))
 
 (deftest job-end
   (testing "when more jobs to run"
