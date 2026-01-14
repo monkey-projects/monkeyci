@@ -1,5 +1,6 @@
 (ns monkey.ci.gui.job.events
-  (:require [monkey.ci.gui.build.db :as bdb]
+  (:require [monkey.ci.gui.alerts :as a]
+            [monkey.ci.gui.build.db :as bdb]
             [monkey.ci.gui.job.db :as db]
             [monkey.ci.gui.loader :as lo]
             [monkey.ci.gui.login.db :as ldb]
@@ -60,8 +61,7 @@
  :job/load-log-files--failed
  (fn [db [_ err]]
    (db/set-alerts db
-                  [{:type :danger
-                    :message (str "Failed to fetch logs: " (u/error-msg err))}])))
+                  [(a/job-fetch-logs-failed err)])))
 
 (rf/reg-event-fx
  :job/load-logs
@@ -95,7 +95,7 @@
 (rf/reg-event-db
  :job/load-logs--failed
  (fn [db [_ path err]]
-   (lo/on-failure db (db/get-path-id db path) "Failed to fetch logs: " err)))
+   (lo/on-failure db (db/get-path-id db path) a/job-fetch-logs-failed err)))
 
 (rf/reg-event-fx
  :job/maybe-load-logs
@@ -118,3 +118,26 @@
               (->> [out err]
                    (filter some?)
                    (mapv (fn [p] [:job/maybe-load-logs job p]))))))))
+
+(rf/reg-event-fx
+ :job/unblock
+ (fn [{:keys [db]} [_ job]]
+   {:dispatch [:secure-request
+               :unblock-job
+               (-> (select-keys job [:org-id :repo-id :build-id])
+                   (assoc :job-id (:id job)))
+               [:job/unblock--success]
+               [:job/unblock--failure]]
+    :db (db/set-unblocking db)}))
+
+(rf/reg-event-db
+ :job/unblock--success
+ (fn [db _]
+   (db/reset-unblocking db)))
+
+(rf/reg-event-db
+ :job/unblock--failure
+ (fn [db err]
+   (-> db
+       (db/reset-unblocking)
+       (db/set-alerts [(a/job-unblock-failed err)]))))

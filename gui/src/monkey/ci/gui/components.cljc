@@ -41,6 +41,11 @@
   [i & txt]
   (into [:<> [:span.me-2 [icon i]]] txt))
 
+(defn spinner-text
+  "Displays spinner with text, similar to `icon-text`"
+  [txt]
+  [:<> [:div.me-2.spinner-border.spinner-border-sm] txt])
+
 (defn icon-btn [i lbl evt & [opts]]
   [:button.btn.btn-primary
    (merge {:on-click (u/link-evt-handler evt)} opts) [:span.me-2 [icon i]] lbl])

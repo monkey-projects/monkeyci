@@ -25,3 +25,8 @@
 (defscene job-tabs-blocked
   [sut/details-tabs
    {:status :blocked}])
+
+(defscene unblocking-btn
+  [sut/unblock-btn
+   {:status :blocked}
+   true])

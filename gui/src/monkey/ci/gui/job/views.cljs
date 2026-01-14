@@ -4,7 +4,7 @@
             [monkey.ci.gui.artifact.subs]
             [monkey.ci.gui.components :as co]
             [monkey.ci.gui.job.events :as e]
-            [monkey.ci.gui.job.subs]
+            [monkey.ci.gui.job.subs :as s]
             [monkey.ci.gui.layout :as l]
             [monkey.ci.gui.logging :as log]
             [monkey.ci.gui.martian :as m]
@@ -177,10 +177,17 @@
     {:header "Artifacts"
      :contents [artifacts job]}))
 
-(defn- unblock-btn [job]
-  [:button.btn.btn-primary
-   {:title "Allow this job to continue execution."}
-   [co/icon-text :play-fill "Continue"]])
+(defn unblock-btn
+  ([job unlocking?]
+   [:button.btn.btn-primary
+    (cond-> {:title "Allow this job to continue execution."}
+      unlocking? (assoc :disabled true))
+    (if unlocking?
+      [co/spinner-text "Continue"]
+      [co/icon-text :play-fill "Continue"])])
+  ([job]
+   (let [u? (rf/subscribe [::s/unblocking?])]
+     (unblock-btn job @u?))))
 
 (defn details-tabs
   "Renders tabs to display the job details.  These tabs include logs and test results."

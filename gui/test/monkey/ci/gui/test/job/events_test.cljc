@@ -203,3 +203,39 @@
                                              [:script :jobs job-id :status] :success))))))
        (is (nil? (rf/dispatch [:job/toggle-logs 0 {:out "/path/to/out"}])))
        (is (empty? @e))))))
+
+(deftest job-unblock
+  (rft/run-test-sync
+   (h/initialize-martian {:unblock-job {:error-code :no-error
+                                        :body {}}})
+   (let [c (h/catch-fx :martian.re-frame/request)]
+     (is (nil? (rf/dispatch [:job/unblock {:id "test-job"}])))
+
+     (testing "invokes unblock endpoint"
+       (is (= 1 (count @c)))
+       (is (= :unblock-job (-> @c first (nth 2))))
+       (is (= {:job-id "test-job"}
+              (-> @c first (nth 3)))
+           "passes job sid as params"))
+
+     (testing "marks unblocking"
+       (is (true? (db/unblocking? @app-db)))))))
+
+(deftest job-unblock--success
+  (is (some? (reset! app-db (db/set-unblocking {}))))
+  (is (nil? (rf/dispatch-sync [:job/unblock--success {}])))
+  
+  (testing "unmarks unblocking"
+    (is (false? (db/unblocking? @app-db)))))
+
+(deftest job-unblock--failure
+  (is (some? (reset! app-db (db/set-unblocking {}))))
+  (is (nil? (rf/dispatch-sync [:job/unblock--failure {:message "test error"}])))
+  
+  (testing "unmarks unblocking"
+    (is (false? (db/unblocking? @app-db))))
+
+  (testing "sets error alert"
+    (is (= [:danger]
+           (->> (db/get-alerts @app-db)
+                (map :type))))))

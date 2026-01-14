@@ -86,3 +86,5 @@
                    (get exp idx) (assoc :expanded? true))))]
        (->> (:script job)
             (map-indexed ->out))))))
+
+(u/db-sub ::unblocking? db/unblocking?)

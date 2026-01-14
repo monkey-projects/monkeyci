@@ -4,6 +4,8 @@
             [monkey.ci.gui.components :as c]))
 
 (defscene github-error
+  :params {:msg "no permission"}
+  [params _]
   [c/render-alert
    (sut/org-github-repos-failed
-    "no permission")])
+    (:msg params))])

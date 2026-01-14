@@ -254,3 +254,9 @@
 
 (def invoice-settings-save-failed
   (error-msg "Failed to update billing settings"))
+
+(def job-fetch-logs-failed
+  (error-msg "Failed to fetch logs"))
+
+(def job-unblock-failed
+  (error-msg "Failed to continue job"))
