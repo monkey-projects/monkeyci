@@ -1,11 +1,8 @@
-(ns monkey.ci.gui.test.cards.build-cards
-  (:require [devcards.core :refer-macros [defcard-rg]]
-            [monkey.ci.gui.build.views :as sut]
-            [reagent.core]
-            [re-frame.core :as rf]
-            [re-frame.db :as rdb]))
+(ns monkey.ci.gui.test.scenes.build-scenes
+  (:require [portfolio.reagent-18 :refer-macros [defscene]]
+            [monkey.ci.gui.build.views :as sut]))
 
-(defcard-rg build-status-icon
+(defscene build-status-icon
   "Large build status icon"
   [:div.d-flex.gap-2
    [sut/build-status-icon :success]
@@ -29,27 +26,27 @@
    :git {:ref "refs/heads/main"}
    :credits 17})
 
-(defcard-rg build-status-pending
+(defscene build-status-pending
   "Pending build status"
   [sut/build-status {:status :pending}])
 
-(defcard-rg build-status-initializing
+(defscene build-status-initializing
   "Initializing build status"
   [sut/build-status {:status :initializing}])
 
-(defcard-rg build-status-running
+(defscene build-status-running
   "Running build status"
   [sut/build-status {:status :running}])
 
-(defcard-rg build-status-success
+(defscene build-status-success
   "Successful build status"
   [sut/build-status {:status :success}])
 
-(defcard-rg build-status-error
+(defscene build-status-error
   "Failed build status"
   [sut/build-status {:status :error}])
 
-(defcard-rg build-details-running
+(defscene build-details-running
   "Running build details"
   [sut/build-details
    {:start-time "2024-09-24T16:52:00"
@@ -57,14 +54,14 @@
     :message "Test build"
     :git {:ref "refs/heads/main"}}])
 
-(defcard-rg build-details-success
+(defscene build-details-success
   "Successful build details"
   [sut/build-details build-success])
 
-(defcard-rg build-overview-running
+(defscene build-overview-running
   "Running build overview"
   [sut/overview build-running])
 
-(defcard-rg build-overview-success
+(defscene build-overview-success
   "Successful build overview"
   [sut/overview build-success])

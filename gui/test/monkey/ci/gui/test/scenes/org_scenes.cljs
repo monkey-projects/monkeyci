@@ -1,14 +1,12 @@
-(ns monkey.ci.gui.test.cards.customer-cards
-  (:require [devcards.core :refer-macros [defcard-rg]]
+(ns monkey.ci.gui.test.scenes.org-scenes
+  (:require [portfolio.reagent-18 :refer-macros [defscene]]
             [monkey.ci.gui.charts :as charts]
             [monkey.ci.gui.org.views :as sut]
-            [re-frame
-             [core :as rf]
-             [db :as rdb]]
-            [reagent.core]))
+            [monkey.ci.gui.org.views-stats :as stats]
+            [re-frame.core :as rf]))
 
-(defcard-rg build-stats
-  "Customer build statistics"
+(defscene build-stats
+  "Organization build statistics"
   (let [config {:elapsed-seconds
                 [{:date 1729382400000, :seconds 0}
                  {:date 1729468800000, :seconds 7151}
@@ -75,5 +73,5 @@
                  {:date 1731888000000, :credits 123.0}
                  {:date 1731974400000, :credits 184.0}
                  {:date 1732060800000, :credits 30.0}]}]
-    (rf/dispatch [:chart/update ::build-stats (sut/build-chart-config config)])
+    (rf/dispatch [:chart/update ::build-stats (stats/build-chart-config config)])
     [charts/chart-component ::build-stats]))

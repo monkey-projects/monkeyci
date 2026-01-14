@@ -9,6 +9,7 @@
             [meta-merge.core :as mm]
             [monkey.ci
              [artifacts :as a]
+             [build :as b]
              [cuid :as cuid]
              [logging :as l]
              [storage :as st]
@@ -1155,6 +1156,41 @@
         (is (= 200 (-> (mock/request :get (repo-path sid))
                        (secure-app-req {:storage st :org-id org-id})
                        :status)))))))
+
+(deftest job-endpoints
+  (h/with-memory-store st
+    (let [repo (h/gen-repo)
+          org (-> (h/gen-org)
+                  (assoc :repos {(:id repo) repo}))
+          build (-> (h/gen-build)
+                    (assoc :org-id (:id org)
+                           :repo-id (:id repo)))
+          job {:type :container
+               :id "test-job"}]
+      (is (some? (st/save-org st org)))
+      (is (some? (st/save-build st build)))
+      (is (some? (st/save-job st (b/sid build) job)))
+      
+      (testing "`/:job-id`"
+        (testing "`GET`"
+          (testing "retrieves job details"
+            (let [r (-> (mock/request :get (str (build-path (b/sid build)) "/job/" (:id job)))
+                        (secure-app-req {:storage st :org-id (:id org)}))]
+              (is (= 200 (:status r)))
+              (is (= {:id "test-job"
+                      :type "container"}
+                     (h/reply->json r)))))
+
+          (testing "`404` when job does not exist"
+            (is (= 404 (-> (mock/request :get (str (build-path (b/sid build)) "/job/nonexisting"))
+                           (secure-app-req {:storage st :org-id (:id org)})
+                           :status)))))
+
+        (testing "`POST /unblock` unblocks job"
+          (is (some? (st/save-job st (b/sid build) (assoc job :blocked true))))
+          (let [r (-> (mock/request :post (str (build-path (b/sid build)) "/job/" (:id job) "/unblock"))
+                      (secure-app-req {:storage st :org-id (:id org)}))]
+            (is (= 202 (:status r)))))))))
 
 (deftest event-stream
   (testing "`GET /org/:org-id/events` exists"

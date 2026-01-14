@@ -85,7 +85,7 @@
 
 (defn stream->sse
   "Returns SSE response for events that are received from a manifold bus.
-   The stream will contain all events the given types, for which `pred`
+   The stream will contain all events of the types for which `pred`
    returns `true`."
   [stream pred]
   (let [out (->> (ms/stream 1)

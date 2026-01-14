@@ -28,6 +28,7 @@
              [crypto :as crypto-api]
              [org :as org-api]
              [invoice :as inv-api]
+             [job :as job-api]
              [join-request :as jr-api]
              [params :as param-api]
              [repo :as repo-api]
@@ -252,8 +253,17 @@
       ["/download"
        {:get {:handler api/download-artifact}}]]]]])
 
+(def job-routes
+  ["/job"
+   [["/:job-id"
+     {:parameters {:path {:job-id s/Str}}}
+     [[""
+       {:get {:handler job-api/get-job}}]
+      ["/unblock"
+       {:post {:handler job-api/unblock-job}}]]]]])
+
 (def build-routes
-  ["/builds" ; TODO Replace with singular
+  ["/builds"                            ; TODO Replace with singular
    {:conflicting true}
    [["" {:get {:handler api/get-builds}}]
     ["/trigger"
@@ -272,7 +282,8 @@
       ["/cancel"
        {:post {:handler api/cancel-build}}]
       log-routes
-      artifact-routes]]]])
+      artifact-routes
+      job-routes]]]])
 
 (def watch-routes
   ["" [["/github"

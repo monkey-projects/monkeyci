@@ -3,6 +3,7 @@
             [com.stuartsierra.component :as co]
             [monkey.ci.events.mailman :as em]
             [monkey.ci.events.mailman.jms :as sut]
+            [monkey.ci.spec.events :as se]
             [monkey.jms :as jms]
             [monkey.mailman.core :as mmc]))
 
@@ -14,37 +15,8 @@
                (get :build/pending)))))
 
   (testing "maps known event types"
-    (let [dests (sut/topic-destinations {:prefix "monkeyci.test"})
-          types [:build/triggered
-                 :build/pending
-                 :build/queued
-                 :build/initializing
-                 :build/start
-                 :build/end
-                 :build/canceled
-                 :build/updated
-                 :script/initializing
-                 :script/start
-                 :script/end
-                 :job/pending
-                 :job/initializing
-                 :job/start
-                 :job/end
-                 :job/skipped
-                 :job/executed
-                 :container/pending
-                 :container/job-queued
-                 :container/start
-                 :container/end
-                 :command/start
-                 :command/end
-                 :sidecar/start
-                 :sidecar/end
-                 :oci/build-scheduled
-                 :oci/job-scheduled
-                 :k8s/build-scheduled
-                 :k8s/job-scheduled]]
-      (doseq [t types] 
+    (let [dests (sut/topic-destinations {:prefix "monkeyci.test"})]
+      (doseq [t se/event-types] 
         (is (contains? dests t)
             (str "should map " t))))))
 

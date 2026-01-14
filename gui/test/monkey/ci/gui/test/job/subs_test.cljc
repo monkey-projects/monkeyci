@@ -6,6 +6,7 @@
             [monkey.ci.gui.job.subs :as sut]
             [monkey.ci.gui.routing :as r]
             [monkey.ci.gui.test.fixtures :as tf]
+            [monkey.ci.gui.test.helpers :as h]
             [re-frame.core :as rf]
             [re-frame.db :refer [app-db]]))
 
@@ -190,3 +191,6 @@
       (is (some? (swap! app-db (fn [db]
                                  (db/set-log-expanded db 1 true)))))
       (is (true? (-> @l second :expanded?))))))
+
+(deftest unblocking?
+  (h/verify-sub [::sut/unblocking?] db/set-unblocking true false))

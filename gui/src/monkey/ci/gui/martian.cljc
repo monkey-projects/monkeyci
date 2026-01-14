@@ -555,6 +555,13 @@
      :path-schema org-schema
      :body-schema {:settings cs/OrgInvoicing}})])
 
+(def job-routes
+  [(api-route
+    {:route-name :unblock-job
+     :method :post
+     :path-parts (into build-path ["/job/" :job-id "/unblock"])
+     :path-schema (assoc build-schema :job-id s/Str)})])
+
 (def routes
   (concat
    org-routes
@@ -573,7 +580,8 @@
    mailing-routes
    general-routes
    login-routes
-   invoicing-routes))
+   invoicing-routes
+   job-routes))
 
 ;; The api url.  This should be configured in a `config.js`.
 (def url #?(:clj "http://localhost:3000"

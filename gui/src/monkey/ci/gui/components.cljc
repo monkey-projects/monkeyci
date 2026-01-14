@@ -41,6 +41,11 @@
   [i & txt]
   (into [:<> [:span.me-2 [icon i]]] txt))
 
+(defn spinner-text
+  "Displays spinner with text, similar to `icon-text`"
+  [txt]
+  [:<> [:div.me-2.spinner-border.spinner-border-sm] txt])
+
 (defn icon-btn [i lbl evt & [opts]]
   [:button.btn.btn-primary
    (merge {:on-click (u/link-evt-handler evt)} opts) [:span.me-2 [icon i]] lbl])
@@ -113,6 +118,7 @@
                :running :bg-info
                :canceled :bg-warning
                :skipped :bg-warning
+               :blocked :bg-warning
                :bg-secondary)]
     [:span {:class (str "badge " (name type))} r]))
 
@@ -123,7 +129,8 @@
                      :running      [:text-info :play-circle]
                      :pending      [:text-warning :pause-circle]
                      :initializing [:text-warning :play-circle]
-                     :canceled     [:text-warning :x-circle]}
+                     :canceled     [:text-warning :x-circle]
+                     :blocked      [:text-warning :slash-circle]}
                     status
                     [:text-default :question-circle])]
     [:div (cond-> {:style {:font-size size}

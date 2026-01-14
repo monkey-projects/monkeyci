@@ -1,9 +1,7 @@
-(ns monkey.ci.gui.test.cards.timer-cards
-  (:require [devcards.core :refer-macros [defcard-rg]]
+(ns monkey.ci.gui.test.scenes.timer-scenes
+  (:require [portfolio.reagent-18 :refer-macros [defscene]]
             [monkey.ci.gui.timer :as sut]
-            [reagent.core]
-            [re-frame.core :as rf]
-            [re-frame.db :as rdb]))
+            [re-frame.core :as rf]))
 
 (rf/reg-event-db
  ::simple-timer
@@ -15,7 +13,7 @@
  (fn [db _]
    (::ticks db)))
 
-(defcard-rg simple-timer
+(defscene simple-timer
   "Simple timer"
   (fn []
     (let [t (rf/subscribe [::simple-ticks])]

@@ -305,6 +305,15 @@
   (job-update (fn [job _]
                 (assoc job :status :skipped))))
 
+(def job-blocked
+  (job-update (fn [job _]
+                (assoc job :status :blocked))))
+
+(def job-unblocked
+  (job-update (fn [job _]
+                ;; When a job is unblocked, it is immediately scheduled for execution
+                (assoc job :status :queued))))
+
 ;;; Event routing configuration
 
 (defn make-routes [storage bus]
@@ -374,4 +383,12 @@
 
      [:job/skipped
       [{:handler job-skipped
+        :interceptors job-int}]]
+
+     [:job/blocked
+      [{:handler job-blocked
+        :interceptors job-int}]]
+
+     [:job/unblocked
+      [{:handler job-unblocked
         :interceptors job-int}]]]))

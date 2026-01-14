@@ -56,6 +56,7 @@
 (def job-pending-evt eb/job-pending-evt)
 (def job-queued-evt eb/job-queued-evt)
 (def job-skipped-evt eb/job-skipped-evt)
+(def job-blocked-evt eb/job-blocked-evt)
 (def job-initializing-evt eb/job-initializing-evt)
 (def job-start-evt eb/job-start-evt)
 (def job-executed-evt eb/job-executed-evt)
@@ -318,3 +319,7 @@
   (or (some-> (:size job) (* 2))
       (:memory job)
       2))
+
+(def blocked?
+  "True if the block should be blocked"
+  (comp true? :blocked))

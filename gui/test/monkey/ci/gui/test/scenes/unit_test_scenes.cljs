@@ -1,10 +1,8 @@
-(ns monkey.ci.gui.test.cards.unit-test-cards
-  (:require [devcards.core :refer-macros [defcard-rg]]
+(ns monkey.ci.gui.test.scenes.unit-test-scenes
+  (:require [portfolio.reagent-18 :refer-macros [defscene]]
             [clojure.string :as cs]
             [monkey.ci.gui.test-results :as sut]
-            [reagent.core]
-            [re-frame.core :as rf]
-            [re-frame.db :as rdb]))
+            [re-frame.core :as rf]))
 
 (rf/clear-subscription-cache!)
 
@@ -25,7 +23,7 @@
        :type "assertion error: true?"
        :description "This is a longer description of the error"}]}]))
 
-(defcard-rg single-suite
+(defscene single-suite
   "Unit tests for single suite"
   [sut/test-results
    ::single-suite
@@ -35,8 +33,8 @@
   {:test-case (str "test-" n)
    :time (* (rand) 10)})
 
-(defcard-rg timing-chart-small-single-suite
-  "Timing chart for single suit with low number of tests"
+(defscene timing-chart-small-single-suite
+  "Timing chart for single suite with low number of tests"
   [sut/timing-chart
    :small-single-suite
    [{:name "small"
@@ -44,8 +42,8 @@
      (->> (range 3)
           (map (comp gen-test-case inc)))}]])
 
-(defcard-rg timing-chart-large-single-suite
-  "Timing chart for single suit with high number of tests"
+(defscene timing-chart-large-single-suite
+  "Timing chart for single suite with high number of tests"
   [sut/timing-chart
    :large-single-suite
    [{:name "large"
@@ -65,6 +63,6 @@
        :message "A description of the test"
        :description "A more detailed description\nCan be multiple lines"}]}]))
 
-(defcard-rg test-results-with-failure
+(defscene test-results-with-failure
   "Test results table with failure"
   [sut/test-results ::tests-with-failure [::tests-with-failure]])
