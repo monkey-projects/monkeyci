@@ -133,6 +133,7 @@
 (rf/reg-event-db
  :job/unblock--success
  (fn [db _]
+   ;; Do not update job, an event should take care of this
    (db/reset-unblocking db)))
 
 (rf/reg-event-db

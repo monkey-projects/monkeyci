@@ -118,6 +118,7 @@
                :running :bg-info
                :canceled :bg-warning
                :skipped :bg-warning
+               :blocked :bg-warning
                :bg-secondary)]
     [:span {:class (str "badge " (name type))} r]))
 
