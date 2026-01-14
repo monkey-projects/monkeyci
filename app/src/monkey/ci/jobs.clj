@@ -48,6 +48,7 @@
 (def failed?  (comp #{:error :failure} status))
 (def success? (comp (partial = :success) status))
 (def active?  (comp #{:queued :initializing :running} status))
+(def blocked? (comp (partial = :blocked) status))
 
 (def as-serializable eb/job->event)
 (def job->event eb/job->event)
@@ -320,6 +321,6 @@
       (:memory job)
       2))
 
-(def blocked?
+(def should-block?
   "True if the block should be blocked"
   (comp true? :blocked))

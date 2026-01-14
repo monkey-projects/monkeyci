@@ -312,6 +312,7 @@
 (def job-unblocked
   (job-update (fn [job _]
                 ;; When a job is unblocked, it is immediately scheduled for execution
+                ;; Perhaps we should change the state her to unblocked for tracing purposes?
                 (assoc job :status :queued))))
 
 ;;; Event routing configuration
