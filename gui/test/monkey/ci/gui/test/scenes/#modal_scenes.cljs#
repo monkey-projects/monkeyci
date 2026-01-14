@@ -1,10 +1,9 @@
-(ns monkey.ci.gui.test.cards.modal-cards
-  (:require [devcards.core :refer-macros [defcard-rg]]
+(ns monkey.ci.gui.test.scenes.modal-scenes
+  (:require [portfolio.reagent-18 :refer-macros [defscene]]
             [monkey.ci.gui.modals :as sut]
-            [monkey.ci.gui.utils :as u]
-            [reagent.core]))
+            [monkey.ci.gui.utils :as u]))
 
-(defcard-rg simple-modal
+(defscene simple-modal
   "Simple modal dialog"
   (let [id :test-modal]
     [:div

@@ -1,13 +1,11 @@
-(ns monkey.ci.gui.test.cards.org-cards
-  (:require [devcards.core :refer-macros [defcard-rg]]
+(ns monkey.ci.gui.test.scenes.org-scenes
+  (:require [portfolio.reagent-18 :refer-macros [defscene]]
             [monkey.ci.gui.charts :as charts]
             [monkey.ci.gui.org.views :as sut]
             [monkey.ci.gui.org.views-stats :as stats]
-            [re-frame.core :as rf]
-            [re-frame.db :as rdb]
-            [reagent.core]))
+            [re-frame.core :as rf]))
 
-(defcard-rg build-stats
+(defscene build-stats
   "Organization build statistics"
   (let [config {:elapsed-seconds
                 [{:date 1729382400000, :seconds 0}

@@ -1,9 +1,7 @@
-(ns monkey.ci.gui.test.cards.table-cards
-  (:require [devcards.core :refer-macros [defcard-rg]]
+(ns monkey.ci.gui.test.scenes.table-scenes
+  (:require [portfolio.reagent-18 :refer-macros [defscene]]
             [monkey.ci.gui.table :as sut]
-            [reagent.core]
-            [re-frame.core :as rf]
-            [re-frame.db :as rdb]))
+            [re-frame.core :as rf]))
 
 (rf/reg-sub
  ::small-table
@@ -15,7 +13,7 @@
     {:name "Pieter Breughel"
      :profession "Painter"}]))
 
-(defcard-rg small-table
+(defscene small-table
   "Table with small number of items"
   (let [id ::small-table]
     [sut/paged-table {:id id
@@ -33,7 +31,7 @@
                 {:name (str "User " (inc n))
                  :number (inc n)})))))
 
-(defcard-rg large-table
+(defscene large-table
   "Table with large number of items"
   (let [id ::large-table]
     [sut/paged-table {:id id
@@ -47,7 +45,7 @@
  ::loading?
  (constantly true))
 
-(defcard-rg loading-table
+(defscene loading-table
   "Table that is still loading"
   (let [id ::loading-table]
     [sut/paged-table
@@ -60,7 +58,7 @@
                   {:label "Name"
                    :value :name}]}]))
 
-(defcard-rg long-table-cells
+(defscene long-table-cells
   "Table with cells that contain long value strings.  Should they be truncated or not?  Can they be truncated?"
   [sut/render-table
    [{:label "Name"
@@ -73,7 +71,7 @@
      :description "Short description"}]
    {}])
 
-(defcard-rg row-click
+(defscene row-click
   "Table with a row-click event handler"
   [sut/render-table
    [{:label "ID"
@@ -87,7 +85,7 @@
    {:class [:table-hover]
     :on-row-click #(js/alert (str "Row clicked:" %))}])
 
-(defcard-rg sorted-table
+(defscene sorted-table
   "Table with sorted column"
   [sut/render-table
    [{:label "Index"
@@ -109,7 +107,7 @@
                {:idx (inc idx)
                 :name (str "Item " (inc idx))})))))
 
-(defcard-rg sortable-table
+(defscene sortable-table
   "Table that allows the user to change sorting"
   [sut/paged-table
    {:id ::sortable-table

@@ -1,18 +1,16 @@
-(ns monkey.ci.gui.test.cards.repo-cards
-  (:require [devcards.core :refer-macros [defcard-rg]]
+(ns monkey.ci.gui.test.scenes.repo-scenes
+  (:require [portfolio.reagent-18 :refer-macros [defscene]]
             [monkey.ci.gui.repo.views :as sut]
-            [monkey.ci.gui.utils :as u]
-            [reagent.core]
-            [re-frame.db :as rdb]))
+            [monkey.ci.gui.utils :as u]))
 
-(defcard-rg labels
+(defscene labels
   "Simple labels component"
   [sut/labels [{:name "project"
                 :value "MonkeyCI"}
                {:name "kind"
                 :value "Application"}]])
 
-(defcard-rg confirm-delete-modal
+(defscene confirm-delete-modal
   "Delete confirmation dialog"
   [:div
    [sut/confirm-delete-modal
