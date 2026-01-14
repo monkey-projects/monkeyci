@@ -180,7 +180,8 @@
 (defn unblock-btn
   ([job unlocking?]
    [:button.btn.btn-primary
-    (cond-> {:title "Allow this job to continue execution."}
+    (cond-> {:title "Allow this job to continue execution."
+             :on-click (u/link-evt-handler [:job/unblock job])}
       unlocking? (assoc :disabled true))
     (if unlocking?
       [co/spinner-text "Continue"]
