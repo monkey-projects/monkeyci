@@ -16,7 +16,8 @@
    "%s.scripts"
    [:script/initializing :script/start :script/end]
    "%s.jobs"
-   [:job/pending :job/queued :job/initializing :job/start :job/end :job/skipped :job/executed]
+   [:job/pending :job/queued :job/initializing :job/start :job/end :job/skipped :job/executed
+    :job/blocked :job/unblocked]
    "%s.jobs.containers"
    [:container/pending :container/initializing :container/start :container/end :sidecar/start :sidecar/end]
    "%s.jobs.commands"

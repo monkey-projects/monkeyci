@@ -123,7 +123,8 @@
                      :running      [:text-info :play-circle]
                      :pending      [:text-warning :pause-circle]
                      :initializing [:text-warning :play-circle]
-                     :canceled     [:text-warning :x-circle]}
+                     :canceled     [:text-warning :x-circle]
+                     :blocked      [:text-warning :slash-circle]}
                     status
                     [:text-default :question-circle])]
     [:div (cond-> {:style {:font-size size}

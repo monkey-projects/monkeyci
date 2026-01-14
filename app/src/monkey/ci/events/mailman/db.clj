@@ -309,6 +309,11 @@
   (job-update (fn [job _]
                 (assoc job :status :blocked))))
 
+(def job-unblocked
+  (job-update (fn [job _]
+                ;; When a job is unblocked, it is immediately scheduled for execution
+                (assoc job :status :queued))))
+
 ;;; Event routing configuration
 
 (defn make-routes [storage bus]
@@ -382,4 +387,8 @@
 
      [:job/blocked
       [{:handler job-blocked
+        :interceptors job-int}]]
+
+     [:job/unblocked
+      [{:handler job-unblocked
         :interceptors job-int}]]]))
