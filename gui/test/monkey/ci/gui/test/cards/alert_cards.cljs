@@ -8,5 +8,5 @@
 (defcard-rg github-error
   "Github error alert"
   [c/render-alert
-   (sut/cust-github-repos-failed
+   (sut/org-github-repos-failed
     "no permission")])

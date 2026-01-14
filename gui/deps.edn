@@ -22,7 +22,7 @@
    :extra-deps {com.github.oliyh/martian-test {:mvn/version "0.2.1"}
                 lambdaisland/kaocha-cljs2 {:mvn/version "0.2.72"}
                 day8.re-frame/test {:mvn/version "0.1.7"}
-                devcards/devcards {:mvn/version "0.2.7"}
+                no.cjohansen/portfolio {:mvn/version "2025.11.2"}
                 com.monkeyprojects/shadow-junit-xml {:mvn/version "0.2.0"}}
    :override-deps {}}
 

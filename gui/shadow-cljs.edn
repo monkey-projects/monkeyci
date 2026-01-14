@@ -2,7 +2,8 @@
 {:deps {:aliases [:dev :test]}
  :dev-http {8080 ["target/js/frontend" "dev-resources/sites/public" "resources/public"]
             8081 ["target/js/frontend" "dev-resources/sites/admin" "resources/public"]
-            8002 ["dev-resources/devcards" "target/js/frontend" "resources/public"]
+            ;;8002 ["dev-resources/devcards" "target/js/frontend" "resources/public"]
+            8002 ["dev-resources/portfolio" "target/js/frontend" "resources/public" "classpath:public"]
             8003 ["target/js/test-shadow"]}
 
  :builds
@@ -51,13 +52,19 @@
    ;; Output as junit
    :main monkey.shadow.junit.runner/run-tests}
 
-  :cards
+  ;; :cards
+  ;; {:target :browser-test
+  ;;  :ns-regexp "-cards$" ;; Pick up all files that end with -cards
+  ;;  :test-dir "dev-resources/devcards"
+  ;;  :runner-ns monkey.ci.gui.test.cards
+  ;;  :compiler-options {:devcards true}
+  ;;  :js-options {:resolve {"devcards-marked"
+  ;;                         {:target :npm :require "marked"}
+  ;;                         "devcards-syntax-highlighter"
+  ;;                         {:target :npm :require "highlight.js"}}}}
+
+  :portfolio
   {:target :browser-test
-   :ns-regexp "-cards$" ;; Pick up all files that end with -cards
-   :test-dir "dev-resources/devcards"
-   :runner-ns monkey.ci.gui.test.cards
-   :compiler-options {:devcards true}
-   :js-options {:resolve {"devcards-marked"
-                          {:target :npm :require "marked"}
-                          "devcards-syntax-highlighter"
-                          {:target :npm :require "highlight.js"}}}}}}
+   :ns-regexp "-scenes$" ;; Pick up all files that end with -cards
+   :test-dir "dev-resources/portfolio"
+   :runner-ns monkey.ci.gui.test.scenes}}}

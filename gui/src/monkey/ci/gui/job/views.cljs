@@ -106,9 +106,12 @@
     ;; Display combined logs for all script lines in the job
     [co/log-viewer (map-indexed script-line @script-logs)]))
 
+(def has-logs? (comp  #{:running :success :failure :error :canceled} :status))
+
 (defn- log-tab [job]
-  {:header "Logs"
-   :contents [job-logs job]})
+  (when (has-logs? job)
+    {:header "Logs"
+     :contents [job-logs job]}))
 
 (defn- job-output [{:keys [output error]}]
   [co/log-viewer
@@ -174,17 +177,33 @@
     {:header "Artifacts"
      :contents [artifacts job]}))
 
-(defn- details-tabs
+(defn- unblock-btn [job]
+  [:button.btn.btn-primary
+   {:title "Allow this job to continue execution."}
+   [co/icon-text :play-fill "Continue"]])
+
+(defn details-tabs
   "Renders tabs to display the job details.  These tabs include logs and test results."
-  [job]
+  [{:keys [status] :as job}]
   (let [[f :as tabs] (->> [(output-tab job)
                            (error-trace job)
                            (test-results job)
                            (log-tab job)
                            (artifacts-tab job)]
                           (remove nil?))]
-    (if (empty? tabs)
+    (cond
+      (= :pending status)
+      [:p "The job is waiting until all conditions are met for execution."]
+
+      (= :blocked status)
+      [:<>
+       [:p "This job needs manual approval in order to continue."]
+       [unblock-btn job]]
+
+      (empty? tabs)
       [:p "No job details available.  You may want to try again later."]
+      
+      :else
       ;; Make first tab the active one
       ;; FIXME Doesn't work after refresh
       (conj [tabs/tabs e/details-tabs-id]

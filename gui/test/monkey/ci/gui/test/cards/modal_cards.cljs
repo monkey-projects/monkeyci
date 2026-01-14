@@ -1,6 +1,6 @@
 (ns monkey.ci.gui.test.cards.modal-cards
   (:require [devcards.core :refer-macros [defcard-rg]]
-            [monkey.ci.gui.components :as sut]
+            [monkey.ci.gui.modals :as sut]
             [monkey.ci.gui.utils :as u]
             [reagent.core]))
 

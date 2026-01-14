@@ -8,9 +8,6 @@
             ["highlight.js" :as hljs]
             ["marked" :as marked]))
 
-#_(defn marked-parse [x]
-  (.parse marked x))
-
 (defn export-symbols []
   ;; devcards uses global DevcardsSyntaxHighlighter and DevcardsMarked
   ;; ex. https://github.com/bhauman/devcards/blob/master/src/devcards/util/markdown.cljs#L28
@@ -20,10 +17,6 @@
 
 (export-symbols)
 
-#_(defn ^:dev/after-load reload []
-  (println "Exporting symbols again")
-  (export-symbols))
-
 (defn- renderer
   "Reworked the original devcards renderer for reagent 19"
   [root _]
@@ -32,15 +25,18 @@
    ;; FIXME Even though this renders, as soon as you click a link, it throws another error
    (react/createElement ds/DevcardsRoot)))
 
+(defonce root (atom nil))
+
 (defn ^:export init []
   ;; No longer works with reagent 19
   #_(dc/start-devcard-ui!)
   (ds/render-base-if-necessary!)
-  (let [root (rdc/create-root (ds/devcards-app-node))]
+  (let [r (reset! root (rdc/create-root (ds/devcards-app-node)))]
     (ds/start-ui-with-renderer
      dc/devcard-event-chan
-     (partial renderer root))
+     (partial renderer r))
     (dc/register-figwheel-listeners!)))
 
 (defn ^:dev/after-load reload []
-  (init))
+  (when @root
+    (.render @root)))
