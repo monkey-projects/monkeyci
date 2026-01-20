@@ -266,7 +266,11 @@
    (db/update-editing db dissoc :github-id)))
 
 (defn- parse-github-id [repo]
-  (mc/update-existing repo :github-id u/parse-int))
+  (letfn [(parse [id]
+            (when-not (empty? id)
+              (u/parse-int id)))]
+    (->> (mc/update-existing repo :github-id parse)
+         (mc/filter-vals some?))))
 
 (rf/reg-event-fx
  :repo/save
