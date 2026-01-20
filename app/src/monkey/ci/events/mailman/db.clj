@@ -310,6 +310,7 @@
                 (assoc job :status :blocked))))
 
 (def job-unblocked
+  ;; FIXME Should not allow unblocking a job when build has finished
   (job-update (fn [job _]
                 ;; When a job is unblocked, it is immediately scheduled for execution
                 ;; Perhaps we should change the state her to unblocked for tracing purposes?

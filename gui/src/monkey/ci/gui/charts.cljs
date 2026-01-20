@@ -74,8 +74,8 @@
         (fn [id config]
           ;; Put the config in the state, we'll need it after mount
           (swap! state assoc :config config)
-          ;; Render the component, chart js will fill it up after mount.  Make sure
-          ;; to populate the ref with the dom element.
+          ;; Render the component, chart js will fill it up after mount.
+          ;; Also populate the ref with the dom element, it's needed by chartjs.
           [:canvas {:id (str id) :ref co-ref}])
         :component-did-update
         (fn [this argv]

@@ -119,6 +119,7 @@
                :canceled :bg-warning
                :skipped :bg-warning
                :blocked :bg-warning
+               :queued  :bg-warning
                :bg-secondary)]
     [:span {:class (str "badge " (name type))} r]))
 
@@ -127,6 +128,7 @@
                      :error        [:text-danger :exclamation-circle]
                      :failure      [:text-danger :exclamation-circle]
                      :running      [:text-info :play-circle]
+                     :queued       [:text-warning :clock]
                      :pending      [:text-warning :pause-circle]
                      :initializing [:text-warning :play-circle]
                      :canceled     [:text-warning :x-circle]

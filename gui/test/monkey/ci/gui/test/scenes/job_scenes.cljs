@@ -22,6 +22,10 @@
   [sut/job-details
    {:status :blocked}])
 
+(defscene job-details-queued
+  [sut/job-details
+   {:status :queued}])
+
 (defscene job-tabs-blocked
   [sut/details-tabs
    {:status :blocked}])
