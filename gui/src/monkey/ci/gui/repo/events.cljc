@@ -263,10 +263,13 @@
 (rf/reg-event-db
  ::unwatch-github
  (fn [db _]
-   (db/update-editing db dissoc :github-id)))
+   (db/update-editing db assoc :github-id nil)))
 
 (defn- parse-github-id [repo]
-  (mc/update-existing repo :github-id u/parse-int))
+  (letfn [(parse [id]
+            (when-not (empty? id)
+              (u/parse-int id)))]
+    (mc/update-existing repo :github-id parse)))
 
 (rf/reg-event-fx
  :repo/save

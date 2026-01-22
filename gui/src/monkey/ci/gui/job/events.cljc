@@ -122,13 +122,15 @@
 (rf/reg-event-fx
  :job/unblock
  (fn [{:keys [db]} [_ job]]
-   {:dispatch [:secure-request
-               :unblock-job
-               (-> (select-keys job [:org-id :repo-id :build-id])
-                   (assoc :job-id (:id job)))
-               [:job/unblock--success]
-               [:job/unblock--failure]]
-    :db (db/set-unblocking db)}))
+   (let [sid (-> (r/current db)
+                 (r/path-params)
+                 (select-keys [:org-id :repo-id :build-id]))]
+     {:dispatch [:secure-request
+                 :unblock-job
+                 (assoc sid :job-id (:id job))
+                 [:job/unblock--success]
+                 [:job/unblock--failure]]
+      :db (db/set-unblocking db)})))
 
 (rf/reg-event-db
  :job/unblock--success

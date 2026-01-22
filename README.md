@@ -117,7 +117,7 @@ site here](https://app.monkeyci.com).
 ### Contribution guidelines ###
 
 * All code must be written in [TDD fashion](https://en.wikipedia.org/wiki/Test-driven_development).
-* Allo code must reviewed by at least two other coworkers, assuming there are coworkers.
+* All code must reviewed by at least two other coworkers, assuming there are coworkers.
 
 ### Who do I talk to? ###
 
@@ -127,7 +127,7 @@ site here](https://app.monkeyci.com).
 
 [GPL v3](LICENSE)
 
-Copyright (c) 2023-2025 by Monkey Projects BV
+Copyright (c) 2023-2026 by Monkey Projects BV
 
 [https://www.monkey-projects.be](https://www.monkey-projects.be)
 

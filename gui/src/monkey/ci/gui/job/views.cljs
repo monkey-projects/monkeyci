@@ -203,6 +203,9 @@
       (= :pending status)
       [:p "The job is waiting until all conditions are met for execution."]
 
+      (= :queued status)
+      [:p "The job is waiting to be picked up by a runner."]
+
       (= :blocked status)
       [:<>
        [:p "This job needs manual approval in order to continue."]

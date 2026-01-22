@@ -122,7 +122,7 @@
 
 (defn blocked
   "Gets or sets job blocked status.  A blocked job will be marked as `blocked` once it
-   is eligible for execution.  An explicity action is required to unblock it."
+   is eligible for execution.  An explicit unblock action is required to execute it."
   [job]
   (assoc job :blocked true))
 

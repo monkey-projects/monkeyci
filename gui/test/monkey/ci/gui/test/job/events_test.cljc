@@ -208,13 +208,18 @@
   (rft/run-test-sync
    (h/initialize-martian {:unblock-job {:error-code :no-error
                                         :body {}}})
+   (is (some? (swap! app-db (fn [db]
+                              (r/set-current db {:parameters
+                                                 {:path
+                                                  {:org-id "test-org"}}})))))
    (let [c (h/catch-fx :martian.re-frame/request)]
      (is (nil? (rf/dispatch [:job/unblock {:id "test-job"}])))
 
      (testing "invokes unblock endpoint"
        (is (= 1 (count @c)))
        (is (= :unblock-job (-> @c first (nth 2))))
-       (is (= {:job-id "test-job"}
+       (is (= {:job-id "test-job"
+               :org-id "test-org"}
               (-> @c first (nth 3)))
            "passes job sid as params"))
 
