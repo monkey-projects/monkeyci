@@ -19,7 +19,7 @@
    :url s/Str
    (s/optional-key :main-branch) s/Str
    (s/optional-key :public) s/Bool
-   (s/optional-key :github-id) s/Int
+   (s/optional-key :github-id) (s/maybe s/Int)
    (s/optional-key :labels) [Label]})
 
 (s/defschema UpdateRepo

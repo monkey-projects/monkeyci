@@ -462,13 +462,13 @@
        (testing "clears alerts"
          (is (empty? (db/edit-alerts @app-db))))
 
-       (testing "does not pass empty github id"
+       (testing "pass empty github id as `nil`"
          (swap! app-db #(db/set-editing % {:name "updated repo name"
                                            :github-id ""}))
 
          (is (not-empty (r/path-params (r/current @app-db))))
          (rf/dispatch [:repo/save])
-         (is (not (contains? (-> @c last (nth 3) :repo) :github-id)))))
+         (is (nil? (-> @c last (nth 3) :repo :github-id)))))
 
      (testing "new repo"
        (swap! app-db #(-> %
