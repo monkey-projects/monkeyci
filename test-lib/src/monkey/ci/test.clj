@@ -6,7 +6,9 @@
              [api :as a]
              [build :as b]
              [jobs :as j]]
-            [monkey.ci.build.api :as ba]
+            [monkey.ci.build
+             [api :as ba]
+             [core :as bc]]
             [monkey.ci.protocols :as p]))
 
 (defn with-build-params* [params f]
@@ -130,3 +132,11 @@
    `monkey.ci.api/main-branch`."
   [ctx b]
   (assoc-in ctx [:build :git :main-branch] b))
+
+(def action-job?
+  "Checks if the argument is an action job"
+  bc/action-job?)
+
+(def container-job?
+  "Checks if the argument is a container job"
+  bc/container-job?)
