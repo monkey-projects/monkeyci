@@ -1,5 +1,5 @@
 (ns monkey.ci.spec.events
-  "Spec definitions for events"
+  "Spec definitions for events.  All events sent (and received) should match `::event`."
   (:require [clojure.set :as set]
             [clojure.spec.alpha :as s]
             [monkey.ci.spec

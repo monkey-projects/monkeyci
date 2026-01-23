@@ -84,6 +84,7 @@
 (s/def ::token (s/with-gen
                  string?
                  #(sg/fixed-string token-size)))
+(s/def ::port (s/and int? pos?))
 
 (s/def :mailing/subject string?)
 (s/def :mailing/text-body string?)

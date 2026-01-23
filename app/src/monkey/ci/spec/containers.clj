@@ -9,7 +9,7 @@
 (s/def ::job-id c/id?)
 (s/def ::loki-url ::c/url)
 
-(s/def ::token string?)
+(s/def ::token ::c/token)
 (s/def ::image-url string?)
 (s/def ::image-tag string?)
 
