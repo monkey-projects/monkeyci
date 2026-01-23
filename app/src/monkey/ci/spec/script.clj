@@ -1,4 +1,5 @@
 (ns monkey.ci.spec.script
+  "Specs used by scripts"
   (:require [clojure.spec.alpha :as s]
             [manifold.deferred :as md]
             [monkey.ci.protocols :as p]
