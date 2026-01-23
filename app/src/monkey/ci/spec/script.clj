@@ -5,8 +5,8 @@
             [monkey.ci.protocols :as p]
             [monkey.ci.spec
              [build-api :as ba]
-             [common :as c]
-             [job :as j]]))
+             [common :as c]]
+            [monkey.ci.spec.job.common :as jc]))
 
 (s/def ::api ::ba/api)
 (s/def ::build map?) ; TODO specify
@@ -27,7 +27,7 @@
 
 (s/def :context/api ::ba/client)
 
-(s/def ::arch ::j/arch)
+(s/def ::arch ::jc/arch)
 (s/def ::archs (s/coll-of ::arch))
 
 (s/def ::context
