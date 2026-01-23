@@ -31,30 +31,12 @@
 (s/def ::output string?)
 (s/def ::runner map?)
 (s/def ::blocked boolean?)
-
-(s/def ::status
-  (s/keys :req-un [::lifecycle ::runner]
-          :opt-un [::result ::output]))
-
-(s/def ::common-spec
-  (s/keys :opt-un [::type ::save-artifacts ::restore-artifacts ::caches ::blocked ::dependencies]))
-
-(defmulti job-spec :type)
+(s/def ::credit-multiplier int?)
 
 (s/def ::action fn?)
 
-(defmethod job-spec :action [_]
-  (-> (s/keys :req-un [::action])
-      (s/merge ::common-spec)))
-
 (s/def ::image string?)
-
-(defmethod job-spec :container [_]
-  (-> (s/keys :req-un [::image])
-      (s/merge ::common-spec)))
-
-(s/def ::spec (s/multi-spec job-spec :type))
-
-(s/def ::job
-  (s/keys :req-un [::id ::spec]
-          :opt-un [::status]))
+(s/def ::size int?)
+(s/def ::arch #{:arm :amd})
+(s/def ::command string?)
+(s/def ::script (s/coll-of ::command))

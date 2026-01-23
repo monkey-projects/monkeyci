@@ -4,11 +4,12 @@
             [monkey.ci.protocols :as p]
             [monkey.ci.spec
              [build-api :as ba]
-             [common :as c]]))
+             [common :as c]
+             [job :as j]]))
 
 (s/def ::api ::ba/api)
 (s/def ::build map?) ; TODO specify
-(s/def ::job map?) ; TODO specify
+(s/def ::job map?) ; TODO Refer to job
 (s/def ::filter (s/coll-of string?))
 (s/def ::result md/deferred?)
 
@@ -25,7 +26,7 @@
 
 (s/def :context/api ::ba/client)
 
-(s/def ::arch #{:arm :amd})
+(s/def ::arch ::j/arch)
 (s/def ::archs (s/coll-of ::arch))
 
 (s/def ::context
