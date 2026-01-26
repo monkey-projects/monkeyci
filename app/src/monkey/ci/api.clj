@@ -25,7 +25,8 @@
   bc/action-job?)
 
 ;; Job return values
-(def success "Indicates the job was successful"
+(def success
+  "Job result that indicates the job was successful"
   bc/success)
 
 (def failure
@@ -278,3 +279,18 @@
 (def manual?
   "Alias for `api-trigger?`"
   api-trigger?)
+
+(defmulti job-result
+  "Retrieves the result of the job, if it has finished"
+  bc/job-schema)
+
+(defmethod job-result :v1 [job]
+  (:result job))
+
+(defmethod job-result :v2 [job]
+  (get-in job [:status :result]))
+
+(defn get-job
+  "Retrieves job by id in the current build"
+  [ctx id]
+  ((get-in ctx [:api :jobs]) id))

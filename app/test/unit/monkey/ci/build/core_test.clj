@@ -162,3 +162,14 @@
 (deftest trigger-src
   (testing "returns build source"
     (is (= :api (sut/trigger-src {:build {:source :api}})))))
+
+(deftest job-schema
+  (testing "extracts v1 schema"
+    (is (= :v1 (sut/job-schema {:schema :v1}))))
+
+  (testing "extracts v2 schema"
+    (is (= :v2 (sut/job-schema {:schema :v2}))))
+
+  (testing "v1 by default for legacy purposes"
+    (is (= :v1 (sut/job-schema {})))))
+

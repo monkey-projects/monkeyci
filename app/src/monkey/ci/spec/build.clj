@@ -46,10 +46,10 @@
 (s/def :job/blocked boolean?)
 
 (s/def :script/job
-  (-> (s/keys :req-un [:job/id]
-              :opt-un [:job/type :job/dependencies :job/caches :job/save-artifacts :job/restore-artifacts
-                       :job/script :job/memory :job/cpus :job/size :job/arch :job/status ::c/timeout
-                       :job/credit-multiplier :job/blocked])))
+  (s/keys :req-un [:job/id]
+          :opt-un [:job/type :job/dependencies :job/caches :job/save-artifacts :job/restore-artifacts
+                   :job/script :job/memory :job/cpus :job/size :job/arch :job/status ::c/timeout
+                   :job/credit-multiplier :job/blocked]))
 
 (s/def :script/jobs (s/coll-of :script/job))
 

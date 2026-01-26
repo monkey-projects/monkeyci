@@ -54,8 +54,10 @@
 
 (defn- get-job-from-state
   "Gets current job from the jobs stored in the state"
-  [ctx]
-  (get (get-jobs ctx) (get-in ctx [:event :job-id])))
+  ([ctx id]
+   (get (get-jobs ctx) id))
+  ([ctx]
+   (get-job-from-state ctx (get-in ctx [:event :job-id]))))
 
 (defn set-initial-job-ctx [ctx job-ctx]
   (emi/update-state ctx assoc ::initial-job-ctx job-ctx))
@@ -137,7 +139,8 @@
   {:name ::add-job-ctx
    :enter (fn [ctx]
             (let [jc (-> (get-job-ctx ctx)
-                         (assoc :job (get-job-from-state ctx)))]
+                         (assoc :job (get-job-from-state ctx))
+                         (assoc-in [:api :jobs] (partial get-job-from-state ctx)))]
               (emi/set-job-ctx ctx jc)))})
 
 (def with-job-ctx

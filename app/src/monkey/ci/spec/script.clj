@@ -1,14 +1,17 @@
 (ns monkey.ci.spec.script
+  "Specs used by scripts"
   (:require [clojure.spec.alpha :as s]
             [manifold.deferred :as md]
             [monkey.ci.protocols :as p]
             [monkey.ci.spec
              [build-api :as ba]
-             [common :as c]]))
+             [common :as c]
+             [job :as j]]
+            [monkey.ci.spec.job.common :as jc]))
 
 (s/def ::api ::ba/api)
 (s/def ::build map?) ; TODO specify
-(s/def ::job map?) ; TODO specify
+(s/def ::job ::j/job)
 (s/def ::filter (s/coll-of string?))
 (s/def ::result md/deferred?)
 
@@ -25,9 +28,10 @@
 
 (s/def :context/api ::ba/client)
 
-(s/def ::arch #{:arm :amd})
+(s/def ::arch ::jc/arch)
 (s/def ::archs (s/coll-of ::arch))
 
+;; Script context, passed to jobs
 (s/def ::context
   (s/keys :req-un [::build :context/api]
           :opt-un [::job ::archs]))

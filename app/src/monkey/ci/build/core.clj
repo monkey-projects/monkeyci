@@ -5,10 +5,9 @@
    application that executes the script.
 
    This namespace provides low-level functions.  For more user-friendly functionality,
-   check out the `monkey.ci.build.v2` namespace."
+   check out the `monkey.ci.api` namespace."
   (:require [clojure.spec.alpha :as s]
-            [medley.core :as mc]
-            [monkey.ci.build.spec]))
+            [medley.core :as mc]))
 
 (defn status [v]
   {:status v})
@@ -175,3 +174,8 @@
 (def trigger-src
   "Returns build trigger source (api, github-app, etc..."
   (comp :source :build))
+
+(defn job-schema
+  "Determines schema version of this job"
+  [job]
+  (or (:schema job) :v1))
