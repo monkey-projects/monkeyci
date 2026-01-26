@@ -5,12 +5,13 @@
             [monkey.ci.protocols :as p]
             [monkey.ci.spec
              [build-api :as ba]
-             [common :as c]]
+             [common :as c]
+             [job :as j]]
             [monkey.ci.spec.job.common :as jc]))
 
 (s/def ::api ::ba/api)
 (s/def ::build map?) ; TODO specify
-(s/def ::job map?) ; TODO Refer to job
+(s/def ::job ::j/job)
 (s/def ::filter (s/coll-of string?))
 (s/def ::result md/deferred?)
 
@@ -30,6 +31,7 @@
 (s/def ::arch ::jc/arch)
 (s/def ::archs (s/coll-of ::arch))
 
+;; Script context, passed to jobs
 (s/def ::context
   (s/keys :req-un [::build :context/api]
           :opt-un [::job ::archs]))

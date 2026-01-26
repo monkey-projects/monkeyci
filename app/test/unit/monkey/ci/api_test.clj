@@ -308,3 +308,21 @@
     (is (= "/test/dir" (sut/checkout-dir
                         {:build
                          {:checkout-dir "/test/dir"}})))))
+
+(deftest job-result
+  (testing "from v1"
+    (is (= ::test-result
+           (sut/job-result {:result ::test-result}))))
+
+  (testing "from v2"
+    (is (= ::test-result
+           (sut/job-result {:schema :v2
+                            :status {:result ::test-result}})))))
+
+(deftest get-job
+  (testing "retrieves other job by id via api"
+    (is (= ::test-job
+           (->  {:api
+                 {:jobs (fn [id]
+                          (when (= "test-id") ::test-job))}}
+                (sut/get-job "test-id"))))))

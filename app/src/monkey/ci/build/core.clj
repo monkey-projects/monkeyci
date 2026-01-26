@@ -174,3 +174,8 @@
 (def trigger-src
   "Returns build trigger source (api, github-app, etc..."
   (comp :source :build))
+
+(defn job-schema
+  "Determines schema version of this job"
+  [job]
+  (or (:schema job) :v1))
