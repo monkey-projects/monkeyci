@@ -20,6 +20,7 @@
              [api :as api]
              [auth :as auth]
              [bitbucket :as bitbucket]
+             [codeberg :as codeberg]
              [common :as c]
              [github :as github]
              [http :as wh]
@@ -463,6 +464,20 @@
      {:get
       {:handler bitbucket/get-config}}]]])
 
+(def codeberg-routes
+  ["/codeberg"
+   [["/login"
+     {:post
+      {:handler codeberg/login
+       :parameters {:query {:code s/Str}}}}]
+    ["/refresh"
+     {:post
+      {:handler codeberg/refresh
+       :parameters {:body {:refresh-token s/Str}}}}]
+    ["/config"
+     {:get
+      {:handler codeberg/get-config}}]]])
+
 (def auth-routes
   ["/auth/jwks" {:get
                  {:handler auth/jwks
@@ -554,6 +569,7 @@
    org-routes
    github-routes
    bitbucket-routes
+   codeberg-routes
    auth-routes
    user-routes
    email-registration-routes

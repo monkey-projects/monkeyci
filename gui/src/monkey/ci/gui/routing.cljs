@@ -81,9 +81,13 @@
     ["/o/:org-id/r/:repo-id/b/:build-id" :page/build]
     ["/o/:org-id/r/:repo-id/b/:build-id/j/:job-id" :page/job]
     ["/u/:user-id" :page/user]
+    ["/email/unsubscribe" :page/unsubscribe-email]
+    ;; TODO Moved to oauth2 endpoint, remove these
     ["/github/callback" :page/github-callback]
     ["/bitbucket/callback" :page/bitbucket-callback]
-    ["/email/unsubscribe" :page/unsubscribe-email]]))
+    ["/oauth2/codeberg/callback" :page/codeberg-callback]
+    ["/oauth2/github/callback" :page/github-callback]
+    ["/oauth2/bitbucket/callback" :page/bitbucket-callback]]))
 
 (defonce admin-router
   (f/router

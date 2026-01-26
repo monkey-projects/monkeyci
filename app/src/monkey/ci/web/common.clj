@@ -7,12 +7,15 @@
              [labels :as lbl]
              [storage :as st]
              [time :as t]
-             [utils :as u]]
+             [utils :as u]
+             [version :as v]]
             [monkey.ci.common.schemas :as schemas]
             [muuntaja.core :as mc]
             [reitit.ring :as ring]
             [ring.util.response :as rur]
             [schema.core :as s]))
+
+(def user-agent (str "MonkeyCI:" (v/version)))
 
 (def not-empty-str schemas/not-empty-str)
 (def Id not-empty-str)
