@@ -83,8 +83,8 @@
     ["/u/:user-id" :page/user]
     ["/email/unsubscribe" :page/unsubscribe-email]
     ;; TODO Moved to oauth2 endpoint, remove these
-    ["/github/callback" :page/github-callback]
-    ["/bitbucket/callback" :page/bitbucket-callback]
+    ["/github/callback" :page/github-callback-old]
+    ["/bitbucket/callback" :page/bitbucket-callback-old]
     ["/oauth2/codeberg/callback" :page/codeberg-callback]
     ["/oauth2/github/callback" :page/github-callback]
     ["/oauth2/bitbucket/callback" :page/bitbucket-callback]]))
@@ -108,7 +108,11 @@
 
 (def public?
   "Route names that are publicly accessible"
-  #{:page/login :page/github-callback :page/bitbucket-callback :page/unsubscribe-email})
+  #{:page/login
+    :page/github-callback :page/github-callback-old
+    :page/bitbucket-callback :page/bitbucket-callback-old
+    :page/codeberg-callback
+    :page/unsubscribe-email})
 
 (defn on-route-change [match _]
   (log/debug "Route changed:" match)

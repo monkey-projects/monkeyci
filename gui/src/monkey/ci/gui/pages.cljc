@@ -23,6 +23,9 @@
    :page/login login/page
    :page/github-callback login/github-callback
    :page/bitbucket-callback login/bitbucket-callback
+   :page/codeberg-callback login/codeberg-callback
+   :page/github-callback-old login/github-callback
+   :page/bitbucket-callback-old login/bitbucket-callback
    :page/org org/page
    :page/org-api-keys api-keys/org-page
    :page/org-settings org/page-edit

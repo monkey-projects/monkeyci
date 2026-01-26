@@ -1,6 +1,7 @@
 (ns monkey.ci.web.oauth2
   "OAuth2 flow support handlers"
   (:require [aleph.http :as http]
+            [clojure.tools.logging :as log]
             [manifold.deferred :as md]
             [medley.core :as mc]
             [monkey.ci.storage :as s]
@@ -55,28 +56,31 @@
 
 (defn- request-access-token
   "Requests access token using oidc flow"
-  [url client-id client-secret opts]
+  [url client-id client-secret set-params opts]
   (let [qp (merge {:client_id client-id
                    :client_secret client-secret}
                   opts)]
     (-> (http/post url
-                   {:query-params qp
-                    :headers {"Accept" "application/json"
-                              "User-Agent" c/user-agent}
-                    :throw-exceptions false})
+                   (-> {:headers {"Accept" "application/json"
+                                  "User-Agent" c/user-agent}
+                        :throw-exceptions false}
+                       (set-params qp)))
         (md/chain c/parse-body)
         deref)))
 
-(defn- request-new-token [{:keys [get-creds request-token-url]} req]
+(defn- request-new-token [{:keys [get-creds request-token-url set-params]} req]
   (let [code (get-in req [:parameters :query :code])
         {:keys [client-id client-secret]} (get-creds req)]
-    (request-access-token request-token-url client-id client-secret {:code code})))
+    (log/debug "Requesting new token from" request-token-url)
+    (request-access-token request-token-url client-id client-secret set-params
+                          {:code code})))
 
 (defn- request-user-info
   "Fetch user details in order to get the id and email (although
    the latter is not strictly necessary).  We need the id in order to
    link the external user to the MonkeyCI user."
   [{:keys [user-info-url convert-user]} token]
+  (log/debug "Requesting user info from" user-info-url "using access token" token)
   (-> (http/get user-info-url
                 {:headers {"Accept" "application/json"
                            "Authorization" (str "Bearer " token)
@@ -96,14 +100,15 @@
    (partial request-new-token conf)
    (partial request-user-info conf)))
 
-(defn- refresh-token
+(defn refresh-token
   "Refreshes a token using the refresh token"
-  [{:keys [get-creds request-token-url]} req]
+  [{:keys [get-creds request-token-url set-params]} req]
   (let [{:keys [client-secret client-id]} (get-creds req)
         refresh-token (get-in req [:parameters :body :refresh-token])]
     (request-access-token request-token-url
                           client-id
                           client-secret
+                          set-params
                           {:grant_type "refresh_token"
                            :refresh_token refresh-token})))
 

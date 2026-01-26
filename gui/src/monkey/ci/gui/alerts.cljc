@@ -260,3 +260,12 @@
 
 (def job-unblock-failed
   (error-msg "Failed to continue job"))
+
+(def codeberg-login-failed
+  (error-msg "Unable to fetch Codeberg user token"))
+
+(def codeberg-load-config-failed
+  (error-msg "Unable to load Codeberg login config"))
+
+(def codeberg-load-user-failed
+  (error-msg "Unable to load Codeberg user details"))

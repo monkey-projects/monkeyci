@@ -308,6 +308,147 @@
       (is (= :danger (-> a first :type)))
       (is (string? (-> a first :message))))))
 
+(deftest load-codeberg-config
+  (testing "sends request to backend to fetch config"
+    (rf-test/run-test-sync
+      (let [c (h/catch-fx :martian.re-frame/request)]
+        (h/initialize-martian {:get-codeberg-config {:status 200
+                                                     :body "ok"
+                                                     :error-code :no-error}})
+        (rf/dispatch [:login/load-codeberg-config])
+        (is (= 1 (count @c)))))))
+
+(deftest load-codeberg-config--success
+  (testing "sets codeberg config in db"
+    (rf/dispatch-sync [:login/load-codeberg-config--success {:body ::test-config}])
+    (is (= ::test-config (db/codeberg-config @app-db)))))
+
+(deftest codeberg-code-received
+  (testing "sends exchange request to backend"
+    (rf-test/run-test-sync
+     (let [c (h/catch-fx :martian.re-frame/request)]
+       (h/initialize-martian {:codeberg-login {:status 200
+                                               :body "ok"
+                                               :error-code :no-error}})
+       (rf/dispatch [:login/codeberg-code-received "test-code"])
+       (is (= 1 (count @c))))))
+
+  (testing "clears alerts in db"
+    (is (map? (reset! app-db (db/set-alerts {} [{:type :info}]))))
+    (rf/dispatch-sync [:login/codeberg-code-received "test-code"])
+    (is (empty? (db/alerts @app-db))))
+
+  (testing "clears user in db"
+    (is (map? (reset! app-db (db/set-user {} ::test-user))))
+    (rf/dispatch-sync [:login/codeberg-code-received "test-code"])
+    (is (nil? (db/user @app-db)))))
+
+(deftest codeberg-login--success
+  ;; Safety
+  (h/catch-fx :http-xhrio)
+  
+  (testing "sets user in db"
+    (rf/dispatch-sync [:login/codeberg-login--success {:body {:id ::test-user}}])
+    (is (= {:id ::test-user} (db/user @app-db))))
+
+  (testing "sets token in db"
+    (rf/dispatch-sync [:login/codeberg-login--success {:body {:token "test-token"}}])
+    (is (= "test-token" (db/token @app-db))))
+
+  (testing "sets codeberg token in db"
+    (rf/dispatch-sync [:login/codeberg-login--success {:body {:codeberg-token "test-token"}}])
+    (is (= "test-token" (db/codeberg-token @app-db))))
+
+  (testing "fetches codeberg user details"
+    (let [e (h/catch-fx :http-xhrio)]
+      (rf/dispatch-sync [:login/codeberg-login--success {:body {:token "test-token"
+                                                                :codeberg-token "codeberg-token"}}])
+      (is (= 1 (count @e)))
+      (is (= {:method :get
+              :uri "https://codeberg.org/login/oauth/userinfo"}
+             (select-keys (first @e) [:method :uri])))))
+
+  (testing "saves tokens to local storage"
+    (let [e (h/catch-fx :local-storage)]
+      (rf/dispatch-sync [:login/codeberg-login--success {:body {:token "test-token"
+                                                                :codeberg-token "test-codeberg"}}])
+      (is (= [["login-tokens" {:token "test-token"
+                               :codeberg-token "test-codeberg"}]]
+             @e)))))
+
+(deftest codeberg-login--failed
+  (testing "sets error alert"
+    (rf/dispatch-sync [:login/codeberg-login--failed {:message "test error"}])
+    (is (= :danger (-> (db/alerts @app-db)
+                       (first)
+                       :type)))))
+
+(deftest codeberg-load-user--success
+  ;; Failsafe
+  (h/catch-fx :route/goto)
+
+  (testing "sets codeberg user in db"
+    (rf/dispatch-sync [:codeberg/load-user--success ::codeberg-user])
+    (is (= ::codeberg-user (db/codeberg-user @app-db))))
+  
+  (testing "redirects to root page if multiple orgs"
+    (rf-test/run-test-sync
+     (let [c (h/catch-fx :route/goto)]
+       (reset! app-db (db/set-user {} {:orgs ["org-1" "org-2"]}))
+       (rf/dispatch [:codeberg/load-user--success {}])
+       (is (= "/" (first @c))))))
+
+  (testing "redirects to org page if only one org"
+    (rf-test/run-test-sync
+     (let [c (h/catch-fx :route/goto)]
+       (reset! app-db (db/set-user {} {:orgs ["test-org"]}))
+       (rf/dispatch [:codeberg/load-user--success {}])
+       (is (= "/o/test-org" (first @c))))))
+
+  (testing "redirects to redirect page if set"
+    (rf-test/run-test-sync
+     (rf/reg-cofx
+      :local-storage
+      (fn [cofx]
+        (assoc cofx :local-storage {:redirect-to "/o/test-org"})))
+     (let [c (h/catch-fx :route/goto)]
+       (rf/dispatch [:codeberg/load-user--success {}])
+       (is (= "/o/test-org" (first @c))))))
+
+  (testing "ignores redirect page if `/`"
+    (rf-test/run-test-sync
+     (rf/reg-cofx
+      :local-storage
+      (fn [cofx]
+        (assoc cofx :local-storage {:redirect-to "/"})))
+     (let [c (h/catch-fx :route/goto)]
+       (reset! app-db (db/set-user {} {:orgs ["test-org"]}))
+       (rf/dispatch [:codeberg/load-user--success {}])
+       (is (= "/o/test-org" (first @c)))))))
+
+(deftest codeberg-load-user--failed
+  (testing "sets error alert"
+    (rf/dispatch-sync [:codeberg/load-user--failed {:response "test error"}])
+    (let [a (db/alerts @app-db)]
+      (is (= :danger (-> a first :type)))
+      (is (string? (-> a first :message)))))
+
+  (testing "on 401 error, refreshes token and retries"
+    (rf-test/run-test-sync
+     (rf/reg-cofx
+      :local-storage
+      (fn [cofx]
+        (assoc cofx :local-storage {:refresh-token "test-refresh-token"})))
+     (let [c (h/catch-fx :martian.re-frame/request)]
+       (h/initialize-martian {:codeberg-refresh {:status 200
+                                                 :body {:codeberg-token "codeberg-token"}
+                                                 :error-code :no-error}})
+       (is (some? (swap! app-db db/set-provider-auth {:provider :codeberg})))
+       (rf/dispatch [:codeberg/load-user--failed {:status 401}])
+       (is (= 1 (count @c)) "expected refresh token request")
+       (is (= :codeberg-refresh (-> @c first (nth 2))))
+       (is (= [:codeberg/load-user] (-> @c first (nth 4) second)))))))
+
 (deftest login-sign-off
   (h/catch-fx :route/goto)
   

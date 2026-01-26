@@ -166,7 +166,9 @@
   {:get-creds github-config
    :request-token-url "https://github.com/login/oauth/access_token"
    :user-info-url "https://api.github.com/user"
-   :convert-user ->oauth-user})
+   :convert-user ->oauth-user
+   :set-params (fn [req params]
+                 (assoc req :query-params params))})
 
 (def login (oauth2/oidc-login oidc-config))
 (def refresh (oauth2/oidc-refresh oidc-config))

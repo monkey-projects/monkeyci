@@ -8,6 +8,7 @@
 (u/db-sub :login/token db/token)
 (u/db-sub :login/github-client-id (comp :client-id db/github-config))
 (u/db-sub :login/bitbucket-client-id (comp :client-id db/bitbucket-config))
+(u/db-sub :login/codeberg-client-id (comp :client-id db/codeberg-config))
 
 (defn- add-github-user [u db]
   (let [gu (db/github-user db)]

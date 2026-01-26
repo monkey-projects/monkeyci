@@ -1369,20 +1369,21 @@
 (deftest codeberg-endpoints
   (testing "`/codeberg`"
     (testing "`POST /login` requests token from codeberg and fetches user info"
-      (at/with-fake-http [{:url "https://codeberg.com/login/oauth/access_token"
+      (at/with-fake-http [{:url "https://codeberg.org/login/oauth/access_token"
                            :request-method :post}
                           (fn [req]
-                            (if (= {:client_id "test-client-id"
-                                    :client_secret "test-secret"
-                                    :code "1234"}
-                                   (:query-params req))
+                            (if (= {:client-id "test-client-id"
+                                    :client-secret "test-secret"
+                                    :code "1234"
+                                    :grant-type "authorization_code"}
+                                   (h/parse-json (:body req)))
                               {:status 200
                                :body (h/to-raw-json {:access_token "test-token"})
                                :headers {"Content-Type" "application/json"}}
                               {:status 400
                                :body (str "invalid query params:" (:query-params req))
                                :headers ["Content-Type" "text/plain"]}))
-                          {:url "https://codeberg.com/login/oauth/userinfo"
+                          {:url "https://codeberg.org/login/oauth/userinfo"
                            :request-method :get}
                           (fn [req]
                             (let [auth (get-in req [:headers "Authorization"])]
@@ -1396,7 +1397,7 @@
                                  :body (str "invalid auth header: " auth)
                                  :headers {"Content-Type" "text/plain"}})))]
         (let [app (-> (test-rt {:config {:codeberg {:client-id "test-client-id"
-                                                  :client-secret "test-secret"}}
+                                                    :client-secret "test-secret"}}
                                 :jwk (auth/keypair->rt (auth/generate-keypair))})
                       (sut/make-app))
               r (-> (mock/request :post "/codeberg/login?code=1234")
@@ -1417,12 +1418,12 @@
         (is (= "test-client-id" (some-> r :body slurp h/parse-json :client-id)))))
 
     (testing "`POST /refresh` refreshes access token"
-      (at/with-fake-http ["https://codeberg.com/login/oauth/access_token"
+      (at/with-fake-http ["https://codeberg.org/login/oauth/access_token"
                           {:status 200
                            :headers {"Content-Type" "application/json"}
                            :body (h/to-json {:access-token "new-token"
                                              :refresh-token "new-refresh"})}
-                          "https://codeberg.com/login/oauth/userinfo"
+                          "https://codeberg.org/login/oauth/userinfo"
                           {:status 200
                            :headers {"Content-Type" "application/json"}}]
         (let [app (-> (test-rt {:config {:codeberg {:client-id "test-client-id"

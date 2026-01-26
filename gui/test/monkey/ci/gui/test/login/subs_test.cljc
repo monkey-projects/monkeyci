@@ -82,25 +82,14 @@
       (is (map? (reset! app-db (db/set-token {} "test-token"))))
       (is (= "test-token" @s)))))
 
-(deftest github-client-id
-  (let [s (rf/subscribe [:login/github-client-id])]
-    (testing "exists"
-      (is (some? s)))
+(deftest codeberg-client-id
+  (h/verify-sub [:login/codeberg-client-id] #(db/set-codeberg-config % {:client-id "test-id"}) "test-id" nil))
 
-    (testing "returns client-id from db"
-      (is (nil? @s))
-      (is (map? (reset! app-db (db/set-github-config {} {:client-id "test-github-client-id"}))))
-      (is (= "test-github-client-id" @s)))))
+(deftest github-client-id
+  (h/verify-sub [:login/github-client-id] #(db/set-github-config % {:client-id "test-id"}) "test-id" nil))
 
 (deftest bitbucket-client-id
-  (let [s (rf/subscribe [:login/bitbucket-client-id])]
-    (testing "exists"
-      (is (some? s)))
-
-    (testing "returns client-id from db"
-      (is (nil? @s))
-      (is (map? (reset! app-db (db/set-bitbucket-config {} {:client-id "test-bitbucket-client-id"}))))
-      (is (= "test-bitbucket-client-id" @s)))))
+  (h/verify-sub [:login/bitbucket-client-id] #(db/set-bitbucket-config % {:client-id "test-id"}) "test-id" nil))
 
 (deftest github-user?
   (h/verify-sub [:login/github-user?]
