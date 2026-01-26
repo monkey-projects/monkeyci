@@ -1,4 +1,5 @@
 (ns monkey.ci.spec.common
+  "Common specs, used by other spec definitions"
   (:require [clojure.spec.alpha :as s]
             [clojure.spec.gen.alpha :as gen]
             [java-time.api :as jt]
@@ -83,6 +84,7 @@
 (s/def ::token (s/with-gen
                  string?
                  #(sg/fixed-string token-size)))
+(s/def ::port (s/and int? pos?))
 
 (s/def :mailing/subject string?)
 (s/def :mailing/text-body string?)

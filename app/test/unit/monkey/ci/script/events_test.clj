@@ -11,6 +11,7 @@
             [monkey.ci.events.mailman :as em]
             [monkey.ci.events.mailman.interceptors :as emi]
             [monkey.ci
+             [api :as api]
              [cuid :as cuid]
              [extensions :as ext]
              [jobs :as j]
@@ -102,9 +103,10 @@
 (deftest add-job-ctx
   (let [{:keys [enter] :as i} sut/add-job-ctx
         job (h/gen-job)
+        other-job (h/gen-job)
         ctx (-> {:event {:job-id (:id job)}}
                 (sut/set-initial-job-ctx {::key ::value})
-                (sut/set-jobs (jobs->map [job]))
+                (sut/set-jobs (jobs->map [job other-job]))
                 (enter)
                 (emi/get-job-ctx))]
     (is (keyword? (:name i)))
@@ -113,7 +115,10 @@
       (is (= ::value (::key ctx))))    
     
     (testing "adds job to job context"
-      (is (= job (:job ctx))))))
+      (is (= job (:job ctx))))
+
+    (testing "adds jobs fn that allows retrieving other jobs from state"
+      (is (= other-job (api/get-job ctx (:id other-job)))))))
 
 (deftest with-job-ctx
   (let [{:keys [leave] :as i} sut/with-job-ctx]
