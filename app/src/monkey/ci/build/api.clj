@@ -21,7 +21,7 @@
 
 (def api-middleware
   (conj mw/default-middleware
-        mw/wrap-exceptions))
+        mw/handle-error-status))
 
 (defn api-request
   "Sends a request to the api at configured url"

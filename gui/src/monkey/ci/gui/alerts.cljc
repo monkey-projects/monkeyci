@@ -17,7 +17,6 @@
   "Renders an alerts component with given id."
   [id]
   (let [s (rf/subscribe id)]
-    ;; TODO Allow user to close notifications
     (when (not-empty @s)
       (->> @s
            (map render-alert)
