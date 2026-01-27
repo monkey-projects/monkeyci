@@ -1104,7 +1104,7 @@
                   l (-> (mock/request :get (build-path sid))
                         (app))]
               (is (= 404 (:status l)))
-              (is (nil? (:body l))))))
+              (is (string? (:error (h/reply->json l)))))))
 
         (testing "`POST /retry` re-triggers build"
           (is (= 202 (-> (mock/request :post (str (build-path sid) "/retry"))

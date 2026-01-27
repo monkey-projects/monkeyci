@@ -70,6 +70,9 @@
   ([error-msg]
    (error-response error-msg 400)))
 
+(defn not-found-response [msg]
+  (error-response msg 404))
+
 ;; Reitit rewrites records in the data to hashmaps, so wrap it in a type
 (deftype RuntimeWrapper [runtime])
 
