@@ -365,7 +365,7 @@
                                                                 :codeberg-token "codeberg-token"}}])
       (is (= 1 (count @e)))
       (is (= {:method :get
-              :uri "https://codeberg.org/login/oauth/userinfo"}
+              :uri "https://codeberg.org/api/v1/user"}
              (select-keys (first @e) [:method :uri])))))
 
   (testing "saves tokens to local storage"

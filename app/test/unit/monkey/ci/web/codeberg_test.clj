@@ -21,15 +21,15 @@
                        {:status 200
                         :body (h/to-json {:access-token "test-token"})
                         :headers {"Content-Type" "application/json"}}
-                       {:url "https://codeberg.org/login/oauth/userinfo"
+                       {:url "https://codeberg.org/api/v1/user"
                         :request-method :get}
                        {:status 200
                         :body (h/to-json u)
                         :headers {"Content-Type" "application/json"}}]
      (f u)))
   ([f]
-   (with-codeberg-user {:name "test user"
-                        :sub (int (* (cm/random) 10000))}
+   (with-codeberg-user {:login "test user"
+                        :id (int (* (cm/random) 10000))}
      f)))
 
 (deftest login
@@ -68,7 +68,7 @@
       (fn [u]
         (let [{st :storage :as rt} (trt/test-runtime)
               _ (st/save-user st {:type "codeberg"
-                                  :type-id (:sub u)
+                                  :type-id (:id u)
                                   :orgs ["test-org"]})
               req (-> rt
                       (h/->req)
@@ -94,7 +94,7 @@
                  (-> req
                      (sut/login)
                      :status)))
-          (let [c (st/find-user-by-type st [:codeberg (:sub u)])]
+          (let [c (st/find-user-by-type st [:codeberg (:id u)])]
             (is (some? c))
             (is (cuid/cuid? (:id c)) "user should have a cuid"))))))
 
@@ -116,7 +116,7 @@
                         :body
                         :token)]
           (is (string? token))
-          (is (= (str "codeberg/" (:sub u))
+          (is (= (str "codeberg/" (:id u))
                  (-> token
                      (jwt/unsign pubkey {:alg :rs256})
                      :sub)))))))

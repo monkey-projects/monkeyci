@@ -23,21 +23,41 @@
                 :name (:display-name bu)
                 :avatar-url (get-in bu [:links :avatar :href])))))
 
+(defn- add-codeberg-user [u db]
+  (let [cu (db/codeberg-user db)]
+    (cond-> u
+      cu (assoc :codeberg cu
+                :name (:login cu)
+                :avatar-url (:avatar-url cu)))))
+
 (rf/reg-sub
  :login/user
  (fn [db _]
    (-> (db/user db)
        (add-github-user db)
-       (add-bitbucket-user db))))
+       (add-bitbucket-user db)
+       (add-codeberg-user db))))
+
+(rf/reg-sub
+ ::user-of-type?
+ :<- [:login/user]
+ (fn [u [_ t]]
+   (some? (t u))))
 
 (rf/reg-sub
  :login/github-user?
- :<- [:login/user]
+ :<- [::user-of-type? :github]
  (fn [u _]
-   (some? (:github u))))
+   u))
 
 (rf/reg-sub
  :login/bitbucket-user?
- :<- [:login/user]
+ :<- [::user-of-type? :bitbucket]
  (fn [u _]
-   (some? (:bitbucket u))))
+   u))
+
+(rf/reg-sub
+ :login/codeberg-user?
+ :<- [::user-of-type? :codeberg]
+ (fn [u _]
+   u))

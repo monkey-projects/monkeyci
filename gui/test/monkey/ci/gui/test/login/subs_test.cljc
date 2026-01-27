@@ -60,7 +60,14 @@
                                                             :links {:avatar {:href "http://test-avatar"}}})))))
       (is (= {:name "bitbucket user"
               :avatar-url "http://test-avatar"}
-             (select-keys @s [:name :avatar-url]))))))
+             (select-keys @s [:name :avatar-url]))))
+
+    (testing "adds codeberg user details"
+      (is (some? (reset! app-db (-> {}
+                                    (db/set-user {:id "test-user"})
+                                    (db/set-codeberg-user {:login "codeberg user"})))))
+      (is (= "codeberg user" (-> @s :codeberg :login)))
+      (is (= "codeberg user" (-> @s :name))))))
 
 (deftest alerts
   (let [s (rf/subscribe [:login/alerts])]
@@ -100,5 +107,11 @@
 (deftest bitbucket-user?
   (h/verify-sub [:login/bitbucket-user?]
                 #(db/set-user % {:bitbucket ::test-bitbucket-user})
+                true
+                false))
+
+(deftest codeberg-user?
+  (h/verify-sub [:login/codeberg-user?]
+                #(db/set-user % {:codeberg ::test-codeberg-user})
                 true
                 false))

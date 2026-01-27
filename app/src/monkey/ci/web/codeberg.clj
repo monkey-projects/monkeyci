@@ -14,14 +14,13 @@
   [req]
   (c/from-rt req (comp :codeberg :config)))
 
-(defn- ->oauth-user [{:keys [sub email] :as u}]
-  (log/debug "Converting codeberg user:" u)
+(defn- ->oauth-user [{:keys [id email] :as u}]
   {:email email
-   :sid [:codeberg sub]})
+   :sid [:codeberg id]})
 
 (def oidc-config {:convert-user ->oauth-user
                   :request-token-url "https://codeberg.org/login/oauth/access_token"
-                  :user-info-url "https://codeberg.org/login/oauth/userinfo"
+                  :user-info-url "https://codeberg.org/api/v1/user"
                   :get-creds codeberg-config
                   :set-params (fn [req p]
                                 ;; Codeberg expects data in the body, not query params like github

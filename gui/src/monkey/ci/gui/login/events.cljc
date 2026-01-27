@@ -250,7 +250,7 @@
                           (codeberg/api-request
                            db
                            {:method :get
-                            :path "/login/oauth/userinfo"
+                            :path "/api/v1/user"
                             :token codeberg-token
                             :on-success [:codeberg/load-user--success]
                             :on-failure [:codeberg/load-user--failed]}))))
