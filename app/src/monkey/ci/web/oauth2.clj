@@ -21,14 +21,14 @@
 (defn- fetch-or-create-user
   "Given the oauth user info, finds the matching user in the database, or creates
    a new one."
-  [{:keys [sid] :as auth-user} req]
+  [{:keys [sid email] :as auth-user} req]
   (let [st (c/req->storage req)]
     (-> (or (s/find-user-by-type st sid)
             (let [u {:id (s/new-id)
                      :type (first sid)
                      :type-id (second sid)
                      ;; Keep track of email for reporting purposes
-                     :email (:email auth-user)}]
+                     :email email}]
               (s/save-user st u)
               u))
         (assoc (keyword (str (name (first sid)) "-token")) (:token auth-user)))))

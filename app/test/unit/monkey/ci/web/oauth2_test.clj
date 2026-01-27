@@ -38,6 +38,7 @@
                  (as-> r (sut/refresh-token
                           {:get-creds (constantly {:client-id "test-client-id"
                                                    :client-secret "test-client-secret"})
-                           :request-token-url "https://test.com/login/oauth/access_token"}
+                           :request-token-url "https://test.com/login/oauth/access_token"
+                           :set-params (fn [r _] r)}
                           r))
                  :body))))))

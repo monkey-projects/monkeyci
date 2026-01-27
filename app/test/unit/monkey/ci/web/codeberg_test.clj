@@ -16,12 +16,12 @@
 (defn- with-codeberg-user
   "Sets up fake http communication with codeberg to return the given user"
   ([u f]
-   (af/with-fake-http [{:url "https://codeberg.com/login/oauth/access_token"
+   (af/with-fake-http [{:url "https://codeberg.org/login/oauth/access_token"
                         :request-method :post}
                        {:status 200
                         :body (h/to-json {:access-token "test-token"})
                         :headers {"Content-Type" "application/json"}}
-                       {:url "https://codeberg.com/login/oauth/userinfo"
+                       {:url "https://codeberg.org/login/oauth/userinfo"
                         :request-method :get}
                        {:status 200
                         :body (h/to-json u)
@@ -29,12 +29,12 @@
      (f u)))
   ([f]
    (with-codeberg-user {:name "test user"
-                        :id (int (* (cm/random) 10000))}
+                        :sub (int (* (cm/random) 10000))}
      f)))
 
 (deftest login
   (testing "when exchange fails at codeberg, returns body and 400 status code"
-    (af/with-fake-http ["https://codeberg.com/login/oauth/access_token"
+    (af/with-fake-http ["https://codeberg.org/login/oauth/access_token"
                         {:status 401
                          :body (h/to-json {:message "invalid access code"})
                          :headers {"Content-Type" "application/json"}}]
@@ -68,7 +68,7 @@
       (fn [u]
         (let [{st :storage :as rt} (trt/test-runtime)
               _ (st/save-user st {:type "codeberg"
-                                  :type-id (:id u)
+                                  :type-id (:sub u)
                                   :orgs ["test-org"]})
               req (-> rt
                       (h/->req)
@@ -94,7 +94,7 @@
                  (-> req
                      (sut/login)
                      :status)))
-          (let [c (st/find-user-by-type st [:codeberg (:id u)])]
+          (let [c (st/find-user-by-type st [:codeberg (:sub u)])]
             (is (some? c))
             (is (cuid/cuid? (:id c)) "user should have a cuid"))))))
 
@@ -116,7 +116,7 @@
                         :body
                         :token)]
           (is (string? token))
-          (is (= (str "codeberg/" (:id u))
+          (is (= (str "codeberg/" (:sub u))
                  (-> token
                      (jwt/unsign pubkey {:alg :rs256})
                      :sub)))))))
