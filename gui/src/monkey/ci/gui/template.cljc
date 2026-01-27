@@ -30,7 +30,7 @@
    [:div.d-flex.border-bottom.gap-2
     [:div.mt-2 [:a {:href "/"} (logo config)]]
     [:div.flex-grow-1
-     [:h1.display-4 "MonkeyCI"]
+     [:h1.display-4.text-primary-dark "MonkeyCI"]
      [:p.lead.text-primary "Unleashing full power to build your code!"]]
     [:div.d-flex.flex-column.align-items-end
      (when user-info

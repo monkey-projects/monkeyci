@@ -292,7 +292,7 @@
    (db/set-alerts db [(a/codeberg-login-failed err)])))
 
 (rf/reg-event-fx
- :login/sign-off
+ :login/log-off
  (fn [{:keys [db]} _]
    {:db (-> db
             (db/set-user nil)

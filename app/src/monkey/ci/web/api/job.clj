@@ -22,4 +22,4 @@
     (fn [_]
       (let [sid (req->job-sid req)]
         (-> (rur/status 202)
-            (wr/add-event (eb/job-unblocked-evt (last sid) (drop-last sid))))))))
+            (wr/add-event (eb/job-unblocked-evt (last sid) (butlast sid))))))))

@@ -30,8 +30,8 @@
         [user-avatar @u]]
        [:p (:name @u) 
         " | "
-        [:a {:href "" :on-click (u/link-evt-handler [:login/sign-off])}
-         "sign off"]]])))
+        [:a {:href "" :on-click (u/link-evt-handler [:login/log-off])}
+         "log off"]]])))
 
 (defn icon [n]
   [:i {:class (str "bi bi-" (name n))}])

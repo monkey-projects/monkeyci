@@ -1159,7 +1159,8 @@
 
 (deftest job-endpoints
   (h/with-memory-store st
-    (let [repo (h/gen-repo)
+    (let [repo {:id (cuid/random-cuid)
+                :name "test repo"}
           org (-> (h/gen-org)
                   (assoc :repos {(:id repo) repo}))
           build (-> (h/gen-build)
