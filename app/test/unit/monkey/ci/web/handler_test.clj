@@ -1383,7 +1383,7 @@
                               {:status 400
                                :body (str "invalid query params:" (:query-params req))
                                :headers ["Content-Type" "text/plain"]}))
-                          {:url "https://codeberg.org/login/oauth/userinfo"
+                          {:url "https://codeberg.org/api/v1/user"
                            :request-method :get}
                           (fn [req]
                             (let [auth (get-in req [:headers "Authorization"])]
@@ -1423,7 +1423,7 @@
                            :headers {"Content-Type" "application/json"}
                            :body (h/to-json {:access-token "new-token"
                                              :refresh-token "new-refresh"})}
-                          "https://codeberg.org/login/oauth/userinfo"
+                          "https://codeberg.org/api/v1/user"
                           {:status 200
                            :headers {"Content-Type" "application/json"}}]
         (let [app (-> (test-rt {:config {:codeberg {:client-id "test-client-id"

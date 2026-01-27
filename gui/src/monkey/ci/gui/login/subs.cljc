@@ -27,7 +27,7 @@
   (let [cu (db/codeberg-user db)]
     (cond-> u
       cu (assoc :codeberg cu
-                :name (:login cu)
+                :name (or (:full-name cu) (:login cu))
                 :avatar-url (:avatar-url cu)))))
 
 (rf/reg-sub
