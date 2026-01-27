@@ -5,9 +5,9 @@
 
 (defn render-alert [{:keys [type message]}]
   [:div.d-flex
-   {:class (str "alert alert-dismissable alert-" (name type))
+   {:class (str "alert alert-dismissible fade show alert-" (name type))
     :role :alert}
-   message
+   [:span message]
    [:button.btn-close.ms-auto
     {:type :button
      :data-bs-dismiss :alert
