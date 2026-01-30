@@ -64,7 +64,7 @@
        (nil? @bitbucket-client-id)])))
 
 (defn login-form []
-  [:div.d-flex.flex-wrap.gap-2
+  [:div.d-flex.flex-wrap.gap-2.flex-column
    [github-btn]
    [bitbucket-btn]
    [codeberg-btn]])
