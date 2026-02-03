@@ -103,8 +103,15 @@
 (defn- job-logs [job]
   (rf/dispatch [:job/load-log-files job])
   (let [script-logs (rf/subscribe [:job/script-with-logs])]
-    ;; Display combined logs for all script lines in the job
-    [co/log-viewer (map-indexed script-line @script-logs)]))
+    [:<>
+     [:div.form-check
+      [:input#wrap-logs.form-check-input
+       {:type :checkbox
+        :on-change (u/form-evt-handler [:job/wrap-logs-changed] u/evt->checked)
+        :checked @(rf/subscribe [::s/wrap-logs?])}]
+      [:label.form-check-label {:for :wrap-logs} "Wrap long lines"]]
+     ;; Display combined logs for all script lines in the job
+     [co/log-viewer (map-indexed script-line @script-logs)]]))
 
 (def has-logs? (comp  #{:running :success :failure :error :canceled} :status))
 

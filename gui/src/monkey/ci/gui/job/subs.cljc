@@ -88,3 +88,4 @@
             (map-indexed ->out))))))
 
 (u/db-sub ::unblocking? db/unblocking?)
+(u/db-sub ::wrap-logs? db/wrap-logs?)

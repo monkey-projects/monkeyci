@@ -71,3 +71,9 @@
 
 (defn reset-unblocking [db]
   (dissoc db ::unblocking))
+
+(defn wrap-logs? [db]
+  (true? (::wrap-logs db)))
+
+(defn set-wrap-logs [db v]
+  (assoc db ::wrap-logs v))

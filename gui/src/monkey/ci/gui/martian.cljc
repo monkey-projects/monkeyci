@@ -471,6 +471,23 @@
     {:route-name :get-bitbucket-config
      :path-parts ["/bitbucket/config"]})])
 
+(def codeberg-routes
+  [(public-route
+    {:route-name :codeberg-login
+     :method :post
+     :path-parts ["/codeberg/login"]
+     :query-schema {:code s/Str}})
+
+   (public-route
+    {:route-name :codeberg-refresh
+     :method :post
+     :path-parts ["/codeberg/refresh"]
+     :body-schema {:refresh {:refresh-token s/Str}}})
+
+   (public-route
+    {:route-name :get-codeberg-config
+     :path-parts ["/codeberg/config"]})])
+
 (def reaper-routes
   [(api-route
     {:route-name :admin-reaper
@@ -564,24 +581,25 @@
 
 (def routes
   (concat
-   org-routes
-   repo-routes
+   bitbucket-routes
    build-routes
-   params-routes
-   ssh-keys-routes
+   codeberg-routes
    credit-routes
+   general-routes
+   github-routes
+   invoicing-routes
+   job-routes
+   log-routes
+   login-routes
+   mailing-routes
+   org-routes
+   params-routes
+   reaper-routes
+   repo-routes
+   ssh-keys-routes
    token-routes
    user-routes
-   webhook-routes
-   log-routes
-   github-routes
-   bitbucket-routes
-   reaper-routes
-   mailing-routes
-   general-routes
-   login-routes
-   invoicing-routes
-   job-routes))
+   webhook-routes))
 
 ;; The api url.  This should be configured in a `config.js`.
 (def url #?(:clj "http://localhost:3000"
@@ -634,7 +652,8 @@
  (fn [{:keys [db]} [_ refresh-token orig-evt]]
    (let [req (case (ldb/provider db)
                :github :github-refresh
-               :bitbucket :bitbucket-refresh)]
+               :bitbucket :bitbucket-refresh
+               :codeberg :codeberg-refresh)]
      (log/debug "Attempting to refresh using token" refresh-token)
      {:dispatch [:martian.re-frame/request
                  req

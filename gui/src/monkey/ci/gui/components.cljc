@@ -194,15 +194,16 @@
 (defn colored [s color]
   (str "\033[" color "m" s "\033[0m"))
 
-(defn log-viewer [contents]
-  (into [:div.bg-dark.text-white.font-monospace.overflow-auto.text-nowrap.p-1
-         {:style {:min-height "20em"}}]
+(defn log-viewer [contents & [opts]]
+  (into [:div.bg-dark.text-white.font-monospace.overflow-auto.p-1
+         (cond-> {:style {:min-height "20em"}}
+           (not (:wrap? opts)) (assoc :class "text-nowrap"))]
         contents))
 
-(defn log-contents [raw]
-  (->> raw
-       (map ->html)
-       (log-viewer)))
+(defn log-contents [raw & [opts]]
+  (-> raw
+      (as-> h (map ->html h))
+      (log-viewer opts)))
 
 (defn build-elapsed [b]
   (let [e (u/build-elapsed b)]

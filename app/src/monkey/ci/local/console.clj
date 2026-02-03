@@ -88,7 +88,7 @@
 (defn- render-jobs [i jobs]
   (let [w (->> jobs
                (map (comp count j/job-id))
-               (apply max))
+               (reduce max 0))
         perc 0.5
         inv-speed 20 ; Inverse speed, the lower, the faster the animation runs
         s (if i (- (mod (float (/ i inv-speed)) (+ 1 perc)) perc) 0)]

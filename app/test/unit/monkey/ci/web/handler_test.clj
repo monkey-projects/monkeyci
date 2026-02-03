@@ -1366,6 +1366,78 @@
         (is (= 200 (:status r)))
         (is (= "test-client-id" (some-> r :body slurp h/parse-json :client-id)))))))
 
+(deftest codeberg-endpoints
+  (testing "`/codeberg`"
+    (testing "`POST /login` requests token from codeberg and fetches user info"
+      (at/with-fake-http [{:url "https://codeberg.org/login/oauth/access_token"
+                           :request-method :post}
+                          (fn [req]
+                            (if (= {:client-id "test-client-id"
+                                    :client-secret "test-secret"
+                                    :code "1234"
+                                    :grant-type "authorization_code"}
+                                   (h/parse-json (:body req)))
+                              {:status 200
+                               :body (h/to-raw-json {:access_token "test-token"})
+                               :headers {"Content-Type" "application/json"}}
+                              {:status 400
+                               :body (str "invalid query params:" (:query-params req))
+                               :headers ["Content-Type" "text/plain"]}))
+                          {:url "https://codeberg.org/api/v1/user"
+                           :request-method :get}
+                          (fn [req]
+                            (let [auth (get-in req [:headers "Authorization"])]
+                              (if (= "Bearer test-token" auth)
+                                {:status 200
+                                 :body (h/to-raw-json {:id 4567
+                                                       :name "test-user"
+                                                       :other-key "other-value"})
+                                 :headers {"Content-Type" "application/json"}}
+                                {:status 400
+                                 :body (str "invalid auth header: " auth)
+                                 :headers {"Content-Type" "text/plain"}})))]
+        (let [app (-> (test-rt {:config {:codeberg {:client-id "test-client-id"
+                                                    :client-secret "test-secret"}}
+                                :jwk (auth/keypair->rt (auth/generate-keypair))})
+                      (sut/make-app))
+              r (-> (mock/request :post "/codeberg/login?code=1234")
+                    (app))]
+          (is (= 200 (:status r)) (:body r))
+          (is (= "test-token"
+                 (some-> (:body r)
+                         (slurp)
+                         (h/parse-json)
+                         :codeberg-token))))))
+
+    (testing "`GET /config` returns client id"
+      (let [app (-> (test-rt {:config {:codeberg {:client-id "test-client-id"}}})
+                    (sut/make-app))
+            r (-> (mock/request :get "/codeberg/config")
+                  (app))]
+        (is (= 200 (:status r)))
+        (is (= "test-client-id" (some-> r :body slurp h/parse-json :client-id)))))
+
+    (testing "`POST /refresh` refreshes access token"
+      (at/with-fake-http ["https://codeberg.org/login/oauth/access_token"
+                          {:status 200
+                           :headers {"Content-Type" "application/json"}
+                           :body (h/to-json {:access-token "new-token"
+                                             :refresh-token "new-refresh"})}
+                          "https://codeberg.org/api/v1/user"
+                          {:status 200
+                           :headers {"Content-Type" "application/json"}}]
+        (let [app (-> (test-rt {:config {:codeberg {:client-id "test-client-id"
+                                                  :client-secret "test-secret"}}})
+                      (sut/make-app))
+              r (-> (h/json-request :post "/codeberg/refresh"
+                                    {:refresh-token "old-token"})
+                    (app))]
+          (is (= 200 (:status r)))
+          (is (= "new-token"
+                 (-> r
+                     (h/reply->json)
+                     :codeberg-token))))))))
+
 (deftest routing-middleware
   (testing "converts json bodies to kebab-case"
     (let [app (ring/ring-handler

@@ -244,3 +244,8 @@
     (is (= [:danger]
            (->> (db/get-alerts @app-db)
                 (map :type))))))
+
+(deftest job-wrap-logs-changed
+  (testing "toggles job wrap logs flag"
+    (rf/dispatch-sync [:job/wrap-logs-changed true])
+    (is (true? (db/wrap-logs? @app-db)))))

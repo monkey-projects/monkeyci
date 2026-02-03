@@ -194,3 +194,6 @@
 
 (deftest unblocking?
   (h/verify-sub [::sut/unblocking?] db/set-unblocking true false))
+
+(deftest wrap-logs?
+  (h/verify-sub [::sut/wrap-logs?] #(db/set-wrap-logs % true) true false))

@@ -144,3 +144,8 @@
    (-> db
        (db/reset-unblocking)
        (db/set-alerts [(a/job-unblock-failed err)]))))
+
+(rf/reg-event-db
+ :job/wrap-logs-changed
+ (fn [db [_ v]]
+   (db/set-wrap-logs db v)))
