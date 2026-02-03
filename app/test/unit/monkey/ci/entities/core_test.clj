@@ -269,7 +269,7 @@
                {:name "test org"})
           user (sut/insert-user
                 conn
-                {:type "github"
+                {:type :github
                  :type-id "1234"
                  :email "test@monkeyci.com"})]
       (testing "can insert"

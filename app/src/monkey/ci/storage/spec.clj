@@ -219,7 +219,7 @@
 
 (s/def ::job-event
   (s/keys :req-un [::org-id ::repo-id ::build-id ::job-id
-                   :job-evt/time ::event]
+                   ::time ::event]
           :opt-un [:job-evt/details]))
 
 (s/def ::user-token
@@ -233,7 +233,7 @@
       (s/merge ::common)))
 
 (s/def ::mailing
-  (-> (s/keys :req-un [::mailing/subject ::mailing/creation-time]
+  (-> (s/keys :req-un [::mailing/subject ::creation-time]
               :opt-un [::mailing/text-body ::mailing/html-body])
       (s/merge ::common)))
 

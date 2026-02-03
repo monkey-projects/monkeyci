@@ -112,7 +112,7 @@
     (let [org (-> (h/gen-org)
                   (assoc :name "test org"))
           user {:id (cuid/random-cuid)
-                :type "github"
+                :type :github
                 :type-id "12342"}
           _ (st/save-user s user)
           res (st/init-org s {:org org
