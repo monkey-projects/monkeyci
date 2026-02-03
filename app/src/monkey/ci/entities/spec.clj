@@ -8,7 +8,8 @@
              [build]
              [common :as c]
              [gen :as sg]
-             [label :as lbl]]))
+             [label :as lbl]
+             [ssh :as ssh]]))
 
 (def id? int?)
 (def ts? int?)
@@ -74,7 +75,7 @@
       (s/merge ::common)))
 
 (s/def ::ssh-key
-  (s/keys :req-un [::org-id :ssh/private-key :ssh/public-key ::description]))
+  (s/keys :req-un [::org-id ::ssh/private-key ::ssh/public-key ::description]))
 
 (s/def ::label-filter
   (s/keys :req-un [::lbl/label ::lbl/value]))

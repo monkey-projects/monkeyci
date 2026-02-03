@@ -207,6 +207,11 @@
 (s/def ::runner-details
   (s/keys :req-un [::runner :runner/details]))
 
+;; TODO Remove this, unused
+(s/def ::queued-task
+  (-> (s/keys :req-un [::creation-time :queued-task/task])
+      (s/merge ::common)))
+
 (s/def ::job-id string?)
 (s/def ::time c/ts?)
 (s/def ::event ::evt/type)

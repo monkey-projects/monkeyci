@@ -151,24 +151,27 @@
   [art]
   (update art :path (comp str #(or % ".") fs/parent)))
 
-(defn save-artifacts
-  "Configures the artifacts to save on a job."
-  [job & arts]
-  (try-unwrap job update :save-artifacts concat (flatten arts)))
+(defn- get-or-update-list-prop [p]
+  (fn [job & xs]
+    (if (empty? xs)
+      (try-unwrap job p)
+      (try-unwrap job update p concat (flatten xs)))))
 
-(defn restore-artifacts
+(def save-artifacts
+  "Configures the artifacts to save on a job."
+  (get-or-update-list-prop :save-artifacts))
+
+(def restore-artifacts
   "Configures the artifacts to restore on a job."
-  [job & arts]
-  (try-unwrap job update :restore-artifacts concat (flatten arts)))
+  (get-or-update-list-prop :restore-artifacts))
 
 (def cache
   "Defines a cache with given id an path, that can be passed to `caches`"
   artifact)
 
-(defn caches
+(def caches
   "Configures the caches a job uses."
-  [job & arts]
-  (try-unwrap job update :caches concat (flatten arts)))
+  (get-or-update-list-prop :caches))
 
 (defn- file-test [tester]
   (fn test-fn
