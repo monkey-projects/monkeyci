@@ -4,11 +4,10 @@
             [medley.core :as mc]
             [monkey.ci.entities
              [core :as ec]
-             [repo :as er]]
+             [repo :as er]
+             [spec :as es]]
             [monkey.ci.labels :as lbl]
-            [monkey.ci.spec
-             [db-entities]
-             [entities]]
+            [monkey.ci.storage.spec :as ss]
             [monkey.ci.storage.sql.common :as sc]))
 
 (defn repo->db
@@ -72,9 +71,9 @@
   (er/repo-for-build-sid conn org-id repo-id))
 
 (defn upsert-repo [conn repo org-id]
-  (spec/valid? :entity/repo repo)
+  (spec/valid? ::ss/repo repo)
   (let [re (repo->db repo org-id)]
-    (spec/valid? :db/repo re)
+    (spec/valid? ::es/repo re)
     (if-let [existing (ec/select-repo conn [:and
                                             (ec/by-org org-id)
                                             (ec/by-display-id (:id repo))])]

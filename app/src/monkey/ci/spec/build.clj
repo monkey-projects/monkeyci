@@ -1,6 +1,5 @@
 (ns monkey.ci.spec.build
-  "Spec definitions for build.  The build object in the runtime and events that contain
-   builds, scripts or jobs should conform to these specs."
+  "Common spec definitions for builds.  These are used by domain-specific specs for build objects."
   (:require [clojure.spec.alpha :as s]
             [clojure.spec.gen.alpha :as gen]
             [monkey.ci.spec.common :as c]))

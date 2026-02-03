@@ -62,6 +62,8 @@
 (defn job-id [x]
   (or (:id x) (:job/id (meta x))))
 
+(def job-type :type)
+
 (defn as-job
   "Marks fn `f` as a job"
   [f]

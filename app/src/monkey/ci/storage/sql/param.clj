@@ -7,7 +7,7 @@
             [monkey.ci.entities
              [core :as ec]
              [param :as eparam]]
-            [monkey.ci.spec.entities]
+            [monkey.ci.storage.spec :as ss]
             [monkey.ci.storage.sql.common :as sc]))
 
 (defn- insert-param-values [conn values param-id]
@@ -46,7 +46,7 @@
     (delete-param-values conn (:delete r))))
 
 (defn- upsert-param [conn param org-id]
-  (spec/valid? :entity/org-params param)
+  (spec/valid? ::ss/org-params param)
   (if-let [existing (ec/select-org-param conn (ec/by-cuid (:id param)))]
     (update-param conn param org-id existing)
     (insert-param conn param org-id)))

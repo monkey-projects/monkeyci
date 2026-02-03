@@ -3,6 +3,7 @@
             [monkey.ci.entities
              [core :as ec]
              [webhook :as ewh]]
+            [monkey.ci.storage.spec :as ss]
             [monkey.ci.storage.sql
              [common :as sc]
              [repo :as sr]]))
@@ -21,7 +22,7 @@
   (ec/update-webhook conn (merge existing (webhook->db wh repo-id))))
 
 (defn upsert-webhook [conn wh]
-  (spec/valid? :entity/webhook wh)
+  (spec/valid? ::ss/webhook wh)
   (if-let [repo-id (sr/select-repo-id-by-sid conn [(:org-id wh) (:repo-id wh)])]
     (if-let [existing (ec/select-webhook conn (ec/by-cuid (:id wh)))]
       (update-webhook conn wh existing repo-id)

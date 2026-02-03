@@ -6,10 +6,9 @@
              [utils :as u]]
             [monkey.ci.entities
              [core :as ec]
-             [org :as ecu]]
-            [monkey.ci.spec
-             [db-entities]
-             [entities]]
+             [org :as ecu]
+             [spec :as es]]
+            [monkey.ci.storage.spec :as ss]
             [monkey.ci.storage.sql
              [common :as sc]
              [repo :as sr]]))
@@ -38,14 +37,14 @@
 
 (defn- update-org [conn org existing]
   (let [ce (org->db org)]
-    (spec/valid? :db/org ce)
+    (spec/valid? ::es/org ce)
     (when (not= ce existing)
       (ec/update-org conn (merge existing ce)))
     (sr/upsert-repos conn org (:id existing))
     org))
 
 (defn upsert-org [conn org]
-  (spec/valid? :entity/org org)
+  (spec/valid? ::ss/org org)
   (if-let [existing (ec/select-org conn (ec/by-cuid (:id org)))]
     (update-org conn org existing)
     (insert-org conn org)))

@@ -106,7 +106,8 @@ activated or not (see the [deps.edn](builder/deps.edn) file).
 #### Building ####
 
 *MonkeyCI* is self-building since quite some time, [check out the application
-site here](https://app.monkeyci.com).
+site here](https://app.monkeyci.com).  You can find the [MonkeyCI builds
+here](https://app.monkeyci.com/o/monkey-projects/r/monkeyci).
 
 ### More Details ###
 

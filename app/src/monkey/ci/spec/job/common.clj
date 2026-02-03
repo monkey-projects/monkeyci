@@ -40,3 +40,4 @@
 (s/def ::arch #{:arm :amd})
 (s/def ::command string?)
 (s/def ::script (s/coll-of ::command))
+(s/def ::env (s/map-of string? string?))
