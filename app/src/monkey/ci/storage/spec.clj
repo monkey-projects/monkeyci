@@ -7,8 +7,11 @@
              [common :as c]
              [events :as evt]
              [gen :as sg]
+             [invoice :as inv]
              [label :as lbl]
-             [ssh :as ssh]]))
+             [mailing :as mailing]
+             [ssh :as ssh]
+             [user :as user]]))
 
 (s/def ::id ::c/cuid)
 (s/def :display/id string?)
@@ -104,14 +107,11 @@
 (s/def ::parameter-value
   (s/keys :req-un [::name ::lbl/value]))
 
-(s/def :user/type #{:github :bitbucket})
-(s/def :user/type-id string?)
-(s/def ::email string?)
-(s/def :user/orgs (s/coll-of ::id))
+(s/def ::orgs (s/coll-of ::id))
 
 (s/def ::user
-  (-> (s/keys :req-un [:user/type :user/type-id]
-              :opt-un [::email :user/orgs])
+  (-> (s/keys :req-un [::user/type ::user/type-id]
+              :opt-un [::user/email ::orgs])
       (s/merge ::common)))
 
 (s/def ::user-id ::c/cuid)
@@ -126,11 +126,11 @@
 
 ;; Email registrations are created then an anonymous user registers their email
 ;; in order to receive mailing updates.
-(s/def :email/confirmed boolean?)
+(s/def ::confirmed boolean?)
 
 (s/def ::email-registration
-  (-> (s/keys :req-un [::email]
-              :opt-un [::creation-time :email/confirmed])
+  (-> (s/keys :req-un [::user/email]
+              :opt-un [::creation-time ::confirmed])
       (s/merge ::common)))
 
 (s/def ::amount (s/int-in 0 1000000))
@@ -183,23 +183,23 @@
   (s/keys :req-un [::user-id ::password]))
 
 (s/def ::invoice
-  (-> (s/keys :req-un [::org-id :invoice/kind :invoice/date
-                       :invoice/net-amount :invoice/vat-perc :invoice/currency
+  (-> (s/keys :req-un [::org-id ::inv/kind ::inv/date
+                       ::inv/net-amount ::inv/vat-perc ::inv/currency
                        :invoice/details]
-              :opt-un [:invoice/invoice-nr :invoice/ext-id])
+              :opt-un [::inv/invoice-nr ::inv/ext-id])
       (s/merge ::common)))
 
 (s/def :invoice/details
   (s/coll-of :invoice/detail))
 
 (s/def :invoice/detail
-  (s/keys :req-un [:invoice/net-amount :invoice/vat-perc ::description]))
+  (s/keys :req-un [::inv/net-amount ::inv/vat-perc ::description]))
 
 (s/def ::vat-nr string?)
 
 (s/def ::org-invoicing
-  (s/keys :req-un [::org-id :invoice/currency :invoice/ext-id ::vat-nr
-                   :invoice/address :invoice/country]))
+  (s/keys :req-un [::org-id ::inv/currency ::inv/ext-id ::vat-nr
+                   ::inv/address ::inv/country]))
 
 (s/def ::runner keyword?)
 (s/def :runner/details map?)
@@ -233,8 +233,8 @@
       (s/merge ::common)))
 
 (s/def ::mailing
-  (-> (s/keys :req-un [:mailing/subject :mailing/creation-time]
-              :opt-un [:mailing/text-body :mailing/html-body])
+  (-> (s/keys :req-un [::mailing/subject ::mailing/creation-time]
+              :opt-un [::mailing/text-body ::mailing/html-body])
       (s/merge ::common)))
 
 (s/def ::mailing-id string?)
@@ -243,7 +243,7 @@
 
 (s/def ::sent-mailing
   (-> (s/keys :req-un [::mailing-id ::sent-at]
-              :opt-un [:mailing/to-users :mailing/to-subscribers ::other-dests])
+              :opt-un [::mailing/to-users ::mailing/to-subscribers ::other-dests])
       (s/merge ::common)))
 
 (s/def ::receive-mailing boolean?)

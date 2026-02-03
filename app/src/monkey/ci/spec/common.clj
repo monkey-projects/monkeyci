@@ -59,22 +59,6 @@
 (s/def :bb/workspace string?)
 (s/def :bb/repo-slug string?)
 
-;; Invoice numbers are strings, but should only consist of digits
-(s/def :invoice/invoice-nr (s/with-gen
-                             (partial re-matches #"\d+")
-                             #(gen/return (str (int (* 100000 (rand)))))))
-(s/def :invoice/net-amount (s/and decimal? pos?))
-(s/def :invoice/vat-perc (s/and decimal? pos?))
-(s/def :invoice/currency #{"EUR" "USD" "GBP"})
-(s/def :invoice/kind #{:invoice :creditnote})
-(s/def :invoice/date date?)
-(s/def :invoice/ext-id (s/with-gen
-                         string?
-                         #(sg/fixed-string 5)))
-(s/def :invoice/address (s/coll-of string?))
-(s/def :invoice/country (s/with-gen
-                          string?
-                          #(sg/fixed-string 3)))
 
 (s/def :queued-task/creation-time ts?)
 (s/def :queued-task/task map?)
@@ -85,9 +69,3 @@
                  string?
                  #(sg/fixed-string token-size)))
 (s/def ::port (s/and int? pos?))
-
-(s/def :mailing/subject string?)
-(s/def :mailing/text-body string?)
-(s/def :mailing/html-body string?)
-(s/def :mailing/to-users boolean?)
-(s/def :mailing/to-subscribers boolean?)

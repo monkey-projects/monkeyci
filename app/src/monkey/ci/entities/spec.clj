@@ -7,9 +7,13 @@
             [monkey.ci.spec
              [build]
              [common :as c]
+             [events :as evt]
              [gen :as sg]
+             [invoice :as inv]
              [label :as lbl]
-             [ssh :as ssh]]))
+             [mailing :as mailing]
+             [ssh :as ssh]
+             [user :as user]]))
 
 (def id? int?)
 (def ts? int?)
@@ -56,13 +60,13 @@
               :opt-un [:build/status ::display-id :build/git ::credits ::message])
       (s/merge ::timed)))
 
-(s/def :job/details map?)
+(s/def ::details map?)
 
 (s/def ::build-id id?)
 (s/def ::credit-multiplier (s/int-in 0 10))
 
 (s/def ::job
-  (-> (s/keys :req-un [::build-id ::display-id :job/details]
+  (-> (s/keys :req-un [::build-id ::display-id ::details]
               :opt-un [:job/status ::credit-multiplier])
       (s/merge ::timed)))
 
@@ -92,15 +96,9 @@
 (s/def ::parameter-value
   (s/keys :req-un [::params-id ::lbl/name ::lbl/value]))
 
-(s/def ::type (s/with-gen
-                  string?
-                  #(sg/fixed-string 20)))
-(s/def ::type-id string?)
-(s/def ::email string?)
-
 (s/def ::user
-  (-> (s/keys :req-un [::type ::type-id]
-              :opt-un [::email])
+  (-> (s/keys :req-un [::user/type ::user/type-id]
+              :opt-un [::user/email])
       (s/merge ::common)))
 
 (s/def ::user-id id?)
@@ -116,7 +114,7 @@
 (s/def ::confirmed boolean?)
 
 (s/def ::email-registration
-  (-> (s/keys :req-un [::email]
+  (-> (s/keys :req-un [::user/email]
               :opt-un [::creation-time ::confirmed])
       (s/merge ::common)))
 
@@ -171,42 +169,41 @@
   (s/keys :req-un [::user-id ::password]))
 
 (s/def ::invoice
-  (-> (s/keys :req-un [::org-id :invoice/kind :invoice/date
-                       :invoice/currency :invoice/net-amount :invoice/vat-perc
+  (-> (s/keys :req-un [::org-id ::inv/kind ::inv/date
+                       ::inv/currency ::inv/net-amount ::inv/vat-perc
                        :db-invoice/details]
-              :opt-un [:invoice/invoice-nr :invoice/ext-id])
+              :opt-un [::inv/invoice-nr ::inv/ext-id])
       (s/merge ::common)))
 
 (s/def :db-invoice/details
   (s/coll-of :db-invoice/detail))
 
 (s/def :db-invoice/detail
-  (s/keys :req-un [:invoice/net-amount :invoice/vat-perc ::description]))
+  (s/keys :req-un [::inv/net-amount ::inv/vat-perc ::description]))
 
 (s/def ::vat-nr string?)
 
 (s/def ::org-invoicing
-  (s/keys :req-un [::org-id :invoice/currency :invoice/address :invoice/country]
-          :opt-un [::vat-nr :invoice/ext-id]))
+  (s/keys :req-un [::org-id ::inv/currency ::inv/address ::inv/country]
+          :opt-un [::vat-nr ::inv/ext-id]))
 
 (s/def ::runner keyword?)
-(s/def :runner/details map?)
 
 (s/def ::runner-details
-  (s/keys :req-un [::runner :runner/details]))
+  (s/keys :req-un [::runner ::details]))
 
+;; TODO Remove this, unused
 (s/def ::queued-task
-  (-> (s/keys :req-un [:queued-task/creation-time :queued-task/task])
+  (-> (s/keys :req-un [::creation-time :queued-task/task])
       (s/merge ::common)))
 
 (s/def ::job-id id?)
-(s/def :job-evt/time ts?)
-(s/def :job-evt/event keyword?)
-(s/def :job-evt/details map?)
+(s/def ::time ts?)
+(s/def ::event ::evt/type)
 
 (s/def ::job-event
-  (s/keys :req-un [::job-id :job-evt/time :job-evt/event]
-          :opt-un [:job-evt/details]))
+  (s/keys :req-un [::job-id ::time ::event]
+          :opt-un [::details]))
 
 (s/def ::user-token
   (-> (s/keys :req-un [::c/token ::user-id]
@@ -218,11 +215,11 @@
               :opt-un [::valid-until ::description])
       (s/merge ::common)))
 
-(s/def :mailing/creation-time ts?)
+(s/def ::creation-time ts?)
 
 (s/def ::mailing
-  (-> (s/keys :req-un [:mailing/subject :mailing/creation-time]
-              :opt-un [:mailing/text-body :mailing/html-body])
+  (-> (s/keys :req-un [::mailing/subject ::creation-time]
+              :opt-un [::mailing/text-body ::mailing/html-body])
       (s/merge ::common)))
 
 (s/def ::mailing-id id?)
@@ -231,7 +228,7 @@
 
 (s/def ::sent-mailing
   (-> (s/keys :req-un [::mailing-id ::sent-at]
-              :opt-un [:mailing/to-users :mailing/to-subscribers ::other-dests])
+              :opt-un [::mailing/to-users ::mailing/to-subscribers ::other-dests])
       (s/merge ::common)))
 
 (s/def ::receive-mailing boolean?)
