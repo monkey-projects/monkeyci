@@ -202,10 +202,10 @@
                    ::inv/address ::inv/country]))
 
 (s/def ::runner keyword?)
-(s/def :runner/details map?)
+(s/def ::details map?)
 
 (s/def ::runner-details
-  (s/keys :req-un [::runner :runner/details]))
+  (s/keys :req-un [::runner ::details]))
 
 ;; TODO Remove this, unused
 (s/def ::queued-task
@@ -215,12 +215,11 @@
 (s/def ::job-id string?)
 (s/def ::time c/ts?)
 (s/def ::event ::evt/type)
-(s/def :job-evt/details map?)
 
 (s/def ::job-event
   (s/keys :req-un [::org-id ::repo-id ::build-id ::job-id
                    ::time ::event]
-          :opt-un [:job-evt/details]))
+          :opt-un [::details]))
 
 (s/def ::user-token
   (-> (s/keys :req-un [::c/token ::user-id]

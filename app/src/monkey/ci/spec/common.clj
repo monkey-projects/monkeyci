@@ -39,6 +39,8 @@
                 cuid/cuid?
                 #(gen/return (cuid/random-cuid))))
 
+(s/def ::sid (s/coll-of id?))
+
 ;; Just using string to avoid "no gen" errors
 (s/def ::url string? #_(s/with-gen url?
                          #(gen/return "http://test-url")))

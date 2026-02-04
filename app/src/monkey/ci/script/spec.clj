@@ -1,6 +1,7 @@
 (ns monkey.ci.script.spec
   "Spec for objects used in scripts (most notably jobs)"
   (:require [clojure.spec.alpha :as s]
+            [monkey.ci.spec.build-api :as ba]
             [monkey.ci.spec.job.common :as jc]))
 
 (s/def ::job-common
@@ -19,4 +20,15 @@
               :opt-un [::jc/size ::jc/arch ::jc/script ::jc/env])
       (s/merge ::job-common)))
 
-(s/def ::job (s/multi-spec job-spec :type))
+;; Job definitions, as configured in build scripts
+(s/def ::job-def (s/multi-spec job-spec :type))
+
+;; Script context, passed to jobs
+
+(s/def ::api ::ba/client)
+(s/def ::archs (s/coll-of ::jc/arch))
+(s/def ::build map?)  ; TODO Specify
+
+(s/def ::context
+  (s/keys :req-un [::build ::api]
+          :opt-un [::job ::archs]))

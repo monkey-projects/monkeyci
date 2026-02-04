@@ -2,12 +2,17 @@
   "Common spec definitions for builds.  These are used by domain-specific specs for build objects."
   (:require [clojure.spec.alpha :as s]
             [clojure.spec.gen.alpha :as gen]
-            [monkey.ci.spec.common :as c]))
+            [monkey.ci.spec
+             [common :as c]
+             [script :as ss]]))
 
 (def id? c/id?)
 (def ts? c/ts?)
 (def path? c/path?)
+(def build-states #{:pending :initializing :running :error :success :canceled})
 
+(s/def ::sid (s/coll-of id? :count 3))
+(s/def ::status build-states)
 ;; Start and end time for build, script, job, etc...
 (s/def ::start-time ts?)
 (s/def ::end-time ts?)
@@ -54,13 +59,8 @@
 
 ;;; Script: contains info about a build script, most notably the jobs
 
-(def build-states #{:pending :initializing :running :error :success :canceled})
-
-(s/def :script/script-dir path?)
-(s/def :script/status build-states)
-
 (s/def :build/script
-  (-> (s/keys :req-un [:script/status :script/script-dir]
+  (-> (s/keys :req-un [::ss/status ::ss/script-dir]
               :opt-un [:script/jobs])
       (s/merge ::generic-entity)))
 

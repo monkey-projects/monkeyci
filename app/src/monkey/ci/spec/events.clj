@@ -3,8 +3,9 @@
   (:require [clojure.set :as set]
             [clojure.spec.alpha :as s]
             [monkey.ci.spec
-             [build]
-             [common :as c]]))
+             [build :as build]
+             [common :as c]
+             [script :as ss]]))
 
 (def build-event-types
   #{:build/triggered :build/queued :build/pending :build/initializing
@@ -57,7 +58,7 @@
 (s/def ::result map?)
 
 (s/def ::build-event
-  (->> (s/keys :req-un [:build/sid])
+  (->> (s/keys :req-un [::build/sid])
        (s/merge ::event-base)))
 
 (s/def ::job-event
@@ -82,7 +83,7 @@
        (s/merge ::build-event)))
 
 (defmethod event-type :build/end [_]
-  (->> (s/keys :req-un [:build/status])
+  (->> (s/keys :req-un [::build/status])
        (s/merge ::build-event)))
 
 (defmethod event-type :build/canceled [_]
@@ -93,7 +94,7 @@
        (s/merge ::build-event)))
 
 (defmethod event-type :script/initializing [_]
-  (->> (s/keys :req-un [:script/script-dir])
+  (->> (s/keys :req-un [::ss/script-dir])
        (s/merge ::build-event)))
 
 (defmethod event-type :script/start [_]
@@ -101,7 +102,7 @@
        (s/merge ::build-event)))
 
 (defmethod event-type :script/end [_]
-  (->> (s/keys :req-un [:script/status])
+  (->> (s/keys :req-un [::ss/status])
        (s/merge ::build-event)))
 
 (defmethod event-type :job/initializing [_]
