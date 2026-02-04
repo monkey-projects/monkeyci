@@ -4,12 +4,14 @@
             [clojure.spec.gen.alpha :as gen]
             [monkey.ci.events.spec :as evt]
             [monkey.ci.spec
-             [build]
+             [build :as build]
              [common :as c]
              [gen :as sg]
+             [git :as git]
              [invoice :as inv]
              [label :as lbl]
              [mailing :as mailing]
+             [script :as script]
              [ssh :as ssh]
              [user :as user]]))
 
@@ -50,7 +52,7 @@
 
 (s/def ::repo
   (s/keys :req-un [::org-id ::name :display/id]
-          :opt-un [:git/url :git/main-branch ::github-id ::labels ::public]))
+          :opt-un [::git/url ::git/main-branch ::github-id ::labels ::public]))
 
 (s/def ::repo-id string?)
 (s/def ::build-id string?)
@@ -59,14 +61,12 @@
 (s/def ::message string?)
 
 (s/def ::build
-  (-> (s/keys :req-un [::build-id ::org-id ::repo-id ::idx :build/source]
-              :opt-un [:build/status ::script :build/git ::credits ::message])
+  (-> (s/keys :req-un [::build-id ::org-id ::repo-id ::idx ::build/source]
+              :opt-un [::build/status ::script ::git/git ::credits ::message])
       (s/merge ::timed)))
 
-(s/def :script/script-dir string?)
-
 (s/def ::script
-  (s/keys :opt-un [:script/script-dir ::jobs]))
+  (s/keys :opt-un [::script/script-dir ::jobs]))
 
 (s/def ::jobs (s/map-of :display/id ::job))
 (s/def :job/credit-multiplier (s/int-in 0 100))

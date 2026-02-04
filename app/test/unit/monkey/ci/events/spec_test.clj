@@ -6,11 +6,48 @@
             [monkey.ci.time :as t]))
 
 (deftest event-spec
+  (testing "validates `:build/triggered` event"
+    (is (not (s/valid? ::sut/event
+                       {:type :build/triggered
+                        :time (t/now)
+                        :sid (h/gen-build-sid)}))
+        "requires build")
+    (is (s/valid? ::sut/event
+                  {:type :build/triggered
+                   :time (t/now)
+                   :sid (h/gen-build-sid)
+                   :build {:build-id "test-build"}})))
+
+  (testing "validates `:build/pending` event"
+    (is (not (s/valid? ::sut/event
+                       {:type :build/pending
+                        :time (t/now)
+                        :sid (h/gen-build-sid)}))
+        "requires build")
+    (is (s/valid? ::sut/event
+                  {:type :build/pending
+                   :time (t/now)
+                   :sid (h/gen-build-sid)
+                   :build {:build-id "test-build"}})))
+
+  (testing "validates `:build/queued` event"
+    (is (not (s/valid? ::sut/event
+                       {:type :build/queued
+                        :time (t/now)
+                        :sid (h/gen-build-sid)}))
+        "requires build")
+    (is (s/valid? ::sut/event
+                  {:type :build/queued
+                   :time (t/now)
+                   :sid (h/gen-build-sid)
+                   :build {:build-id "test-build"}})))
+
   (testing "validates `:build/initializing` event"
     (is (not (s/valid? ::sut/event
                        {:type :build/initializing
                         :time (t/now)
-                        :sid (h/gen-build-sid)})))
+                        :sid (h/gen-build-sid)}))
+        "requires build")
     (is (s/valid? ::sut/event
                   {:type :build/initializing
                    :time (t/now)

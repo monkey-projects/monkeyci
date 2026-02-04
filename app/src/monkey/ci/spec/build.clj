@@ -18,6 +18,7 @@
 (s/def ::end-time ts?)
 ;; Informative message for the user, e.g. on failure
 (s/def ::message string?)
+(s/def ::source #{:github-webhook :github-app :api :bitbucket-webhook :cli})
 
 (s/def ::generic-entity (s/keys :req-un [::start-time]
                                 :opt-un [::end-time ::message]))
@@ -78,19 +79,6 @@
 (s/def :build/status build-states)
 (s/def :build/workspace string?)
 (s/def :build/dek string?)
-
-;; GIT configuration
-(s/def :git/url ::c/url)
-(s/def :git/ref string?)
-(s/def :git/commit-id string?)
-(s/def :git/dir path?)
-(s/def :git/main-branch string?)
-(s/def :git/ssh-keys-dir path?)
-(s/def :git/message string?)
-
-(s/def :build/git
-  (s/keys :req-un [:git/url]
-          :opt-un [:git/ref :git/commit-id :git/main-branch :git/ssh-keys-dir :git/message :git/dir]))
 
 ;;; Changes: which files have changed for the build
 
