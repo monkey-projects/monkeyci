@@ -25,13 +25,6 @@
 (s/def ::common
   (s/keys :req-un [::id]))
 
-;; Maybe we should use instants instead?
-(s/def ::start-time c/ts?)
-(s/def ::end-time c/ts?)
-
-(s/def ::timed
-  (s/keys :opt-un [::start-time ::end-time]))
-
 (s/def :org/display-id :display/id)
 
 (s/def ::org
@@ -55,15 +48,15 @@
           :opt-un [::git/url ::git/main-branch ::github-id ::labels ::public]))
 
 (s/def ::repo-id string?)
-(s/def ::build-id string?)
 (s/def ::idx int?)
 (s/def ::credits (s/int-in 0 10000))
-(s/def ::message string?)
 
+;; TODO Merge/replace with ::build/build
 (s/def ::build
-  (-> (s/keys :req-un [::build-id ::org-id ::repo-id ::idx ::build/source]
-              :opt-un [::build/status ::script ::git/git ::credits ::message])
-      (s/merge ::timed)))
+  (-> (s/keys :req-un [::build/build-id ::org-id ::repo-id ::idx ::build/source]
+              :opt-un [::build/status ::script ::git/git
+                       ::credits ::build/message ::webhook-id])
+      (s/merge ::c/timed)))
 
 (s/def ::script
   (s/keys :opt-un [::script/script-dir ::jobs]))
@@ -72,9 +65,9 @@
 (s/def :job/credit-multiplier (s/int-in 0 100))
 
 (s/def ::job
-  (-> (s/keys :req-un [::org-id ::repo-id ::build-id :display/id]
+  (-> (s/keys :req-un [::org-id ::repo-id ::build/build-id :display/id]
               :opt-un [:job/status ::labels :job/credit-multiplier])
-      (s/merge ::timed)))
+      (s/merge ::c/timed)))
 
 (s/def ::secret-key string?)
 (s/def ::creation-time c/ts?)
@@ -156,7 +149,7 @@
 (s/def ::consumed-at c/ts?)
 
 (s/def ::credit-consumption
-  (-> (s/keys :req-un [::credit-id ::org-id ::repo-id ::build-id
+  (-> (s/keys :req-un [::credit-id ::org-id ::repo-id ::build/build-id
                        ::amount ::consumed-at])
       (s/merge ::common)))
 
@@ -217,7 +210,7 @@
 (s/def ::event ::evt/type)
 
 (s/def ::job-event
-  (s/keys :req-un [::org-id ::repo-id ::build-id ::job-id
+  (s/keys :req-un [::org-id ::repo-id ::build/build-id ::job-id
                    ::time ::event]
           :opt-un [::details]))
 

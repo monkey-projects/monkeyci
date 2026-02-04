@@ -41,6 +41,13 @@
 
 (s/def ::sid (s/coll-of id?))
 
+;; Start and end time for build, script, job, etc...
+(s/def ::start-time ts?)
+(s/def ::end-time ts?)
+
+(s/def ::timed
+  (s/keys :opt-un [::start-time ::end-time]))
+
 ;; Just using string to avoid "no gen" errors
 (s/def ::url string? #_(s/with-gen url?
                          #(gen/return "http://test-url")))

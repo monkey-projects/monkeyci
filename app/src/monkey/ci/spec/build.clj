@@ -13,15 +13,11 @@
 
 (s/def ::sid (s/coll-of id? :count 3))
 (s/def ::status build-states)
-;; Start and end time for build, script, job, etc...
-(s/def ::start-time ts?)
-(s/def ::end-time ts?)
+(s/def ::build-id id?)
+(s/def ::idx pos-int?)
 ;; Informative message for the user, e.g. on failure
 (s/def ::message string?)
 (s/def ::source #{:github-webhook :github-app :api :bitbucket-webhook :cli})
-
-(s/def ::generic-entity (s/keys :req-un [::start-time]
-                                :opt-un [::end-time ::message]))
 
 ;;; Jobs: parts of a script
 
@@ -62,8 +58,8 @@
 
 (s/def :build/script
   (-> (s/keys :req-un [::ss/status ::ss/script-dir]
-              :opt-un [:script/jobs])
-      (s/merge ::generic-entity)))
+              :opt-un [:script/jobs ::message])
+      (s/merge ::c/timed)))
 
 ;;; Build: contains information about a single build, like id, git info, and script
 
@@ -93,9 +89,10 @@
 (s/def :build/params map?)
 
 (s/def ::build
-  (-> (s/keys :req-un [:build/org-id :build/repo-id :build/build-id :build/sid
-                       :build/source]
-              :opt-un [:build/git :build/cleanup? :build/webhook-id :build/script :build/checkout-dir
-                       :build/changes :build/workspace :build/status ::c/timeout :build/dek
-                       :build/params])
-      (s/merge ::generic-entity)))
+  (-> (s/keys :req-un [:build/org-id :build/repo-id ::sid
+                       ::source]
+              ;; Build id and idx are assigned when build is queued
+              :opt-un [::build-id ::idx :build/git :build/cleanup? :build/webhook-id :build/script
+                       :build/checkout-dir :build/changes :build/workspace ::status ::c/timeout
+                       :build/dek :build/params ::message])
+      (s/merge ::c/timed)))
