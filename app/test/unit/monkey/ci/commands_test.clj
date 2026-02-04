@@ -16,8 +16,8 @@
             [monkey.ci.runners.controller :as rc]
             [monkey.ci.sidecar
              [config :as cs]
-             [core :as sc]]
-            [monkey.ci.spec.sidecar :as ss]
+             [core :as sc]
+             [spec :as ss]]
             [monkey.ci.test
              [aleph-test :as at]
              [config :as tc]

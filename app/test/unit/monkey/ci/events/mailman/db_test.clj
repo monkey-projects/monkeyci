@@ -6,11 +6,12 @@
              [build :as b]
              [cuid :as cuid]
              [storage :as st]]
-            [monkey.ci.events.mailman :as em]
+            [monkey.ci.events
+             [mailman :as em]
+             [spec :as se]]
             [monkey.ci.events.mailman
              [db :as sut]
              [interceptors :as emi]]
-            [monkey.ci.spec.events :as se]
             [monkey.ci.storage.spec :as ss]
             [monkey.ci.test.helpers :as h]))
 

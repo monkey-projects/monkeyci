@@ -2,10 +2,10 @@
   "Spec for application entities."
   (:require [clojure.spec.alpha :as s]
             [clojure.spec.gen.alpha :as gen]
+            [monkey.ci.events.spec :as evt]
             [monkey.ci.spec
              [build]
              [common :as c]
-             [events :as evt]
              [gen :as sg]
              [invoice :as inv]
              [label :as lbl]

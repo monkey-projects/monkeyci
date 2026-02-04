@@ -5,8 +5,7 @@
             [monkey.ci.spec
              [build :as b]
              [build-api :as ba]
-             [common :as c]
-             [events :as e]]
+             [common :as c]]
             [monkey.ci.spec.job.common :as jc]))
 
 (s/def ::events-file string?)

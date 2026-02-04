@@ -1,7 +1,7 @@
 (ns monkey.ci.events.spec-test
   (:require [clojure.spec.alpha :as s]
             [clojure.test :refer [deftest is testing]]
-            [monkey.ci.spec.events :as sut]
+            [monkey.ci.events.spec :as sut]
             [monkey.ci.test.helpers :as h]
             [monkey.ci.time :as t]))
 

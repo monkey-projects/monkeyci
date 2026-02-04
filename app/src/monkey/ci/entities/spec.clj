@@ -7,13 +7,13 @@
             [monkey.ci.spec
              [build]
              [common :as c]
-             [events :as evt]
              [gen :as sg]
              [invoice :as inv]
              [label :as lbl]
              [mailing :as mailing]
              [ssh :as ssh]
-             [user :as user]]))
+             [user :as user]]
+            [monkey.ci.events.spec :as evt]))
 
 (def id? int?)
 (def ts? int?)

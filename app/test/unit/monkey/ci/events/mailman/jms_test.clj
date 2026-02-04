@@ -1,9 +1,10 @@
 (ns monkey.ci.events.mailman.jms-test
   (:require [clojure.test :refer [deftest testing is]]
             [com.stuartsierra.component :as co]
-            [monkey.ci.events.mailman :as em]
+            [monkey.ci.events
+             [mailman :as em]
+             [spec :as es]]
             [monkey.ci.events.mailman.jms :as sut]
-            [monkey.ci.spec.events :as se]
             [monkey.jms :as jms]
             [monkey.mailman.core :as mmc]))
 
@@ -16,7 +17,7 @@
 
   (testing "maps known event types"
     (let [dests (sut/topic-destinations {:prefix "monkeyci.test"})]
-      (doseq [t se/event-types] 
+      (doseq [t es/event-types] 
         (is (contains? dests t)
             (str "should map " t))))))
 
