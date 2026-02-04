@@ -1,7 +1,7 @@
 (ns monkey.ci.sidecar.config
   "Functions for handling sidecar configuration"
   (:require [medley.core :as mc]
-            [monkey.ci.spec.sidecar :as ss]))
+            [monkey.ci.sidecar.spec :as ss]))
 
 (defn- ns-keys [m]
   (mc/map-keys (comp (partial keyword "monkey.ci.spec.sidecar") name)))

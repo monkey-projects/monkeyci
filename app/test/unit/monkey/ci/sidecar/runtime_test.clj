@@ -3,8 +3,8 @@
             [clojure.test :refer [deftest is testing]]
             [monkey.ci.sidecar
              [config :as sc]
-             [runtime :as sut]]
-            [monkey.ci.spec.sidecar :as ss]))
+             [runtime :as sut]
+             [spec :as ss]]))
 
 (def config
   (-> {}
