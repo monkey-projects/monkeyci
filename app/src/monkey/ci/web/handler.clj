@@ -45,6 +45,7 @@
 (defn resolve-id-from-db
   "Tries to resolve an org cuid from its display id."
   [req org-id]
+  ;; FIXME This could theoretically cause problems if an org has another org's id as display id
   (or (st/find-org-id-by-display-id (c/req->storage req) org-id)
       org-id))
 
@@ -56,10 +57,8 @@
       (-> (cache/through-cache c org-id (partial target req))
           (get org-id)))))
 
-(def default-id-resolver (cached-id-resolver resolve-id-from-db))
-
-(def org-body-checker (auth/org-body-checker default-id-resolver))
-(def org-path-checker (auth/org-auth-checker default-id-resolver))
+(defn default-id-resolver []
+  (cached-id-resolver resolve-id-from-db))
 
 (defn health [_]
   ;; TODO Make this more meaningful
@@ -164,7 +163,7 @@
 (def webhook-routes
   ["/webhook"
    [[""
-     {:auth-chain [org-body-checker]}
+     {:auth-chain [auth/org-body-checker]}
      [["" {:post {:handler    api/create-webhook
                   :parameters {:body NewWebhook}}}]]]
     ["/health"
@@ -223,17 +222,17 @@
 
 (def repo-parameter-routes
   ["/param"
-   {:auth-chain ^:replace [org-path-checker]}
+   {:auth-chain ^:replace [auth/org-auth-checker]}
    [["" {:get {:handler param-api/get-repo-params}}]]])
 
 (def repo-ssh-keys-routes
   ["/ssh-keys"
-   {:auth-chain ^:replace [org-path-checker]}
+   {:auth-chain ^:replace [auth/org-auth-checker]}
    [["" {:get {:handler ssh-api/get-repo-ssh-keys}}]]])
 
 (def repo-webhook-routes
   ["/webhooks"
-   {:auth-chain ^:replace [org-path-checker]}
+   {:auth-chain ^:replace [auth/org-auth-checker]}
    [["" {:get {:handler repo-api/list-webhooks}}]]])
 
 (def log-routes
@@ -412,7 +411,7 @@
 
 (def org-routes
   ["/org"
-   {:auth-chain [org-path-checker]}
+   {:auth-chain [auth/org-auth-checker]}
    (c/generic-routes
     {:creator org-api/create-org
      :updater org-api/update-org
@@ -585,22 +584,23 @@
   ([rt routes]
    (ring/router
     routes
-    {:data {:middleware (vec (concat [wm/stringify-body
-                                      [cors/wrap-cors
-                                       :access-control-allow-origin #".*"
-                                       :access-control-allow-methods [:get :put :post :delete]
-                                       :access-control-allow-credentials true]]
-                                     ;; TODO Transactions for sql storage
-                                     wm/default-middleware
-                                     [wm/kebab-case-query
-                                      wm/log-request
-                                      wm/post-events
-                                      :resolve-org-id
-                                      :auth-chain]))
-            :muuntaja (c/make-muuntaja)
-            :coercion reitit.coercion.schema/coercion
-            ;; Wrap the runtime in a type, so reitit doesn't change the records into maps
-            ::c/runtime (c/->RuntimeWrapper rt)}
+    {:data (-> {:middleware (vec (concat [wm/stringify-body
+                                          [cors/wrap-cors
+                                           :access-control-allow-origin #".*"
+                                           :access-control-allow-methods [:get :put :post :delete]
+                                           :access-control-allow-credentials true]]
+                                         ;; TODO Transactions for sql storage
+                                         wm/default-middleware
+                                         [wm/kebab-case-query
+                                          wm/log-request
+                                          wm/post-events
+                                          :resolve-org-id
+                                          :auth-chain]))
+                :muuntaja (c/make-muuntaja)
+                :coercion reitit.coercion.schema/coercion
+                ;; Wrap the runtime in a type, so reitit doesn't change the records into maps
+                ::c/runtime (c/->RuntimeWrapper rt)}
+               (c/set-id-resolver (default-id-resolver)))
      ;; Disabled, results in 405 errors for some reason
      ;;:compile rc/compile-request-coercers
      :reitit.middleware/registry
@@ -617,7 +617,7 @@
           [auth/sysadmin-authorization]}
          ;; TODO Move the dev-mode checks into the runtime startup code
          (as-> m (mc/map-vals (partial non-dev rt) m))
-         (assoc :resolve-org-id [wm/resolve-org-id default-id-resolver]))}))
+         (assoc :resolve-org-id [wm/resolve-org-id]))}))
   ([rt]
    (make-router rt routes)))
 

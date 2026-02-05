@@ -5,6 +5,7 @@
              [mailman :as tmm]
              [runtime :as trt]]
             [monkey.ci.web
+             [common :as wc]
              [middleware :as sut]
              [response :as r]]
             [ring.util.response :as rur]))
@@ -30,18 +31,20 @@
 
 (deftest resolve-org-id
   (testing "invokes target handler"
-    (let [r (sut/resolve-org-id (constantly ::handled) ::resolver)]
+    (let [r (sut/resolve-org-id (constantly ::handled))]
       (is (= ::handled (r {})))))
 
   (testing "replaces org id with resolved id"
-    (let [r (sut/resolve-org-id #(get-in % [:parameters :path :org-id])
-                                (fn [req org-id]
-                                  (when (= "original-id" org-id)
-                                    "resolved-id")))]
+    (let [r (sut/resolve-org-id #(get-in % [:parameters :path :org-id]))
+          resolver (fn [req org-id]
+                     (when (= "original-id" org-id)
+                       "resolved-id"))]
       (is (= "resolved-id"
-             (r {:parameters
-                 {:path
-                  {:org-id "original-id"}}}))))))
+             (-> (wc/set-id-resolver {} resolver)
+                 (h/->match-data)
+                 (assoc :parameters {:path
+                                     {:org-id "original-id"}})
+                 (r)))))))
 
 (deftest replace-body-org-id
   (testing "invokes target"

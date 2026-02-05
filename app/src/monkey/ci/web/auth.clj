@@ -279,26 +279,27 @@
   (denied "Credentials do not grant access to this org"
           {:org-id org-id}))
 
-(defn- org-checker [kind id-resolver]
+(defn- org-checker [kind]
   (fn [_ req]
     (when-let [oid (get-in req [:parameters kind :org-id])]
-      (when-not
-          (and (ba/authenticated? req)
-               (or (sysadmin? (:identity req))
-                   (contains? (get-in req [:identity :orgs])
-                              oid)
-                   ;; Should also match org display ids
-                   (contains? (get-in req [:identity :orgs])
-                              (id-resolver req oid))))
-        (denied-no-org-access oid)))))
+      (let [id-resolver (c/req->id-resolver req)]
+        (when-not
+            (and (ba/authenticated? req)
+                 (or (sysadmin? (:identity req))
+                     (contains? (get-in req [:identity :orgs])
+                                oid)
+                     ;; Should also match org display ids
+                     (contains? (get-in req [:identity :orgs])
+                                (id-resolver req oid))))
+          (denied-no-org-access oid))))))
 
 (def org-auth-checker
   "Checks if the user has access to the organization"
-  (partial org-checker :path))
+  (org-checker :path))
 
 (def org-body-checker
   "Checks if the user has access to the organization specified in the body"
-  (partial org-checker :body))
+  (org-checker :body))
 
 (defn webhook-org-checker
   "Verifies if the user has permissions on the webhook org"

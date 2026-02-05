@@ -107,6 +107,16 @@
   "Retrieves mailman component from request"
   #(from-rt % :mailman))
 
+(def req->id-resolver
+  "Retrieves the id resolver from route match data"
+  (comp ::id-resolver route-data))
+
+(defn set-id-resolver
+  "Sets given id resolver in the route data.  The id resolver is used to determine the actual
+   org id should a display id be provided."
+  [data r]
+  (assoc data ::id-resolver r))
+
 (defn id-getter [id-key]
   (comp id-key :path :parameters))
 
