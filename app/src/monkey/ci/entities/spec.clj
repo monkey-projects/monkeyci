@@ -5,9 +5,10 @@
   (:require [clojure.spec.alpha :as s]
             [clojure.spec.gen.alpha :as gen]
             [monkey.ci.spec
-             [build]
+             [build :as build]
              [common :as c]
              [gen :as sg]
+             [git :as git]
              [invoice :as inv]
              [label :as lbl]
              [mailing :as mailing]
@@ -47,7 +48,7 @@
 
 (s/def ::repo
   (-> (s/keys :req-un [::display-id ::org-id ::name]
-              :opt-un [:git/url :git/main-branch ::public])
+              :opt-un [::git/url ::git/main-branch ::public])
       (s/merge ::common)))
 
 (s/def ::repo-id id?)
@@ -57,7 +58,7 @@
 
 (s/def ::build
   (-> (s/keys :req-un [::repo-id ::idx]
-              :opt-un [:build/status ::display-id :build/git ::credits ::message])
+              :opt-un [::build/status ::display-id :build/git ::credits ::message])
       (s/merge ::timed)))
 
 (s/def ::details map?)

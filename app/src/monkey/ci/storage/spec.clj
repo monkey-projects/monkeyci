@@ -55,7 +55,7 @@
 (s/def ::build
   (-> (s/keys :req-un [::build/build-id ::org-id ::repo-id ::idx ::build/source]
               :opt-un [::build/status ::script ::git/git
-                       ::credits ::build/message ::webhook-id])
+                       ::credits ::build/message #_::webhook-id])
       (s/merge ::c/timed)))
 
 (s/def ::script
