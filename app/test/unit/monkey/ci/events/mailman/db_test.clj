@@ -6,11 +6,13 @@
              [build :as b]
              [cuid :as cuid]
              [storage :as st]]
-            [monkey.ci.events.mailman :as em]
+            [monkey.ci.events
+             [mailman :as em]
+             [spec :as se]]
             [monkey.ci.events.mailman
              [db :as sut]
              [interceptors :as emi]]
-            [monkey.ci.spec.events :as se]
+            [monkey.ci.storage.spec :as ss]
             [monkey.ci.test.helpers :as h]))
 
 (defn- validate-spec [spec obj]
@@ -271,7 +273,7 @@
       (let [res (-> ctx
                     (sut/set-credits 100M)
                     (sut/check-credits))]
-        (validate-spec :entity/build (:build res))
+        (validate-spec ::ss/build (:build res))
         (is (= :build/pending (:type res)))))
 
     (testing "returns `build/end` event with status `error` if no credits available"

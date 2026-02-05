@@ -24,61 +24,52 @@
 
 (deftest ^:sql orgs
   (with-storage conn s
-    (testing "can write and read"
-      (let [org (h/gen-org)]
+    (let [org (h/gen-org)]
+      (testing "can write and read"
         (is (sid/sid? (st/save-org s org)))
         (is (= 1 (count (ec/select-orgs conn [:is :id [:not nil]]))))
         (is (some? (ec/select-org conn (ec/by-cuid (:id org)))))
         (is (= (assoc org :repos {})
-               (st/find-org s (:id org))))))
+               (st/find-org s (:id org)))))
 
-    (testing "can operate within a transaction"
-      (st/with-transaction s tx
-        (let [org (h/gen-org)]
-          (is (sid/sid? (st/save-org tx org)))
-          (is (some? (ec/select-org ((:get-conn tx) tx) (ec/by-cuid (:id org)))))
-          (is (= (assoc org :repos {})
-                 (st/find-org tx (:id org)))))))
+      (testing "can operate within a transaction"
+        (st/with-transaction s tx
+          (let [upd (assoc org :name "updated org")]
+            (is (sid/sid? (st/save-org tx upd)))
+            (is (some? (ec/select-org ((:get-conn tx) tx) (ec/by-cuid (:id upd)))))
+            (is (= (assoc upd :repos {})
+                   (st/find-org tx (:id upd)))))))
 
-    (testing "copies overrides in trx"
-      (st/with-transaction s tx
-        (is (= (:overrides s) (:overrides tx)))))
+      (testing "copies overrides in trx"
+        (st/with-transaction s tx
+          (is (= (:overrides s) (:overrides tx)))))
 
-    (testing "can write and read with repos"
-      (let [org (h/gen-org)
-            repo {:name "test repo"
-                  :org-id (:id org)
-                  :id "test-repo"
-                  :url "http://test-repo"}]
-        (is (sid/sid? (st/save-org s org)))
-        (is (sid/sid? (st/save-repo s repo)))
-        (is (= (assoc org :repos {(:id repo) (dissoc repo :org-id)})
-               (st/find-org s (:id org))))))
+      (testing "with repos"
+        (let [repo {:name "test repo"
+                    :org-id (:id org)
+                    :id "test-repo"
+                    :url "http://test-repo"}]
+          (testing "can write and read with repos"
+            (is (sid/sid? (st/save-org s org)))
+            (is (sid/sid? (st/save-repo s repo)))
+            (is (= (assoc org :repos {(:id repo) (dissoc repo :org-id)})
+                   (st/find-org s (:id org)))))
 
-    (testing "can delete with repos"
-      (let [org (h/gen-org)
-            repo {:name "test repo"
-                  :org-id (:id org)
-                  :id "test-repo"
-                  :url "http://test-repo"}]
-        (is (sid/sid? (st/save-org s org)))
-        (is (sid/sid? (st/save-repo s repo)))
-        (is (some? (st/find-org s (:id org))))
-        (is (true? (st/delete-org s (:id org)))
-            "expected to delete org record")
-        (is (nil? (st/find-org s (:id org)))
-            "did not expect to find org after deletion")))
+          (testing "can delete with repos"
+            (is (true? (st/delete-org s (:id org)))
+                "expected to delete org record")
+            (is (nil? (st/find-org s (:id org)))
+                "did not expect to find org after deletion"))))
 
-    (testing "can search"
-      (let [org (-> (h/gen-org)
-                    (assoc :name "test org"))]
-        (is (sid/sid? (st/save-org s org)))
-        
-        (testing "by name"
-          (is (= [org] (st/search-orgs s {:name "test"}))))
+      (testing "can search"
+        (let [org (assoc org :name "test org")]
+          (is (sid/sid? (st/save-org s org)))
+          
+          (testing "by name"
+            (is (= [org] (st/search-orgs s {:name "test"}))))
 
-        (testing "by id"
-          (is (= [org] (st/search-orgs s {:id (:id org)}))))))
+          (testing "by id"
+            (is (= [org] (st/search-orgs s {:id (:id org)})))))))
 
     (testing "can find multiple by id"
       (let [orgs (repeatedly 3 h/gen-org)]
@@ -112,7 +103,7 @@
     (let [org (-> (h/gen-org)
                   (assoc :name "test org"))
           user {:id (cuid/random-cuid)
-                :type "github"
+                :type :github
                 :type-id "12342"}
           _ (st/save-user s user)
           res (st/init-org s {:org org

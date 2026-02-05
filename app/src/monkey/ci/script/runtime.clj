@@ -17,8 +17,7 @@
             [monkey.ci.events.mailman.build-api :as emba]
             [monkey.ci.script
              [config :as sc]
-             [events :as se]]
-            [monkey.ci.spec.script :as ss]))
+             [events :as se]]))
 
 (defn- client-url [{:keys [url port]}]
   (if port
@@ -73,7 +72,7 @@
   "Given a script configuration object, creates component system.  When started,
    it handles and posts events that execute the build script."
   [config]
-  {:pre [(spec/valid? ::ss/config config)]}
+  {:pre [(spec/valid? ::sc/config config)]}
   (co/system-map
    :api-client (new-api-client config)
    :event-stream (using-api (new-event-stream))

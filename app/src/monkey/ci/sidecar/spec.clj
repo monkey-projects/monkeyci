@@ -1,33 +1,25 @@
-(ns monkey.ci.spec.sidecar
+(ns monkey.ci.sidecar.spec
   "Specs for sidecar configuration"
   (:require [clojure.spec.alpha :as s]
             [monkey.ci.protocols :as p]
             [monkey.ci.spec
              [build :as b]
              [build-api :as ba]
-             [common :as c]
-             [events :as e]]))
+             [common :as c]]
+            [monkey.ci.spec.job.common :as jc]))
 
 (s/def ::events-file string?)
 (s/def ::start-file string?)
 (s/def ::abort-file string?)
+(s/def ::sid ::b/sid)
 
-;; TODO Remove this, unnecessary
 (s/def ::job-config
   (s/keys :req [::job ::sid]))
 
+;; TODO Replace with event job spec
 (s/def ::job
-  (s/keys :req-un [:job/id]
-          :opt-un [:job/caches :job/save-artifacts :job/restore-artifacts :job/script
-                   :job/memory :job/cpus :job/arch]))
-
-(s/def ::checkout-dir string?)
-
-(s/def ::build
-  (s/keys :req-un [:build/workspace :build/org-id :build/repo-id :build/build-id]
-          :opt-un [::checkout-dir]))
-
-(s/def ::sid (s/coll-of string?))
+  (s/keys :req-un [::jc/id]
+          :opt-un [::jc/caches ::jc/save-artifacts ::jc/restore-artifacts ::jc/script]))
 
 (s/def ::api ::ba/api)
 

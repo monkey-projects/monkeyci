@@ -15,6 +15,7 @@
              [protocols :as p]
              [storage :as s]
              [vault :as v]]
+            [monkey.ci.storage.spec :as ss]
             [monkey.ci.web
              [auth :as auth]
              [common :as wc]]
@@ -213,29 +214,29 @@
   (gen/generate (spec/gen t)))
 
 (defn gen-org []
-  (gen-entity :entity/org))
+  (gen-entity ::ss/org))
 
 (def ^:deprecated gen-cust gen-org)
 
 (defn gen-repo []
-  (gen-entity :entity/repo))
+  (gen-entity ::ss/repo))
 
 (defn gen-webhook []
-  (gen-entity :entity/webhook))
+  (gen-entity ::ss/webhook))
 
 (defn gen-ssh-key []
-  (gen-entity :entity/ssh-key))
+  (gen-entity ::ss/ssh-key))
 
 (defn gen-org-params []
-  (gen-entity :entity/org-params))
+  (gen-entity ::ss/org-params))
 
 (def ^:deprecated gen-customer-params gen-org-params)
 
 (defn gen-user []
-  (gen-entity :entity/user))
+  (gen-entity ::ss/user))
 
 (defn gen-build []
-  (-> (gen-entity :entity/build)
+  (-> (gen-entity ::ss/build)
       ;; TODO Put this in the spec itself
       (update-in [:script :jobs] (fn [jobs]
                                    (->> jobs
@@ -243,65 +244,65 @@
                                         (into {}))))))
 
 (defn gen-job []
-  (gen-entity :entity/job))
+  (gen-entity ::ss/job))
 
 (defn gen-join-request []
-  (gen-entity :entity/join-request))
+  (gen-entity ::ss/join-request))
 
 (defn gen-email-registration []
-  (gen-entity :entity/email-registration))
+  (gen-entity ::ss/email-registration))
 
 (defn- update-amount [x]
   (update x :amount bigdec))
 
 (defn gen-org-credit []
-  (-> (gen-entity :entity/org-credit)
+  (-> (gen-entity ::ss/org-credit)
       (update-amount)))
 
 (def ^:deprecated gen-cust-credit gen-org-credit)
 
 (defn gen-credit-subs []
-  (-> (gen-entity :entity/credit-subscription)
+  (-> (gen-entity ::ss/credit-subscription)
       (update-amount)))
 
 (defn gen-credit-cons []
-  (-> (gen-entity :entity/credit-consumption)
+  (-> (gen-entity ::ss/credit-consumption)
       (update-amount)))
 
 (defn gen-bb-webhook []
-  (gen-entity :entity/bb-webhook))
+  (gen-entity ::ss/bb-webhook))
 
 (defn gen-crypto []
-  (gen-entity :entity/crypto))
+  (gen-entity ::ss/crypto))
 
 (defn gen-invoice []
-  (gen-entity :entity/invoice))
+  (gen-entity ::ss/invoice))
 
 (defn gen-queued-task []
-  (-> (gen-entity :entity/queued-task)
+  (-> (gen-entity ::ss/queued-task)
       ;; Fixed task, to avoid brittle tests
       (assoc :task {:key :value})))
 
 (defn gen-job-evt []
-  (gen-entity :entity/job-event))
+  (gen-entity ::ss/job-event))
 
 (defn gen-user-token []
-  (gen-entity :entity/user-token))
+  (gen-entity ::ss/user-token))
 
 (defn gen-org-token []
-  (gen-entity :entity/org-token))
+  (gen-entity ::ss/org-token))
 
 (defn gen-mailing []
-  (gen-entity :entity/mailing))
+  (gen-entity ::ss/mailing))
 
 (defn gen-sent-mailing []
-  (gen-entity :entity/sent-mailing))
+  (gen-entity ::ss/sent-mailing))
 
 (defn gen-user-settings []
-  (gen-entity :entity/user-setting))
+  (gen-entity ::ss/user-setting))
 
 (defn gen-org-invoicing []
-  (gen-entity :entity/org-invoicing))
+  (gen-entity ::ss/org-invoicing))
 
 (defn gen-build-sid []
   (repeatedly 3 cuid/random-cuid))

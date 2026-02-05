@@ -8,7 +8,9 @@
              [api :as ba]
              [core :as bc]
              [v2 :as v2]]
-            [monkey.ci.events.mailman :as em]
+            [monkey.ci.events
+             [mailman :as em]
+             [spec :as es]]
             [monkey.ci.events.mailman.interceptors :as emi]
             [monkey.ci
              [api :as api]
@@ -19,7 +21,6 @@
             [monkey.ci.script
              [core :as sc]
              [events :as sut]]
-            [monkey.ci.spec.events :as se]
             [monkey.ci.test
              [extensions :as te]
              [helpers :as h]
@@ -353,8 +354,8 @@
                 (sut/set-build (h/gen-build))
                 (sut/set-jobs jobs)
                 (sut/script-init))]
-      (is (spec/valid? ::se/event r)
-          (spec/explain-str ::se/event r))
+      (is (spec/valid? ::es/event r)
+          (spec/explain-str ::es/event r))
       (is (= :script/start (:type r)))
       (is (= ["test-job"]
              (->> r :jobs (map bc/job-id))))
@@ -369,8 +370,8 @@
                 (sut/set-build (h/gen-build))
                 (sut/set-jobs (jobs->map [job]))
                 (sut/script-init))]
-      (is (spec/valid? ::se/event r)
-          (spec/explain-str ::se/event r))
+      (is (spec/valid? ::es/event r)
+          (spec/explain-str ::es/event r))
       (is (= "test-img" (-> r :jobs first :image)))
       (is (= :ext-value (-> r :jobs first :ext-key))))))
 
@@ -391,8 +392,8 @@
         (testing "queues jobs without dependencies"
           (is (= 1 (count r)))
           (is (every? (comp (partial = :job/queued) :type) r))
-          (is (spec/valid? ::se/event (first r))
-              (spec/explain-str ::se/event (first r)))
+          (is (spec/valid? ::es/event (first r))
+              (spec/explain-str ::es/event (first r)))
           (is (= [(get jobs "start")]
                  (map :job r)))))))
 

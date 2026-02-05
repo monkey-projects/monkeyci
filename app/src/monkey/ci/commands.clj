@@ -35,8 +35,8 @@
             [monkey.ci.script.core :as script]
             [monkey.ci.sidecar
              [core :as sc]
-             [runtime :as rs]]
-            [monkey.ci.spec.sidecar :as ss]
+             [runtime :as rs]
+             [spec :as ss]]
             [monkey.ci.web
              [auth :as auth]
              [http :as wh]]))

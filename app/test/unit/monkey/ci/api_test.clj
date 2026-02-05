@@ -190,14 +190,14 @@
     (testing "sets caches on job"
       (is (= [art] (-> (sut/action-job "test-job" (constantly ::ok))
                        (sut/caches art)
-                       :caches))))
+                       (sut/caches)))))
 
     (testing "adds to existing artifacts"
       (let [orig (sut/cache "original" "/tmp")]
         (is (= [orig art]
                (-> (sut/action-job "test-job" (constantly ::ok) {:caches [orig]})
                    (sut/caches art)
-                   :caches)))))
+                   (sut/caches))))))
 
     (testing "sets caches on job fn"
       (let [job (-> (constantly (sut/container-job "test-job"))

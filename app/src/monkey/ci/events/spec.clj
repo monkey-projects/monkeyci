@@ -1,10 +1,11 @@
-(ns monkey.ci.spec.events
+(ns monkey.ci.events.spec
   "Spec definitions for events.  All events sent (and received) should match `::event`."
   (:require [clojure.set :as set]
             [clojure.spec.alpha :as s]
             [monkey.ci.spec
-             [build]
-             [common :as c]]))
+             [build :as build]
+             [common :as c]
+             [script :as ss]]))
 
 (def build-event-types
   #{:build/triggered :build/queued :build/pending :build/initializing
@@ -45,7 +46,8 @@
 
 (s/def ::type event-types)
 (s/def ::message string?)
-(s/def ::time int?)
+(s/def ::time c/ts?)
+;; Event source (e.g. api, script, build-agent,...)
 (s/def ::src keyword?)
 
 (s/def ::event-base (s/keys :req-un [::type ::time]
@@ -54,55 +56,62 @@
 (s/def ::build map?) ; TODO Specify
 (s/def ::credit-multiplier int?)
 (s/def ::job-id c/id?)
-(s/def ::result map?)
+(s/def ::result map?) ; TODO Specify
 
-(s/def ::build-event
-  (->> (s/keys :req-un [:build/sid])
+(s/def ::build-ref-event
+  (->> (s/keys :req-un [::build/sid])
        (s/merge ::event-base)))
+
+(s/def ::build-holding-event
+  (->> (s/keys :req-un [::build])
+       (s/merge ::build-ref-event)))
 
 (s/def ::job-event
   (->> (s/keys :req-un [::job-id])
-       (s/merge ::build-event)))
+       (s/merge ::build-ref-event)))
 
 (s/def ::runner-details map?)
 
 (defmulti event-type :type)
 
+(defmethod event-type :build/triggered [_]
+  ::build-holding-event)
+
 (defmethod event-type :build/pending [_]
-  (->> (s/keys :req-un [::build])
-       (s/merge ::build-event)))
+  ::build-holding-event)
+
+(defmethod event-type :build/queued [_]
+  ::build-holding-event)
 
 (defmethod event-type :build/initializing [_]
-  (->> (s/keys :req-un [::build]
-               :opt-un [::runner-details])
-       (s/merge ::build-event)))
+  (->> (s/keys :opt-un [::runner-details])
+       (s/merge ::build-holding-event)))
 
 (defmethod event-type :build/start [_]
   (->> (s/keys :req-un [::credit-multiplier])
-       (s/merge ::build-event)))
+       (s/merge ::build-ref-event)))
 
 (defmethod event-type :build/end [_]
-  (->> (s/keys :req-un [:build/status])
-       (s/merge ::build-event)))
+  (->> (s/keys :req-un [::build/status])
+       (s/merge ::build-ref-event)))
 
 (defmethod event-type :build/canceled [_]
-  ::build-event)
+  ::build-ref-event)
 
 (defmethod event-type :build/updated [_]
-  (->> (s/keys :req-un [::build])
-       (s/merge ::build-event)))
+  ::build-holding-event)
 
 (defmethod event-type :script/initializing [_]
-  (->> (s/keys :req-un [:script/script-dir])
-       (s/merge ::build-event)))
+  (->> (s/keys :req-un [::ss/script-dir])
+       (s/merge ::build-ref-event)))
 
 (defmethod event-type :script/start [_]
   (->> (s/keys :req-un [:script/jobs])
-       (s/merge ::build-event)))
+       (s/merge ::build-ref-event)))
 
 (defmethod event-type :script/end [_]
-  (->> (s/keys :req-un [:script/status])
-       (s/merge ::build-event)))
+  (->> (s/keys :req-un [::ss/status])
+       (s/merge ::build-ref-event)))
 
 (defmethod event-type :job/initializing [_]
   (->> (s/keys :req-un [::credit-multiplier])

@@ -8,7 +8,7 @@
              [cuid :as cuid]
              [storage :as st]
              [utils :as u]]
-            [monkey.ci.spec.events :as se]
+            [monkey.ci.events.spec :as es]
             [monkey.ci.test
              [helpers :as h]
              [runtime :as trt]]
@@ -617,7 +617,7 @@
               [e :as evts] (r/get-events resp)]
           (is (= 202 (:status resp)))
           (is (= [:build/canceled] (map :type evts)))
-          (is (spec/valid? ::se/event e))
+          (is (spec/valid? ::es/event e))
           (is (= (sid build) (:sid e)))))
       
       (testing "404 if build not found"
