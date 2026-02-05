@@ -11,11 +11,12 @@
              [protocols :as p]
              [storage :as st]
              [vault :as v]]
-            [monkey.ci.events.mailman :as em]
+            [monkey.ci.events
+             [mailman :as em]
+             [spec :as es]]
             [monkey.ci.events.mailman.interceptors :as emi]
             [monkey.ci.runners.oci :as sut]
             [monkey.ci.script.config :as sc]
-            [monkey.ci.spec.events :as se]
             [monkey.ci.test.helpers :as h]
             [monkey.mailman.core :as mmc]))
 
@@ -324,7 +325,7 @@
                       first
                       :result
                       first)]
-          (is (spec/valid? ::se/event res))
+          (is (spec/valid? ::es/event res))
           (is (= :build/initializing (:type res)))))
 
       (testing "when instance creation fails, returns `build/end` event"
@@ -341,7 +342,7 @@
                       first
                       :result
                       first)]
-          (is (spec/valid? ::se/event res))
+          (is (spec/valid? ::es/event res))
           (is (= :build/end (:type res)))
           (is (= :error (-> res :build :status))))))))
 

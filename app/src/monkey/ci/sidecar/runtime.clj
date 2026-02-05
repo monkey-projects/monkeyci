@@ -11,8 +11,9 @@
             [monkey.ci.containers.common :as cc]
             [monkey.ci.events.mailman.build-api :as eba]
             [monkey.ci.runtime.common :as rc]
-            [monkey.ci.sidecar.config :as cs]
-            [monkey.ci.spec.sidecar :as ss]))
+            [monkey.ci.sidecar
+             [config :as cs]
+             [spec :as ss]]))
 
 (defrecord SidecarRuntime [mailman log-maker workspace artifacts cache]
   co/Lifecycle

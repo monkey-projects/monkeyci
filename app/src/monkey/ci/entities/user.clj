@@ -5,10 +5,10 @@
   "Fetches all orgs cuids linked to a user"
   [conn user-id]
   (->> (ec/select conn
-                  {:select [:c.cuid]
-                   :from [[:orgs :c]]
-                   :join [[:user-orgs :uc] [:= :uc.org-id :c.id]]
-                   :where [:= :uc.user-id user-id]})
+                  {:select [:o.cuid]
+                   :from [[:orgs :o]]
+                   :join [[:user-orgs :uo] [:= :uo.org-id :o.id]]
+                   :where [:= :uo.user-id user-id]})
        (map :cuid)))
 
 (defn select-user-orgs
@@ -16,10 +16,10 @@
    for orgs, so repositories are not fetched."
   [conn user-cuid]
   (ec/select conn
-             {:select [:c.*]
-              :from [[:orgs :c]]
-              :join [[:user-orgs :uc] [:= :uc.org-id :c.id]
-                     [:users :u] [:= :u.id :uc.user-id]]
+             {:select [:o.*]
+              :from [[:orgs :o]]
+              :join [[:user-orgs :uo] [:= :uo.org-id :o.id]
+                     [:users :u] [:= :u.id :uo.user-id]]
               :where [:= :u.cuid user-cuid]}))
 
 (defn select-sysadmin-by-user-cuid [conn cuid]
@@ -37,10 +37,11 @@
               :where [:is-not :u.email nil]}))
 
 (defn select-by-email [conn email]
-  (ec/select conn
-             {:select [:u.*]
-              :from [[:users :u]]
-              :where [:like :u.email email]}))
+  (->> (ec/select conn
+                  {:select [:u.*]
+                   :from [[:users :u]]
+                   :where [:like :u.email email]})
+       (map ec/convert-user-select)))
 
 (defn select-user-setting-by-cuid [conn cuid]
   (->> {:select [:s.*]

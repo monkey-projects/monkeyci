@@ -14,8 +14,9 @@
             [monkey.ci.events
              [core :as ec]
              [mailman :as em]]
-            [monkey.ci.sidecar.config :as cs]
-            [monkey.ci.spec.sidecar :as ss]))
+            [monkey.ci.sidecar
+             [config :as cs]
+             [spec :as ss]]))
 
 (defn- create-file-with-dirs [f]
   (let [p (fs/parent f)]

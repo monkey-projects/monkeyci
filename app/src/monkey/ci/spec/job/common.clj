@@ -27,11 +27,13 @@
     :blocked     ; Job is blocked and waits for approval
     })
 
+(s/def ::status ::lifecycle)
+
 (s/def ::result map?)
 (s/def ::output string?)
 (s/def ::runner map?)
 (s/def ::blocked boolean?)
-(s/def ::credit-multiplier int?)
+(s/def ::credit-multiplier (s/int-in 0 30))
 
 (s/def ::action fn?)
 
@@ -40,3 +42,4 @@
 (s/def ::arch #{:arm :amd})
 (s/def ::command string?)
 (s/def ::script (s/coll-of ::command))
+(s/def ::env (s/map-of string? string?))

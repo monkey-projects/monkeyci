@@ -41,6 +41,8 @@
   "Gets result warnings"
   :warnings)
 
+(def job-type :type)
+
 (defn action-job
   "Creates a new job"
   ([id action opts]
@@ -48,7 +50,7 @@
   ([id action]
    (action-job id action {})))
 
-(def action-job? (comp (partial = :action) :type))
+(def action-job? (comp (partial = :action) job-type))
 
 (defn container-job
   "Creates a job that executes in a container"
@@ -57,7 +59,7 @@
          :type :container
          :id id))
 
-(def container-job? (comp (partial = :container) :type))
+(def container-job? (comp (partial = :container) job-type))
 
 (defn job-id [x]
   (or (:id x) (:job/id (meta x))))
