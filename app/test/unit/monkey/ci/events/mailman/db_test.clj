@@ -485,7 +485,9 @@
               (sut/set-job job)
               (sut/set-job-events [{:type :job/initializing
                                     :time 900
-                                    :credit-multiplier 2}])
+                                    :credit-multiplier 2}
+                                   {:type :job/start
+                                    :time 950}])
               (sut/job-end))]
     (testing "returns `build/updated` event"
       (validate-spec ::se/event r)

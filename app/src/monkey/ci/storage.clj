@@ -496,7 +496,9 @@
   (override-or
    [:job :find]
    (fn [s job-sid]
+     ;;(log/debug "Looking up job" job-sid)
      (some-> (find-build s (sid/->sid (take 3 job-sid)))
+             (log/spy)
              (get-in [:script :jobs (nth job-sid 3)])))))
 
 (defn params-sid [org-id & [param-id]]

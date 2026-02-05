@@ -52,7 +52,6 @@
    Assumes that the db is in the context."
   {:name ::org-credits
    :enter (fn [ctx]
-            ;; TODO Ignore any credits that have expired, or are not active yet
             (set-credits ctx (st/calc-available-credits (get-db ctx)
                                                         (get-in ctx [:event :build :org-id])
                                                         (t/now))))})
@@ -152,7 +151,6 @@
 (def load-job-events
   {:name ::load-job-events
    :enter (fn [ctx]
-            (println "job events:" (st/list-job-events (get-db ctx) (job-sid ctx)))
             (set-job-events ctx (st/list-job-events (get-db ctx) (job-sid ctx))))})
 
 (def save-credit-consumption
@@ -293,10 +291,10 @@
        (apply merge)))
 
 (def job-end
-  ;; TODO List job events and merge the data into one.  This to fix any missing data due to
-  ;; concurrent updates.
   (job-update (fn [job {:keys [event] :as ctx}]
+                (log/debug "Job ended, merging history:" (get-in ctx [:event :job-id]))
                 (-> (merge-history ctx)
+                    (log/spy)
                     (merge job)
                     (assoc :end-time (:time event))
                     (merge (select-keys event [:status :result]))))))

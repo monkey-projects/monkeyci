@@ -71,10 +71,14 @@
 (defn reply->json
   "Takes the reply body and parses it from json"
   [rep]
-  (some-> rep
-          :body
-          slurp
-          parse-json))
+  (try
+    (some-> rep
+            :body
+            slurp
+            parse-json)
+    (catch Exception ex
+      (throw (ex-info "Unable to parse json reply" {:cause ex
+                                                    :reply rep})))))
 
 (defn to-json
   "Converts object to json and converts keys to camelCase"

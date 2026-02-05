@@ -604,6 +604,7 @@
      ;; Disabled, results in 405 errors for some reason
      ;;:compile rc/compile-request-coercers
      :reitit.middleware/registry
+     ;; Security, only enabled in non-dev mode
      (-> {:github-security
           [github/validate-security]
           :github-app-security
