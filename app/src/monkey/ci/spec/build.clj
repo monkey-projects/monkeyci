@@ -4,7 +4,9 @@
             [clojure.spec.gen.alpha :as gen]
             [monkey.ci.spec
              [common :as c]
-             [script :as ss]]))
+             [git :as git]
+             [script :as ss]]
+            [monkey.ci.spec.job.common :as jc]))
 
 (def id? c/id?)
 (def ts? c/ts?)
@@ -19,62 +21,19 @@
 (s/def ::message string?)
 (s/def ::source #{:github-webhook :github-app :api :bitbucket-webhook :cli})
 
-;;; Jobs: parts of a script
-
-(s/def :job/id id?)
-(s/def :job/type #{:action :container})
-(s/def :job/status #{:pending :starting :running :stopping :error :failure :success :skipped :blocked})
-
-(s/def :blob/id id?)
-(s/def :blob/path path?)
-(s/def :blob/size int?)
-(s/def :job/dependencies (s/coll-of :blob/id))
-
-(s/def ::blob
-  (s/keys :req-un [:blob/id :blob/path]
-          :opt-un [:blob/size]))
-(s/def :job/caches (s/coll-of ::blob))
-(s/def :job/save-artifacts (s/coll-of ::blob))
-(s/def :job/restore-artifacts (s/coll-of ::blob))
-(s/def :job/memory int?)
-(s/def :job/cpus int?)
-(s/def :job/size int?)
-(s/def :job/arch #{:arm :amd})
-(s/def :job/credit-multiplier (s/with-gen int? #(gen/choose 1 10)))
-
-(s/def :job/command string?)
-(s/def :job/script (s/coll-of :job/command))
-(s/def :job/blocked boolean?)
-
-(s/def :script/job
-  (s/keys :req-un [:job/id]
-          :opt-un [:job/type :job/dependencies :job/caches :job/save-artifacts :job/restore-artifacts
-                   :job/script :job/memory :job/cpus :job/size :job/arch :job/status ::c/timeout
-                   :job/credit-multiplier :job/blocked]))
-
-(s/def :script/jobs (s/coll-of :script/job))
-
-;;; Script: contains info about a build script, most notably the jobs
-
-(s/def :build/script
-  (-> (s/keys :req-un [::ss/status ::ss/script-dir]
-              :opt-un [:script/jobs ::message])
+(s/def ::script
+  (-> (s/keys :opt-un [::ss/script-dir])
       (s/merge ::c/timed)))
 
 ;;; Build: contains information about a single build, like id, git info, and script
 
-(s/def :build/id id?)
-(s/def :build/build-id id?)
-(s/def :build/sid (s/coll-of id? :count 3))
-(s/def :build/cleanup? boolean?)
-(s/def :build/webhook-id id?)
-(s/def :build/org-id id?)
-(s/def :build/repo-id id?)
-(s/def :build/source #{:github-webhook :github-app :api :bitbucket-webhook})
-(s/def :build/checkout-dir path?)
-(s/def :build/status build-states)
-(s/def :build/workspace string?)
-(s/def :build/dek string?)
+(s/def ::cleanup? boolean?)
+(s/def ::webhook-id id?)
+(s/def ::org-id id?)
+(s/def ::repo-id id?)
+(s/def ::checkout-dir path?)
+(s/def ::workspace string?)
+(s/def ::dek string?)
 
 ;;; Changes: which files have changed for the build
 
@@ -82,17 +41,16 @@
 (s/def :changes/removed  (s/coll-of string?))
 (s/def :changes/modified (s/coll-of string?))
 
-(s/def :build/changes
+(s/def ::changes
   (s/keys :opt-un [:changes/added :changes/removed :changes/modified]))
 
 ;; Optional build parameters, override existing params
-(s/def :build/params map?)
+(s/def ::params (s/map-of string? string?))
 
 (s/def ::build
-  (-> (s/keys :req-un [:build/org-id :build/repo-id ::sid
-                       ::source]
+  (-> (s/keys :req-un [::org-id ::repo-id ::sid ::source]
               ;; Build id and idx are assigned when build is queued
-              :opt-un [::build-id ::idx :build/git :build/cleanup? :build/webhook-id :build/script
-                       :build/checkout-dir :build/changes :build/workspace ::status ::c/timeout
-                       :build/dek :build/params ::message])
+              :opt-un [::build-id ::idx ::git/git ::cleanup? ::webhook-id ::script
+                       ::checkout-dir ::changes ::workspace ::status ::c/timeout
+                       ::dek ::params ::message])
       (s/merge ::c/timed)))

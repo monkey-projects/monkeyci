@@ -1,5 +1,7 @@
 (ns monkey.ci.storage.spec
-  "Spec for application entities."
+  "Spec for application entities.  This defines how objects look that are used inside 
+   the application (i.e. the api part).  These may change form whenever they move to
+   another domain, for example persistence or script processing (e.g. agents)."
   (:require [clojure.spec.alpha :as s]
             [clojure.spec.gen.alpha :as gen]
             [monkey.ci.events.spec :as evt]
@@ -13,26 +15,23 @@
              [mailing :as mailing]
              [script :as script]
              [ssh :as ssh]
-             [user :as user]]))
+             [user :as user]]
+            [monkey.ci.spec.job.common :as jc]))
 
 (s/def ::id ::c/cuid)
-(s/def :display/id string?)
+(s/def ::display-id string?)
 
-(s/def :github/secret string?)
 (s/def ::name (s/and string? not-empty))
 (s/def ::description string?)
 
 (s/def ::common
   (s/keys :req-un [::id]))
 
-(s/def :org/display-id :display/id)
+(s/def :display/id ::display-id)
 
 (s/def ::org
-  (-> (s/keys :req-un [::name :org/display-id])
+  (-> (s/keys :req-un [::name ::display-id])
       (s/merge ::common)))
-
-(s/def ::lbl/name string?)
-(s/def ::lbl/value string?)
 
 (s/def ::label
   (s/keys :req-un [::lbl/name ::lbl/value]))
@@ -62,11 +61,10 @@
   (s/keys :opt-un [::script/script-dir ::jobs]))
 
 (s/def ::jobs (s/map-of :display/id ::job))
-(s/def :job/credit-multiplier (s/int-in 0 100))
 
 (s/def ::job
   (-> (s/keys :req-un [::org-id ::repo-id ::build/build-id :display/id]
-              :opt-un [:job/status ::labels :job/credit-multiplier])
+              :opt-un [::jc/status ::labels ::jc/credit-multiplier])
       (s/merge ::c/timed)))
 
 (s/def ::secret-key string?)

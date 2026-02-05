@@ -1,7 +1,7 @@
 (ns monkey.ci.entities.spec
-  "Spec for database entities.  This can be useful to auto-generate database
-   record entities for testing, but also to validate entities before persisting 
-   them."
+  "Spec for database entities.  These define how information stored in the database
+   looks.  This can also be useful to auto-generate database record entities for
+   testing, but also to validate entities before persisting them."
   (:require [clojure.spec.alpha :as s]
             [clojure.spec.gen.alpha :as gen]
             [monkey.ci.spec
@@ -14,6 +14,7 @@
              [mailing :as mailing]
              [ssh :as ssh]
              [user :as user]]
+            [monkey.ci.spec.job.common :as job]
             [monkey.ci.events.spec :as evt]))
 
 (def id? int?)
@@ -58,7 +59,7 @@
 
 (s/def ::build
   (-> (s/keys :req-un [::repo-id ::idx]
-              :opt-un [::build/status ::display-id :build/git ::credits ::message])
+              :opt-un [::build/status ::display-id ::git/git ::credits ::message])
       (s/merge ::timed)))
 
 (s/def ::details map?)
@@ -68,7 +69,7 @@
 
 (s/def ::job
   (-> (s/keys :req-un [::build-id ::display-id ::details]
-              :opt-un [:job/status ::credit-multiplier])
+              :opt-un [::job/status ::credit-multiplier])
       (s/merge ::timed)))
 
 (s/def ::creation-time ts?)

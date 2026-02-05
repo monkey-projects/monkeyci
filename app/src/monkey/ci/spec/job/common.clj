@@ -27,11 +27,13 @@
     :blocked     ; Job is blocked and waits for approval
     })
 
+(s/def ::status ::lifecycle)
+
 (s/def ::result map?)
 (s/def ::output string?)
 (s/def ::runner map?)
 (s/def ::blocked boolean?)
-(s/def ::credit-multiplier int?)
+(s/def ::credit-multiplier (s/int-in 0 30))
 
 (s/def ::action fn?)
 
