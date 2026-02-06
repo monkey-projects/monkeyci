@@ -461,11 +461,13 @@
             old-build (-> (h/gen-build)
                           (assoc :org-id (:id org)
                                  :repo-id (:id repo)
+                                 :build-id (cuid/random-cuid)
                                  :start-time 100)
                           (dissoc :script))
             new-build (-> (h/gen-build)
                           (assoc :org-id (:id org)
                                  :repo-id (:id repo)
+                                 :build-id (cuid/random-cuid)
                                  :start-time 200)
                           (dissoc :script))]
         (is (sid/sid? (st/save-org s org)))
