@@ -11,7 +11,7 @@
 (def ts-gen (gen/choose (jt/to-millis-from-epoch (jt/offset-date-time 2020 1 1))
                         (jt/to-millis-from-epoch (jt/offset-date-time 2030 1 1))))
 
-(def id? string?)
+(def id? (s/and string? not-empty))
 (def ts? (s/with-gen int?
            (constantly ts-gen)))
 (def path? string?)

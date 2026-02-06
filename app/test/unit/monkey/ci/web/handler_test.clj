@@ -1163,7 +1163,8 @@
           org (-> (h/gen-org)
                   (assoc :repos {(:id repo) repo}))
           build (-> (h/gen-build)
-                    (assoc :org-id (:id org)
+                    (assoc :build-id "test-build"
+                           :org-id (:id org)
                            :repo-id (:id repo)))
           job {:type :container
                :id "test-job"}]
@@ -1176,7 +1177,7 @@
           (testing "retrieves job details"
             (let [r (-> (mock/request :get (str (build-path (b/sid build)) "/job/" (:id job)))
                         (secure-app-req {:storage st :org-id (:id org)}))]
-              (is (= 200 (:status r)))
+              (is (= 200 (:status r)) (str "sid: " (b/sid build)))
               (is (= {:id "test-job"
                       :type "container"}
                      (h/reply->json r)))))

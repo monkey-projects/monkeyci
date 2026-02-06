@@ -19,7 +19,7 @@
             [monkey.ci.spec.job.common :as jc]))
 
 (s/def ::id ::c/cuid)
-(s/def ::display-id string?)
+(s/def ::display-id (s/and string? not-empty))
 
 (s/def ::name (s/and string? not-empty))
 (s/def ::description string?)

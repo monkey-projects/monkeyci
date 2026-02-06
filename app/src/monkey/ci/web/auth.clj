@@ -156,7 +156,7 @@
   (when (and (not (expired? token)) sub)
     (let [id (sid/parse-sid sub)]
       (when (and (= 2 (count id)) (= role-sysadmin (first id)))
-        (log/trace "Looking up user with id" id)
+        (log/trace "Looking up sysadmin user with id" id)
         (st/find-user-by-type storage id)))))
 
 (defmethod resolve-token :default [_ _]
