@@ -411,15 +411,15 @@
                            :start-time (t/now)
                            :end-time (t/now))
                     (mc/update-existing :git dissoc :ssh-keys-dir :ssh-keys))
-          build-sid (st/ext-build-sid build)]
+          build-sid (st/ext-build-sid build)
+          sub (juxt :org-id :repo-id :build-id)]
       (is (sid/sid? (st/save-org s org)))
 
       (testing "can save and retrieve"
         (is (sid/sid? (st/save-build s build)))
         (is (= 1 (count (ec/select conn {:select :*
                                          :from :builds}))))
-        (is (= build (-> (st/find-build s build-sid)
-                         (select-keys (keys build))))))
+        (is (= (sub build) (sub (st/find-build s build-sid)))))
 
       (testing "can list"
         (is (= [(:build-id build)]
@@ -431,8 +431,8 @@
       (testing "can list with details, excluding jobs"
         (let [d (st/list-builds s (take 2 build-sid))]
           (is (= 1 (count d)))
-          (is (= (update build :script dissoc :jobs)
-                 (select-keys (first d) (keys build))))))
+          (is (= (sub (update build :script dissoc :jobs))
+                 (sub (first d))))))
 
       (testing "removes ssh private keys"
         (let [ssh-key {:id (st/new-id)
