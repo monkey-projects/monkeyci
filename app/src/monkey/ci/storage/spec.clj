@@ -47,15 +47,11 @@
           :opt-un [::git/url ::git/main-branch ::github-id ::labels ::public]))
 
 (s/def ::repo-id string?)
-(s/def ::idx int?)
 (s/def ::credits (s/int-in 0 10000))
 
-;; TODO Merge/replace with ::build/build
 (s/def ::build
-  (-> (s/keys :req-un [::build/build-id ::org-id ::repo-id ::idx ::build/source]
-              :opt-un [::build/status ::script ::git/git
-                       ::credits ::build/message #_::webhook-id])
-      (s/merge ::c/timed)))
+  (s/merge ::build/build-with-id
+           (s/keys :opt-un [::credits])))
 
 (s/def ::script
   (s/keys :opt-un [::script/script-dir ::jobs]))
@@ -63,7 +59,7 @@
 (s/def ::jobs (s/map-of :display/id ::job))
 
 (s/def ::job
-  (-> (s/keys :req-un [::org-id ::repo-id ::build/build-id :display/id]
+  (-> (s/keys :req-un [::org-id ::repo-id ::build/build-id :display/id ::jc/type]
               :opt-un [::jc/status ::labels ::jc/credit-multiplier])
       (s/merge ::c/timed)))
 

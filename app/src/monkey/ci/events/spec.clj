@@ -5,7 +5,8 @@
             [monkey.ci.spec
              [build :as build]
              [common :as c]
-             [script :as ss]]))
+             [script :as ss]]
+            [monkey.ci.spec.job.common :as jc]))
 
 (def build-event-types
   #{:build/triggered :build/queued :build/pending :build/initializing
@@ -53,17 +54,22 @@
 (s/def ::event-base (s/keys :req-un [::type ::time]
                             :opt-un [::message ::src]))
 
-(s/def ::build map?) ; TODO Specify
-(s/def ::credit-multiplier int?)
-(s/def ::job-id c/id?)
-(s/def ::result map?) ; TODO Specify
+(s/def ::job-id ::jc/id)
+
+;; Job as passed in events
+(s/def ::job
+  (s/keys :req-un [::jc/id ::jc/type]
+          :opt-un [::jc/caches ::jc/save-artifacts ::jc/restore-artifacts ::jc/dependencies
+                   ::jc/blocked]))
+
+(s/def ::jobs (s/coll-of ::job))
 
 (s/def ::build-ref-event
   (->> (s/keys :req-un [::build/sid])
        (s/merge ::event-base)))
 
 (s/def ::build-holding-event
-  (->> (s/keys :req-un [::build])
+  (->> (s/keys :req-un [::build/build])
        (s/merge ::build-ref-event)))
 
 (s/def ::job-event
@@ -88,7 +94,7 @@
        (s/merge ::build-holding-event)))
 
 (defmethod event-type :build/start [_]
-  (->> (s/keys :req-un [::credit-multiplier])
+  (->> (s/keys :req-un [::jc/credit-multiplier])
        (s/merge ::build-ref-event)))
 
 (defmethod event-type :build/end [_]
@@ -106,7 +112,7 @@
        (s/merge ::build-ref-event)))
 
 (defmethod event-type :script/start [_]
-  (->> (s/keys :req-un [:script/jobs])
+  (->> (s/keys :req-un [::jobs])
        (s/merge ::build-ref-event)))
 
 (defmethod event-type :script/end [_]
@@ -114,7 +120,7 @@
        (s/merge ::build-ref-event)))
 
 (defmethod event-type :job/initializing [_]
-  (->> (s/keys :req-un [::credit-multiplier])
+  (->> (s/keys :req-un [::jc/credit-multiplier])
        (s/merge ::job-event)))
 
 (defmethod event-type :job/pending [_]
@@ -135,8 +141,8 @@
   ::job-event)
 
 (s/def ::job-status-event
-  (->> (s/keys :req-un [:job/status]
-               :opt-un [::result])
+  (->> (s/keys :req-un [::jc/status]
+               :opt-un [::jc/result])
        (s/merge ::job-event)))
 
 (defmethod event-type :job/executed [_]

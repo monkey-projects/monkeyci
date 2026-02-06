@@ -48,9 +48,13 @@
 (s/def ::params (s/map-of string? string?))
 
 (s/def ::build
-  (-> (s/keys :req-un [::org-id ::repo-id ::sid ::source]
+  (-> (s/keys :req-un [::org-id ::repo-id ::source]
               ;; Build id and idx are assigned when build is queued
               :opt-un [::build-id ::idx ::git/git ::cleanup? ::webhook-id ::script
                        ::checkout-dir ::changes ::workspace ::status ::c/timeout
                        ::dek ::params ::message])
       (s/merge ::c/timed)))
+
+(s/def ::build-with-id
+  (->> (s/keys :req-un [::build-id ::idx])
+       (s/merge ::build)))

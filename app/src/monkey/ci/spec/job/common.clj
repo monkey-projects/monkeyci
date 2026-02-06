@@ -33,7 +33,7 @@
 (s/def ::output string?)
 (s/def ::runner map?)
 (s/def ::blocked boolean?)
-(s/def ::credit-multiplier (s/int-in 0 30))
+(s/def ::credit-multiplier (s/int-in 0 100))
 
 (s/def ::action fn?)
 
