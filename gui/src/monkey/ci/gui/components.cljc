@@ -218,8 +218,7 @@
 (defn tab-header [i lbl]
   [:span [:span.me-2 [icon i]] lbl])
 
-(defn docs-link [page title]
-  [:a {:href (templ/docs-url (str "/" page)) :target :_blank} title])
+(def docs-link templ/docs-link)
 
 (defn bg-shape []
   [:div.shape-container

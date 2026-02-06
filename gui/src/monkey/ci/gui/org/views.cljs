@@ -17,6 +17,7 @@
             [monkey.ci.gui.org-settings.views :as settings]
             [monkey.ci.gui.table :as t]
             [monkey.ci.gui.tabs :as tabs]
+            [monkey.ci.gui.template :as templ]
             [monkey.ci.gui.time :as time]
             [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
@@ -71,17 +72,26 @@
      :contents [vr/org-repos]}]])
 
 (defn- repo-intro [id]
-  [:<>
-   [:p.mt-2
-    "Looks like you have not configured any repositories yet.  You can add a new "
-    "repository manually, or use the " [:a (vr/watch-repo-link id) "Watch Repository"]
-    " button to find one in your repository manager."]
-   [add-repo-btn id]
-   [:p.mt-2
+  [:div.d-flex.gap-2.flex-column.mt-2
+   [:div
+    [:p
+     "Looks like you have not configured any repositories yet.  You can add a new "
+     "repository manually, or use the " [:a (vr/watch-repo-link id) "Watch Repository"]
+     " button to find one in your repository manager."]
+    [add-repo-btn id]]
+   [:p
     "A repository points to a remote git site, that contains a MonkeyCI script.  See "
-    [co/docs-link "articles/repos" "the documentation on repositories."] " Want to "
-    "learn how to write your first build script?  Check out "
-    [co/docs-link "categories/getting-started" "the getting started guide."]]])
+    [co/docs-link "articles/repos" "the documentation on repositories."]
+    [:br]
+    "Want to learn how to write your first build script?  Check out "
+    [co/docs-link "categories/getting-started" "the getting started guide."]]
+   [:p "Here are some useful pointers to get you started:"]
+   [:ul
+    [:li [templ/docs-link "/articles/intro/basic-example" "Your first build script"]]
+    [:li [templ/docs-link "/articles/local-builds" "Running builds on your local machine"]]
+    [:li [templ/docs-link "/articles/repos" "What are repositories?"]]
+    [:li [templ/docs-link "/articles/jobs" "Intro on jobs"]]
+    [:li [templ/docs-link "/categories/cookbook" "Script cookbook"]]]])
 
 (defn- org-actions [id]
   [:div.d-flex.gap-2
