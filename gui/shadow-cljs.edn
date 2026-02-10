@@ -23,7 +23,7 @@
    {:preloads [re-frisk-remote.preload]}
    :compiler-options
    {:closure-defines
-    {monkey.ci.gui.version/VERSION "0.23.1"}}
+    {monkey.ci.gui.version/VERSION "0.23.2-SNAPSHOT"}}
    :dev
    {:compiler-options
     {:closure-defines
