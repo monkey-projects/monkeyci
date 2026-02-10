@@ -161,6 +161,7 @@
        (fn [r]
          (if r
            (log/debug "Event pushed to internal stream:" (:type evt))
+           ;; TODO Health checking for the stream
            (log/warn "Failed to push event to internal stream:" (:type evt))))))
   nil)
 
@@ -222,7 +223,8 @@
                                                            script-exit))}))
 
 (defn new-event-stream []
-  (ms/stream))
+  ;; Make sure the stream is never close, otherwise the agent stops working
+  (ms/stream* {:permanent? true}))
 
 (defn make-runner-system
   "Given a runner configuration object, creates component system.  When started,
