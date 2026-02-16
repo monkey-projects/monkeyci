@@ -2,9 +2,6 @@
   "Handles log configuration and how to process logs from a build script"
   (:require [babashka.fs :as fs]
             [clojure.java.io :as io]
-            [clojure.string :as cs]
-            [clojure.tools.logging :as log]
-            [manifold.deferred :as md]
             [monkey.ci
              [build :as b]
              [oci :as oci]
@@ -67,54 +64,6 @@
 
 (defmethod make-logger :file [conf]
   (partial ->FileLogger (:logging conf)))
-
-(defn- ensure-cleanup
-  "Registers a shutdown hook to ensure the deferred is being completed, even if the
-   system shuts down.  The shutdown hook is removed on completion.  If we don't do
-   this, the multipart streams don't get committed when the vm shuts down in the
-   process."
-  [d]
-  (let [shutdown? (atom false)
-        t (Thread. (fn []
-                     (reset! shutdown? true)
-                     (log/debug "Waiting for upload to complete...")
-                     (deref d)
-                     (log/debug "Upload completed")))
-        remove-hook (fn [& _]
-                      (when-not @shutdown?
-                        (try 
-                          (.removeShutdownHook (Runtime/getRuntime) t)
-                          (catch Exception _
-                            (log/warn "Unable to remove shutdown hook, process is probably already shutting down.")))))]
-    (if (md/deferred? d)
-      (do
-        (.addShutdownHook (Runtime/getRuntime) t)
-        (md/finally d remove-hook))
-      d)))
-
-(defn sid->path [{:keys [prefix]} path sid]
-  (->> (concat [prefix] sid path)
-       (remove nil?)
-       (cs/join "/")))
-
-(deftype OciBucketLogger [conf build path]
-  LogCapturer
-  (log-output [_]
-    :stream)
-
-  (handle-stream [_ in]
-    (let [sid (b/sid build)
-          ;; Since the configured path already includes the build id,
-          ;; we only use repo id to build the path
-          on (sid->path conf path (sid/sid->repo-sid sid))]
-      (-> (oci/stream-to-bucket (assoc conf :object-name on) in)
-          (ensure-cleanup)))))
-
-(defmethod make-logger :oci [conf]
-  (fn [build path]
-    (-> conf
-        :logging
-        (->OciBucketLogger build path))))
 
 (defn handle-process-streams
   "Given a process return value (as from `babashka.process/process`) and two
