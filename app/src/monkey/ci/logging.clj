@@ -1,7 +1,6 @@
 (ns monkey.ci.logging
   "Handles log configuration and how to process logs from a build script"
   (:require [babashka.fs :as fs]
-            [clj-commons.byte-streams :as bs]
             [clojure.java.io :as io]
             [clojure.string :as cs]
             [clojure.tools.logging :as log]
@@ -9,9 +8,7 @@
             [monkey.ci
              [build :as b]
              [oci :as oci]
-             [sid :as sid]
-             [utils :as u]]
-            [monkey.oci.os.core :as os]))
+             [sid :as sid]]))
 
 (defprotocol LogCapturer
   "Used to allow processes to store log information.  Depending on the implementation,
@@ -174,38 +171,3 @@
 
 (defmethod make-log-retriever :default [_]
   (->NoopLogRetriever))
-
-(defn- sid->prefix [sid {:keys [prefix]}]
-  (cond->> (str (cs/join sid/delim sid) sid/delim)
-    (some? prefix) (str prefix "/")))
-
-(deftype OciBucketLogRetriever [client conf]
-  LogRetriever
-  (list-logs [_ sid]
-    (let [prefix (sid->prefix sid conf)
-          ->out (fn [r]
-                  ;; Strip the prefix to retain the relative path
-                  (update r :name subs (count prefix)))]
-      @(md/chain
-        (os/list-objects client (-> conf
-                                    (select-keys [:ns :compartment-id :bucket-name])
-                                    (assoc :prefix prefix
-                                           :fields "name,size")))
-        (fn [{:keys [objects]}]
-          (->> objects
-               (map ->out))))))
-  
-  (fetch-log [_ sid path]
-    ;; TODO Also return object size, so we can tell the client
-    ;; FIXME Return nil if file does not exist, instead of throwing an error
-    @(md/chain
-      (os/get-object client (-> conf
-                                (select-keys [:ns :compartment-id :bucket-name])
-                                (assoc :object-name (str (sid->prefix sid conf) path))))
-      bs/to-input-stream)))
-
-(defmethod make-log-retriever :oci [conf]
-  (let [oci-conf (:logging conf)
-        client (-> (os/make-client oci-conf)
-                   (oci/add-inv-interceptor :logging))]
-    (->OciBucketLogRetriever client oci-conf)))

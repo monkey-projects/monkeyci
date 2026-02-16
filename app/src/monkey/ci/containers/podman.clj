@@ -390,6 +390,7 @@
                (merge (podman-opts ctx))
                (build-cmd-args))
      :dir (job-work-dir ctx job)
+     ;; TODO Replace with streams for log ingestion
      :out (log-file "out.log")
      :err (log-file "err.log")
      ;; Pass the job env to the process.  These are then passed on to the container.
