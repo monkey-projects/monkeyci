@@ -2,7 +2,10 @@
   "Client for log ingestion microservice"
   (:require [aleph.http :as http]
             [clojure.string :as cs]
-            [manifold.time :as mt]
+            [clojure.tools.logging :as log]
+            [manifold
+             [deferred :as md]
+             [stream :as ms]]
             [monkey.flow :as flow]))
 
 (defn make-client [conf]
@@ -28,3 +31,18 @@
   "Retrieves any logs at specified path"
   [client path]
   (client :fetch path))
+
+(defn pushing-stream
+  "Returns an `OutputStream` that pushes the received bytes to the log ingester
+   at configured intervals, or after a given number of bytes."
+  [client {:keys [path buf-size interval] :or {buf-size 0x10000 interval 1000}}]
+  (let [s (ms/stream 1 (flow/buffer-xf buf-size))]
+    ;; Flush periodically
+    (ms/connect (ms/periodically interval (constantly ::flow/flush)) s {:upstream? true})
+    ;; Push any received logs to the log ingester
+    (ms/consume-async (fn [logs]
+                        (log/trace "Pushing logs of" (count logs) "chars")
+                        (-> (push-logs client path [logs])
+                            (md/chain (constantly true))))
+                      s)
+    (flow/raw-stream s)))

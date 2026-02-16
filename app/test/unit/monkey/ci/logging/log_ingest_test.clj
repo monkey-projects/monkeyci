@@ -1,7 +1,9 @@
 (ns monkey.ci.logging.log-ingest-test
   (:require [clojure.test :refer [deftest testing is]]
             [aleph.http :as http]
-            [monkey.ci.logging.log-ingest :as sut]))
+            [manifold.deferred :as md]
+            [monkey.ci.logging.log-ingest :as sut]
+            [monkey.ci.test.helpers :as h]))
 
 (deftest make-client
   (testing "creates client object according to params"
@@ -44,3 +46,22 @@
       (is (= [["test" "path"]]
              (get @inv :fetch))))))
 
+(deftest pushing-stream
+  (testing "returns output stream"
+    (let [os (sut/pushing-stream (constantly nil)
+                                 {:interval 1000})]
+      (is (instance? java.io.OutputStream os))
+      (is (nil? (.close os)))))
+
+  (testing "pushes written data to client on full buffer"
+    (let [inv (atom {})
+          c (fn [req & args]
+              (md/success-deferred (swap! inv assoc req args)))
+          ps (sut/pushing-stream c
+                                 {:path ["test" "path"]
+                                  :interval 1000
+                                  :buf-size 10})]
+      (is (nil? (.write ps (.getBytes "0123456789"))))
+      (is (= [["test" "path"] ["0123456789"]]
+             (h/wait-until #(get @inv :push) 1000)))
+      (is (nil? (.close ps))))))
