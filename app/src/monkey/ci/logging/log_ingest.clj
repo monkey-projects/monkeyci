@@ -1,11 +1,15 @@
 (ns monkey.ci.logging.log-ingest
   "Client for log ingestion microservice"
   (:require [aleph.http :as http]
+            [clj-commons.byte-streams :as bs]
             [clojure.string :as cs]
             [clojure.tools.logging :as log]
             [manifold
              [deferred :as md]
              [stream :as ms]]
+            [monkey.ci
+             [build :as b]
+             [logging :as l]]
             [monkey.flow :as flow]))
 
 (defn make-client [conf]
@@ -46,3 +50,31 @@
                             (md/chain (constantly true))))
                       s)
     (flow/raw-stream s)))
+
+(defn- ingest-path [build-sid path]
+  (concat build-sid (cs/split path #"/")))
+
+(defrecord LogIngestLogger [client opts build path]
+  l/LogCapturer
+  (log-output [this]
+    (pushing-stream client (assoc opts :path (ingest-path (b/sid build) path))))
+  
+  (handle-stream [this in]))
+
+(defn make-ingest-logger [client opts build path]
+  (->LogIngestLogger client opts build path))
+
+(defrecord LogIngestRetriever [client]
+  l/LogRetriever
+  (list-logs [this _]
+    ;; TODO Must be added on log ingester server first
+    [])
+
+  (fetch-log [this build-sid path]
+    (-> (fetch-logs client (ingest-path build-sid path))
+        (deref)
+        :entries
+        (bs/to-input-stream))))
+
+(defn make-log-ingest-retriever [client]
+  (->LogIngestRetriever client))

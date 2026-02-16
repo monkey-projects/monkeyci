@@ -2,10 +2,7 @@
   "Handles log configuration and how to process logs from a build script"
   (:require [babashka.fs :as fs]
             [clojure.java.io :as io]
-            [monkey.ci
-             [build :as b]
-             [oci :as oci]
-             [sid :as sid]]))
+            [monkey.ci.build :as b]))
 
 (defprotocol LogCapturer
   "Used to allow processes to store log information.  Depending on the implementation,

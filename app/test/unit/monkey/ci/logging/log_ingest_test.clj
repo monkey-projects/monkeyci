@@ -2,6 +2,9 @@
   (:require [clojure.test :refer [deftest testing is]]
             [aleph.http :as http]
             [manifold.deferred :as md]
+            [monkey.ci
+             [build :as b]
+             [logging :as l]]
             [monkey.ci.logging.log-ingest :as sut]
             [monkey.ci.test.helpers :as h]))
 
@@ -65,3 +68,32 @@
       (is (= [["test" "path"] ["0123456789"]]
              (h/wait-until #(get @inv :push) 1000)))
       (is (nil? (.close ps))))))
+
+(deftest log-ingest-logger
+  (let [build (h/gen-build)
+        path ["test" "path"]
+        inv (atom nil)
+        client (fn [_ path logs]
+                 (md/success-deferred (reset! inv [path logs])))
+        logger (sut/make-ingest-logger client {:interval 100}
+                                       build "test/path")
+        s (l/log-output logger)]
+    
+    (testing "creates output stream"
+      (is (instance? java.io.OutputStream s)))
+
+    (testing "pushes to build sid + path"
+      (is (nil? (.write s (.getBytes "this is a test"))))
+      (is (not= :timeout (h/wait-until #(some? @inv) 200)))
+      (is (= (concat (b/sid build) path)
+             (first @inv))))
+
+    (is (nil? (.close s)))))
+
+(deftest log-ingest-retriever
+  (testing "retrieves log contents using client"
+    (let [client (constantly (md/success-deferred {:entries ["test-log"]}))
+          r (sut/make-log-ingest-retriever client)
+          f (l/fetch-log r ["test" "build"] "test-path")]
+      (is (instance? java.io.InputStream f))
+      (is (= "test-log" (slurp f))))))
