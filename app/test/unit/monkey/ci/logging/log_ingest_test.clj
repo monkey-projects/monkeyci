@@ -35,3 +35,12 @@
       (is (= [["test" "path"] ["test-logs"]]
              (get @inv :push))))))
 
+(deftest push-logs
+  (testing "fetches from remote using client"
+    (let [inv (atom {})
+          c (fn [req & args]
+              (swap! inv assoc req args))]
+      (is (some? (sut/fetch-logs c ["test" "path"])))
+      (is (= [["test" "path"]]
+             (get @inv :fetch))))))
+

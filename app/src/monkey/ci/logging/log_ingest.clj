@@ -26,4 +26,5 @@
 
 (defn fetch-logs
   "Retrieves any logs at specified path"
-  [client path])
+  [client path]
+  (client :fetch path))
