@@ -49,7 +49,7 @@
   "Reads lines from the given reader, and passes each of them as parsed edn 
    to the callback fn.  If the callback returns `false` or throws an error, 
    the async process is terminated.  On EOF, the callback is passed `::eof`
-   and not any data read."
+   instead of a data map."
   [reader callback]
   (let [r (as-pushback reader)]
     (md/future

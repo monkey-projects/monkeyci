@@ -5,13 +5,17 @@
             [clojure.tools.logging :as log]
             [io.pedestal.interceptor :as i]
             [io.pedestal.interceptor.chain :as pi]
-            [manifold.deferred :as md]
+            [manifold
+             [deferred :as md]
+             [stream :as ms]]
             [monkey.ci
              [cuid :as cuid]
              [vault :as v]]
             [monkey.ci.containers.podman :as sut]
             [monkey.ci.events.mailman.interceptors :as emi]
-            [monkey.ci.test.helpers :as h :refer [contains-subseq?]]
+            [monkey.ci.test
+             [helpers :as h :refer [contains-subseq?]]
+             [mailman :as tm]]
             [monkey.ci.vault.common :as vc]
             [monkey.mailman.core :as mmc]))
 
@@ -457,6 +461,26 @@
              (-> {}
                  (enter)
                  (sut/podman-opts)))))))
+
+(deftest watch-events
+  (h/with-tmp-dir dir
+    (let [{:keys [leave] :as i} sut/watch-events
+          events-file (fs/path dir "script" sut/events-file)
+          mm (tm/test-component)]
+      (is (some? (fs/create-dirs (fs/parent events-file))))
+      (is (keyword? (:name i)))
+
+      (testing "`leave` forwards events read from events file to mailman"
+        (let [ctx (-> {}
+                      (sut/set-job-dir dir)
+                      (emi/set-mailman mm)
+                      (leave))]
+          (is (nil? (spit (fs/file events-file) (prn-str {:type :container/pending}))))
+          (let [es (sut/get-events-stream ctx)]
+            (is (ms/sink? es))
+            (is (= {:type :container/pending}
+                   @(ms/try-take! es nil 500 :timeout)))
+            (is (nil? (ms/close! es)))))))))
 
 (deftest job-queued
   (testing "returns `job/initializing` event"

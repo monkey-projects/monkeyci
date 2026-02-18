@@ -230,3 +230,9 @@
   (->> (ms/periodically period p)
        (ms/filter (every-pred some? (complement false?)))
        (ms/take!)))
+
+(defn wait-for-file
+  "Periodically checks if given file exists.  Returns a deferred that holds
+   the path if it exists."
+  [f & opts]
+  (wait-until #(when (fs/exists? f) f) opts))

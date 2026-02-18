@@ -103,38 +103,27 @@
 
 (deftest stream-file
   (h/with-tmp-dir dir
-    (let [;; pushed (atom {})
-          ;; client (fn [_ path s]
-          ;;          (swap! pushed (fn [r]
-          ;;                          (-> r
-          ;;                              (assoc :path path)
-          ;;                              (update :contents conj s))))
-          ;;          (md/success-deferred {:status 200}))
-          ;; path ["test" "path"]
-          s (ms/stream 1)
+    (let [out (ms/stream 1)
+          in (ms/filter (partial not= ::sut/eof) out)
           f (fs/path dir "test.log")
           msg "this is a test"
           _ (spit (fs/file f) msg)
-          r (sut/stream-file f s {:interval 100})]
+          r (sut/stream-file f out {:interval 100})]
       (testing "returns deferred"
         (is (md/deferred? r)))
 
       (testing "pushes the log contents to stream"
-        (let [r (deref (ms/take! s) 200 :timeout)]
+        (let [r @(ms/try-take! in nil 200 :timeout)]
           (is (not= :timeout r))
           (is (= msg (String. (:buf r) (:off r) (:len r))))))
 
-      (testing "returns `::eof` on successful read until eof"
-        (is (= ::sut/eof (deref r 200 :timeout)))))))
+      (testing "continues reading until sink is closed"
+        (let [new-msg "this is another message"]
+          (is (nil? (spit (fs/file f) new-msg :append true)))
+          (let [r @(ms/try-take! in nil 200 :timeout)]
+            (is (map? r))
+            (is (= new-msg (String. (:buf r) (:off r) (:len r)))))))
 
-(deftest wait-for-file
-  (h/with-tmp-dir dir
-    (let [p (fs/path dir "test.txt")
-          w (sut/wait-for-file p)]
-      (testing "returns a deferred"
-        (is (md/deferred? w)))
-
-      (testing "realizes when file exists"
-        (is (not (md/realized? w)))
-        (is (nil? (spit (fs/file p) "test")))
-        (is (= p (deref w 100 :timeout)))))))
+      (testing "stops when sink closed"
+        (is (nil? (ms/close! out)))
+        (is (= ::sut/sink-closed (deref r 200 :timeout)))))))

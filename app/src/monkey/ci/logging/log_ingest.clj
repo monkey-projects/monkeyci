@@ -8,7 +8,8 @@
             [clojure.tools.logging :as log]
             [manifold
              [deferred :as md]
-             [stream :as ms]]
+             [stream :as ms]
+             [time :as mt]]
             [monkey.ci
              [build :as b]
              [logging :as l]
@@ -90,28 +91,30 @@
   [f s & [{:keys [interval buf-size] :or {interval 1000 buf-size 0x10000} :as opts}]]
   (let [r (md/deferred)
         buf (byte-array buf-size)]
-    (with-open [r (io/input-stream (fs/file f))]
+    (let [r (io/input-stream (fs/file f))]
       (letfn [(read-next []
                 (.read r buf))]
-        (md/loop [n (read-next)]
-          (if (neg? n)
-            ::eof
-            (md/chain
-             (ms/put! s {:buf buf :off 0 :len n})
-             (fn [v]
-               (if v
-                 (md/recur
-                  (read-next))
-                 ::sink-closed)))))))))
-
-(defn wait-for-file
-  "Periodically checks if given file exists.  Returns a deferred that holds
-   the path if it exists."
-  [f & opts]
-  (u/wait-until #(when (fs/exists? f) f) opts))
+        (-> (md/loop [n (read-next)]
+              ;; Continue on eof, only stop when sink is closed
+              (md/chain
+               (if (neg? n)
+                 (md/chain
+                  (ms/put! s ::eof)
+                  (fn [v]
+                    ;; Wait a bit before continuing
+                    (mt/in interval (constantly v))))
+                 (ms/put! s {:buf buf :off 0 :len n}))
+               (fn [v]
+                 (if v
+                   (md/recur
+                    (read-next))
+                   ::sink-closed))))
+            (md/finally #(.close r)))))))
 
 (defn stream-file-when-exists
-  "Waits until file `f` exists, then streams it contents to Manifold sink `s`."
+  "Waits until file `f` exists, then streams its contents to Manifold sink `s`.
+   Returns a deferred that will hold the result of the streaming operation.
+   In order to stop reading the file, close the sink."
   [f s & opts]
-  (md/chain (wait-for-file f (select-keys opts [:period]))
+  (md/chain (u/wait-for-file f (select-keys opts [:period]))
             #(stream-file % s opts)))

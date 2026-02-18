@@ -1,5 +1,6 @@
 (ns monkey.ci.utils-test
-  (:require [clojure.java.io :as io]
+  (:require [babashka.fs :as fs]
+            [clojure.java.io :as io]
             [clojure.test :refer :all]
             [manifold.deferred :as md]
             [monkey.ci.test.helpers :as h]
@@ -84,3 +85,15 @@
       (is (not (md/realized? s)))
       (is (some? (reset! r ::done)))
       (is (= ::done (deref s 100 :timeout))))))
+
+(deftest wait-for-file
+  (h/with-tmp-dir dir
+    (let [p (fs/path dir "test.txt")
+          w (sut/wait-for-file p)]
+      (testing "returns a deferred"
+        (is (md/deferred? w)))
+
+      (testing "realizes when file exists"
+        (is (not (md/realized? w)))
+        (is (some? (fs/create-file p)))
+        (is (= p (deref w 100 :timeout)))))))

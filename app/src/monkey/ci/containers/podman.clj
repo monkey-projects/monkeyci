@@ -8,6 +8,9 @@
             [clojure.java.io :as io]
             [clojure.string :as cs]
             [clojure.tools.logging :as log]
+            [manifold
+             [deferred :as md]
+             [stream :as ms]]
             [medley.core :as mc]
             [monkey.ci
              [artifacts :as art]
@@ -22,7 +25,9 @@
              [workspace :as ws]]
             [monkey.ci.build.core :as bc]
             [monkey.ci.containers.common :as cc]
-            [monkey.ci.events.mailman :as em]
+            [monkey.ci.events
+             [edn :as ee]
+             [mailman :as em]]
             [monkey.ci.events.mailman.interceptors :as emi]
             [monkey.ci.vault.common :as vc]))
 
@@ -47,6 +52,8 @@
     "XDG_CONFIG_HOME"
     "XDG_DATA_HOME"
     "XDG_RUNTIME_DIR"})
+
+(def events-file "events.edn")
 
 (defn- reserved? [var]
   (or (reserved-vars var)
@@ -149,7 +156,7 @@
              "MONKEYCI_LOG_DIR" cld
              "MONKEYCI_START_FILE" (str csd "/" start)
              "MONKEYCI_ABORT_FILE" (str csd "/abort")
-             "MONKEYCI_EVENT_FILE" (str csd "/events.edn")}]
+             "MONKEYCI_EVENT_FILE" (str csd "/" events-file)}]
     (when-let [s (:script job)]
       (script->files s sd)
       (io/copy (slurp (io/resource cc/job-script)) (fs/file (fs/path sd cc/job-script)))
@@ -227,6 +234,11 @@
 
 (defn set-podman-opts [ctx opts]
   (assoc ctx podman-opts opts))
+
+(def get-events-stream ::events-stream)
+
+(defn set-events-stream [ctx s]
+  (assoc ctx ::events-stream s))
 
 ;;; Interceptors
 
@@ -366,6 +378,27 @@
    :leave (fn [ctx]
             (emi/set-result ctx (job-queued conf ctx)))})
 
+(def watch-events
+  "Interceptor that starts watching the events file that will be written to by the started process.
+   These events are posted to the configured mailman."
+  {:name ::watch-events
+   :leave (fn [ctx]
+            (let [e (fs/path (get-script-dir ctx) events-file)
+                  s (ms/stream 1)]
+              ;; TODO Post to mailman
+              (-> ctx
+                  (set-events-stream s)
+                  (assoc ::events-stream-result
+                         (-> (u/wait-for-file e)
+                             (md/chain
+                              (fn [p]
+                                (let [r (io/reader (fs/file p))]
+                                  (-> (ee/read-edn r (-> (fn [evt]
+                                                           @(ms/put! s evt))
+                                                         (ee/sleep-on-eof 100)
+                                                         (ee/stop-on-file-delete p)))
+                                      (md/finally #(.close r)))))))))))})
+
 ;;; Event handlers
 
 (defn podman-src [evt]
@@ -445,6 +478,7 @@
 
      [:job/initializing
       ;; TODO Start polling for events from events.edn?
+      ;; TODO Only start the job when the :container/pending event is received.
       [{:handler job-init
         :interceptors [emi/handle-job-error
                        state
