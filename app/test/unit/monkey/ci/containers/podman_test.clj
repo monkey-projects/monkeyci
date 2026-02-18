@@ -478,8 +478,8 @@
           (is (nil? (spit (fs/file events-file) (prn-str {:type :container/pending}))))
           (let [es (sut/get-events-stream ctx)]
             (is (ms/sink? es))
-            (is (= {:type :container/pending}
-                   @(ms/try-take! es nil 500 :timeout)))
+            (is (not= :timeout (h/wait-until #(not-empty (tm/get-posted mm)) 200)))
+            (is (= [{:type :container/pending}] (tm/get-posted mm)))
             (is (nil? (ms/close! es)))))))))
 
 (deftest job-queued

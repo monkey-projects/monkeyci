@@ -385,7 +385,8 @@
    :leave (fn [ctx]
             (let [e (fs/path (get-script-dir ctx) events-file)
                   s (ms/stream 1)]
-              ;; TODO Post to mailman
+              ;; Post to mailman
+              (ms/consume #(em/post-events (emi/get-mailman ctx) [%]) s)
               (-> ctx
                   (set-events-stream s)
                   (assoc ::events-stream-result
