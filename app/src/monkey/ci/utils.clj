@@ -11,7 +11,9 @@
              [walk :as cw]]
             [clojure.java.io :as io]
             [clojure.tools.logging :as log]
-            [manifold.deferred :as md]
+            [manifold
+             [deferred :as md]
+             [stream :as ms]]
             [medley.core :as mc]
             [monkey.ci
              [edn :as ce]
@@ -220,3 +222,11 @@
         (recur (str new-id "-" idx)
                (inc idx))
         id))))
+
+(defn wait-until
+  "Periodically invokes predicate `p`.  Returns a deferred that realizes when `p`
+   becomes truthy.  Returns the first truthy return value of `p`."
+  [p & {:keys [period] :or {period 100}}]
+  (->> (ms/periodically period p)
+       (ms/filter (every-pred some? (complement false?)))
+       (ms/take!)))

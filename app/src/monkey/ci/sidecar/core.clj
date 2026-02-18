@@ -9,7 +9,6 @@
              [cache :as cache]
              [jobs :as j]
              [spec :as spec]
-             [utils :as u]
              [workspace :as ws]]
             [monkey.ci.events
              [core :as ec]
@@ -43,30 +42,6 @@
   (when-not (fs/exists? f)
     (create-file-with-dirs f))
   f)
-
-;; (defn- upload-log [logger path]
-;;   (when (and path logger)
-;;     (let [size (fs/size path)]
-;;       (when (pos? size)
-;;         (log/debug "Uploading log file" path "(" size "bytes)")
-;;         (with-open [is (io/input-stream path)]
-;;           (let [capt (logger [(fs/file-name path)])
-;;                 d (l/handle-stream capt is)]
-;;             (when  (md/deferred? d)
-;;               @d)))))))
-
-;; (defn upload-logs
-;;   "Uploads log files referenced in the event, if any"
-;;   [evt logger]
-;;   (doseq [l ((juxt :stdout :stderr) evt)]
-;;     (when l
-;;       (upload-log logger l)
-;;       (log/debug "File uploaded:" l))))
-
-;; (defn- get-logger [{:keys [sid job log-maker]}]
-;;   (let [log-base (conj sid (j/job-id job))]
-;;     (when log-maker (comp (partial log-maker build)
-;;                           (partial concat log-base)))))
 
 (defn- make-evt [evt {:keys [job sid]}]
   (ec/make-event

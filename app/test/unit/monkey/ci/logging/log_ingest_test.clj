@@ -1,7 +1,10 @@
 (ns monkey.ci.logging.log-ingest-test
   (:require [clojure.test :refer [deftest testing is]]
             [aleph.http :as http]
-            [manifold.deferred :as md]
+            [babashka.fs :as fs]
+            [manifold
+             [deferred :as md]
+             [stream :as ms]]
             [monkey.ci
              [build :as b]
              [logging :as l]]
@@ -97,3 +100,41 @@
           f (l/fetch-log r ["test" "build"] "test-path")]
       (is (instance? java.io.InputStream f))
       (is (= "test-log" (slurp f))))))
+
+(deftest stream-file
+  (h/with-tmp-dir dir
+    (let [;; pushed (atom {})
+          ;; client (fn [_ path s]
+          ;;          (swap! pushed (fn [r]
+          ;;                          (-> r
+          ;;                              (assoc :path path)
+          ;;                              (update :contents conj s))))
+          ;;          (md/success-deferred {:status 200}))
+          ;; path ["test" "path"]
+          s (ms/stream 1)
+          f (fs/path dir "test.log")
+          msg "this is a test"
+          _ (spit (fs/file f) msg)
+          r (sut/stream-file f s {:interval 100})]
+      (testing "returns deferred"
+        (is (md/deferred? r)))
+
+      (testing "pushes the log contents to stream"
+        (let [r (deref (ms/take! s) 200 :timeout)]
+          (is (not= :timeout r))
+          (is (= msg (String. (:buf r) (:off r) (:len r))))))
+
+      (testing "returns `::eof` on successful read until eof"
+        (is (= ::sut/eof (deref r 200 :timeout)))))))
+
+(deftest wait-for-file
+  (h/with-tmp-dir dir
+    (let [p (fs/path dir "test.txt")
+          w (sut/wait-for-file p)]
+      (testing "returns a deferred"
+        (is (md/deferred? w)))
+
+      (testing "realizes when file exists"
+        (is (not (md/realized? w)))
+        (is (nil? (spit (fs/file p) "test")))
+        (is (= p (deref w 100 :timeout)))))))

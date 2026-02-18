@@ -1,9 +1,9 @@
 (ns monkey.ci.utils-test
-  (:require
-   [clojure.java.io :as io]
-   [clojure.test :refer :all]
-   [monkey.ci.test.helpers :as h]
-   [monkey.ci.utils :as sut]))
+  (:require [clojure.java.io :as io]
+            [clojure.test :refer :all]
+            [manifold.deferred :as md]
+            [monkey.ci.test.helpers :as h]
+            [monkey.ci.utils :as sut]))
 
 (deftest abs-path
   (testing "returns abs path as is"
@@ -75,3 +75,12 @@
   (testing "applies f to nth item in collection"
     (is (= ["a" "B" "c"]
            (sut/update-nth ["a" "b" "c"] 1 (memfn toUpperCase))))))
+
+(deftest wait-until
+  (let [r (atom nil)
+        s (sut/wait-until #(deref r))]
+    (testing "returns first non-falsey value of predicate"
+      (is (md/deferred? s))
+      (is (not (md/realized? s)))
+      (is (some? (reset! r ::done)))
+      (is (= ::done (deref s 100 :timeout))))))

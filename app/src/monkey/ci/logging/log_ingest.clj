@@ -1,7 +1,9 @@
 (ns monkey.ci.logging.log-ingest
   "Client for log ingestion microservice"
   (:require [aleph.http :as http]
+            [babashka.fs :as fs]
             [clj-commons.byte-streams :as bs]
+            [clojure.java.io :as io]
             [clojure.string :as cs]
             [clojure.tools.logging :as log]
             [manifold
@@ -9,7 +11,8 @@
              [stream :as ms]]
             [monkey.ci
              [build :as b]
-             [logging :as l]]
+             [logging :as l]
+             [utils :as u]]
             [monkey.flow :as flow]))
 
 (defn make-client [conf]
@@ -78,3 +81,37 @@
 
 (defn make-log-ingest-retriever [client]
   (->LogIngestRetriever client))
+
+(defn stream-file
+  "Reads the given logfile to the sink.  When the sink is closed, or eof is reached,
+   the streaming operation is stopped.  Additional options can be specified to set
+   buffer size and push interval.  Returns a deferred that will hold the reason the
+   async loop has stopped."
+  [f s & [{:keys [interval buf-size] :or {interval 1000 buf-size 0x10000} :as opts}]]
+  (let [r (md/deferred)
+        buf (byte-array buf-size)]
+    (with-open [r (io/input-stream (fs/file f))]
+      (letfn [(read-next []
+                (.read r buf))]
+        (md/loop [n (read-next)]
+          (if (neg? n)
+            ::eof
+            (md/chain
+             (ms/put! s {:buf buf :off 0 :len n})
+             (fn [v]
+               (if v
+                 (md/recur
+                  (read-next))
+                 ::sink-closed)))))))))
+
+(defn wait-for-file
+  "Periodically checks if given file exists.  Returns a deferred that holds
+   the path if it exists."
+  [f & opts]
+  (u/wait-until #(when (fs/exists? f) f) opts))
+
+(defn stream-file-when-exists
+  "Waits until file `f` exists, then streams it contents to Manifold sink `s`."
+  [f s & opts]
+  (md/chain (wait-for-file f (select-keys opts [:period]))
+            #(stream-file % s opts)))
