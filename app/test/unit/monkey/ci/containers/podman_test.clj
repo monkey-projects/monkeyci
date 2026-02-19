@@ -179,6 +179,7 @@
           routes (sut/make-routes {:work-dir dir :state state})
           expected [:container/job-queued
                     :job/initializing
+                    :container/pending
                     :container/end]]
       (doseq [t expected]
         (testing (format "handles `%s`" t)
@@ -466,21 +467,50 @@
   (h/with-tmp-dir dir
     (let [{:keys [leave] :as i} sut/watch-events
           events-file (fs/path dir "script" sut/events-file)
-          mm (tm/test-component)]
+          mm (tm/test-component)
+          job (h/gen-job)
+          sid (repeatedly 3 cuid/random-cuid)]
       (is (some? (fs/create-dirs (fs/parent events-file))))
       (is (keyword? (:name i)))
 
-      (testing "`leave` forwards events read from events file to mailman"
-        (let [ctx (-> {}
+      (testing "`leave`"
+        (let [ctx (-> {:event
+                       {:type :job/initializing
+                        :job-id (:id job)
+                        :sid sid}}
                       (sut/set-job-dir dir)
                       (emi/set-mailman mm)
                       (leave))]
           (is (nil? (spit (fs/file events-file) (prn-str {:type :container/pending}))))
+
           (let [es (sut/get-events-stream ctx)]
-            (is (ms/sink? es))
-            (is (not= :timeout (h/wait-until #(not-empty (tm/get-posted mm)) 200)))
-            (is (= [{:type :container/pending}] (tm/get-posted mm)))
+            (testing "forwards events read from events file to mailman"
+              (is (ms/sink? es))
+              (is (not= :timeout (h/wait-until #(not-empty (tm/get-posted mm)) 200)))
+              (is (= [:container/pending]
+                     (map :type (tm/get-posted mm)))))
+
+            (testing "augments events with job id and build sid"
+              (let [e (first (tm/get-posted mm))]
+                (is (= sid (:sid e)))
+                (is (= (:id job) (:job-id e)))))
+
             (is (nil? (ms/close! es)))))))))
+
+(deftest stop-watch-events
+  (let [{:keys [enter] :as i} sut/stop-watch-events]
+    (is (keyword? (:name i)))
+    
+    (testing "closes the event stream"
+      (let [s (ms/stream)]
+        (is (nil? (-> {:event
+                       {:type :container/end
+                        :job-id "test-job"
+                        :sid ["test" "build"]}}
+                      (sut/set-events-stream s)
+                      (enter)
+                      (sut/get-events-stream))))
+        (is (ms/closed? s))))))
 
 (deftest job-queued
   (testing "returns `job/initializing` event"
@@ -507,22 +537,41 @@
                  :local-dir))))))
 
 (deftest job-init
-  (testing "returns `job/start` event"
+  (testing "when no script, returns `job/start` event"
     (is (= :job/start
            (-> {:event
                 {:type :job/initializing
-                 :job-id "test-job"}}
+                 :job-id "no-script-job"}}
+               (sut/set-job {:id "no-script-job"})
                (sut/job-init)
+               first
+               :type))))
+
+  (testing "when script, does nothing"
+    (is (empty? (-> {:event
+                     {:type :job/initializing
+                      :job-id "script-job"}}
+                    (sut/set-job {:id "script-job"
+                                  :script ["ls"]})
+                    (sut/job-init))))))
+
+(deftest job-pending
+  (testing "returns `job/start` event"
+    (is (= :job/start
+           (-> {:event
+                {:type :job/pending
+                 :job-id "test-job"}}
+               (sut/job-pending)
                first
                :type)))))
 
 (deftest job-exec
   (testing "returns `job/executed` event"
     (let [r (-> {:event
-                {:type :container/end
-                 :job-id "test-job"}}
-               (sut/job-exec)
-               first)]
+                 {:type :container/end
+                  :job-id "test-job"}}
+                (sut/job-exec)
+                first)]
       (is (= :job/executed
              (:type r))))))
 

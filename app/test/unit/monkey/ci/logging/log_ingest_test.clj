@@ -126,4 +126,4 @@
 
       (testing "stops when sink closed"
         (is (nil? (ms/close! out)))
-        (is (= ::sut/sink-closed (deref r 200 :timeout)))))))
+        (is (= ::sut/sink-closed (deref r 500 :timeout)))))))

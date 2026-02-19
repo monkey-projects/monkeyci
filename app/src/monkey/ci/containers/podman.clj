@@ -235,10 +235,21 @@
 (defn set-podman-opts [ctx opts]
   (assoc ctx podman-opts opts))
 
-(def get-events-stream ::events-stream)
+(defn get-events-stream [ctx]
+  (some-> (emi/get-state ctx)
+          (get-in [:events-streams (build-sid ctx) (ctx->job-id ctx)])))
 
 (defn set-events-stream [ctx s]
-  (assoc ctx ::events-stream s))
+  (emi/update-state ctx assoc-in [:events-streams (build-sid ctx) (ctx->job-id ctx)] s))
+
+(defn remove-events-stream
+  "Removes event stream for the current job from state"
+  [ctx]
+  (emi/update-state ctx (fn [s]
+                          (-> s
+                              (update-in [:events-streams (build-sid ctx)] dissoc (ctx->job-id ctx))
+                              ;; Remove any empty entries if all jobs have finished
+                              (update :events-streams u/prune-tree)))))
 
 ;;; Interceptors
 
@@ -384,7 +395,11 @@
   {:name ::watch-events
    :leave (fn [ctx]
             (let [e (fs/path (get-script-dir ctx) events-file)
-                  s (ms/stream 1)]
+                  s (ms/stream 1)
+                  sid (build-sid ctx)
+                  job-id (ctx->job-id ctx)
+                  add-ids (fn [evt]
+                            (assoc evt :sid sid :job-id job-id))]
               ;; Post to mailman
               (ms/consume #(em/post-events (emi/get-mailman ctx) [%]) s)
               (-> ctx
@@ -395,10 +410,20 @@
                               (fn [p]
                                 (let [r (io/reader (fs/file p))]
                                   (-> (ee/read-edn r (-> (fn [evt]
-                                                           @(ms/put! s evt))
+                                                           @(ms/put! s (add-ids evt)))
                                                          (ee/sleep-on-eof 100)
                                                          (ee/stop-on-file-delete p)))
                                       (md/finally #(.close r)))))))))))})
+
+(def stop-watch-events
+  "Stops watching events for a job by closing the event sink"
+  {:name ::stop-watch-events
+   :enter (fn [ctx]
+            (let [s (get-events-stream ctx)]
+              (when s
+                (ms/close! s))
+              (cond-> ctx
+                s (remove-events-stream))))})
 
 ;;; Event handlers
 
@@ -434,14 +459,26 @@
                  (log/info "Container job" job-id "exited with code" exit)
                  (try
                    (em/post-events (emi/get-mailman ctx)
+                                   ;; Note that the job script also fires a :container/end event,
+                                   ;; so we may want to rename this.  This is not really a problem
+                                   ;; since they both come in close succession, but it would be
+                                   ;; clearer.
                                    [(container-end-evt job-id sid (if (= 0 exit) bc/success bc/failure))])
                    (catch Exception ex
                      (log/error "Failed to post job/executed event" ex)))))}))
 
 (defn job-init [ctx]
+  (let [job (get-job ctx)
+        {:keys [job-id sid]} (:event ctx)]
+    ;; If the job contains a script, we can wait for the container/pending event.  Otherwise
+    ;; we'll have to mark the job as started right here.
+    (when (empty? (:script job))
+      [(podman-src (j/job-start-evt job-id sid))])))
+
+(defn job-pending [ctx]
+  ;; Raised by the job script, when the job is waiting to start.  In this case, this is immediately,
+  ;; so we can assume the job is already running.
   (let [{:keys [job-id sid]} (:event ctx)]
-    ;; Ideally the container notifies us when it's running by means of a script,
-    ;; similar to the oci sidecar.
     [(podman-src (j/job-start-evt job-id sid))]))
 
 (defn job-exec
@@ -478,11 +515,18 @@
                        (add-podman-opts (:podman conf))]}]]
 
      [:job/initializing
-      ;; TODO Start polling for events from events.edn?
-      ;; TODO Only start the job when the :container/pending event is received.
+      ;; This marks the job as running, but only if there is no script configured.
       [{:handler job-init
         :interceptors [emi/handle-job-error
                        state
+                       require-job
+                       (add-job-dir wd)
+                       (emi/add-mailman mailman)
+                       watch-events]}]]
+
+     [:container/pending
+      [{:handler job-pending
+        :interceptors [state
                        require-job]}]]
 
      [:container/end
@@ -498,5 +542,6 @@
                        (cleanup conf)
                        (add-job-dir wd)
                        (add-job-ctx job-ctx)
+                       stop-watch-events
                        (art/save-interceptor emi/get-job-ctx)
                        (cache/save-interceptor emi/get-job-ctx)]}]]]))
