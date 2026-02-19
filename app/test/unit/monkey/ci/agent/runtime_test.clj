@@ -115,7 +115,16 @@
           (is (string? token))
           (is (= sid (-> (jwt/unsign token pubkey {:alg :rs256})
                          :sub
-                         (sid/parse-sid)))))))))
+                         (sid/parse-sid)))))))
+
+    (testing "throws on error response"
+      (ta/with-fake-http
+          ["http://test-api/org/test-cust/repo/test-repo/ssh-keys"
+           (fn [req]
+             {:status 400
+              :body (java.io.ByteArrayInputStream. (.getBytes "Test client error"))})]
+        (let [fetcher (sut/new-ssh-keys-fetcher conf)]
+          (is (thrown-with-msg? Exception #"Test client error" (fetcher sid))))))))
 
 (deftest build-key-decrypter
   (testing "decrypts from global api"

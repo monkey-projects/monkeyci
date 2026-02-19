@@ -4,6 +4,7 @@
             [aleph.http.client-middleware :as ahmw]
             [clojure.tools.logging :as log]
             [com.stuartsierra.component :as co]
+            [medley.core :as mco]
             [monkey.ci
              [artifacts :as a]
              [build :as b]
@@ -66,21 +67,35 @@
 ;; TODO Move this implementation to api-server ns
 (defn new-ssh-keys-fetcher [config]
   (let [client (ahmw/wrap-request http/request)
-        maker (api-with-token-maker config)]
+        maker (api-with-token-maker config)
+        try-slurp (fn [x]
+                    (try
+                      (slurp x)
+                      (catch Exception ex x)))]
     (fn [[org-id repo-id :as sid]]
       (let [api (maker sid)]
         (log/debug "Retrieving ssh keys for" sid)
-        (-> {:url (format "%s/org/%s/repo/%s/ssh-keys"
-                          (:url api)
-                          org-id
-                          repo-id)
-             :method :get
-             :oauth-token (:token api)
-             :accept "application/edn"}
-            (client)
-            (deref)
-            :body
-            (edn/edn->))))))
+        (try
+          (-> {:url (format "%s/org/%s/repo/%s/ssh-keys"
+                            (:url api)
+                            org-id
+                            repo-id)
+               :method :get
+               :oauth-token (:token api)
+               :accept "application/edn"}
+              (client)
+              (deref)
+              :body
+              (edn/edn->))
+          (catch Exception ex
+            ;; On error, rethrow but read the response body
+            (let [resp (some-> (ex-data ex)
+                               :body
+                               try-slurp)]
+              (throw (if resp
+                       (ex-info (str (ex-message ex) ": " resp)
+                                (ex-data ex))
+                       ex)))))))))
 
 (defn new-build-key-decrypter
   "Build key decrypter, to decrypt the build data encryption key, which is then
