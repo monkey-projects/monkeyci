@@ -2,7 +2,7 @@
         day8.re-frame/http-fx {:mvn/version "0.2.4"}
         com.github.oliyh/martian-re-frame {:mvn/version "0.2.1"}
         com.monkeyci/common {:local/root "../common"}
-        com.monkeyci/site-template {:mvn/version "0.13.2"}
+        com.monkeyci/site-template {:mvn/version "0.14.0"}
         medley/medley {:mvn/version "1.4.0"}
         metosin/reitit-frontend {:mvn/version "0.9.2"}
         org.clojure/core.async {:mvn/version "1.8.741"}

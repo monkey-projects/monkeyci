@@ -50,6 +50,7 @@
 (s/def ::time c/ts?)
 ;; Event source (e.g. api, script, build-agent,...)
 (s/def ::src keyword?)
+(s/def ::done? boolean?)
 
 (s/def ::event-base (s/keys :req-un [::type ::time]
                             :opt-un [::message ::src]))
@@ -159,5 +160,15 @@
 
 (defmethod event-type :sidecar/end [_]
   ::job-status-event)
+
+(defmethod event-type :container/pending [_]
+  ::job-event)
+
+(defmethod event-type :container/start [_]
+  ::job-event)
+
+(defmethod event-type :container/end [_]
+  (s/merge ::job-event
+           (s/keys :req-un [::done? ::jc/result])))
 
 (s/def ::event (s/multi-spec event-type :type))
