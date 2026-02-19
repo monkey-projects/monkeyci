@@ -20,8 +20,8 @@
     :job/executed :job/blocked :job/unblocked})
 
 (def container-event-types
-  #{:container/pending :container/initializing :container/start :container/end
-    :container/job-queued})
+  #{:container/pending :container/initializing :container/start :container/script-end
+    :container/end :container/job-queued})
 
 (def sidecar-event-types
   #{:sidecar/start :sidecar/end})
@@ -168,6 +168,9 @@
   ::job-event)
 
 (defmethod event-type :container/end [_]
+  ::job-status-event)
+
+(defmethod event-type :container/script-end [_]
   (s/merge ::job-event
            (s/keys :req-un [::done? ::jc/result])))
 

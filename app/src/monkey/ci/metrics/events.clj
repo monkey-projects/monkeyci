@@ -1,6 +1,7 @@
 (ns monkey.ci.metrics.events
   "Event handlers that update metrics"
-  (:require [monkey.ci.metrics
+  (:require [clojure.tools.logging :as log]
+            [monkey.ci.metrics
              [common :as c]
              [prometheus :as prom]]))
 
@@ -15,8 +16,12 @@
   [counter get-label-vals]
   {:name ::event-counter
    :enter (fn [ctx]
-            (->> (prom/counter-inc counter 1 (get-label-vals ctx))
-                 (set-counter ctx)))})
+            (try
+              (->> (prom/counter-inc counter 1 (get-label-vals ctx))
+                   (set-counter ctx))
+              (catch Exception ex
+                (log/warn "Failed to increase event counter for" (:event ctx) ":" (ex-message ex))
+                ctx)))})
 
 (def ctx->org-id (comp first :sid :event))
 (def ctx->status (comp name :status :event))

@@ -19,7 +19,8 @@
    [:job/pending :job/queued :job/initializing :job/start :job/end :job/skipped :job/executed
     :job/blocked :job/unblocked]
    "%s.jobs.containers"
-   [:container/pending :container/initializing :container/start :container/end :sidecar/start :sidecar/end]
+   [:container/pending :container/initializing :container/start :container/script-end
+    :container/end :sidecar/start :sidecar/end]
    "%s.jobs.commands"
    [:command/start :command/end]
    ;; All things that need to be run in a container go here.

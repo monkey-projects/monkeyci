@@ -330,7 +330,10 @@
                    with-build]
         job-int [use-db
                  load-build
-                 with-job]]
+                 with-job]
+        only-save [{:handler noop-handler
+                    :interceptors [use-db
+                                   save-event]}]]
     [[:build/triggered
       ;; Checks if the org has credits available, and creates the build in db
       [{:handler check-credits
@@ -401,14 +404,8 @@
       [{:handler job-unblocked
         :interceptors job-int}]]
 
-     [:container/pending
-      [{:handler noop-handler
-        :interceptors [save-event]}]]
+     [:container/pending only-save]
      
-     [:container/start
-      [{:handler noop-handler
-        :interceptors [save-event]}]]
+     [:container/start only-save]
      
-     [:container/end
-      [{:handler noop-handler
-        :interceptors [save-event]}]]]))
+     [:container/end only-save]]))

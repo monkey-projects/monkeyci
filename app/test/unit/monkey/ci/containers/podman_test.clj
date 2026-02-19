@@ -495,6 +495,9 @@
                 (is (= sid (:sid e)))
                 (is (= (:id job) (:job-id e)))))
 
+            (testing "adds time"
+              (is (int? (-> (tm/get-posted mm) first :time))))
+
             (is (nil? (ms/close! es)))))))))
 
 (deftest stop-watch-events

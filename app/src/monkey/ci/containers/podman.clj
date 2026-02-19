@@ -20,6 +20,7 @@
              [jobs :as j]
              [process :as proc]
              [protocols :as p]
+             [time :as t]
              [utils :as u]
              [vault :as v]
              [workspace :as ws]]
@@ -251,6 +252,9 @@
                               ;; Remove any empty entries if all jobs have finished
                               (update :events-streams u/prune-tree)))))
 
+(defn podman-src [evt]
+  (assoc evt :src :podman))
+
 ;;; Interceptors
 
 (defn add-job-dir
@@ -275,7 +279,7 @@
    :enter (fn [ctx]
             (let [dest (fs/create-dirs (get-work-dir ctx))
                   ws (ws/->BlobWorkspace workspace (str dest))]
-              (log/debug "Restoring workspace to" dest)
+              (log/debug "Restoring workspace for job" (ctx->job-id ctx) "to" dest)
               (assoc ctx ::workspace (-> (p/restore-workspace ws (build-sid ctx))
                                          (u/maybe-deref)))))})
 
@@ -398,8 +402,10 @@
                   s (ms/stream 1)
                   sid (build-sid ctx)
                   job-id (ctx->job-id ctx)
-                  add-ids (fn [evt]
-                            (assoc evt :sid sid :job-id job-id))]
+                  augment-evt (fn [evt]
+                                (-> evt
+                                    (podman-src)
+                                    (assoc :sid sid :job-id job-id :time (t/now))))]
               ;; Post to mailman
               (ms/consume #(em/post-events (emi/get-mailman ctx) [%]) s)
               (-> ctx
@@ -409,8 +415,9 @@
                              (md/chain
                               (fn [p]
                                 (let [r (io/reader (fs/file p))]
+                                  (log/debug "Starting to watch events from" (str p))
                                   (-> (ee/read-edn r (-> (fn [evt]
-                                                           @(ms/put! s (add-ids evt)))
+                                                           @(ms/put! s (augment-evt evt)))
                                                          (ee/sleep-on-eof 100)
                                                          (ee/stop-on-file-delete p)))
                                       (md/finally #(.close r)))))))))))})
@@ -426,9 +433,6 @@
                 s (remove-events-stream))))})
 
 ;;; Event handlers
-
-(defn podman-src [evt]
-  (assoc evt :src :podman))
 
 (def container-end-evt
   "Creates a `container/end` event, specifically for podman containers.  This is used
@@ -459,10 +463,6 @@
                  (log/info "Container job" job-id "exited with code" exit)
                  (try
                    (em/post-events (emi/get-mailman ctx)
-                                   ;; Note that the job script also fires a :container/end event,
-                                   ;; so we may want to rename this.  This is not really a problem
-                                   ;; since they both come in close succession, but it would be
-                                   ;; clearer.
                                    [(container-end-evt job-id sid (if (= 0 exit) bc/success bc/failure))])
                    (catch Exception ex
                      (log/error "Failed to post job/executed event" ex)))))}))

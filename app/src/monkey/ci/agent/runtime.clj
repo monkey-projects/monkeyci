@@ -43,11 +43,20 @@
 (defn new-api-server [config]
   (->ApiServer nil (:agent config)))
 
+(defmulti make-route-options :type)
+
+(defmethod make-route-options :default [_]
+  {})
+
+(defmethod make-route-options :nats [conf]
+  (select-keys conf [:stream :consumer]))
+
 (defn new-agent-routes [config]
   (letfn [(make-routes [co]
             (e/make-routes (-> (:agent config)
                                (merge co))))]
-    (em/map->RouteComponent {:make-routes make-routes})))
+    (em/map->RouteComponent {:make-routes make-routes
+                             :options (make-route-options (:mailman config))})))
 
 (defn- make-token [pk sid]
   (-> (auth/build-token sid)
@@ -145,7 +154,8 @@
 (defn new-container-routes [config]
   (em/map->RouteComponent
    {:make-routes (fn [co]
-                   (make-container-routes (:containers config) co))}))
+                   (make-container-routes (:containers config) co))
+    :options (make-route-options (:mailman config))}))
 
 (def global-to-local-events #{:build/queued :build/canceled})
 

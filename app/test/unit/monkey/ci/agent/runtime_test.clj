@@ -188,3 +188,25 @@
 
     (testing "provides key decrypter"
       (is (fn? (:key-decrypter sys))))))
+
+(deftest agent-routes
+  (testing "includes stream and consumer for nats"
+    (let [conf {:mailman {:type :nats
+                          :stream "test-stream"
+                          :consumer "test-consumer"}}
+          r (sut/new-agent-routes conf)]
+      (is (= "test-stream"
+             (get-in r [:options :stream])))
+      (is (= "test-consumer"
+             (get-in r [:options :consumer]))))))
+
+(deftest container-routes
+  (testing "includes stream and consumer for nats"
+    (let [conf {:mailman {:type :nats
+                          :stream "test-stream"
+                          :consumer "test-consumer"}}
+          r (sut/new-container-routes conf)]
+      (is (= "test-stream"
+             (get-in r [:options :stream])))
+      (is (= "test-consumer"
+             (get-in r [:options :consumer]))))))
