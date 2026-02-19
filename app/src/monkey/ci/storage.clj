@@ -945,6 +945,16 @@
 
 (def job-event->sid (juxt :org-id :repo-id :build-id :job-id (comp str :time)))
 
+(defn event->storage
+  "Converts the event into a format suitable for storage"
+  [{:keys [sid job-id] :as evt}]
+  (-> build-sid-keys
+      (zipmap sid)
+      (assoc :job-id job-id
+             :event (:type evt)
+             :time (:time evt)
+             :details evt)))
+
 (defn save-job-event [st evt]
   (p/write-obj st (job-event-sid (job-event->sid evt)) evt))
 

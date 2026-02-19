@@ -195,6 +195,28 @@
         (testing "creates job event"
           (is (= 1 (count (st/list-job-events s (conj (b/sid build) (:id job)))))))))))
 
+(deftest save-event
+  (h/with-memory-store s
+    (let [{:keys [enter] :as i} sut/save-event]
+      (is (keyword? (:name i)))
+      
+      (testing "`enter` saves the event to storage"
+        (let [job (h/gen-job)
+              build (h/gen-build)
+              sid (sut/build->sid build)
+              evt {:type :container/pending
+                   :job-id (:id job)
+                   :sid sid
+                   :time 100}]
+          (is (some? (st/save-build s build)))
+          (is (some? (-> {:event evt}
+                         (emi/set-db s)
+                         (enter))))
+          (let [m (st/list-job-events s (vec (concat sid [(:id job)])))]
+            (is (= 1 (count m)))
+            (is (= [:container/pending]
+                   (map :event m)))))))))
+
 (deftest load-job-events
   (h/with-memory-store s
     (let [job (h/gen-job)
@@ -202,14 +224,14 @@
                     (dissoc :sid)
                     (assoc-in [:script :jobs] {(:id job) job}))
           sid (sut/build->sid build)
-          evt (-> (select-keys build [:org-id :repo-id :build-id])
-                  (assoc :job-id (:id job)
-                         :time 100
-                         :type :job/initializing))
+          evt {:job-id (:id job)
+               :sid sid
+               :time 100
+               :type :job/initializing}
           {:keys [enter] :as i} sut/load-job-events]
       (is (keyword? (:name i)))
       (is (some? (st/save-build s build)))
-      (is (some? (st/save-job-event s evt)))
+      (is (some? (st/save-job-event s (st/event->storage evt))))
 
       (testing "loads events for job into ctx"
         (is (= [:job/initializing]
@@ -581,7 +603,10 @@
                      :job/end
                      :job/skipped
                      :job/blocked
-                     :job/unblocked]]
+                     :job/unblocked
+                     :container/pending
+                     :container/start
+                     :container/end]]
     (doseq [t event-types]
       (testing (format "`%s` is handled" (str t))
         (is (contains? routes t))))))
