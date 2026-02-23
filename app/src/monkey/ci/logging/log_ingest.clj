@@ -84,10 +84,10 @@
   (->LogIngestRetriever client))
 
 (defn stream-file
-  "Reads the given logfile to the sink.  When the sink is closed, or eof is reached,
-   the streaming operation is stopped.  Additional options can be specified to set
-   buffer size and push interval.  Returns a deferred that will hold the reason the
-   async loop has stopped."
+  "Reads the given logfile to the sink.  When the sink is closed, the streaming 
+   operation is stopped.  Additional options can be specified to set buffer size
+   and push interval.  Returns a deferred that will hold the reason the async
+   loop has stopped."
   [f s & [{:keys [interval buf-size] :or {interval 1000 buf-size 0x10000} :as opts}]]
   (let [r (md/deferred)
         buf (byte-array buf-size)]
