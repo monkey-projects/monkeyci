@@ -31,13 +31,30 @@
                  :stderr "err.log"}}
                (sut/command-end))))))
 
+(deftest add-config
+  (let [{:keys [enter] :as i} (sut/add-config ::test-config)]
+    (is (keyword? (:name i)))
+    
+    (testing "sets config in context"
+      (is (= ::test-config
+             (-> {}
+                 (enter)
+                 (sut/get-config)))))))
+
 (deftest start-ingest
   (h/with-tmp-dir dir
     (let [{:keys [leave] :as i} sut/start-ingest
           s (ms/stream 1)
           p (fs/path dir "test.log")
-          r (-> {}
-                (sut/set-stream-creator (constantly s))
+          r (-> {:event
+                 {:type :command/start
+                  :sid ::build-sid
+                  :job-id ::job-id}}
+                (sut/set-stream-creator (fn [f opts]
+                                          (when (and (= ::build-sid (:sid opts))
+                                                     (= ::job-id (:job-id opts))
+                                                     (= (str p) f))
+                                            s)))
                 (mi/set-result {:ingest/start [(str p)]})
                 (leave))]
       (is (keyword? (:name i)))
@@ -54,6 +71,9 @@
 
       (testing "clears result"
         (is (nil? (mi/get-result r))))
+
+      (testing "stores in state"
+        (is (not-empty (mi/get-state r))))
 
       (is (nil? (ms/close! s)))
 

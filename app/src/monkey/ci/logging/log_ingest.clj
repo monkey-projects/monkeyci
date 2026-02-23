@@ -115,6 +115,6 @@
   "Waits until file `f` exists, then streams its contents to Manifold sink `s`.
    Returns a deferred that will hold the result of the streaming operation.
    In order to stop reading the file, close the sink."
-  [f s & opts]
+  [f s & [opts]]
   (md/chain (u/wait-for-file f (select-keys opts [:period]))
             #(stream-file % s opts)))

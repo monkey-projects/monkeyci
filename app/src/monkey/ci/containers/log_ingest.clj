@@ -15,33 +15,37 @@
 (defn set-stream-creator [ctx sc]
   (assoc ctx ::stream-creator sc))
 
-(def get-ingest-streams ::ingest-streams)
+(def get-config ::config)
+
+(defn set-config [ctx c]
+  (assoc ctx ::config c))
+
+(def get-ingest-streams
+  (comp ::ingest-streams mi/get-state))
 
 (defn add-ingest-streams [ctx s]
-  (update ctx ::ingest-streams merge (->> (group-by :path s)
-                                          (mc/map-vals first))))
+  (mi/update-state ctx update ::ingest-streams merge (->> (group-by :path s)
+                                                          (mc/map-vals first))))
 
 (defn remove-ingest-streams [ctx s]
   (let [f (set (map :path s))]
-    (update ctx ::ingest-streams (partial mc/remove-keys f))))
+    (mi/update-state ctx update ::ingest-streams (partial mc/remove-keys f))))
 
 (defn- ingest-file
   "Starts ingesting log entries from given file into stream `s`."
-  [f s]
-  ;; TODO Pass additional streaming options
+  [opts [f s]]
   (log/debug "Starting to ingest logs from:" f)
   {:path f
    :stream s
-   :result (li/stream-file-when-exists f s)})
+   :result (li/stream-file-when-exists f s opts)})
 
 (defn- ingest-all [ctx files]
   (->> files
        ;; Only ingest files where the dir exists.  The file may not exist at this point yet.
        (filter (comp fs/exists? fs/parent))
        (map (fn [f]
-              ;; TODO Pass job details to stream creator
-              [f ((get-stream-creator ctx) f)]))
-       (map (partial apply ingest-file))))
+              [f ((get-stream-creator ctx) f (:event ctx))]))
+       (map (partial ingest-file (get-config ctx)))))
 
 (defn- stop-ingest-all [ctx files]
   (let [r (get-ingest-streams ctx)]
@@ -57,6 +61,11 @@
            (doall)))))
 
 ;;; Interceptors
+
+(defn add-config [conf]
+  {:name ::add-config
+   :enter (fn [ctx]
+            (set-config ctx conf))})
 
 (def start-ingest
   {:name ::start-ingest
@@ -89,10 +98,15 @@
 (defn make-routes
   "Creates Mailman routes to handle command events for log ingestion."
   [conf]
-  [[:command/start
-    [{:handler command-start
-      :interceptors [start-ingest]}]]
+  (let [state (atom {})]
+    [[:command/start
+      [{:handler command-start
+        :interceptors [(mi/with-state state)
+                       (add-config conf)
+                       start-ingest]}]]
 
-   [:command/end
-    [{:handler command-end
-      :interceptors [stop-ingest]}]]])
+     [:command/end
+      [{:handler command-end
+        :interceptors [(mi/with-state state)
+                       (add-config conf)
+                       stop-ingest]}]]]))
