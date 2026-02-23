@@ -28,6 +28,8 @@
           :fetch
           {:method :get})
         (assoc :url (cs/join "/" (concat [(:url conf) "log"] (first args))))
+        ;; Include extra headers from config (e.g. security)
+        (update :headers (partial merge (:headers conf)))
         (http/request))))
 
 (defn push-logs
@@ -40,10 +42,7 @@
   [client path]
   (client :fetch path))
 
-(defn pushing-stream
-  "Returns an `OutputStream` that pushes the received bytes to the log ingester
-   at configured intervals, or after a given number of bytes."
-  [client {:keys [path buf-size interval] :or {buf-size 0x10000 interval 1000}}]
+(defn make-sink [client path {:keys [buf-size interval] :or {buf-size 0x10000 interval 1000}}]
   (let [s (ms/stream 1 (flow/buffer-xf buf-size))]
     ;; Flush periodically
     (ms/connect (ms/periodically interval (constantly ::flow/flush)) s {:upstream? true})
@@ -53,7 +52,14 @@
                         (-> (push-logs client path [logs])
                             (md/chain (constantly true))))
                       s)
-    (flow/raw-stream s)))
+    s))
+
+(defn pushing-stream
+  "Returns an `OutputStream` that pushes the received bytes to the log ingester
+   at configured intervals, or after a given number of bytes."
+  [client {:keys [path] :as opts}]
+  (-> (make-sink client path opts)
+      (flow/raw-stream)))
 
 (defn- ingest-path [build-sid path]
   (concat build-sid (cs/split path #"/")))

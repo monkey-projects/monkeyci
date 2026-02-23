@@ -2,6 +2,7 @@
   "Sets up the runtime that is used by a build agent."
   (:require [aleph.http :as http]
             [aleph.http.client-middleware :as ahmw]
+            [babashka.fs :as fs]
             [clojure.tools.logging :as log]
             [com.stuartsierra.component :as co]
             [medley.core :as mco]
@@ -20,11 +21,13 @@
              [api-server :as bas]
              [api :as ba]]
             [monkey.ci.containers
+             [log-ingest :as cl]
              [oci :as c-oci]
              [podman :as c-podman]]
             [monkey.ci.events
              [mailman :as em]
              [polling :as ep]]
+            [monkey.ci.logging.log-ingest :as log-ingest]
             [monkey.ci.metrics.core :as mc]
             [monkey.ci.runners.runtime :as rr]
             [monkey.ci.web.auth :as auth]
@@ -151,10 +154,19 @@
   (log/warn "Unknown container runner type:" (:type conf))
   [])
 
+(defn- make-log-ingest-routes
+  "Creates routes that monitor command events for log ingestion."
+  [config {:keys [log-ingest]}]
+  (-> config
+      (merge (select-keys log-ingest [:stream-creator]))
+      (cl/make-routes)))
+
 (defn new-container-routes [config]
   (em/map->RouteComponent
    {:make-routes (fn [co]
-                   (make-container-routes (:containers config) co))
+                   (cond-> (make-container-routes (:containers config) co)
+                     (not-empty (:log-ingest co))
+                     (concat  (make-log-ingest-routes (:log-ingest config) co))))
     :options (make-route-options (:mailman config))}))
 
 (def global-to-local-events #{:build/queued :build/canceled})
@@ -234,6 +246,22 @@
                        ;; TODO Reset job count after some timeout (resilience)
                        :max-reached? max-jobs-reached?})))
 
+(defn new-log-ingest
+  "Creates log ingestion client, if configured.  It is tied to the log ingestion routes,
+   which use this client to provide a stream creator function, which receives raw byte
+   data from job log files.  Configuration options include `url`, `buf-size` and `interval`."
+  [{conf :log-ingest}]
+  (if (not-empty conf)
+    (let [client (log-ingest/make-client conf)]
+      (letfn [(file->path [f {:keys [sid job-id]}]
+                (vec (concat sid [job-id (fs/file-name f)])))
+              (make-ingest-sink [f evt]
+                (log-ingest/make-sink client (file->path f evt) conf))]
+        {:client client
+         :stream-creator make-ingest-sink}))
+    ;; Not configured, provide empty component
+    {}))
+
 (defn make-container-system
   "Creates a component system to be used by container agents"
   [conf]
@@ -256,5 +284,6 @@
                   :routes :container-routes
                   :state :state})
      :key-decrypter (new-container-key-decrypter conf)
+     :log-ingest (new-log-ingest conf)
      ;; Shared state between container routes and poll loop for capacity calculation
      :state (atom {}))))

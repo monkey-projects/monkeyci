@@ -32,14 +32,16 @@
                (sut/command-end))))))
 
 (deftest add-config
-  (let [{:keys [enter] :as i} (sut/add-config ::test-config)]
+  (let [conf {:stream-creator (constantly ::test)}
+        {:keys [enter] :as i} (sut/add-config conf)]
     (is (keyword? (:name i)))
-    
-    (testing "sets config in context"
-      (is (= ::test-config
-             (-> {}
-                 (enter)
-                 (sut/get-config)))))))
+
+    (let [r (enter {})]
+      (testing "sets config in context"
+        (is (map? (sut/get-config r))))
+
+      (testing "sets stream creator"
+        (is (fn? (sut/get-stream-creator r)))))))
 
 (deftest start-ingest
   (h/with-tmp-dir dir

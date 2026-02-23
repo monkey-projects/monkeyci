@@ -65,7 +65,9 @@
 (defn add-config [conf]
   {:name ::add-config
    :enter (fn [ctx]
-            (set-config ctx conf))})
+            (-> ctx
+                (set-config (dissoc conf :stream-creator))
+                (set-stream-creator (:stream-creator conf))))})
 
 (def start-ingest
   {:name ::start-ingest

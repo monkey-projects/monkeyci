@@ -32,7 +32,17 @@
           (is (some? (c :fetch ["test" "path"])))
           (let [r (last @req)]
             (is (= :get (:method r)))
-            (is (= "http://test/log/test/path" (:url r)))))))))
+            (is (= "http://test/log/test/path" (:url r))))))))
+
+  (testing "passes configured headers"
+    (with-redefs [http/request (fn [req]
+                                 (if (nil? (get-in req [:headers "test-header"]))
+                                   (md/error-deferred (ex-info "invalid headers" req))
+                                   (md/success-deferred {:status 200})))]
+      (let [c (sut/make-client {:url "http://test" :headers {"test-header" "test-value"}})]
+        (is (= 200 (-> (c :fetch ["test" "path"])
+                       (deref)
+                       :status)))))))
 
 (deftest push-logs
   (testing "pushes to client"
