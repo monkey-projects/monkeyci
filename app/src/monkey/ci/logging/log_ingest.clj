@@ -12,6 +12,7 @@
              [time :as mt]]
             [monkey.ci
              [build :as b]
+             [edn :as edn]
              [errors :as err]
              [logging :as l]
              [time :as t]
@@ -28,7 +29,8 @@
              :headers {"content-type" "application/edn"
                        "content-length" (count b)}})
           :fetch
-          {:method :get})
+          {:method :get
+           :headers {"accept" "application/edn"}})
         (assoc :url (cs/join "/" (concat [(:url conf) "log"] (first args))))
         ;; Include extra headers from config (e.g. security)
         (update :headers (partial merge (:headers conf)))
@@ -37,12 +39,25 @@
 (defn push-logs
   "Pushes given logs at specified path"
   [client path logs]
-  (client :push path logs))
+  (md/chain
+   (client :push path logs)
+   (fn [{:keys [status]}]
+     (= 204 status))))
 
 (defn fetch-logs
-  "Retrieves any logs at specified path"
+  "Retrieves any logs at specified path.  Returns a deferred with the result, or `nil`
+   if the path does not exist."
   [client path]
-  (client :fetch path))
+  (md/chain
+   (client :fetch path)
+   (fn [r]
+     (when (= 200 (:status r))
+       (try
+         (edn/edn-> (:body r))
+         (catch Exception ex
+           ;; If body is empty, we should also return `nil`
+           (when (not= "EOF while reading" (ex-message ex))
+             (log/error "Unable to fetch logs" ex))))))))
 
 (defn make-sink [client path {:keys [buf-size interval] :or {buf-size 0x10000 interval 1000} :as opts}]
   (log/debug "Creating log ingestion sink with options:" opts)

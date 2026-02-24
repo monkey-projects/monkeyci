@@ -1157,7 +1157,7 @@
             (testing "downloads log file by query param"
               (let [app (sut/make-app (test-rt
                                        {:log-retriever
-                                        (constantly "test log file")}))
+                                        (constantly (md/success-deferred "test log file"))}))
                     l (->> (str job-path "/logs?file=out.txt")
                            (mock/request :get)
                            (app))]

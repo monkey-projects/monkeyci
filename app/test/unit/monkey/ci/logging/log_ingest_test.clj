@@ -54,19 +54,32 @@
   (testing "pushes to client"
     (let [inv (atom {})
           c (fn [req & args]
-              (swap! inv assoc req args))]
-      (is (some? (sut/push-logs c ["test" "path"] ["test-logs"])))
+              (swap! inv assoc req args)
+              (md/success-deferred {:status 204}))]
+      (is (true? @(sut/push-logs c ["test" "path"] ["test-logs"])))
       (is (= [["test" "path"] ["test-logs"]]
              (get @inv :push))))))
 
-(deftest push-logs
+(deftest fetch-logs
   (testing "fetches from remote using client"
     (let [inv (atom {})
+          result {:entries [{:ts "1"
+                             :contents "test contents"}]}
           c (fn [req & args]
-              (swap! inv assoc req args))]
-      (is (some? (sut/fetch-logs c ["test" "path"])))
+              (swap! inv assoc req args)
+              (md/success-deferred
+               {:status 200
+                :body (pr-str result)}))]
+      (is (= result @(sut/fetch-logs c ["test" "path"])))
       (is (= [["test" "path"]]
-             (get @inv :fetch))))))
+             (get @inv :fetch)))))
+
+  (testing "`nil` if empty body"
+    (is (nil? @(sut/fetch-logs (constantly
+                                (md/success-deferred
+                                 {:status 200
+                                  :body ""}))
+                               ["test" "path"])))))
 
 (deftest make-sink
   (testing "pushes written data to client on full buffer"

@@ -264,9 +264,9 @@
   (testing "when log ingester configured, uses it to fetch logs"
     (with-redefs [li/fetch-logs (fn [client path]
                                   (if (and (fn? client)
-                                           (= "test/file.log" path))
-                                    "test log contents"
-                                    (str "invalid args: " path)))]
+                                           (= ["test" "file.log"] path))
+                                    (md/success-deferred "test log contents")
+                                    (md/error-deferred (ex-info "invalid args" {:path path}))))]
       (let [lr (sut/new-log-retriever {:log-ingest {:url "http://test"}})]
         (is (= "test log contents"
                (lr ["test"] "file.log")))))))

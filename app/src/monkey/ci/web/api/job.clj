@@ -29,8 +29,7 @@
         path (get-in req [:parameters :query :file])
         retriever (wc/from-rt req :log-retriever)]
     (if-let [r (retriever sid path)]
-      (-> (rur/response r)
-          (rur/content-type "text/plain"))
+      (rur/response r)
       ;; No logging found.  We could turn this in a 404 if the job or command does not
       ;; exist, but this would slow things down.
       (rur/status 204))))
