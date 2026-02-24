@@ -6,6 +6,7 @@
             [config :as co]
             [medley.core :as mc]
             [monkey.ci.logging :as l]
+            [monkey.ci.logging.oci :as lo]
             [monkey.oci.os.core :as os])
   (:import ch.qos.logback.classic.joran.JoranConfigurator
            org.slf4j.LoggerFactory))
@@ -30,7 +31,7 @@
   "Downloads logs for a given build from log bucket"
   [sid dir]
   (let [conf (co/oci-config :logging)
-        path (l/sid->path conf nil sid)]
+        path (lo/sid->path conf nil sid)]
     (log/info "Downloading logs for" sid "at" path "into" dir)
     (when-not (fs/create-dirs dir)
       (throw (ex-info "Unable to create directories" {:dir dir})))

@@ -4,9 +4,10 @@
             [clojure.tools.logging :as log]
             [manifold.stream :as ms]
             [medley.core :as mc]
+            [monkey.ci.containers.podman :as cp]
             [monkey.ci.events.mailman :as mm]
-            [monkey.ci.logging.log-ingest :as li]
-            [monkey.ci.events.mailman.interceptors :as mi]))
+            [monkey.ci.events.mailman.interceptors :as mi]
+            [monkey.ci.logging.log-ingest :as li]))
 
 (def get-std-files (juxt :stdout :stderr))
 
@@ -19,6 +20,14 @@
 
 (defn set-config [ctx c]
   (assoc ctx ::config c))
+
+(defn set-local-dir [ctx sid p]
+  (mi/update-state ctx assoc-in [::local-dirs sid] p))
+
+(defn get-local-dir [ctx sid]
+  (-> (mi/get-state ctx)
+      ::local-dirs
+      (get sid)))
 
 (def get-ingest-streams
   (comp ::ingest-streams mi/get-state))
@@ -39,10 +48,17 @@
    :stream s
    :result (li/stream-file-when-exists f s opts)})
 
+(defn- local-path
+  "Maps the file to its local path, according to a previously stored job local dir."
+  [{:keys [event] :as ctx} f]
+  (when-let [ld (get-local-dir ctx [(:sid event) (:job-id event)])]
+    (str (fs/path (cp/calc-log-dir ld) (fs/file-name f)))))
+
 (defn- ingest-all [ctx files]
   (->> files
+       (map (partial local-path ctx))
        ;; Only ingest files where the dir exists.  The file may not exist at this point yet.
-       (filter (comp fs/exists? fs/parent))
+       (filter (every-pred some? (comp fs/exists? fs/parent)))
        (map (fn [f]
               [f ((get-stream-creator ctx) f (:event ctx))]))
        (map (partial ingest-file (get-config ctx)))))
@@ -55,7 +71,8 @@
                 (ms/close! (:stream v))
                 v))]
       (->> files
-           (filter fs/exists?)
+           (map (partial local-path ctx))
+           (filter (every-pred some? fs/exists?))
            (map close-stream)
            (remove nil?)
            (doall)))))
@@ -68,6 +85,13 @@
             (-> ctx
                 (set-config (dissoc conf :stream-creator))
                 (set-stream-creator (:stream-creator conf))))})
+
+(def save-local-dir
+  "Saves local run dir in state, because we'll need it to translate the paths in command events
+   to actual directories."
+  {:name ::save-local-dir
+   :leave (fn [{e :event :as ctx}]
+            (set-local-dir ctx [(:sid e) (:job-id e)] (:local-dir e)))})
 
 (def start-ingest
   {:name ::start-ingest
@@ -100,8 +124,14 @@
 (defn make-routes
   "Creates Mailman routes to handle command events for log ingestion."
   [conf]
+  (log/debug "Creating log ingestion routes with config:" conf)
   (let [state (atom {})]
-    [[:command/start
+    [[:job/initializing
+      [{:handler (constantly nil)
+        :interceptors [(mi/with-state state)
+                       save-local-dir]}]]
+     
+     [:command/start
       [{:handler command-start
         :interceptors [(mi/with-state state)
                        (add-config conf)

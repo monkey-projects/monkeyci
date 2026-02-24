@@ -5,6 +5,7 @@
             [babashka.fs :as fs]
             [clojure.tools.logging :as log]
             [com.stuartsierra.component :as co]
+            [manifold.stream :as ms]
             [medley.core :as mco]
             [monkey.ci
              [artifacts :as a]
@@ -166,7 +167,7 @@
    {:make-routes (fn [co]
                    (cond-> (make-container-routes (:containers config) co)
                      (not-empty (:log-ingest co))
-                     (concat  (make-log-ingest-routes (:log-ingest config) co))))
+                     (em/merge-routes (make-log-ingest-routes (:log-ingest config) co))))
     :options (make-route-options (:mailman config))}))
 
 (def global-to-local-events #{:build/queued :build/canceled})
@@ -253,6 +254,7 @@
   [{conf :log-ingest}]
   (if (not-empty conf)
     (let [client (log-ingest/make-client conf)]
+      (log/info "Sending ingested logs to " (:url conf))
       (letfn [(file->path [f {:keys [sid job-id]}]
                 (vec (concat sid [job-id (fs/file-name f)])))
               (make-ingest-sink [f evt]
@@ -274,7 +276,7 @@
      :workspace (rr/new-workspace conf)
      :container-routes (co/using
                         (new-container-routes conf)
-                        [:mailman :artifacts :cache :workspace :state :key-decrypter])
+                        [:mailman :artifacts :cache :workspace :state :key-decrypter :log-ingest])
      ;; Set up separate mailman to poll only the container/job-queued subject
      :poll-mailman (new-poll-mailman conf)
      :poll-loop (co/using

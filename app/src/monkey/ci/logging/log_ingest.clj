@@ -12,7 +12,9 @@
              [time :as mt]]
             [monkey.ci
              [build :as b]
+             [errors :as err]
              [logging :as l]
+             [time :as t]
              [utils :as u]]
             [monkey.flow :as flow]))
 
@@ -42,15 +44,20 @@
   [client path]
   (client :fetch path))
 
-(defn make-sink [client path {:keys [buf-size interval] :or {buf-size 0x10000 interval 1000}}]
-  (let [s (ms/stream 1 (flow/buffer-xf buf-size))]
+(defn make-sink [client path {:keys [buf-size interval] :or {buf-size 0x10000 interval 1000} :as opts}]
+  (log/debug "Creating log ingestion sink with options:" opts)
+  (let [s (ms/stream 1 (comp (filter (partial not= ::eof))
+                             (flow/buffer-xf buf-size)))]
     ;; Flush periodically
     (ms/connect (ms/periodically interval (constantly ::flow/flush)) s {:upstream? true})
     ;; Push any received logs to the log ingester
     (ms/consume-async (fn [logs]
                         (log/trace "Pushing logs of" (count logs) "chars")
-                        (-> (push-logs client path [logs])
-                            (md/chain (constantly true))))
+                        (-> (push-logs client path [{:ts (t/now)
+                                                     :contents logs}])
+                            (md/chain (constantly true))
+                            (md/catch (fn [ex]
+                                        (log/error "Failed to push logs" (err/unwrap-exception ex))))))
                       s)
     s))
 
@@ -95,6 +102,7 @@
    and push interval.  Returns a deferred that will hold the reason the async
    loop has stopped."
   [f s & [{:keys [interval buf-size] :or {interval 1000 buf-size 0x10000} :as opts}]]
+  (log/debug "Streaming file with options:" opts)
   (let [r (md/deferred)
         buf (byte-array buf-size)]
     (let [r (io/input-stream (fs/file f))]
