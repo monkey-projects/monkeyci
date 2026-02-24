@@ -131,7 +131,8 @@
 
 (deftest log-ingest-retriever
   (testing "retrieves log contents using client"
-    (let [client (constantly (md/success-deferred {:entries ["test-log"]}))
+    (let [client (constantly (md/success-deferred {:status 200
+                                                   :body (pr-str {:entries [{:content "test-log"}]})}))
           r (sut/make-log-ingest-retriever client)
           f (l/fetch-log r ["test" "build"] "test-path")]
       (is (instance? java.io.InputStream f))

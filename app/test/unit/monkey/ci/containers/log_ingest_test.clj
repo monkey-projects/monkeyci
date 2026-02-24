@@ -100,13 +100,14 @@
                     :job-id ::job-id}}
                   (sut/add-ingest-streams [{:path p
                                             :stream s}])
+                  (sut/set-config {:close-delay 100})
                   (mi/set-result {:ingest/stop ["/some/container/dir/existing.log"]})
                   (sut/set-local-dir [::build-sid ::job-id] (str dir))
                   (leave))]
       (is (keyword? (:name i)))
       
       (testing "closes stream"
-        (is (ms/closed? s)))
+        (is (not= :timeout (h/wait-until #(ms/closed? s) 300))))
 
       (testing "removes streams from context"
         (is (empty? (sut/get-ingest-streams ctx))))

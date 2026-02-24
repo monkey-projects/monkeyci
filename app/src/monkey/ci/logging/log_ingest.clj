@@ -103,10 +103,11 @@
     [])
 
   (fetch-log [this sid path]
-    (-> (fetch-logs client (ingest-path sid path))
-        (deref)
-        :entries
-        (bs/to-input-stream))))
+    (->> (fetch-logs client (ingest-path sid path))
+         (deref)
+         :entries
+         (map :content)
+         (bs/to-input-stream))))
 
 (defn make-log-ingest-retriever [client]
   (->LogIngestRetriever client))
