@@ -1,6 +1,7 @@
 (ns monkey.ci.runtime.app
   "Functions for setting up a runtime for application (cli or server)"
   (:require [buddy.core.codecs :as bcc]
+            [clojure.string :as cs]
             [clojure.tools.logging :as log]
             [com.stuartsierra.component :as co]
             [manifold.bus :as mb]
@@ -18,6 +19,7 @@
              [db :as emd]
              [interceptors :as emi]
              [jms :as emj]]
+            [monkey.ci.logging.log-ingest :as li]
             [monkey.ci.mailing.scw :as mailing-scw]
             [monkey.ci.metrics
              [core :as m]
@@ -275,6 +277,16 @@
 (defn new-invoicing [{:keys [invoicing]}]
   {:client (inv/make-client invoicing)})
 
+(defn new-log-retriever
+  "If log ingester configuration is provided, uses it to create a log retriever fn.
+   Otherwise returns a noop."
+  [{conf :log-ingest}]
+  (if (empty? conf)
+    (constantly nil)
+    (let [client (li/make-client conf)]
+      (fn [job-sid path]
+        (li/fetch-logs client (cs/join "/" (concat job-sid [path])))))))
+
 (defn make-server-system
   "Creates a component system that can be used to start an application server."
   [config]
@@ -293,7 +305,7 @@
    :runtime   (co/using
                (new-server-runtime config)
                [:artifacts :metrics :storage :jwk :process-reaper :vault :mailman :update-bus
-                :crypto :mailer :invoicing])
+                :crypto :mailer :invoicing :log-retriever])
    :pool      (new-db-pool config)
    :migrator  (co/using
                (new-db-migrator config)
@@ -327,7 +339,8 @@
           (new-otlp-client config)
           [:metrics])
    :mailer (new-mailer config)
-   :invoicing (new-invoicing config)))
+   :invoicing (new-invoicing config)
+   :log-retriever (new-log-retriever config)))
 
 (defn with-server-system [config f]
   (rc/with-system (make-server-system config) f))

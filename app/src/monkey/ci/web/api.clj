@@ -240,20 +240,6 @@
         (r/add-event (b/build-evt :build/canceled build)))
     (rur/not-found {:message "Build not found"})))
 
-(defn list-build-logs [req]
-  (let [build-sid (c/build-sid req)
-        retriever (c/from-rt req rt/log-retriever)]
-    (rur/response (l/list-logs retriever build-sid))))
-
-(defn download-build-log [req]
-  (let [build-sid (c/build-sid req)
-        path (get-in req [:parameters :query :path])
-        retriever (c/from-rt req rt/log-retriever)]
-    (if-let [r (l/fetch-log retriever build-sid path)]
-      (-> (rur/response r)
-          (rur/content-type "text/plain"))
-      (rur/not-found nil))))
-
 (defn event-stream
   "Sets up an event stream for all `build/updated` events for the org specified in the
    request path."

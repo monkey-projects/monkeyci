@@ -87,8 +87,8 @@
     ;; TODO Must be added on log ingester server first
     [])
 
-  (fetch-log [this build-sid path]
-    (-> (fetch-logs client (ingest-path build-sid path))
+  (fetch-log [this sid path]
+    (-> (fetch-logs client (ingest-path sid path))
         (deref)
         :entries
         (bs/to-input-stream))))
