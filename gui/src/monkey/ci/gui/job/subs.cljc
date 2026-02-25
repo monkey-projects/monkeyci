@@ -27,19 +27,35 @@
  (fn [[id b] _]
    (get-in b [:script :jobs id])))
 
-(defn- convert-result [{:keys [stream values]}]
-  ;; TODO Add timestamp (first entry in each value)
-  (->> (map second values)
-       (interpose [:br])))
+(defmulti convert-log-contents :src)
+
+(defmethod convert-log-contents :loki [resp]
+  (letfn [(convert-vals [{:keys [stream values]}]
+            (->> (map second values)
+                 (interpose [:br])))]
+    (->> resp
+         :data
+         :result
+         first
+         convert-vals)))
+
+(defmethod convert-log-contents :log-ingest [resp]
+  (let [split-lines #(cs/split % "\n")]
+    (->> resp
+         :entries
+         (map :contents)
+         (reduce str)
+         (split-lines)
+         (interpose [:br]))))
+
+(defmethod convert-log-contents :default [resp]
+  (println "Unable to convert log contents:" (str resp)))
 
 (rf/reg-sub
  :job/logs
  (fn [db [_ path]]
    (->> (db/get-logs db path)
-        :data
-        :result
-        first
-        convert-result)))
+        (convert-log-contents))))
 
 (defn- error-count [{:keys [errors failures]}]
   (+ (count errors) (count failures)))
@@ -82,10 +98,25 @@
              (->out [idx line]
                (let [m (get file-per-line idx)]
                  (cond-> {:cmd line}
-                   m (merge (as-types-map m))
+                   m (merge (as-types-map m) {:log-src :loki})
                    (get exp idx) (assoc :expanded? true))))]
        (->> (:script job)
             (map-indexed ->out))))))
+
+(rf/reg-sub
+ ;; If no logs, assumes they are not stored in Loki, but in the log ingester
+ :job/script-with-implied-logs
+ :<- [:job/script-with-logs]
+ (fn [d _]
+   (let [has-logs? (some-fn :out :err)
+         add-implied (fn [idx e]
+                       (assoc e
+                              :out (str idx "_out.log")
+                              :err (str idx "_err.log")
+                              :log-src :log-ingest))]
+     (cond->> d
+       (every? (complement has-logs?) d)
+       (map-indexed add-implied)))))
 
 (u/db-sub ::unblocking? db/unblocking?)
 (u/db-sub ::wrap-logs? db/wrap-logs?)
