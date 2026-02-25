@@ -36,6 +36,7 @@
 
 (rf/reg-event-fx
  :job/load-log-files
+ ;; Fetches log files from Loki using a label search
  (fn [{:keys [db] :as ctx} [_ job :as evt]]
    (let [[org-id :as id] (db/db->job-id db)
          loader (lo/loader-evt-handler
@@ -64,7 +65,8 @@
                   [(a/job-fetch-logs-failed err)])))
 
 (rf/reg-event-fx
- :job/load-logs
+ ;; Fetches log contents from old-style loki endpoints
+ :job/load-loki-logs
  (fn [{:keys [db] :as ctx} [_ job path :as evt]]
    (let [[org-id :as id] (db/get-path-id db path)
          loader (lo/loader-evt-handler
@@ -81,33 +83,56 @@
                                :query (-> (loki/job-query id (:id job))
                                           (assoc "filename" path)
                                           (loki/query->str))))
-                    [:job/load-logs--success path]
-                    [:job/load-logs--failed path]]))]
+                    [:job/load-logs--success path :loki]
+                    [:job/load-logs--failed path :loki]]))]
+     (loader ctx evt))))
+
+(rf/reg-event-fx
+ ;; Fetches log contents from log-ingested endpoints
+ :job/load-log-ingest-logs
+ (fn [{:keys [db] :as ctx} [_ job path :as evt]]
+   (let [[org-id :as id] (db/get-path-id db path)
+         loader (lo/loader-evt-handler
+                 id
+                 (fn [& _]
+                   [:secure-request
+                    :download-job-log
+                    (-> (r/path-params (r/current db))
+                        (assoc :file path))
+                    [:job/load-logs--success path :log-ingest]
+                    [:job/load-logs--failed path :log-ingest]]))]
      (loader ctx evt))))
 
 (rf/reg-event-db
  :job/load-logs--success
- (fn [db [_ path resp]]
-   (-> db
-       (lo/on-success (db/get-path-id db path) resp)
-       (db/clear-alerts path))))
+ (fn [db [_ path src resp]]
+   (letfn [(patch-result [resp]
+             (if (= 204 (:status resp))
+               (assoc resp :body {:src src})
+               (update resp :body assoc :src src)))]
+     (-> db
+         (lo/on-success (db/get-path-id db path) (patch-result resp))
+         (db/clear-alerts path)))))
 
 (rf/reg-event-db
  :job/load-logs--failed
- (fn [db [_ path err]]
+ (fn [db [_ path _ err]]
    (lo/on-failure db (db/get-path-id db path) a/job-fetch-logs-failed err)))
 
 (rf/reg-event-fx
  :job/maybe-load-logs
- (fn [{:keys [db]} [_ job path]]
+ (fn [{:keys [db]} [_ job path src]]
    ;; Only fetch if job is running or if this is the first time
    (let [running? (= :running (:status job))]
      (when (or running? (not (db/get-logs db path)))
-       {:dispatch [:job/load-logs job path]}))))
+       {:dispatch [(case src
+                     :loki :job/load-loki-logs
+                     :log-ingest :job/load-log-ingest-logs)
+                   job path]}))))
 
 (rf/reg-event-fx
  :job/toggle-logs
- (fn [{:keys [db]} [_ idx {:keys [out err]}]]
+ (fn [{:keys [db]} [_ idx {:keys [out err log-src]}]]
    (let [job-id (last (db/db->job-id db))
          job (get-in (bdb/get-build db) [:script :jobs job-id])
          exp? (db/log-expanded? db idx)]
@@ -117,7 +142,7 @@
        (assoc :dispatch-n
               (->> [out err]
                    (filter some?)
-                   (mapv (fn [p] [:job/maybe-load-logs job p]))))))))
+                   (mapv (fn [p] [:job/maybe-load-logs job p log-src]))))))))
 
 (rf/reg-event-fx
  :job/unblock

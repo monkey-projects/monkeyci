@@ -14,6 +14,7 @@
 (def org-path ["/org/" :org-id])
 (def repo-path (into org-path ["/repo/" :repo-id]))
 (def build-path (into repo-path ["/builds/" :build-id]))
+(def job-path (into build-path ["/job/" :job-id]))
 (def param-path (into org-path ["/param/" :param-id]))
 (def user-path ["/user/" :user-id])
 (def mailing-path ["/admin/mailing/" :mailing-id])
@@ -27,6 +28,9 @@
 
 (def build-schema
   (assoc repo-schema :build-id s/Str))
+
+(def job-schema
+  (assoc build-schema :job-id s/Str))
 
 (def param-schema
   (assoc org-schema
@@ -390,7 +394,13 @@
      :path-parts ["/logs/" :org-id "/label/" :label "/values"]
      :path-schema (assoc org-schema :label s/Str)
      :query-schema log-query-schema
-     :produces #{"application/json"}})])
+     :produces #{"application/json"}})
+
+   (api-route
+    {:route-name :download-job-log
+     :path-parts (into job-path ["/logs"])
+     :path-schema job-schema
+     :query-schema {:file s/Str}})])
 
 (def github-routes
   [(api-route
@@ -576,8 +586,8 @@
   [(api-route
     {:route-name :unblock-job
      :method :post
-     :path-parts (into build-path ["/job/" :job-id "/unblock"])
-     :path-schema (assoc build-schema :job-id s/Str)})])
+     :path-parts (into job-path ["/unblock"])
+     :path-schema job-schema})])
 
 (def routes
   (concat

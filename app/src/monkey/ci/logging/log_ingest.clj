@@ -12,7 +12,10 @@
              [time :as mt]]
             [monkey.ci
              [build :as b]
+             [edn :as edn]
+             [errors :as err]
              [logging :as l]
+             [time :as t]
              [utils :as u]]
             [monkey.flow :as flow]))
 
@@ -26,34 +29,59 @@
              :headers {"content-type" "application/edn"
                        "content-length" (count b)}})
           :fetch
-          {:method :get})
+          {:method :get
+           :headers {"accept" "application/edn"}})
         (assoc :url (cs/join "/" (concat [(:url conf) "log"] (first args))))
+        ;; Include extra headers from config (e.g. security)
+        (update :headers (partial merge (:headers conf)))
         (http/request))))
 
 (defn push-logs
   "Pushes given logs at specified path"
   [client path logs]
-  (client :push path logs))
+  (md/chain
+   (client :push path logs)
+   (fn [{:keys [status]}]
+     (= 204 status))))
 
 (defn fetch-logs
-  "Retrieves any logs at specified path"
+  "Retrieves any logs at specified path.  Returns a deferred with the result, or `nil`
+   if the path does not exist."
   [client path]
-  (client :fetch path))
+  (md/chain
+   (client :fetch path)
+   (fn [r]
+     (when (= 200 (:status r))
+       (try
+         (edn/edn-> (:body r))
+         (catch Exception ex
+           ;; If body is empty, we should also return `nil`
+           (when (not= "EOF while reading" (ex-message ex))
+             (log/error "Unable to fetch logs" ex))))))))
 
-(defn pushing-stream
-  "Returns an `OutputStream` that pushes the received bytes to the log ingester
-   at configured intervals, or after a given number of bytes."
-  [client {:keys [path buf-size interval] :or {buf-size 0x10000 interval 1000}}]
-  (let [s (ms/stream 1 (flow/buffer-xf buf-size))]
+(defn make-sink [client path {:keys [buf-size interval] :or {buf-size 0x10000 interval 1000} :as opts}]
+  (log/debug "Creating log ingestion sink with options:" opts)
+  (let [s (ms/stream 1 (comp (filter (partial not= ::eof))
+                             (flow/buffer-xf buf-size)))]
     ;; Flush periodically
     (ms/connect (ms/periodically interval (constantly ::flow/flush)) s {:upstream? true})
     ;; Push any received logs to the log ingester
     (ms/consume-async (fn [logs]
                         (log/trace "Pushing logs of" (count logs) "chars")
-                        (-> (push-logs client path [logs])
-                            (md/chain (constantly true))))
+                        (-> (push-logs client path [{:ts (t/now)
+                                                     :contents logs}])
+                            (md/chain (constantly true))
+                            (md/catch (fn [ex]
+                                        (log/error "Failed to push logs" (err/unwrap-exception ex))))))
                       s)
-    (flow/raw-stream s)))
+    s))
+
+(defn pushing-stream
+  "Returns an `OutputStream` that pushes the received bytes to the log ingester
+   at configured intervals, or after a given number of bytes."
+  [client {:keys [path] :as opts}]
+  (-> (make-sink client path opts)
+      (flow/raw-stream)))
 
 (defn- ingest-path [build-sid path]
   (concat build-sid (cs/split path #"/")))
@@ -74,11 +102,12 @@
     ;; TODO Must be added on log ingester server first
     [])
 
-  (fetch-log [this build-sid path]
-    (-> (fetch-logs client (ingest-path build-sid path))
-        (deref)
-        :entries
-        (bs/to-input-stream))))
+  (fetch-log [this sid path]
+    (->> (fetch-logs client (ingest-path sid path))
+         (deref)
+         :entries
+         (map :content)
+         (bs/to-input-stream))))
 
 (defn make-log-ingest-retriever [client]
   (->LogIngestRetriever client))
@@ -89,6 +118,7 @@
    and push interval.  Returns a deferred that will hold the reason the async
    loop has stopped."
   [f s & [{:keys [interval buf-size] :or {interval 1000 buf-size 0x10000} :as opts}]]
+  (log/debug "Streaming file with options:" opts)
   (let [r (md/deferred)
         buf (byte-array buf-size)]
     (let [r (io/input-stream (fs/file f))]
@@ -115,6 +145,6 @@
   "Waits until file `f` exists, then streams its contents to Manifold sink `s`.
    Returns a deferred that will hold the result of the streaming operation.
    In order to stop reading the file, close the sink."
-  [f s & opts]
+  [f s & [opts]]
   (md/chain (u/wait-for-file f (select-keys opts [:period]))
             #(stream-file % s opts)))

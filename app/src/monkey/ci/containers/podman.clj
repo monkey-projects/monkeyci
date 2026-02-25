@@ -211,9 +211,12 @@
   "The directory where the container process is run"
   (comp #(fs/path % "work") get-job-dir))
 
+(defn calc-log-dir [jd]
+  (fs/path jd "logs"))
+
 (def get-log-dir
   "The directory where container output is written to"
-  (comp #(fs/path % "logs") get-job-dir))
+  (comp calc-log-dir get-job-dir))
 
 (def get-script-dir
   "The directory where script files are stored"

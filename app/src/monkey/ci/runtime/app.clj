@@ -3,14 +3,16 @@
   (:require [buddy.core.codecs :as bcc]
             [clojure.tools.logging :as log]
             [com.stuartsierra.component :as co]
-            [manifold.bus :as mb]
+            [manifold
+             [bus :as mb]
+             [deferred :as md]]
             [monkey.ci
              [blob :as blob]
-             [build :as b]
              [invoicing :as inv]
              [oci :as oci]
              [protocols :as p]
              [reporting :as rep]
+             [sid :as sid]
              [storage :as s]
              [vault :as v]]
             [monkey.ci.events.mailman :as em]
@@ -18,12 +20,12 @@
              [db :as emd]
              [interceptors :as emi]
              [jms :as emj]]
+            [monkey.ci.logging.log-ingest :as li]
             [monkey.ci.mailing.scw :as mailing-scw]
             [monkey.ci.metrics
              [core :as m]
              [events :as me]
              [otlp :as mo]]
-            [monkey.ci.reporting.print]
             [monkey.ci.runners.oci :as ro]
             [monkey.ci.runtime.common :as rc]
             [monkey.ci.storage.sql :as sql]
@@ -275,6 +277,17 @@
 (defn new-invoicing [{:keys [invoicing]}]
   {:client (inv/make-client invoicing)})
 
+(defn new-log-retriever
+  "If log ingester configuration is provided, uses it to create a log retriever fn.
+   Otherwise returns a noop."
+  [{conf :log-ingest}]
+  (if (empty? conf)
+    (constantly nil)
+    (let [client (li/make-client conf)]
+      (fn [job-sid path]
+        (log/debug "Fetching logs for" job-sid ", file" path)
+        @(li/fetch-logs client (concat (sid/parse-sid job-sid) [path]))))))
+
 (defn make-server-system
   "Creates a component system that can be used to start an application server."
   [config]
@@ -293,7 +306,7 @@
    :runtime   (co/using
                (new-server-runtime config)
                [:artifacts :metrics :storage :jwk :process-reaper :vault :mailman :update-bus
-                :crypto :mailer :invoicing])
+                :crypto :mailer :invoicing :log-retriever])
    :pool      (new-db-pool config)
    :migrator  (co/using
                (new-db-migrator config)
@@ -327,7 +340,8 @@
           (new-otlp-client config)
           [:metrics])
    :mailer (new-mailer config)
-   :invoicing (new-invoicing config)))
+   :invoicing (new-invoicing config)
+   :log-retriever (new-log-retriever config)))
 
 (defn with-server-system [config f]
   (rc/with-system (make-server-system config) f))

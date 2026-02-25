@@ -8,7 +8,7 @@
 
 (deftest routes
   (testing "handles required events"
-    (let [exp #{:command/start :command/end}
+    (let [exp #{:command/start :command/end :job/initializing}
           r (sut/make-routes {})
           handled (set (map first r))]
       (is (= exp handled)))))
@@ -31,18 +31,39 @@
                  :stderr "err.log"}}
                (sut/command-end))))))
 
+(deftest add-config
+  (let [conf {:stream-creator (constantly ::test)}
+        {:keys [enter] :as i} (sut/add-config conf)]
+    (is (keyword? (:name i)))
+
+    (let [r (enter {})]
+      (testing "sets config in context"
+        (is (map? (sut/get-config r))))
+
+      (testing "sets stream creator"
+        (is (fn? (sut/get-stream-creator r)))))))
+
 (deftest start-ingest
   (h/with-tmp-dir dir
     (let [{:keys [leave] :as i} sut/start-ingest
           s (ms/stream 1)
-          p (fs/path dir "test.log")
-          r (-> {}
-                (sut/set-stream-creator (constantly s))
-                (mi/set-result {:ingest/start [(str p)]})
+          log-dir (fs/create-dir (fs/path dir "logs"))
+          p (fs/path log-dir "test.log")
+          r (-> {:event
+                 {:type :command/start
+                  :sid ::build-sid
+                  :job-id ::job-id}}
+                (sut/set-stream-creator (fn [f opts]
+                                          (when (and (= ::build-sid (:sid opts))
+                                                     (= ::job-id (:job-id opts))
+                                                     (= (str p) f))
+                                            s)))
+                (mi/set-result {:ingest/start ["/some/container/dir/test.log"]})
+                (sut/set-local-dir [::build-sid ::job-id] (str dir))
                 (leave))]
       (is (keyword? (:name i)))
       
-      (testing "starts ingestion according to result"
+      (testing "starts ingestion of local file"
         (is (nil? (spit (fs/file p) "test log entry")))
         (is (map? @(ms/try-take! s 300))))
 
@@ -54,6 +75,9 @@
 
       (testing "clears result"
         (is (nil? (mi/get-result r))))
+
+      (testing "stores in state"
+        (is (not-empty (mi/get-state r))))
 
       (is (nil? (ms/close! s)))
 
@@ -67,18 +91,23 @@
 (deftest stop-ingest
   (h/with-tmp-dir dir
     (let [{:keys [leave] :as i} sut/stop-ingest
-          p (str (fs/path dir "existing.log"))
+          log-dir (fs/create-dir (fs/path dir "logs"))
+          p (str (fs/path log-dir "existing.log"))
           _ (fs/create-file p)
           s (ms/stream)
-          ctx (-> {}
+          ctx (-> {:event
+                   {:sid ::build-sid
+                    :job-id ::job-id}}
                   (sut/add-ingest-streams [{:path p
                                             :stream s}])
-                  (mi/set-result {:ingest/stop [p]})
+                  (sut/set-config {:close-delay 100})
+                  (mi/set-result {:ingest/stop ["/some/container/dir/existing.log"]})
+                  (sut/set-local-dir [::build-sid ::job-id] (str dir))
                   (leave))]
       (is (keyword? (:name i)))
       
       (testing "closes stream"
-        (is (ms/closed? s)))
+        (is (not= :timeout (h/wait-until #(ms/closed? s) 300))))
 
       (testing "removes streams from context"
         (is (empty? (sut/get-ingest-streams ctx))))
@@ -90,3 +119,17 @@
         (is (some? (-> {}
                        (mi/set-result {:ingest/stop ["nonexisting.txt"]})
                        (leave))))))))
+
+(deftest save-local-dir
+  (let [{:keys [leave] :as i} sut/save-local-dir]
+    (is (keyword? (:name i)))
+    
+    (testing "`leave` adds local dir for job to state"
+      (is (= "/local/dir"
+             (-> {:event
+                  {:type :job-initializing
+                   :local-dir "/local/dir"
+                   :sid ["test" "build"]
+                   :job-id "test-job"}}
+                 (leave)
+                 (sut/get-local-dir [["test" "build"] "test-job"])))))))
