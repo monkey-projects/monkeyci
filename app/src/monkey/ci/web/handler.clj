@@ -235,14 +235,6 @@
    {:auth-chain ^:replace [auth/org-auth-checker]}
    [["" {:get {:handler repo-api/list-webhooks}}]]])
 
-(def log-routes
-  ["/logs"                              ; Deprecated, use loki instead
-   [[""
-     {:get {:handler api/list-build-logs}}]
-    ["/download"
-     {:get {:handler api/download-build-log
-            :parameters {:query {:path s/Str}}}}]]])
-
 (def artifact-routes
   ["/artifact"
    [["" {:get {:handler api/get-build-artifacts}}]
@@ -260,7 +252,10 @@
      [[""
        {:get {:handler job-api/get-job}}]
       ["/unblock"
-       {:post {:handler job-api/unblock-job}}]]]]])
+       {:post {:handler job-api/unblock-job}}]
+      ["/logs"
+       {:get {:handler job-api/download-job-log
+              :parameters {:query {:file s/Str}}}}]]]]])
 
 (def build-routes
   ["/builds"                            ; TODO Replace with singular
@@ -281,7 +276,6 @@
        {:post {:handler api/retry-build}}]
       ["/cancel"
        {:post {:handler api/cancel-build}}]
-      log-routes
       artifact-routes
       job-routes]]]])
 

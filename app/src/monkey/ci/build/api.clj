@@ -10,7 +10,9 @@
              [deferred :as md]
              [stream :as ms]]
             [medley.core :as mc]
-            [monkey.ci.build :as b]
+            [monkey.ci
+             [build :as b]
+             [errors :as err]]
             [monkey.ci.events.http :as eh]
             [monkey.ci.web.crypto :as crypto]))
 
@@ -32,11 +34,7 @@
                    :oauth-token token
                    :middelware api-middleware))
           (handle-error [ex]
-            (throw (ex-info
-                    (ex-message ex)
-                    (-> (ex-data ex)
-                        ;; Read the response body in case of error
-                        (mc/update-existing :body bs/to-string)))))]
+            (throw (err/unwrap-exception ex)))]
     (-> req
         (build-request)
         (http/request)

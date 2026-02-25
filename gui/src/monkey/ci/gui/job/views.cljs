@@ -101,8 +101,8 @@
           (into [:<>])))])
 
 (defn- job-logs [job]
-  (rf/dispatch [:job/load-log-files job])
-  (let [script-logs (rf/subscribe [:job/script-with-logs])]
+  ;;(rf/dispatch [:job/load-log-files job])
+  (let [script-logs (rf/subscribe [:job/script-with-implied-logs])]
     [:<>
      [:div.form-check
       [:input#wrap-logs.form-check-input

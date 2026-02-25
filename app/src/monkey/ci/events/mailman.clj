@@ -108,3 +108,14 @@
     (ms/on-closed s (fn []
                       (mmc/unregister-listener l)))
     s))
+
+(defn merge-routes
+  "Merges multiple route structures into one"
+  [& routes]
+  (->> routes
+       (apply concat)
+       (reduce (fn [r [t h]]
+                 (update r t (comp vec concat) h))
+               {})
+       (into [])))
+
