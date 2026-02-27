@@ -31,6 +31,7 @@
                                          ;; Conflicts with other versions
                                          :exclusions [org.bouncycastle/bcprov-lts8on
                                                       org.slf4j/slf4j-api]}
+        com.monkeyprojects/minio-clj {:mvn/version "0.1.0"}
         com.monkeyprojects/monkey-jms-artemis {:mvn/version "0.3.2"}
         com.monkeyprojects/oci-container-instance {:mvn/version "0.2.5"}
         com.monkeyprojects/oci-os {:mvn/version "0.4.1"}
@@ -43,7 +44,6 @@
         com.zaxxer/HikariCP {:mvn/version "7.0.2"}
         commons-io/commons-io {:mvn/version "2.21.0"}
         dev.weavejester/ragtime {:mvn/version "0.12.1"}
-        io.minio/minio {:mvn/version "8.6.0"}
         io.prometheus/prometheus-metrics-core {:mvn/version "1.4.3"}
         io.prometheus/prometheus-metrics-exporter-opentelemetry {:mvn/version "1.4.3"}
         io.prometheus/prometheus-metrics-exporter-pushgateway {:mvn/version "1.4.3"}

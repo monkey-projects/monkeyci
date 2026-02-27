@@ -8,11 +8,10 @@
             [monkey.ci
              [blob :as blob]
              [protocols :as p]]
-            [monkey.ci.blob
-             [minio :as minio]
-             [s3 :as sut]]
+            [monkey.ci.blob.s3 :as sut]
             [monkey.ci.build.archive :as a]
-            [monkey.ci.test.helpers :as h]))
+            [monkey.ci.test.helpers :as h]
+            [monkey.minio :as minio]))
 
 (def input-stream? (partial instance? java.io.InputStream))
 
