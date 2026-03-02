@@ -26,7 +26,6 @@
 (s/def ::config
   (s/keys :req [::events-file ::start-file ::abort-file ::job-config ::api]))
 
-(s/def ::log-maker fn?)
 (s/def ::paths
   (s/keys :req-un [::events-file ::start-file ::abort-file]))
 
@@ -36,4 +35,4 @@
 
 (s/def ::runtime
   (s/keys :req-un [::job ::paths ::sid]
-          :opt-un [::workspace ::artifacts ::cache ::log-maker ::poll-interval ::c/mailman]))
+          :opt-un [::workspace ::artifacts ::cache ::poll-interval ::c/mailman]))

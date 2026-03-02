@@ -14,7 +14,6 @@
              [build :as b]
              [edn :as edn]
              [errors :as err]
-             [logging :as l]
              [time :as t]
              [utils :as u]]
             [monkey.flow :as flow]))
@@ -82,35 +81,6 @@
   [client {:keys [path] :as opts}]
   (-> (make-sink client path opts)
       (flow/raw-stream)))
-
-(defn- ingest-path [build-sid path]
-  (concat build-sid (cs/split path #"/")))
-
-(defrecord LogIngestLogger [client opts build path]
-  l/LogCapturer
-  (log-output [this]
-    (pushing-stream client (assoc opts :path (ingest-path (b/sid build) path))))
-  
-  (handle-stream [this in]))
-
-(defn make-ingest-logger [client opts build path]
-  (->LogIngestLogger client opts build path))
-
-(defrecord LogIngestRetriever [client]
-  l/LogRetriever
-  (list-logs [this _]
-    ;; TODO Must be added on log ingester server first
-    [])
-
-  (fetch-log [this sid path]
-    (->> (fetch-logs client (ingest-path sid path))
-         (deref)
-         :entries
-         (map :content)
-         (bs/to-input-stream))))
-
-(defn make-log-ingest-retriever [client]
-  (->LogIngestRetriever client))
 
 (defn stream-file
   "Reads the given logfile to the sink.  When the sink is closed, the streaming 

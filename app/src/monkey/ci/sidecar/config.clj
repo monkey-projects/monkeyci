@@ -12,8 +12,7 @@
   (merge
    (ns-keys (get-in rt [:config :sidecar]))
    {::ss/events (:events rt)
-    ::ss/build (:build rt)
-    ::ss/log-maker (get-in rt [:logging :maker])}))
+    ::ss/build (:build rt)}))
 
 (defn set-job [conf job]
   (assoc-in conf [::ss/job-config ::ss/job] job))
@@ -34,11 +33,6 @@
 
 (defn set-api [conf api]
   (assoc conf ::ss/api api))
-
-(def log-maker ::ss/log-maker)
-
-(defn set-log-maker [conf l]
-  (assoc conf ::ss/log-maker l))
 
 (def default-poll-interval 1000)
 

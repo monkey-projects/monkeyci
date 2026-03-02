@@ -1,12 +1,7 @@
 (ns monkey.ci.test.runtime.sidecar
   "Helper functions for working with sidecar runtimes"
-  (:require [monkey.ci
-             [cuid :as cuid]
-             [logging :as l]]
+  (:require [monkey.ci.cuid :as cuid]
             [monkey.ci.test.mailman :as tm]))
-
-(defn set-log-maker [rt e]
-  (assoc rt :log-maker e))
 
 (defn set-events-file [rt f]
   (assoc-in rt [:paths :events-file] f))
@@ -33,7 +28,6 @@
 
 (defn make-test-rt [& [conf]]
   (-> test-rt
-      (set-log-maker (constantly (l/->InheritLogger)))
       (set-events-file "test-events")
       (set-start-file "test-start")
       (set-abort-file "test-abort")

@@ -7,7 +7,6 @@
              [blob :as blob]
              [build :as b]
              [labels :as lbl]
-             [logging :as l]
              [runtime :as rt]
              [storage :as st]
              [time :as t]]
