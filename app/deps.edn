@@ -31,6 +31,7 @@
                                          ;; Conflicts with other versions
                                          :exclusions [org.bouncycastle/bcprov-lts8on
                                                       org.slf4j/slf4j-api]}
+        com.monkeyprojects/metrics {:mvn/version "0.1.0-SNAPSHOT"}
         com.monkeyprojects/minio-clj {:mvn/version "0.1.0"}
         com.monkeyprojects/monkey-jms-artemis {:mvn/version "0.3.2"}
         com.monkeyprojects/oci-container-instance {:mvn/version "0.2.5"}

@@ -1,9 +1,8 @@
 (ns monkey.ci.metrics.events
   "Event handlers that update metrics"
   (:require [clojure.tools.logging :as log]
-            [monkey.ci.metrics
-             [common :as c]
-             [prometheus :as prom]]))
+            [monkey.ci.metrics.common :as c]
+            [monkey.metrics.prometheus :as prom]))
 
 (def get-counter ::counter)
 

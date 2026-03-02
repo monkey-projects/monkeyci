@@ -1,8 +1,7 @@
 (ns monkey.ci.metrics.entity-stats-test
   (:require [clojure.test :refer [deftest testing is]]
-            [monkey.ci.metrics
-             [entity-stats :as sut]
-             [prometheus :as p]]
+            [monkey.ci.metrics.entity-stats :as sut]
+            [monkey.metrics.prometheus :as p]
             [monkey.ci.storage :as st]
             [monkey.ci.test.helpers :as h]))
 

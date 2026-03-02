@@ -20,12 +20,13 @@
             [monkey.ci.events.mailman
              [interceptors :as emi]
              [jms :as emj]]
-            [monkey.ci.metrics
-             [core :as m]
-             [prometheus :as prom]]
+            [monkey.ci.metrics.core :as m]
             [monkey.ci.runners.controller :as rco]
             [monkey.ci.runtime.common :as rc]
-            [monkey.mailman.core :as mmc]))
+            [monkey.mailman.core :as mmc]
+            [monkey.metrics
+             [prometheus :as prom]
+             [push-gw :as mmpg]]))
 
 (defrecord ControllerRuntime [config artifacts cache workspace git build api-config mailman])
 
@@ -97,14 +98,14 @@
   co/Lifecycle
   (start [this]
     (cond-> this
-      (not-empty config) (assoc :gw (prom/push-gw (:host config)
+      (not-empty config) (assoc :gw (mmpg/push-gw (:host config)
                                                   (:port config)
                                                   (:registry metrics)
                                                   "monkeyci_build"))))
 
   (stop [this]
     (when-let [gw (:gw this)]
-      (prom/push gw))
+      (mmpg/push gw))
     (dissoc this :gw)))
 
 (defn new-push-gw [config]
