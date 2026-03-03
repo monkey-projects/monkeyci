@@ -535,6 +535,8 @@
   (-> (select-keys conf [:artifacts :cache])
       (assoc :checkout-dir (b/checkout-dir (:build conf)))))
 
+(def default-expose-range [10000 20000])
+
 (defn make-routes [{:keys [workspace work-dir mailman state] :as conf}]
   (let [state (emi/with-state (or state (atom {})))
         job-ctx (make-job-ctx conf)
@@ -552,7 +554,7 @@
                        (add-key-decrypter (:key-decrypter conf))
                        (restore-ws workspace)
                        (emi/add-mailman mailman)
-                       (assign-ports (get-in conf [:podman :expose-ports]))
+                       (assign-ports (get-in conf [:podman :expose-ports] default-expose-range))
                        (add-job-ctx job-ctx)
                        (cache/restore-interceptor emi/get-job-ctx)
                        (art/restore-interceptor emi/get-job-ctx)
