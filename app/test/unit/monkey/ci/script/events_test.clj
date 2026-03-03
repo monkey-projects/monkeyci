@@ -116,10 +116,7 @@
       (is (= ::value (::key ctx))))    
     
     (testing "adds job to job context"
-      (is (= job (:job ctx))))
-
-    (testing "adds jobs fn that allows retrieving other jobs from state"
-      (is (= other-job (api/get-job ctx (:id other-job)))))))
+      (is (= job (:job ctx))))))
 
 (deftest with-job-ctx
   (let [{:keys [leave] :as i} sut/with-job-ctx]
@@ -268,11 +265,45 @@
                     (emi/set-state {:build {:sid build-sid}})
                     (enter))))))))
 
+(deftest add-job-retriever
+  (let [s (atom {:jobs {"test-job" ::test-job}})
+        {:keys [enter] :as i} (sut/add-job-retriever s)]
+    (is (keyword? (:name i)))
+    
+    (testing "adds job retriever api fn to to job context"
+      (let [f (-> {}
+                  (enter)
+                  (sut/get-job-ctx)
+                  (get-in [:api :jobs]))]
+        (is (fn? f))
+        (is (= ::test-job (f "test-job")))))))
+
+(deftest update-job-init
+  (let [{:keys [leave] :as i} sut/update-job-init]
+    (is (keyword? (:name i)))
+    
+    (testing "`leave` adds agent details to job"
+      (let [r (-> {:event
+                   {:job-id "test-job"
+                    :agent
+                    {:address "test-addr"
+                     :ports {10000 8080}}}}
+                  (sut/set-jobs {"test-job"
+                                 {:type :container}})
+                  (leave))]
+        (is (= "test-addr"
+               (-> r
+                   (sut/get-jobs)
+                   (get "test-job")
+                   :agent
+                   :address)))))))
+
 (deftest routes
   (let [types [:script/initializing
                :script/start
                :script/end
                :job/queued
+               :job/initializing
                :job/executed
                :job/end
                :job/unblocked

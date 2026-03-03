@@ -297,3 +297,16 @@
   "Retrieves job by id in the current build"
   [ctx id]
   ((get-in ctx [:api :jobs]) id))
+
+(defn get-job-exposed-addr
+  "If the given job exposes a port, looks it up in the context and returns the
+   externally accessible address as a map with `:port` and `:address` keys.  If
+   the job is not found, or the given port is not mapped, returns `nil`."
+  [ctx id port]
+  (when-let [a (some-> (get-job ctx id)
+                       :agent)]
+    (when-let [[p _] (->> (:ports a)
+                          (filter (comp (partial = port) second))
+                          first)]
+      {:address (:address a)
+       :port p})))

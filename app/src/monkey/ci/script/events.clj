@@ -139,8 +139,7 @@
   {:name ::add-job-ctx
    :enter (fn [ctx]
             (let [jc (-> (get-job-ctx ctx)
-                         (assoc :job (get-job-from-state ctx))
-                         (assoc-in [:api :jobs] (partial get-job-from-state ctx)))]
+                         (assoc :job (get-job-from-state ctx)))]
               (emi/set-job-ctx ctx jc)))})
 
 (def with-job-ctx
@@ -149,6 +148,16 @@
    :enter (:enter add-job-ctx)
    :leave (fn [ctx]
             (set-job-ctx ctx (emi/get-job-ctx ctx)))})
+
+(defn add-job-retriever
+  "Interceptor that augments the job context with an api function that can be used to
+   retrieve other job details."
+  [state]
+  {:name ::add-job-retriever
+   :enter (fn [ctx]
+            (set-job-ctx ctx (-> (get-job-ctx ctx)
+                                 (assoc-in [:api :jobs] (fn [id]
+                                                          (get-in @state [:jobs id]))))))})
 
 (def execute-action
   "Interceptor that executes the job in the input event in a new thread, provided
@@ -219,6 +228,12 @@
             (cond-> ctx
               (= (build-sid ctx) (b/sid (get-build ctx)))
               (set-build-canceled)))})
+
+(def update-job-init
+  "Updates the job info with details from the job/initialzing event"
+  {:name ::update-job-init
+   :leave (fn [ctx]
+            (update-job ctx (job-id ctx) assoc :agent (get-in ctx [:event :agent])))})
 
 ;;; Handlers
 
@@ -372,6 +387,7 @@
         :interceptors [emi/handle-job-error
                        state
                        with-job-ctx
+                       (add-job-retriever state)
                        ext/before-interceptor
                        execute-action]}]]
 
@@ -380,6 +396,11 @@
         :interceptors [emi/handle-job-error
                        state
                        add-job-ctx]}]]
+
+     [:job/initializing
+      [{:handler (constantly nil)
+        :interceptors [state
+                       update-job-init]}]]
 
      [:job/executed
       ;; Handle this for both container and action jobs

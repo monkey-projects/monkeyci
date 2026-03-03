@@ -142,6 +142,14 @@
             (is (contains-subseq? args ["--cpus" "2"]))
             (is (contains-subseq? args ["--memory" "4g"])))))
 
+      (testing "binds exposed ports using available range"
+        (let [args (-> base-conf
+                       (assoc :mapped-ports {8080 10000
+                                             8443 10001})
+                       (sut/build-cmd-args))]
+          (is (contains-subseq? args ["-p" "10000:8080"]))
+          (is (contains-subseq? args ["-p" "10001:8443"]))))
+
       (testing "uses build and job id as container name"
         (is (contains-subseq? (sut/build-cmd-args base-conf)
                               ["--name" "test-build-test-job"])))
@@ -515,6 +523,36 @@
                       (sut/get-events-stream))))
         (is (ms/closed? s))))))
 
+(deftest assign-ports
+  (let [{:keys [enter] :as i} (sut/assign-ports [100 200])]
+    (is (keyword? (:name i)))
+    
+    (testing "updates port mapping in context"
+      (is (= {["test" "build"]
+              {"test-job" {8000 100}}}
+             (-> {:event
+                  {:sid ["test" "build"]
+                   :job-id "test-job"}}
+                 (sut/set-job {:id "test-job"
+                               :expose [8000]})
+                 (enter)
+                 (sut/get-mapped-ports)))))
+
+    (testing "skips already mapped ports"
+      (is (= {["test" "build"]
+              {"test-job" {8000 101}}
+              ["other" "build"]
+              {"other-job" {1234 100}}}
+             (-> {:event
+                  {:sid ["test" "build"]
+                   :job-id "test-job"}}
+                 (sut/set-job {:id "test-job"
+                               :expose [8000]})
+                 (sut/set-mapped-ports {["other" "build"]
+                                        {"other-job" {1234 100}}})
+                 (enter)
+                 (sut/get-mapped-ports)))))))
+
 (deftest job-queued
   (testing "returns `job/initializing` event"
     (is (= [:job/initializing]
@@ -537,7 +575,20 @@
              (-> {}
                  (sut/job-queued (sut/set-job-dir {} job-dir))
                  first
-                 :local-dir))))))
+                 :local-dir)))))
+
+  (testing "adds agent details with mapped ports"
+    (let [a (-> {:event
+                 {:sid ["test" "build"]
+                  :job-id "test-job"}}
+                (sut/set-mapped-ports {["test" "build"]
+                                       {"test-job" {1000 8080}}})
+                (as-> ctx (sut/job-queued {} ctx))
+                first
+                :agent)]
+      (is (map? a))
+      (is (string? (:address a)))
+      (is (= {1000 8080} (:ports a))))))
 
 (deftest job-init
   (testing "when no script, returns `job/start` event"
@@ -626,3 +677,16 @@
 
   (testing "returns job count"
     (is (= 3 (sut/count-jobs {:job-count 3})))))
+
+(deftest find-avail-ports
+  (testing "selects first available from range"
+    (is (= [100 101]
+           (sut/find-avail-ports 2 [100 200] #{}))))
+
+  (testing "skips used ports"
+    (is (= [100 102]
+           (sut/find-avail-ports 2 [100 200] #{101}))))
+
+  (testing "returns less than `n` when not enough available ports"
+    (is (= [100]
+           (sut/find-avail-ports 2 [100 101] #{101})))))

@@ -121,7 +121,8 @@
        (s/merge ::build-ref-event)))
 
 (defmethod event-type :job/initializing [_]
-  (->> (s/keys :req-un [::jc/credit-multiplier])
+  (->> (s/keys :req-un [::jc/credit-multiplier]
+               :opt-un [::jc/agent])
        (s/merge ::job-event)))
 
 (defmethod event-type :job/pending [_]

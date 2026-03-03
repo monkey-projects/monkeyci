@@ -7,7 +7,7 @@
 (s/def ::job-common
   (s/keys :req-un [::jc/type ::jc/id]
           :opt-un [::jc/dependencies ::jc/save-artifacts ::jc/restore-artifacts ::jc/caches
-                   ::jc/blocked]))
+                   ::jc/blocked ::jc/timeout]))
 
 (defmulti job-spec :type)
 
@@ -17,7 +17,7 @@
 
 (defmethod job-spec :container [_]
   (-> (s/keys :req-un [::jc/image]
-              :opt-un [::jc/size ::jc/arch ::jc/script ::jc/env])
+              :opt-un [::jc/size ::jc/arch ::jc/script ::jc/env ::jc/expose])
       (s/merge ::job-common)))
 
 ;; Job definitions, as configured in build scripts
