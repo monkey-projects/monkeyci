@@ -130,9 +130,11 @@
                (remove used))))
 
 (defn- expose-ports [cmd ports]
-  (concat (mapcat (fn [[cp hp]]
-                    ["-p" (str hp ":" cp)])
-                  ports)))
+  (->> ports
+       (mapcat (fn [[cp hp]]
+                 ["-p" (str hp ":" cp)]))
+       (concat)
+       (vec)))
 
 (defn build-cmd-args
   "Builds command line args for the podman executable"
