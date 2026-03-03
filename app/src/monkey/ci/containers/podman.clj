@@ -123,9 +123,20 @@
 (defn podman-cmd [opts]
   (get opts :podman-cmd "podman"))
 
+(defn find-avail-ports
+  "Calculates first `n` available ports from the given range, skipping those in use."
+  [n port-range used]
+  (take n (->> (apply range port-range)
+               (remove used))))
+
+(defn- expose-ports [cmd ports]
+  (concat (mapcat (fn [[cp hp]]
+                    ["-p" (str hp ":" cp)])
+                  ports)))
+
 (defn build-cmd-args
   "Builds command line args for the podman executable"
-  [{:keys [job sid] base :work-dir sd :script-dir :as opts}]
+  [{:keys [job sid mapped-ports] base :work-dir sd :script-dir :as opts}]
   (let [cn (get-job-id sid)
         cwd "/home/monkeyci"
         ext-dir "/opt/monkeyci"
@@ -150,6 +161,7 @@
                           "-w" wd
                           ;; TODO Allow arbitrary additional command line opts
                           ]
+                   (not-empty mapped-ports) (expose-ports mapped-ports)
                    ;; Do not delete container in dev mode
                    (not (:dev-mode opts)) (conj "--rm"))
         env {"MONKEYCI_WORK_DIR" wd
@@ -254,6 +266,17 @@
                               (update-in [:events-streams (build-sid ctx)] dissoc (ctx->job-id ctx))
                               ;; Remove any empty entries if all jobs have finished
                               (update :events-streams u/prune-tree)))))
+
+(defn set-mapped-ports [ctx p]
+  (emi/update-state ctx assoc ::mapped-ports p))
+
+(def get-mapped-ports (comp ::mapped-ports emi/get-state))
+
+(defn get-job-mapped-ports
+  "Retrieves mapped ports for current job"
+  [ctx]
+  (-> (get-mapped-ports ctx)
+      (get-in [(build-sid ctx) (ctx->job-id ctx)])))
 
 (defn podman-src [evt]
   (assoc evt :src :podman))
@@ -435,6 +458,24 @@
               (cond-> ctx
                 s (remove-events-stream))))})
 
+(defn assign-ports
+  "Interceptor that is responsible for assigning exposed job ports from a configured range"
+  [r]
+  (letfn [(calc-used-ports [m]
+            (->> m
+                 vals
+                 (mapcat vals)
+                 (mapcat vals)
+                 set))]
+    {:name ::assign-ports
+     :enter (fn [ctx]
+              (let [ports (:expose (get-job ctx))
+                    mapped (get-mapped-ports ctx)
+                    m (find-avail-ports (count ports) r (calc-used-ports mapped))
+                    c (-> mapped
+                          (assoc-in [(build-sid ctx) (ctx->job-id ctx)] (zipmap ports m)))]
+                (set-mapped-ports ctx c)))}))
+
 ;;; Event handlers
 
 (def container-end-evt
@@ -452,7 +493,8 @@
                 :sid (conj sid job-id)
                 :work-dir (get-work-dir ctx)
                 :log-dir (get-log-dir ctx)
-                :script-dir (get-script-dir ctx)}
+                :script-dir (get-script-dir ctx)
+                :mapped-ports (get-job-mapped-ports ctx)}
                (merge (podman-opts ctx))
                (build-cmd-args))
      :dir (job-work-dir ctx job)
@@ -510,6 +552,7 @@
                        (add-key-decrypter (:key-decrypter conf))
                        (restore-ws workspace)
                        (emi/add-mailman mailman)
+                       (assign-ports (get-in conf [:podman :expose-ports]))
                        (add-job-ctx job-ctx)
                        (cache/restore-interceptor emi/get-job-ctx)
                        (art/restore-interceptor emi/get-job-ctx)

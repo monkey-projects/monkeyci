@@ -113,7 +113,8 @@
        (mapcat (comp enumeration-seq (memfn getInetAddresses)))))
 
 (defn get-ip-addr
-  "Determines the ip address of this VM"
+  "Determines the ip address of this VM by selecting the first of all available addresses.
+   This could be an ipv4 or ipv6 address."
   []
   (first (get-all-ip-addresses)))
 
