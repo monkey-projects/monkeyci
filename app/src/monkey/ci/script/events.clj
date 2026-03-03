@@ -229,6 +229,12 @@
               (= (build-sid ctx) (b/sid (get-build ctx)))
               (set-build-canceled)))})
 
+(def update-job-init
+  "Updates the job info with details from the job/initialzing event"
+  {:name ::update-job-init
+   :leave (fn [ctx]
+            (update-job ctx (job-id ctx) assoc :agent (get-in ctx [:event :agent])))})
+
 ;;; Handlers
 
 (defn script-init
@@ -390,6 +396,11 @@
         :interceptors [emi/handle-job-error
                        state
                        add-job-ctx]}]]
+
+     [:job/initializing
+      [{:handler (constantly nil)
+        :interceptors [state
+                       update-job-init]}]]
 
      [:job/executed
       ;; Handle this for both container and action jobs

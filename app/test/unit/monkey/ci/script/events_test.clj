@@ -278,11 +278,32 @@
         (is (fn? f))
         (is (= ::test-job (f "test-job")))))))
 
+(deftest update-job-init
+  (let [{:keys [leave] :as i} sut/update-job-init]
+    (is (keyword? (:name i)))
+    
+    (testing "`leave` adds agent details to job"
+      (let [r (-> {:event
+                   {:job-id "test-job"
+                    :agent
+                    {:address "test-addr"
+                     :ports {10000 8080}}}}
+                  (sut/set-jobs {"test-job"
+                                 {:type :container}})
+                  (leave))]
+        (is (= "test-addr"
+               (-> r
+                   (sut/get-jobs)
+                   (get "test-job")
+                   :agent
+                   :address)))))))
+
 (deftest routes
   (let [types [:script/initializing
                :script/start
                :script/end
                :job/queued
+               :job/initializing
                :job/executed
                :job/end
                :job/unblocked

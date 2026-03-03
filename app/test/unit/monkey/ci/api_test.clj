@@ -326,3 +326,22 @@
                  {:jobs (fn [id]
                           (when (= "test-id") ::test-job))}}
                 (sut/get-job "test-id"))))))
+
+(deftest get-job-exposed-addr
+  (testing "`nil` if job not found"
+    (is (nil? (sut/get-job-exposed-addr {:api {:jobs (constantly nil)}} "test-job" 1000))))
+
+  (let [state {"test-job"
+               {:agent
+                {:address "test-addr"
+                 :ports {10001 8080}}}}
+        ctx {:api
+             {:jobs (fn [id]
+                      (get state id))}}]
+    (testing "returns externally accessible address for mapped port"
+      (is (= {:address "test-addr"
+              :port 10001}
+             (sut/get-job-exposed-addr ctx "test-job" 8080))))
+
+    (testing "`nil` if port not mapped"
+      (is (nil? (sut/get-job-exposed-addr ctx "test-job" 12342))))))
