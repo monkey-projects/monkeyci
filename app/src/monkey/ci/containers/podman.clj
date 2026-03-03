@@ -410,9 +410,12 @@
             (set-podman-opts ctx opts))})
 
 (defn job-queued [conf ctx]
-  (let [{:keys [job-id sid]} (:event ctx)]
+  (let [{:keys [job-id sid]} (:event ctx)
+        m (get-job-mapped-ports ctx)]
     [(-> (j/job-initializing-evt job-id sid (:credit-multiplier conf))
-         (assoc :local-dir (get-job-dir ctx)))]))
+         (assoc :local-dir (get-job-dir ctx)
+                :agent (cond-> {:address (.getHostAddress (u/get-ip-addr))}
+                         (not-empty m) (assoc :ports m))))]))
 
 (defn job-queued-result [conf]
   {:name ::job-queued

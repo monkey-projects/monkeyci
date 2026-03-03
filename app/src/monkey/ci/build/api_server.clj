@@ -105,18 +105,8 @@
       (u/maybe-deref)
       (rur/response)))
 
-(defn get-all-ip-addresses
-  "Lists all non-loopback, non-virtual site local ip addresses"
-  []
-  (->> (enumeration-seq (java.net.NetworkInterface/getNetworkInterfaces))
-       (remove (some-fn (memfn isLoopback) (memfn isVirtual)))
-       (mapcat (comp enumeration-seq (memfn getInetAddresses)))))
-
-(defn get-ip-addr
-  "Determines the ip address of this VM by selecting the first of all available addresses.
-   This could be an ipv4 or ipv6 address."
-  []
-  (first (get-all-ip-addresses)))
+(def get-all-ip-addresses u/get-all-ip-addresses)
+(def get-ip-addr u/get-ip-addr)
 
 (defprotocol ApiHostAddress
   (->url [this port] "Converts this host address to a url with given port"))

@@ -575,7 +575,20 @@
              (-> {}
                  (sut/job-queued (sut/set-job-dir {} job-dir))
                  first
-                 :local-dir))))))
+                 :local-dir)))))
+
+  (testing "adds agent details with mapped ports"
+    (let [a (-> {:event
+                 {:sid ["test" "build"]
+                  :job-id "test-job"}}
+                (sut/set-mapped-ports {["test" "build"]
+                                       {"test-job" {1000 8080}}})
+                (as-> ctx (sut/job-queued {} ctx))
+                first
+                :agent)]
+      (is (map? a))
+      (is (string? (:address a)))
+      (is (= {1000 8080} (:ports a))))))
 
 (deftest job-init
   (testing "when no script, returns `job/start` event"

@@ -46,3 +46,10 @@
 (s/def ::env (s/map-of string? string?))
 (s/def ::port int?)
 (s/def ::expose (s/coll-of ::port))
+
+(s/def ::address string?)
+(s/def ::ports (s/map-of int? int?))
+
+(s/def ::agent
+  (s/keys :req-un [::address]
+          :opt-un [::ports]))
