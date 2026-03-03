@@ -17,9 +17,9 @@
 (deftest apply-extensions-before
   (testing "executes `before` fn of registered extension for key"
     (let [ext {:key :test/before
-               :before (fn [rt]
+               :before (fn [ctx]
                          ;; Get the config from the job
-                         (assoc rt ::value (get-in rt [:job :test/before])))}
+                         (assoc ctx ::value (get-in ctx [:job :test/before])))}
           reg (sut/register sut/new-register ext)
           job (bc/action-job "test-job" (constantly bc/success)
                              {:test/before "config for extensions"})
@@ -30,8 +30,8 @@
   (testing "executes `before-job` multimethod for key"
     (with-extensions
       ;; Register a test extension
-      (defmethod sut/before-job :test/before [_ rt]
-        (assoc rt ::value (get-in rt [:job :test/before])))
+      (defmethod sut/before-job :test/before [_ ctx]
+        (assoc ctx ::value (get-in ctx [:job :test/before])))
       (is (some? (get-method sut/before-job :test/before)))
       
       (let [job (bc/action-job "test-job" (constantly bc/success)
@@ -44,9 +44,9 @@
 (deftest apply-extensions-after
   (testing "executes `after` fn of registered extension for key"
     (let [ext {:key :test/after
-               :after (fn [rt]
+               :after (fn [ctx]
                          ;; Get the config from the job
-                         (assoc rt ::value (get-in rt [:job :test/after])))}
+                         (assoc ctx ::value (get-in ctx [:job :test/after])))}
           reg (sut/register sut/new-register ext)
           job (bc/action-job "test-job" (constantly bc/success)
                              {:test/after "config for extensions"})
@@ -57,8 +57,8 @@
   (testing "executes `after-job` multimethod for key"
     (with-extensions
       ;; Register a test extension
-      (defmethod sut/after-job :test/after [_ rt]
-        (assoc rt ::value (get-in rt [:job :test/after])))
+      (defmethod sut/after-job :test/after [_ ctx]
+        (assoc ctx ::value (get-in ctx [:job :test/after])))
       (is (some? (get-method sut/after-job :test/after)))
       
       (let [job (bc/action-job "test-job" (constantly bc/success)

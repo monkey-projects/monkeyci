@@ -116,10 +116,7 @@
       (is (= ::value (::key ctx))))    
     
     (testing "adds job to job context"
-      (is (= job (:job ctx))))
-
-    (testing "adds jobs fn that allows retrieving other jobs from state"
-      (is (= other-job (api/get-job ctx (:id other-job)))))))
+      (is (= job (:job ctx))))))
 
 (deftest with-job-ctx
   (let [{:keys [leave] :as i} sut/with-job-ctx]
@@ -267,6 +264,19 @@
                      {:sid ["other" "build"]}}
                     (emi/set-state {:build {:sid build-sid}})
                     (enter))))))))
+
+(deftest add-job-retriever
+  (let [s (atom {:jobs {"test-job" ::test-job}})
+        {:keys [enter] :as i} (sut/add-job-retriever s)]
+    (is (keyword? (:name i)))
+    
+    (testing "adds job retriever api fn to to job context"
+      (let [f (-> {}
+                  (enter)
+                  (sut/get-job-ctx)
+                  (get-in [:api :jobs]))]
+        (is (fn? f))
+        (is (= ::test-job (f "test-job")))))))
 
 (deftest routes
   (let [types [:script/initializing
