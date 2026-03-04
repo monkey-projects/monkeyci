@@ -274,6 +274,9 @@
 
 (def get-mapped-ports (comp ::mapped-ports emi/get-state))
 
+(defn update-mapped-ports [ctx f & args]
+  (set-mapped-ports ctx (apply f (get-mapped-ports ctx) args)))
+
 (defn get-job-mapped-ports
   "Retrieves mapped ports for current job"
   [ctx]
@@ -474,12 +477,28 @@
                  set))]
     {:name ::assign-ports
      :enter (fn [ctx]
-              (let [ports (:expose (get-job ctx))
-                    mapped (get-mapped-ports ctx)
-                    m (find-avail-ports (count ports) r (calc-used-ports mapped))
-                    c (-> mapped
-                          (assoc-in [(build-sid ctx) (ctx->job-id ctx)] (zipmap ports m)))]
-                (set-mapped-ports ctx c)))}))
+              (let [ports (:expose (get-job ctx))]
+                (update-mapped-ports
+                 ctx
+                 (fn [mapped]
+                   (->> (find-avail-ports (count ports) r (calc-used-ports mapped))
+                        (zipmap ports)
+                        (assoc-in mapped [(build-sid ctx) (ctx->job-id ctx)]))))))}))
+
+(def release-ports
+  "Releases any previously assigned ports associated with the job"
+  (letfn [(maybe-remove-build [m sid]
+            (cond-> m
+              (empty? (get m sid)) (dissoc sid)))]
+    {:name ::release-ports
+     :enter (fn [ctx]
+              (update-mapped-ports
+               ctx
+               (fn [mapped]
+                 (let [sid (build-sid ctx)]
+                   (-> mapped
+                       (update sid dissoc (ctx->job-id ctx))
+                       (maybe-remove-build sid))))))}))
 
 ;;; Event handlers
 
@@ -596,5 +615,6 @@
                        (add-job-dir wd)
                        (add-job-ctx job-ctx)
                        stop-watch-events
+                       release-ports
                        (art/save-interceptor emi/get-job-ctx)
                        (cache/save-interceptor emi/get-job-ctx)]}]]]))

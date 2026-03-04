@@ -554,6 +554,20 @@
                  (enter)
                  (sut/get-mapped-ports)))))))
 
+(deftest release-ports
+  (let [{:keys [enter] :as i} sut/release-ports]
+    (is (keyword? (:name i)))
+    
+    (testing "releases assigned ports"
+      (let [sid ["test" "build"]
+            job-id "test-job"]
+        (is (empty? (-> {:event
+                         {:sid sid
+                          :job-id job-id}}
+                        (sut/set-mapped-ports {sid {job-id {1000 2000}}})
+                        (enter)
+                        (sut/get-mapped-ports))))))))
+
 (deftest job-queued
   (testing "returns `job/initializing` event"
     (is (= [:job/initializing]
