@@ -147,6 +147,7 @@
                        (assoc :mapped-ports {8080 10000
                                              8443 10001})
                        (sut/build-cmd-args))]
+          (is (= "podman" (first args)) "still runs podman")
           (is (contains-subseq? args ["-p" "10000:8080"]))
           (is (contains-subseq? args ["-p" "10001:8443"]))))
 

@@ -29,7 +29,8 @@
     {:main-branch "main"}}
    :api
    ;; Dummy api client
-   {:client (constantly (atom {}))}
+   {:client (constantly (atom {}))
+    :jobs (constantly nil)}
    :archs [:amd]})
 
 (defn with-git-ref
@@ -140,3 +141,11 @@
 (def container-job?
   "Checks if the argument is a container job"
   bc/container-job?)
+
+(def success?
+  "Checks if the job return value is successful"
+  bc/success?)
+
+(def failure?
+  "Checks if the job return value is a failure"
+  bc/failed?)

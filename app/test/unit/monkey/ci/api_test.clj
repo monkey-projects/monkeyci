@@ -71,6 +71,24 @@
       (is (= "test-img"
              (sut/image (job test-ctx)))))))
 
+(deftest expose
+  (testing "gets container job exposed ports"
+    (is (= [8080]
+           (-> (sut/container-job "test-job" {:expose [8080]})
+               (sut/expose)))))
+
+  (testing "sets container job exposed ports"
+    (is (= [8443]
+           (-> (sut/container-job "test-job")
+               (sut/expose [8443])
+               (sut/expose)))))
+
+  (testing "sets container job fn expose"
+    (let [job (-> (fn [_] (sut/container-job "test-job"))
+                  (sut/expose "test-img"))]
+      (is (= "test-img"
+             (sut/expose (job test-ctx)))))))
+
 (deftest script
   (testing "sets and gets script from container job"
     (is (= ["first" "second"]

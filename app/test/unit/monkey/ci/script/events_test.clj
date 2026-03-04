@@ -273,7 +273,7 @@
     (testing "adds job retriever api fn to to job context"
       (let [f (-> {}
                   (enter)
-                  (sut/get-job-ctx)
+                  (emi/get-job-ctx)
                   (get-in [:api :jobs]))]
         (is (fn? f))
         (is (= ::test-job (f "test-job")))))))

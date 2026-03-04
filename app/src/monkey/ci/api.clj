@@ -94,6 +94,13 @@
   ([job script]
    (try-unwrap job assoc :script script)))
 
+(defn expose
+  "Gets or sets exposed ports"
+  ([job]
+   (:expose job))
+  ([job ports]
+   (try-unwrap job assoc :expose ports)))
+
 (defn- set-env [job e]
   (cond
     (action-job? job) (assoc job :env e)

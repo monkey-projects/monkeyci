@@ -11,7 +11,8 @@
             [monkey.ci
              [console :as c]
              [jobs :as j]
-             [utils :as u]]
+             [utils :as u]
+             [version :as v]]
             [monkey.ci.common.jobs :as cj]
             [monkey.ci.events.mailman.interceptors :as mi]
             [monkey.ci.local.common :as lc]))
@@ -60,7 +61,7 @@
    (str (c/color-256  46) "░▒█▀▄▀█░▄▀▀▄░█▀▀▄░█░▄░█▀▀░█░░█░▒█▀▀▄░▀█▀")
    (str (c/color-256 118) "░▒█▒█▒█░█░░█░█░▒█░█▀▄░█▀▀░█▄▄█░▒█░░░░▒█░")
    (str (c/color-256 190) "░▒█░░▒█░░▀▀░░▀░░▀░▀░▀░▀▀▀░▄▄▄▀░▒█▄▄▀░▄█▄")
-   (str color-white "  Build your code in style")
+   (str color-white "  Build your code in style - " (v/version))
    c/reset])
 
 (defn- duration-since [t]

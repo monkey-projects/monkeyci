@@ -155,9 +155,9 @@
   [state]
   {:name ::add-job-retriever
    :enter (fn [ctx]
-            (set-job-ctx ctx (-> (get-job-ctx ctx)
-                                 (assoc-in [:api :jobs] (fn [id]
-                                                          (get-in @state [:jobs id]))))))})
+            (emi/set-job-ctx ctx (-> (emi/get-job-ctx ctx)
+                                     (assoc-in [:api :jobs] (fn [id]
+                                                              (get-in @state [:jobs id]))))))})
 
 (def execute-action
   "Interceptor that executes the job in the input event in a new thread, provided
@@ -230,7 +230,7 @@
               (set-build-canceled)))})
 
 (def update-job-init
-  "Updates the job info with details from the job/initialzing event"
+  "Updates the job info with details from the job/initializing event"
   {:name ::update-job-init
    :leave (fn [ctx]
             (update-job ctx (job-id ctx) assoc :agent (get-in ctx [:event :agent])))})

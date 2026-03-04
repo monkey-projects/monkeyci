@@ -21,7 +21,7 @@
   {:extra-deps {com.monkeyprojects/build {:mvn/version "0.3.1"}}
    :exec-fn monkey.build/jar
    :exec-args {:lib com.monkeyci/test
-               :version [[:env "MONKEYCI_VERSION"] "0.23.1-SNAPSHOT"]
+               :version [[:env "MONKEYCI_VERSION"] "0.24.0-SNAPSHOT"]
                :jar "target/monkeyci-test.jar"}}
 
   :install

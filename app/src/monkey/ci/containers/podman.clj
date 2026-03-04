@@ -133,7 +133,7 @@
   (->> ports
        (mapcat (fn [[cp hp]]
                  ["-p" (str hp ":" cp)]))
-       (concat)
+       (concat cmd)
        (vec)))
 
 (defn build-cmd-args
