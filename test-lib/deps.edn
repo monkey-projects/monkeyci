@@ -1,4 +1,4 @@
-{:deps {com.monkeyci/app {:mvn/version "0.22.3"}}
+{:deps {com.monkeyci/app {:mvn/version "0.24.0-SNAPSHOT"}}
  :paths ["src" "resources"]
 
  :aliases
