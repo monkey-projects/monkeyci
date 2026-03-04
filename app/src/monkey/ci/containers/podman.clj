@@ -221,6 +221,13 @@
 (defn set-job-dir [ctx wd]
   (emi/update-state ctx assoc ::job-dir wd))
 
+(defn get-job-timeout
+  "Returns the timeout for this job"
+  [ctx]
+  (min (or (some-> (get-job ctx) :timeout)
+           j/default-job-timeout)
+       j/max-job-timeout))
+
 (def get-work-dir
   "The directory where the container process is run"
   (comp #(fs/path % "work") get-job-dir))
@@ -559,7 +566,7 @@
   (-> (select-keys conf [:artifacts :cache])
       (assoc :checkout-dir (b/checkout-dir (:build conf)))))
 
-(def default-expose-range [10000 20000])
+(def default-expose-range [20000 21000])
 
 (defn make-routes [{:keys [workspace work-dir mailman state] :as conf}]
   (let [state (emi/with-state (or state (atom {})))
@@ -583,6 +590,7 @@
                        (cache/restore-interceptor emi/get-job-ctx)
                        (art/restore-interceptor emi/get-job-ctx)
                        decrypt-env
+                       (emi/schedule-process-kill get-job-timeout)
                        emi/start-process
                        (add-podman-opts (:podman conf))]}]]
 
@@ -607,6 +615,7 @@
                        require-job
                        remove-job
                        dec-job-count
+                       ;; TODO Cancel process kill
                        ;; Handle any errors before decreasing job count, to make sure that's
                        ;; being executed.
                        emi/handle-job-error

@@ -10,6 +10,7 @@
              [stream :as ms]]
             [monkey.ci
              [cuid :as cuid]
+             [jobs :as j]
              [vault :as v]]
             [monkey.ci.containers.podman :as sut]
             [monkey.ci.events.mailman.interceptors :as emi]
@@ -181,6 +182,26 @@
            (-> {}
                (sut/set-job-dir "/test/wd")
                (sut/job-work-dir {:work-dir "job-dir"}))))))
+
+(deftest get-job-timeout
+  (testing "returns default timeout"
+    (is (= j/default-job-timeout (sut/get-job-timeout {}))))
+
+  (testing "returns configured job timeout"
+    (is (= 1000
+           (-> {:event
+                {:job-id "test-job"}}
+               (sut/set-job {:id "test-job"
+                             :timeout 1000})
+               (sut/get-job-timeout)))))
+
+  (testing "does not exceed max timeout"
+    (is (= j/max-job-timeout
+           (-> {:event
+                {:job-id "test-job"}}
+               (sut/set-job {:id "test-job"
+                             :timeout (* 2 j/max-job-timeout)})
+               (sut/get-job-timeout))))))
 
 (deftest make-routes
   (h/with-tmp-dir dir
