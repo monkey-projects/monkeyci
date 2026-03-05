@@ -249,3 +249,16 @@
    This could be an ipv4 or ipv6 address."
   []
   (first (get-all-ip-addresses)))
+
+(defprotocol InetAddressString
+  (inetaddr->str [a] "Returns textual representation of the inet address"))
+
+(extend-protocol InetAddressString
+  java.net.Inet4Address
+  (inetaddr->str [a]
+    (.getHostName a))
+
+  java.net.Inet6Address
+  (inetaddr->str [a]
+    ;; Drop the scope id
+    (.getHostAddress (java.net.InetAddress/getByAddress nil (.getAddress a)))))

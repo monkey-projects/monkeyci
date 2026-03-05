@@ -426,7 +426,7 @@
         m (get-job-mapped-ports ctx)]
     [(-> (j/job-initializing-evt job-id sid (:credit-multiplier conf))
          (assoc :local-dir (get-job-dir ctx)
-                :agent (cond-> {:address (.getHostAddress (u/get-ip-addr))}
+                :agent (cond-> {:address (u/inetaddr->str (u/get-ip-addr))}
                          (not-empty m) (assoc :ports m))))]))
 
 (defn job-queued-result [conf]
