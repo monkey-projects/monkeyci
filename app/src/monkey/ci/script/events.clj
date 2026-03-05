@@ -360,9 +360,10 @@
       (assoc :api {:client (:api-client conf)})))
 
 (defn make-routes [{:keys [result] :as conf}]
-  (let [state (atom (-> conf
-                        (select-keys [:build :filter])
-                        (assoc ::initial-job-ctx (make-job-ctx conf))))
+  (let [state (or (:state conf) ; For testing
+                  (atom (-> conf
+                            (select-keys [:build :filter])
+                            (assoc ::initial-job-ctx (make-job-ctx conf)))))
         state-int (emi/with-state state)]
     [[:script/initializing
       [{:handler script-init

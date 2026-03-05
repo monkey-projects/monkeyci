@@ -6,8 +6,7 @@
             [medley.core :as mc]
             [monkey.ci.build
              [api :as ba]
-             [core :as bc]
-             [v2 :as v2]]
+             [core :as bc]]
             [monkey.ci.events
              [mailman :as em]
              [spec :as es]]
@@ -369,14 +368,33 @@
                      :result
                      first
                      :result
-                     ext-id))))))))
+                     ext-id))))))
+
+    (testing "`job/queued`"
+      (let [exec-ctx (atom nil)
+            job (api/action-job "test-job" (fn [ctx]
+                                             (reset! exec-ctx ctx)
+                                             api/success))
+            test-state (atom {:jobs (jobs->map [job])})
+            r (-> (sut/make-routes {:api-client ::test-client
+                                    :state test-state})
+                  (mmc/router))]
+        (testing "executes action job"
+          (is (some? (-> {:type :job/queued
+                          :job-id (:id job)}
+                         (r))))
+          (is (some? @exec-ctx)))
+
+        (testing "passes job retriever in job ctx"
+          (is (fn? (-> @exec-ctx :api :jobs)))
+          (is (= job (api/get-job @exec-ctx "test-job"))))))))
 
 (deftest make-job-ctx
   (testing "passes archs from config"
     (let [archs [:arch-1 :arch-2]]
       (is (= archs (-> {:archs archs}
                        (sut/make-job-ctx)
-                       (v2/archs)))))))
+                       (api/archs)))))))
 
 (deftest script-init
   (testing "fires `script/start` event with pending jobs"
