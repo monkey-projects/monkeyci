@@ -13,6 +13,7 @@
              [jobs :as j]
              [utils :as u]
              [version :as v]]
+            [monkey.ci.build.core :as bc]
             [monkey.ci.common.jobs :as cj]
             [monkey.ci.events.mailman.interceptors :as mi]
             [monkey.ci.local.common :as lc]))
@@ -119,6 +120,17 @@
                       #(in-yellow (str "  " %))) (name (:status job))))))
           jobs)))
 
+(defn- failed-jobs-messages [jobs]
+  (let [f (->> jobs
+               (filter bc/failed?))
+        m (->> f
+               (map (comp count j/job-id))
+               (reduce max 0))]
+    (map (fn [j]
+           (format (format "%%%ds: %%s" (inc m)) (j/job-id j)
+                   (get-in j [:result :message] "(No message)")))
+         f)))
+
 (defn render-state
   "Converts state into printable lines, possibly using ansi control codes."
   [{:keys [build jobs i]}]
@@ -128,8 +140,9 @@
     (and build (nil? jobs)) (concat ["Initializing build script..."])
     jobs (concat (render-jobs i jobs))
     (= :success (:status build)) (concat ["" (success-msg "Build completed successfully!") ""])
-    (= :error (:status build)) (concat ["" (failure-msg "Build failed.")
-                                        (str "Check the logs in " (:local-dir build))
+    (= :error (:status build)) (concat ["" (failure-msg "Build failed.") ""]
+                                       (failed-jobs-messages jobs)
+                                       [(str "Check the logs in " (:local-dir build))
                                         ""])))
 
 (defrecord PeriodicalRenderer [state renderer interval]
@@ -208,9 +221,9 @@
   (with-state [s ctx]
     (update-job s (:job-id event)
                 merge
-                (select-keys event [:status :message])
-                {:end-time (:time event)
-                 :output (get-in event [:result :output])})))
+                (select-keys event [:status])
+                {:end-time (:time event)}
+                (select-keys (:result event) [:output :message]))))
 
 ;;; Interceptors
 

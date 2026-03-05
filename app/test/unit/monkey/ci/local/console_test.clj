@@ -36,7 +36,7 @@
                (sut/get-build)
                :start-time)))))
 
-(deftest build-start
+(deftest build-end
   (let [b (-> {:event
                 {:time ::test-time
                  :status :success}}
@@ -106,8 +106,8 @@
   (let [r (-> {:event {:job-id "test-job"
                        :time ::test-time
                        :status :success
-                       :message "test msg"
-                       :result {:output "test output"}}}
+                       :result {:output "test output"
+                                :message "test msg"}}}
               (mi/set-state {:jobs [{:id "test-job"
                                      :status :running}]})
               (sut/job-end)
@@ -197,4 +197,16 @@
                                        :start-time 100}
                                :i 0})]
       (is (seqable? r))
-      (is (every? string? r)))))
+      (is (every? string? r))))
+
+  (testing "renders job error messages when job finished"
+    (let [r (-> {:build {:start-time 100
+                         :end-time 200
+                         :build-id "test-build"
+                         :status :error}
+                 :jobs [{:id "failed-job"
+                         :status :failure
+                         :result {:message "Test error"}}]
+                 :i 0}
+                (sut/render-state))]
+      (is (not-empty (filter (partial re-matches #".*Test error.*") r))))))
