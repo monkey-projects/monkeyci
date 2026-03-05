@@ -360,19 +360,20 @@
       (assoc :api {:client (:api-client conf)})))
 
 (defn make-routes [{:keys [result] :as conf}]
-  (let [state (emi/with-state (atom (-> conf
-                                        (select-keys [:build :filter])
-                                        (assoc ::initial-job-ctx (make-job-ctx conf)))))]
+  (let [state (atom (-> conf
+                        (select-keys [:build :filter])
+                        (assoc ::initial-job-ctx (make-job-ctx conf))))
+        state-int (emi/with-state state)]
     [[:script/initializing
       [{:handler script-init
         :interceptors [handle-script-error
-                       state
+                       state-int
                        load-jobs]}]]
 
      [:script/start
       [{:handler script-start
         :interceptors [handle-script-error
-                       state
+                       state-int
                        enqueue-jobs]}]]
 
      [:script/end
@@ -385,7 +386,7 @@
       ;; type and executes before-extensions.  Action jobs are executed immediately.
       [{:handler job-queued
         :interceptors [emi/handle-job-error
-                       state
+                       state-int
                        with-job-ctx
                        (add-job-retriever state)
                        ext/before-interceptor
@@ -394,30 +395,30 @@
      [:job/unblocked
       [{:handler job-unblocked
         :interceptors [emi/handle-job-error
-                       state
+                       state-int
                        add-job-ctx]}]]
 
      [:job/initializing
       [{:handler (constantly nil)
-        :interceptors [state
+        :interceptors [state-int
                        update-job-init]}]]
 
      [:job/executed
       ;; Handle this for both container and action jobs
       [{:handler job-executed
         :interceptors [emi/handle-job-error
-                       state
+                       state-int
                        add-job-ctx
                        add-result-to-ctx
                        ext/after-interceptor]}]]
 
      [:job/end
       [{:handler job-end
-        :interceptors [state
+        :interceptors [state-int
                        enqueue-jobs
                        set-job-result]}]]
 
      [:build/canceled
       [{:handler build-canceled
-        :interceptors [state
+        :interceptors [state-int
                        mark-canceled]}]]]))
