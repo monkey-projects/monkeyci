@@ -322,6 +322,25 @@
     {:route-name :delete-org-token
      :path-parts (into org-path ["/token/" :token-id])
      :path-schema (assoc org-schema :token-id s/Str)
+     :method :delete})
+
+   (api-route
+    {:route-name :get-user-tokens
+     :path-parts (into user-path ["/token"])
+     :path-schema user-schema
+     :method :get})
+
+   (api-route
+    {:route-name :create-user-token
+     :path-parts (into user-path ["/token"])
+     :path-schema user-schema
+     :body-schema {:token ApiToken}
+     :method :post})
+
+   (api-route
+    {:route-name :delete-user-token
+     :path-parts (into user-path ["/token" :token-id])
+     :path-schema (assoc user-schema :token-id s/Str)
      :method :delete})])
 
 (def user-routes

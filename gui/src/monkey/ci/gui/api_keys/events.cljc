@@ -9,9 +9,12 @@
             [re-frame.core :as rf]))
 
 (def config
-  {db/org-id {:request :get-org-tokens
-              :save-request :create-org-token
-              :delete-request :delete-org-token}})
+  {db/org-id  {:request        :get-org-tokens
+               :save-request   :create-org-token
+               :delete-request :delete-org-token}
+   db/user-id {:request        :get-user-tokens
+               :save-request   :create-user-token
+               :delete-request :delete-user-token}})
 
 (rf/reg-event-fx
  :tokens/load
