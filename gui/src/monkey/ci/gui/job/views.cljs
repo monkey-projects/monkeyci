@@ -1,5 +1,6 @@
 (ns monkey.ci.gui.job.views
   (:require [clojure.string :as cs]
+            [medley.core :as mc]
             [monkey.ci.gui.artifact.events]
             [monkey.ci.gui.artifact.subs]
             [monkey.ci.gui.components :as co]
@@ -90,7 +91,16 @@
        [row "Exposed ports:" [:div.font-monospace (cs/join ", " e)]])
      (when-let [a (:agent job)]
        [port-mapping a])
-     [row "Raw definition:" [:code (str (dissoc job :result))]]
+     [row
+      [:span
+       "Raw definition:"
+       [:span.ms-1
+        {:title "The definition of the job as processed by MonkeyCI.  Environment variables have been cleared for security purposes."}
+        [co/icon :question-circle]]]
+      [:code (str (-> job
+                      (dissoc :result)
+                      (mc/update-existing :container/env
+                                          (partial mc/map-vals (constantly "...")))))]]
      (when-let [r (:result job)]
        [row "Raw result:" [:code (str r)]])]))
 

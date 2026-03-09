@@ -230,3 +230,4 @@
 
 (defn page-title [& contents]
   (into [:h3.text-primary] contents))
+

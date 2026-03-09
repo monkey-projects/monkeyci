@@ -40,6 +40,8 @@
   [sut/job-details
    {:type :container
     :container/image "docker.io/clojure:tools-deps-trixie"
+    :container/env {"MYSQL_USER" "testuser"
+                    "MYSQL_PASS" "testpass"}
     :script ["clojure -M -m nrepl.cmdline -p 7888 -b 0.0.0.0"]
     :expose [7888]
     :agent {:address "2a01:4f8:c013:5630::1"
