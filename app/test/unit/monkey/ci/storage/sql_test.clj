@@ -24,61 +24,52 @@
 
 (deftest ^:sql orgs
   (with-storage conn s
-    (testing "can write and read"
-      (let [org (h/gen-org)]
+    (let [org (h/gen-org)]
+      (testing "can write and read"
         (is (sid/sid? (st/save-org s org)))
         (is (= 1 (count (ec/select-orgs conn [:is :id [:not nil]]))))
         (is (some? (ec/select-org conn (ec/by-cuid (:id org)))))
         (is (= (assoc org :repos {})
-               (st/find-org s (:id org))))))
+               (st/find-org s (:id org)))))
 
-    (testing "can operate within a transaction"
-      (st/with-transaction s tx
-        (let [org (h/gen-org)]
-          (is (sid/sid? (st/save-org tx org)))
-          (is (some? (ec/select-org ((:get-conn tx) tx) (ec/by-cuid (:id org)))))
-          (is (= (assoc org :repos {})
-                 (st/find-org tx (:id org)))))))
+      (testing "can operate within a transaction"
+        (st/with-transaction s tx
+          (let [upd (assoc org :name "updated org")]
+            (is (sid/sid? (st/save-org tx upd)))
+            (is (some? (ec/select-org ((:get-conn tx) tx) (ec/by-cuid (:id upd)))))
+            (is (= (assoc upd :repos {})
+                   (st/find-org tx (:id upd)))))))
 
-    (testing "copies overrides in trx"
-      (st/with-transaction s tx
-        (is (= (:overrides s) (:overrides tx)))))
+      (testing "copies overrides in trx"
+        (st/with-transaction s tx
+          (is (= (:overrides s) (:overrides tx)))))
 
-    (testing "can write and read with repos"
-      (let [org (h/gen-org)
-            repo {:name "test repo"
-                  :org-id (:id org)
-                  :id "test-repo"
-                  :url "http://test-repo"}]
-        (is (sid/sid? (st/save-org s org)))
-        (is (sid/sid? (st/save-repo s repo)))
-        (is (= (assoc org :repos {(:id repo) (dissoc repo :org-id)})
-               (st/find-org s (:id org))))))
+      (testing "with repos"
+        (let [repo {:name "test repo"
+                    :org-id (:id org)
+                    :id "test-repo"
+                    :url "http://test-repo"}]
+          (testing "can write and read with repos"
+            (is (sid/sid? (st/save-org s org)))
+            (is (sid/sid? (st/save-repo s repo)))
+            (is (= (assoc org :repos {(:id repo) (dissoc repo :org-id)})
+                   (st/find-org s (:id org)))))
 
-    (testing "can delete with repos"
-      (let [org (h/gen-org)
-            repo {:name "test repo"
-                  :org-id (:id org)
-                  :id "test-repo"
-                  :url "http://test-repo"}]
-        (is (sid/sid? (st/save-org s org)))
-        (is (sid/sid? (st/save-repo s repo)))
-        (is (some? (st/find-org s (:id org))))
-        (is (true? (st/delete-org s (:id org)))
-            "expected to delete org record")
-        (is (nil? (st/find-org s (:id org)))
-            "did not expect to find org after deletion")))
+          (testing "can delete with repos"
+            (is (true? (st/delete-org s (:id org)))
+                "expected to delete org record")
+            (is (nil? (st/find-org s (:id org)))
+                "did not expect to find org after deletion"))))
 
-    (testing "can search"
-      (let [org (-> (h/gen-org)
-                    (assoc :name "test org"))]
-        (is (sid/sid? (st/save-org s org)))
-        
-        (testing "by name"
-          (is (= [org] (st/search-orgs s {:name "test"}))))
+      (testing "can search"
+        (let [org (assoc org :name "test org")]
+          (is (sid/sid? (st/save-org s org)))
+          
+          (testing "by name"
+            (is (= [org] (st/search-orgs s {:name "test"}))))
 
-        (testing "by id"
-          (is (= [org] (st/search-orgs s {:id (:id org)}))))))
+          (testing "by id"
+            (is (= [org] (st/search-orgs s {:id (:id org)})))))))
 
     (testing "can find multiple by id"
       (let [orgs (repeatedly 3 h/gen-org)]
@@ -112,13 +103,15 @@
     (let [org (-> (h/gen-org)
                   (assoc :name "test org"))
           user {:id (cuid/random-cuid)
-                :type "github"
+                :type :github
                 :type-id "12342"}
           _ (st/save-user s user)
           res (st/init-org s {:org org
                               :user-id (:id user)
-                              :credits {:amount 1000
-                                        :from (t/now)}
+                              :credits [{:amount 1000
+                                         :from (t/now)
+                                         :description "Test sub"
+                                         :period "P2Y"}]
                               :dek "test-dek"})]
       
       (testing "creates new org"
@@ -133,7 +126,9 @@
       (testing "creates credit subscription"
         (let [cs (st/list-org-credit-subscriptions s (:id org))]
           (is (= 1 (count cs)))
-          (is (= 1000M (-> cs first :amount)))))
+          (is (= 1000M (-> cs first :amount)))
+          (is (string? (-> cs first :description)))
+          (is (= "P2Y" (-> cs first :valid-period)))))
 
       (testing "creates initial credits"
         (let [c (st/list-org-credits s (:id org))]
@@ -268,7 +263,21 @@
             (is (sid/sid? (st/save-ssh-keys s org-id [(assoc k :label-filters lf)])))
             (let [matches (st/find-ssh-keys s org-id)]
               (is (= 1 (count matches)))
-              (is (= lf (-> matches first :label-filters))))))))))
+              (is (= lf (-> matches first :label-filters))))))
+
+        (testing "deletes removed keys from set"
+          (let [new-k (assoc (h/gen-ssh-key) :org-id org-id)]
+            (is (sid/sid? (st/save-ssh-keys s org-id [k new-k])))
+            (is (= 2 (count (st/find-ssh-keys s org-id))))
+            (is (sid/sid? (st/save-ssh-keys s org-id [new-k])))
+            (is (= #{(:id new-k)}
+                   (->> (st/find-ssh-keys s org-id)
+                        (map :id)
+                        (set))))))
+
+        (testing "when empty set, deletes all keys"
+          (is (sid/sid? (st/save-ssh-keys s org-id [])))
+          (is (empty? (st/find-ssh-keys s org-id))))))))
 
 (deftest ^:sql webhooks
   (with-storage conn s
@@ -351,6 +360,7 @@
 (deftest ^:sql users
   (with-storage conn s
     (let [user (-> (h/gen-user)
+                   (assoc :email "test@monkeyci.com")
                    (dissoc :orgs :orgomers))
           user->id (juxt :type :type-id)]
       (testing "can save and find"
@@ -359,6 +369,10 @@
 
       (testing "can find by cuid"
         (is (= user (st/find-user s (:id user)))))
+
+      (testing "can list emails"
+        (is (= ["test@monkeyci.com"]
+               (st/list-user-emails s))))
 
       (testing "can link to org"
         (let [org (h/gen-org)
@@ -370,6 +384,9 @@
 
       (testing "can find orgs"
         (is (not-empty (st/list-user-orgs s (:id user)))))
+
+      (testing "can find by email"
+        (is (= [user] (st/find-users-by-email s (:email user)))))
       
       (testing "can unlink from org"
         (is (sid/sid? (st/save-user s (dissoc user :orgs))))
@@ -394,15 +411,15 @@
                            :start-time (t/now)
                            :end-time (t/now))
                     (mc/update-existing :git dissoc :ssh-keys-dir :ssh-keys))
-          build-sid (st/ext-build-sid build)]
+          build-sid (st/ext-build-sid build)
+          sub (juxt :org-id :repo-id :build-id)]
       (is (sid/sid? (st/save-org s org)))
 
       (testing "can save and retrieve"
         (is (sid/sid? (st/save-build s build)))
         (is (= 1 (count (ec/select conn {:select :*
                                          :from :builds}))))
-        (is (= build (-> (st/find-build s build-sid)
-                         (select-keys (keys build))))))
+        (is (= (sub build) (sub (st/find-build s build-sid)))))
 
       (testing "can list"
         (is (= [(:build-id build)]
@@ -414,8 +431,8 @@
       (testing "can list with details, excluding jobs"
         (let [d (st/list-builds s (take 2 build-sid))]
           (is (= 1 (count d)))
-          (is (= (update build :script dissoc :jobs)
-                 (select-keys (first d) (keys build))))))
+          (is (= (sub (update build :script dissoc :jobs))
+                 (sub (first d))))))
 
       (testing "removes ssh private keys"
         (let [ssh-key {:id (st/new-id)
@@ -435,115 +452,122 @@
           (is (= 1 (st/find-next-build-idx s repo-sid))
               "initial index is one")
           (is (= 2 (st/find-next-build-idx s repo-sid))
-              "increases on each invocation")))
+              "increases on each invocation"))))
 
-      (testing "can list builds since timestamp"
-        (let [repo (h/gen-repo)
-              org (-> (h/gen-org)
-                       (assoc :repos {(:id repo) repo}))
-              old-build (-> (h/gen-build)
-                            (assoc :org-id (:id org)
-                                   :repo-id (:id repo)
-                                   :start-time 100)
-                            (dissoc :script))
-              new-build (-> (h/gen-build)
-                            (assoc :org-id (:id org)
-                                   :repo-id (:id repo)
-                                   :start-time 200)
-                            (dissoc :script))]
-          (is (sid/sid? (st/save-org s org)))
-          (is (sid/sid? (st/save-build s old-build)))
-          (is (sid/sid? (st/save-build s new-build)))
-          (let [r (st/list-builds-since s (:id org) 150)]
-            (is (= [(:build-id new-build)] (map :build-id r)))
-            (is (= (:id org) (:org-id (first r))))
-            (is (= (:id repo) (:repo-id (first r)))))))
+    (testing "can list builds since timestamp"
+      (let [repo (h/gen-repo)
+            org (-> (h/gen-org)
+                    (assoc :repos {(:id repo) repo}))
+            old-build (-> (h/gen-build)
+                          (assoc :org-id (:id org)
+                                 :repo-id (:id repo)
+                                 :build-id (cuid/random-cuid)
+                                 :start-time 100)
+                          (dissoc :script))
+            new-build (-> (h/gen-build)
+                          (assoc :org-id (:id org)
+                                 :repo-id (:id repo)
+                                 :build-id (cuid/random-cuid)
+                                 :start-time 200)
+                          (dissoc :script))]
+        (is (sid/sid? (st/save-org s org)))
+        (is (sid/sid? (st/save-build s old-build)))
+        (is (sid/sid? (st/save-build s new-build)))
+        (let [r (st/list-builds-since s (:id org) 150)]
+          (is (= [(:build-id new-build)] (map :build-id r)))
+          (is (= (:id org) (:org-id (first r))))
+          (is (= (:id repo) (:repo-id (first r)))))))
 
-      (testing "can find latest by build index"
-        (let [repo (h/gen-repo)
-              org (-> (h/gen-org)
-                       (assoc :repos {(:id repo) repo}))
-              old-build (-> (h/gen-build)
-                            (assoc :org-id (:id org)
-                                   :repo-id (:id repo)
-                                   :start-time 100
-                                   :idx 9
-                                   :build-id "build-9")
-                            (dissoc :script))
-              new-build (-> (h/gen-build)
-                            (assoc :org-id (:id org)
-                                   :repo-id (:id repo)
-                                   :start-time 200
-                                   :idx 10
-                                   :build-id "build-10")
-                            (dissoc :script))]
-          (is (sid/sid? (st/save-org s org)))
-          (is (sid/sid? (st/save-build s old-build)))
-          (is (sid/sid? (st/save-build s new-build)))
-          (let [r (st/find-latest-build s [(:id org) (:id repo)])]
-            (is (= (:build-id new-build) (:build-id r))))))
+    (testing "can find latest by build index"
+      (let [repo (h/gen-repo)
+            org (-> (h/gen-org)
+                    (assoc :repos {(:id repo) repo}))
+            old-build (-> (h/gen-build)
+                          (assoc :org-id (:id org)
+                                 :repo-id (:id repo)
+                                 :start-time 100
+                                 :idx 9
+                                 :build-id "build-9")
+                          (dissoc :script))
+            new-build (-> (h/gen-build)
+                          (assoc :org-id (:id org)
+                                 :repo-id (:id repo)
+                                 :start-time 200
+                                 :idx 10
+                                 :build-id "build-10")
+                          (dissoc :script))
+            job {:id "test-job"}]
+        (is (sid/sid? (st/save-org s org)))
+        (is (sid/sid? (st/save-build s old-build)))
+        (is (sid/sid? (st/save-build s new-build)))
+        (is (sid/sid? (st/save-job s (st/ext-build-sid new-build) job)))
+        (let [r (st/find-latest-build s [(:id org) (:id repo)])]
+          (is (= (:build-id new-build) (:build-id r))
+              "is latest build")
+          (is (= {(:id job) job} (get-in r [:script :jobs]))
+              "contains job details"))))
 
-      (testing "can find all latest for org"
-        (let [repos (repeatedly 2 h/gen-repo)
-              org (-> (h/gen-org)
-                       (assoc :repos (->> repos
-                                          (map (fn [r] [(:id r) r]))
-                                          (into {}))))
-              builds (->> [{:idx 1
-                            :build-id "build-1"
-                            :repo-id (:id (first repos))}
-                           {:idx 2
-                            :build-id "build-2"
-                            :repo-id (:id (first repos))}
-                           {:idx 3
-                            :build-id "build-3"
-                            :repo-id (:id (second repos))}
-                           {:idx 4
-                            :build-id "build-4"
-                            :repo-id (:id (second repos))}]
-                          (map #(assoc % :org-id (:id org))))]
-          (is (sid/sid? (st/save-org s org)))
-          (doseq [b builds]
-            (is (sid/sid? (st/save-build s b))))
-          (let [latest (st/find-latest-builds s (:id org))]
-            (is (= #{"build-2" "build-4"}
-                   (->> latest
-                        (map :build-id)
-                        (set)))))))
+    (testing "can find all latest for org"
+      (let [repos (repeatedly 2 h/gen-repo)
+            org (-> (h/gen-org)
+                    (assoc :repos (->> repos
+                                       (map (fn [r] [(:id r) r]))
+                                       (into {}))))
+            builds (->> [{:idx 1
+                          :build-id "build-1"
+                          :repo-id (:id (first repos))}
+                         {:idx 2
+                          :build-id "build-2"
+                          :repo-id (:id (first repos))}
+                         {:idx 3
+                          :build-id "build-3"
+                          :repo-id (:id (second repos))}
+                         {:idx 4
+                          :build-id "build-4"
+                          :repo-id (:id (second repos))}]
+                        (map #(assoc % :org-id (:id org))))]
+        (is (sid/sid? (st/save-org s org)))
+        (doseq [b builds]
+          (is (sid/sid? (st/save-build s b))))
+        (let [latest (st/find-latest-builds s (:id org))]
+          (is (= #{"build-2" "build-4"}
+                 (->> latest
+                      (map :build-id)
+                      (set)))))))
 
-      (testing "can find latest n for org"
-        (let [repos (repeatedly 2 h/gen-repo)
-              org (-> (h/gen-org)
-                       (assoc :repos (->> repos
-                                          (map (fn [r] [(:id r) r]))
-                                          (into {}))))
-              builds (->> [{:idx 1
-                            :build-id "build-1"
-                            :repo-id (:id (first repos))
-                            :start-time 100}
-                           {:idx 2
-                            :build-id "build-2"
-                            :repo-id (:id (first repos))
-                            :start-time 200}
-                           {:idx 3
-                            :build-id "build-3"
-                            :repo-id (:id (second repos))
-                            :start-time 300}
-                           {:idx 4
-                            :build-id "build-4"
-                            :repo-id (:id (second repos))
-                            :start-time 400}]
-                          (map #(assoc % :org-id (:id org))))]
-          (is (sid/sid? (st/save-org s org)))
-          (doseq [b builds]
-            (is (sid/sid? (st/save-build s b))))
-          (let [latest (st/find-latest-n-builds s (:id org) 2)]
-            (is (= #{"build-3" "build-4"}
-                   (->> latest
-                        (map :build-id)
-                        (set))))
-            (is (= (:id (second repos))
-                   (-> latest first :repo-id)))))))))
+    (testing "can find latest n for org"
+      (let [repos (repeatedly 2 h/gen-repo)
+            org (-> (h/gen-org)
+                    (assoc :repos (->> repos
+                                       (map (fn [r] [(:id r) r]))
+                                       (into {}))))
+            builds (->> [{:idx 1
+                          :build-id "build-1"
+                          :repo-id (:id (first repos))
+                          :start-time 100}
+                         {:idx 2
+                          :build-id "build-2"
+                          :repo-id (:id (first repos))
+                          :start-time 200}
+                         {:idx 3
+                          :build-id "build-3"
+                          :repo-id (:id (second repos))
+                          :start-time 300}
+                         {:idx 4
+                          :build-id "build-4"
+                          :repo-id (:id (second repos))
+                          :start-time 400}]
+                        (map #(assoc % :org-id (:id org))))]
+        (is (sid/sid? (st/save-org s org)))
+        (doseq [b builds]
+          (is (sid/sid? (st/save-build s b))))
+        (let [latest (st/find-latest-n-builds s (:id org) 2)]
+          (is (= #{"build-3" "build-4"}
+                 (->> latest
+                      (map :build-id)
+                      (set))))
+          (is (= (:id (second repos))
+                 (-> latest first :repo-id))))))))
 
 (deftest ^:sql jobs
   (with-storage conn s
@@ -604,7 +628,9 @@
 
 (deftest ^:sql email-registrations
   (with-storage conn s
-    (let [er (h/gen-email-registration)]
+    (let [er (-> (h/gen-email-registration)
+                 (assoc :confirmed true
+                        :creation-time (t/now)))]
       (testing "can create and retrieve"
         (is (sid/sid? (st/save-email-registration s er)))
         (is (= er (st/find-email-registration s (:id er)))))
@@ -619,6 +645,9 @@
         (is (= [(:id er)] (->> (st/list-email-registrations s)
                                (map :id)))))
 
+      (testing "can count"
+        (is (= 1 (st/count-email-registrations s))))
+      
       (testing "can delete"
         (is (true? (st/delete-email-registration s (:id er))))
         (is (empty? (st/list-email-registrations s)))))))
@@ -630,7 +659,8 @@
           cs (-> (h/gen-credit-subs)
                  (assoc :org-id (:id org)
                         :valid-from (- now 1000)
-                        :valid-until (+ now 1000)))
+                        :valid-until (+ now 1000)
+                        :description "Test subscription"))
           sid (st/credit-sub-sid (:id org) (:id cs))]
       (is (sid/sid? (st/save-org s org)))
 
@@ -661,7 +691,9 @@
                    (assoc :repos {(:id repo) repo}))
           cred (-> (h/gen-org-credit)
                    (assoc :org-id (:id org)
-                          :amount 100M)
+                          :amount 100M
+                          :valid-from 100
+                          :valid-until 200)
                    (dissoc :user-id :subscription-id))]
       (is (sid/sid? (st/save-org s org)))
       
@@ -672,15 +704,16 @@
       (testing "for org"
         (let [other-org (h/gen-org)
               _ (st/save-org s other-org)
-              sids (->> [(assoc cred :from-time 1000)
+              sids (->> [(assoc cred :valid-from 1000 :valid-until nil)
                          (-> (h/gen-org-credit)
                              (assoc :org-id (:id org)
-                                    :from-time 2000
+                                    :valid-from 2000
+                                    :valid-until 3000
                                     :amount 200M)
                              (dissoc :user-id :subscription-id))
                          (-> (h/gen-org-credit)
                              (assoc :org-id (:id other-org)
-                                    :from-time 1000)
+                                    :valid-from 1000)
                              (dissoc :user-id :subscription-id))]
                         (mapv (partial st/save-org-credit s)))]
           (is (some? sids))
@@ -695,24 +728,31 @@
                    (->> (st/list-org-credits s (:id org))
                         (map :id)))))))
 
-      (testing "calculates available credits using credit consumptions"
-        (let [build (-> (h/gen-build)
-                        (assoc :org-id (:id org)
-                               :repo-id (:id repo)
-                               :credits 25M))
-              ccons {:org-id (:id org)
-                     :repo-id (:id repo)
-                     :build-id (:build-id build)
-                     :credit-id (:id cred)
-                     :amount 30M}]
-          (is (sid/sid? (st/save-build s build)))
-          (is (sid/sid? (st/save-credit-consumption s ccons)))
-          (is (= 270M (st/calc-available-credits s (:id org))))))
+      (testing "available credits"
+        (testing "calculates using credit consumptions"
+          (let [build (-> (h/gen-build)
+                          (assoc :org-id (:id org)
+                                 :repo-id (:id repo)
+                                 :credits 25M))
+                ccons {:org-id (:id org)
+                       :repo-id (:id repo)
+                       :build-id (:build-id build)
+                       :credit-id (:id cred)
+                       :amount 30M}]
+            (is (sid/sid? (st/save-build s build)))
+            (is (sid/sid? (st/save-credit-consumption s ccons)))
+            (is (= 270M (st/calc-available-credits s (:id org) 2100)))))
+        
+        (testing "ignores credits that are not active yet"
+          (is (= 70M (st/calc-available-credits s (:id org) 1100))))
 
-      (testing "lists available credits"
-        (is (= [(:id cred)]
-               (->> (st/list-available-credits s (:id org))
-                    (map :id))))))))
+        (testing "ignores expired credits"
+          (is (= 70M (st/calc-available-credits s (:id org) 3100))))
+
+        (testing "can list"
+          (is (= [(:id cred)]
+                 (->> (st/list-available-credits s (:id org))
+                      (map :id)))))))))
 
 (deftest ^:sql credit-consumptions
   (with-storage conn s
@@ -843,6 +883,8 @@
                          :currency "EUR"
                          :net-amount 100M
                          :vat-perc 21M
+                         :ext-id "1234"
+                         :invoice-nr "5689"
                          :details
                          [{:net-amount 20M
                            :vat-perc 21M
@@ -945,6 +987,10 @@
         (is (= token (-> (st/find-user-token st [(:id user) (:id token)])
                          (select-keys (keys token))))))
 
+      (testing "can find by token"
+        (is (= token (some-> (st/find-user-token-by-token st (:token token))
+                             (select-keys (keys token))))))
+      
       (testing "can list for user"
         (is (= [(:id token)]
                (->> (st/list-user-tokens st (:id user))
@@ -968,6 +1014,10 @@
         (is (= token (-> (st/find-org-token st [(:id org) (:id token)])
                          (select-keys (keys token))))))
 
+      (testing "can find by token"
+        (is (= token (some-> (st/find-org-token-by-token st (:token token))
+                             (select-keys (keys token))))))
+
       (testing "can list for org"
         (is (= [(:id token)]
                (->> (st/list-org-tokens st (:id org))
@@ -976,6 +1026,70 @@
       (testing "can delete"
         (is (true? (st/delete-org-token st [(:id org) (:id token)])))
         (is (empty? (st/list-org-tokens st (:id org))))))))
+
+(deftest ^:sql mailings
+  (with-storage conn st
+    (let [m (h/gen-mailing)]
+      (testing "can save and find"
+        (is (sid/sid? (st/save-mailing st m)))
+        (is (= m (st/find-mailing st (:id m)))))
+
+      (testing "can list"
+        (is (= [m] (st/list-mailings st))))
+
+      (testing "can delete"
+        (is (true? (st/delete-mailing st (:id m)))))
+
+      (testing "sent mailings"
+        (is (sid/sid? (st/save-mailing st m)))
+        (let [sm {:id (cuid/random-cuid)
+                  :mailing-id (:id m)
+                  :sent-at (t/now)}]
+          (testing "can save and find"
+            (is (sid/sid? (st/save-sent-mailing st sm)))
+            (is (= sm (st/find-sent-mailing st [(:id m) (:id sm)]))))
+
+          (testing "can list for mailing"
+            (is (= [sm] (st/list-sent-mailings st (:id m)))))
+
+          (testing "can update"
+            (is (some? (st/save-sent-mailing st (assoc sm :to-users true))))))))))
+
+(deftest ^:sql user-settings
+  (with-storage conn st
+    (let [u (h/gen-user)
+          s (-> (h/gen-user-settings)
+                (assoc :user-id (:id u)
+                       :receive-mailing true))]
+      (is (sid/sid? (st/save-user st u)))
+
+      (testing "can save and find for user"
+        (is (sid/sid? (st/save-user-settings st s)))
+        (is (= s (st/find-user-settings st (:id u)))))
+
+      (testing "can update"
+        (is (sid/sid? (st/save-user-settings st (assoc s :receive-mailing false))))
+        (is (false? (-> (st/find-user-settings st (:id u))
+                        :receive-mailing)))))))
+
+(deftest ^:sql org-invoicing
+  (with-storage conn st
+    (let [org (h/gen-org)
+          i (-> (h/gen-org-invoicing)
+                (assoc :org-id (:id org)
+                       :currency "USD"
+                       :address ["test street"]))]
+      (is (sid/sid? (st/save-org st org)))
+
+      (testing "can save"
+        (is (sid/sid? (st/save-org-invoicing st i))))
+
+      (testing "can find by org"
+        (is (= i (st/find-org-invoicing st (:id org)))))
+
+      (testing "can update"
+        (is (some? (st/save-org-invoicing st (assoc i :currency "EUR"))))
+        (is (= "EUR" (:currency (st/find-org-invoicing st (:id org)))))))))
 
 (deftest pool-component
   (testing "creates sql connection pool using settings"

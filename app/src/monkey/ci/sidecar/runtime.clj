@@ -4,15 +4,15 @@
             [monkey.ci
              [artifacts :as art]
              [cache :as cache]
-             [logging :as l]
              [spec :as spec]
              [workspace :as ws]]
             [monkey.ci.build.api :as api]
             [monkey.ci.containers.common :as cc]
             [monkey.ci.events.mailman.build-api :as eba]
             [monkey.ci.runtime.common :as rc]
-            [monkey.ci.sidecar.config :as cs]
-            [monkey.ci.spec.sidecar :as ss]))
+            [monkey.ci.sidecar
+             [config :as cs]
+             [spec :as ss]]))
 
 (defrecord SidecarRuntime [mailman log-maker workspace artifacts cache]
   co/Lifecycle
@@ -37,9 +37,6 @@
 (defn- new-mailman []
   (eba/map->BuildApiBrokerComponent {}))
 
-(defn- new-log-maker [config]
-  (l/make-logger {:logging (cs/log-maker config)}))
-
 (defn- new-workspace [_]
   (ws/make-build-api-workspace nil cc/work-dir))
 
@@ -57,12 +54,11 @@
   (co/system-map
    :runtime    (co/using
                 (new-runtime config)
-                [:mailman :log-maker :workspace :artifacts :cache])
+                [:mailman :workspace :artifacts :cache])
    :api-client (new-api-client config)
    :mailman    (co/using
                 (new-mailman)
                 [:api-client])
-   :log-maker  (new-log-maker config)
    :workspace  (co/using
                 (new-workspace config)
                 {:client :api-client})

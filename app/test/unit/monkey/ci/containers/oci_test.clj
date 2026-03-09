@@ -15,8 +15,9 @@
              [common :as cc]
              [oci :as sut]]
             [monkey.ci.events.mailman :as em]
-            [monkey.ci.sidecar.config :as cs]
-            [monkey.ci.spec.sidecar :as ss]
+            [monkey.ci.sidecar
+             [config :as cs]
+             [spec :as ss]]
             [monkey.ci.test
              [helpers :as h]
              [runtime :as trt]]))
@@ -434,7 +435,7 @@
     (is (keyword? (:name i)))
     
     (testing "calculates from instance config"
-      (is (= 5 (-> {}
+      (is (= 4 (-> {}
                    (oci/set-ci-config {:shape "CI.Standard.E4.Flex"
                                        :shape-config
                                        {:ocpus 1

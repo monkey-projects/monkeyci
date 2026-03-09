@@ -19,15 +19,18 @@
   "Converts job into something that can be converted to edn"
   [job]
   (letfn [(art->ser [a]
-            (select-keys a [:id :path]))]
+            (select-keys a [:id :path]))
+          (serialize-props [j]
+            (reduce (fn [r k]
+                      (mc/update-existing r k (partial map art->ser)))
+                    j
+                    [:save-artifacts :restore-artifacts :caches]))]
     (-> job
         ;; Keep everything except the action, which is a function
         (dissoc :action)
         ;; Force into map because records are not serializable
         (as-> m (into {} m))
-        (mc/update-existing :save-artifacts (partial map art->ser))
-        (mc/update-existing :restore-artifacts (partial map art->ser))
-        (mc/update-existing :caches (partial map art->ser))
+        (serialize-props)
         (assoc :id (bc/job-id job)))))
 
 (defn job-event
@@ -48,6 +51,12 @@
 
 (defn job-skipped-evt [job-id build-sid]
   (job-event :job/skipped job-id build-sid))
+
+(defn job-blocked-evt [job-id build-sid]
+  (job-event :job/blocked job-id build-sid))
+
+(defn job-unblocked-evt [job-id build-sid]
+  (job-event :job/unblocked job-id build-sid))
 
 (defn job-initializing-evt [job-id build-sid cm]
   (-> (job-event :job/initializing job-id build-sid)

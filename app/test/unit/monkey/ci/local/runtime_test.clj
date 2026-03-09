@@ -21,6 +21,7 @@
           r (-> {:mailman broker}
                 (lc/set-work-dir dir)
                 (lc/set-build (h/gen-build))
+                (lc/set-quiet true)
                 (sut/start-and-post evt))]
       (testing "returns deferred"
         (is (md/deferred? r)))
@@ -57,6 +58,12 @@
       (testing "has print routes"
         (is (some? (:print-routes sys))))
 
+      (testing "has state"
+        (is (some? (:state sys))))
+
+      (testing "has renderer"
+        (is (some? (:renderer sys))))
+
       (testing "has podman routes"
         (is (some? (:podman sys))))
 
@@ -78,6 +85,7 @@
       (let [sys (-> {:mailman (tm/test-component)}
                     (lc/set-work-dir dir)
                     (lc/set-build {:dek ::test-dek})
+                    (lc/set-quiet true)
                     (sut/make-system)
                     (co/start))]
         (testing "podman routes"
@@ -124,3 +132,15 @@
                       (spit "test file"))))
         (is (some? (p/restore-blob ws "test-src" dest)))
         (is (= "test file" (slurp (fs/file (fs/path dest "test.txt")))))))))
+
+(deftest new-params
+  (testing "fixed params when no api key configured"
+    (is (instance? monkey.ci.params.FixedBuildParams
+                   (sut/new-params {}))))
+
+  (testing "combined params when api key configured"
+    (is (instance? monkey.ci.params.MultiBuildParams
+                   (-> {}
+                       (lc/set-global-api {:url "http://test"
+                                           :token "test-token"})
+                       (sut/new-params))))))

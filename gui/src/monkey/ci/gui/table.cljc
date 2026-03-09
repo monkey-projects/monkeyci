@@ -15,7 +15,9 @@
     :columns [{:label "Id"
                :value :id}
               {:label "Name"
-               :value (comp :name :org)}]}])
+               :value (comp :name :org)}]
+    :loading {:sub [:test/loading?]
+              :rows 5}}])
 
 (defn nav-link [item-opts link-opts content]
   [:li.page-item item-opts
@@ -164,7 +166,7 @@
 
 (defn- render-tbody [cols items {:keys [on-row-click]}]
   (letfn [(td? [x]
-            (and (keyword? x) (re-matches #"^td\..*" (name x))))
+            (and (keyword? x) (re-matches #"^td\.?.*" (name x))))
           (render-cell [v]
             ;; Allow rendering functions to define their own td
             (if (and (vector? v) (td? (first v)))

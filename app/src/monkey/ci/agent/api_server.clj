@@ -65,6 +65,8 @@
            bas/context conf}}))
 
 (defn start-server [conf]
+  ;; TODO Use UDS instead of http ports, it's safer and then we don't need to determine
+  ;; the internal ip address of the agent host.
   (-> (http/start-server
        (c/make-app (make-router conf))
        {:port (get conf :port 0)})

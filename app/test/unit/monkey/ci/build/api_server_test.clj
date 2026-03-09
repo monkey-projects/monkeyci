@@ -5,7 +5,9 @@
             [clojure.test :refer [deftest is testing]]
             [manifold.deferred :as md]
             [monkey.ci.build.api-server :as sut]
-            [monkey.ci.protocols :as p]
+            [monkey.ci
+             [edn :as edn]
+             [protocols :as p]]
             [monkey.ci.spec.api-server :as aspec]
             [monkey.ci.test
              [aleph-test :as at]
@@ -109,25 +111,26 @@
     
     (testing "retrieves from remote api"
       ;; Requests look different because of applied middleware
-      (at/with-fake-http [{:request-url (format "http://test-api/org/%s/repo/%s/param" (:id org) (:id repo))
-                           :request-method :get}
+      (at/with-fake-http [{:url (format "http://test-api/org/%s/repo/%s/param"
+                                        (:id org) (:id repo))
+                           :method :get}
                           {:status 200
-                           :body (pr-str param-values)
+                           :body param-values
                            :headers {"Content-Type" "application/edn"}}]
         (is (= param-values
-               (-> (sut/get-params-from-api {:url "http://test-api"
-                                             :token "test-token"}
-                                            build)
+               (-> {:url "http://test-api"
+                    :token "test-token"}
+                   (sut/get-params-from-api build)
                    deref)))))))
 
 (deftest decrypt-key-from-api
   (testing "invokes endpoint on general api"
     (let [org (h/gen-org)]
-      (at/with-fake-http [{:request-url
+      (at/with-fake-http [{:url
                            (format "http://test-api/org/%s/crypto/decrypt-key" (:id org))
-                           :request-method :post}
+                           :method :post}
                           {:status 200
-                           :body (pr-str {:key "decrypted-key"})
+                           :body {:key "decrypted-key"}
                            :headers {"Content-Type" "application/edn"}}]
         (is (= "decrypted-key"
                @(sut/decrypt-key-from-api {:url "http://test-api"
@@ -233,9 +236,17 @@
         (is (not-empty (slurp (:body res))))))))
 
 (deftest get-ip-addr
-  (testing "returns ipv4 address"
-    (is (re-matches #"\d+\.\d+\.\d+\.\d+"
-                    (sut/get-ip-addr)))))
+  (testing "returns valid ip address"
+    (is (instance? java.net.InetAddress (sut/get-ip-addr)))))
+
+(deftest api-host-address
+  (testing "converts ipv4 to url"
+    (is (= "http://1.2.3.4:1234"
+           (sut/->url (java.net.InetAddress/getByName "1.2.3.4") 1234))))
+
+  (testing "converts ipv6 to url"
+    (is (= "http://[0:0:0:0:0:0:0:1]:1234"
+           (sut/->url (java.net.InetAddress/getByName "::1") 1234)))))
 
 (deftest api-server-routes
   (let [token (sut/generate-token)
@@ -259,13 +270,23 @@
         (is (= 200 (:status r))
             (bs/to-string (:body r)))))
 
-    (testing "`POST /events` dispatches events"
-      (is (= 202 (-> (mock/request :post "/events")
-                     (mock/body (pr-str [{:type ::test-event}]))
-                     (mock/content-type "application/edn")
-                     (auth)
-                     (app)
-                     :status))))
+    (testing "`POST /events`"
+      (testing "dispatches events"
+        (is (= 202 (-> (mock/request :post "/events")
+                       (mock/body (pr-str [{:type ::test-event}]))
+                       (mock/content-type "application/edn")
+                       (auth)
+                       (app)
+                       :status))))
+
+      (testing "can process regexes in body"
+        (is (= 202 (-> (mock/request :post "/events")
+                       (mock/body (edn/->edn [{:type ::test-event
+                                               :regex #"test-regex"}]))
+                       (mock/content-type "application/edn")
+                       (auth)
+                       (app)
+                       :status)))))
 
     (testing "`GET /events` receives events"
       (is (= 200 (-> (mock/request :get "/events")

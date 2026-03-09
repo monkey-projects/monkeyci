@@ -156,7 +156,7 @@
   (when (and (not (expired? token)) sub)
     (let [id (sid/parse-sid sub)]
       (when (and (= 2 (count id)) (= role-sysadmin (first id)))
-        (log/trace "Looking up user with id" id)
+        (log/trace "Looking up sysadmin user with id" id)
         (st/find-user-by-type storage id)))))
 
 (defmethod resolve-token :default [_ _]
@@ -166,16 +166,15 @@
 (defn- api-token-expired? [{v :valid-until}]
   (and v (> (t/now) v)))
 
-(defn- resolve-user-api-token [req token]
-  (let [st (c/req->storage req)]
-    (when-let [t (st/find-user-token-by-token st (hash-pw token))]
-      (when-not (api-token-expired? t)
-        (let [u (st/find-user st (:user-id t))]
-          ;; Add the allowed organizations to the identity
-          (assoc t :orgs (set (:orgs u))))))))
+(defn- resolve-user-api-token [st req token]
+  (when-let [t (st/find-user-token-by-token st (hash-pw token))]
+    (when-not (api-token-expired? t)
+      (let [u (st/find-user st (:user-id t))]
+        ;; Add the allowed organizations to the identity
+        (assoc t :orgs (set (:orgs u)))))))
 
-(defn- resolve-org-api-token [req token]
-  (when-let [t (st/find-org-token-by-token (c/req->storage req) (hash-pw token))]
+(defn- resolve-org-api-token [st req token]
+  (when-let [t (st/find-org-token-by-token st (hash-pw token))]
     (when-not (api-token-expired? t)
       ;; Add the allowed organization id to the identity for uniformity
       (assoc t :orgs #{(:org-id t)}))))
@@ -194,14 +193,14 @@
 
 (defn secure-ring-app
   "Wraps the ring handler so it verifies the JWT authorization header"
-  [app rt]
+  [app {:keys [storage] :as rt}]
   (let [pk (rt->pub-key rt)
         jws-backend (bb/jws {:secret pk
                              :token-name "Bearer"
                              :options {:alg :rs256}
                              :authfn (partial resolve-token rt)})
-        user-token-backend (bb/token {:authfn resolve-user-api-token})
-        org-token-backend (bb/token {:authfn resolve-org-api-token})]
+        user-token-backend (bb/token {:authfn (partial resolve-user-api-token storage)})
+        org-token-backend (bb/token {:authfn (partial resolve-org-api-token storage)})]
     (when-not pk
       (log/warn "No public key configured"))
     (-> app
@@ -280,26 +279,27 @@
   (denied "Credentials do not grant access to this org"
           {:org-id org-id}))
 
-(defn- org-checker [kind id-resolver]
+(defn- org-checker [kind]
   (fn [_ req]
     (when-let [oid (get-in req [:parameters kind :org-id])]
-      (when-not
-          (and (ba/authenticated? req)
-               (or (sysadmin? (:identity req))
-                   (contains? (get-in req [:identity :orgs])
-                              oid)
-                   ;; Should also match org display ids
-                   (contains? (get-in req [:identity :orgs])
-                              (id-resolver req oid))))
-        (denied-no-org-access oid)))))
+      (let [id-resolver (c/req->id-resolver req)]
+        (when-not
+            (and (ba/authenticated? req)
+                 (or (sysadmin? (:identity req))
+                     (contains? (get-in req [:identity :orgs])
+                                oid)
+                     ;; Should also match org display ids
+                     (contains? (get-in req [:identity :orgs])
+                                (id-resolver req oid))))
+          (denied-no-org-access oid))))))
 
 (def org-auth-checker
   "Checks if the user has access to the organization"
-  (partial org-checker :path))
+  (org-checker :path))
 
 (def org-body-checker
   "Checks if the user has access to the organization specified in the body"
-  (partial org-checker :body))
+  (org-checker :body))
 
 (defn webhook-org-checker
   "Verifies if the user has permissions on the webhook org"

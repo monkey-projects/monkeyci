@@ -7,7 +7,6 @@
             [manifold.deferred :as md]
             [monkey.ci
              [build :as b]
-             [runtime :as rt]
              [utils :as utils]
              [version :as v]]))
 
@@ -51,16 +50,16 @@
                     watch? (assoc :watch? true))}}}))
 
 (defn test!
-  "Executes any unit tests that have been defined for the build by starting a clojure process
-   with a custom alias for running tests using kaocha."
-  [build rt]
-  (let [watch? (true? (get-in rt [:config :args :watch]))
-        deps (generate-test-deps (rt/dev-mode? rt) watch?)]
+  "Executes any unit tests that have been defined for the build script at
+   given location by starting a clojure process with a custom alias for
+   running tests using kaocha."
+  [dir {:keys [watch? dev-mode?]}]
+  (let [deps (generate-test-deps dev-mode? watch?)]
     (bp/process
      {:cmd ["clojure" "-Sdeps" (pr-str deps) "-X:monkeyci/test"]
       :out :inherit
       :err :inherit
-      :dir (b/script-dir build)})))
+      :dir dir})))
 
 (defn exit-fn
   "Due to a strange issue with the onExit functionality in java.lang.Process, the

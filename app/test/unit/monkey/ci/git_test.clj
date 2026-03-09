@@ -9,22 +9,46 @@
    [monkey.ci.web.auth :as auth]
    [monkey.oci.common.utils :as ocu]))
 
+(defn fake-clone-cmd [calls]
+  (proxy [org.eclipse.jgit.api.CloneCommand] []
+    (setDirectory [dir]
+      (swap! calls assoc :dir dir)
+      this)
+    (setBranch [branch]
+      (swap! calls assoc :branch branch)
+      this)
+    (setNoCheckout [c?]
+      (swap! calls assoc :no-checkout? c?)
+      this)
+    (call []
+      nil)))
+
 (deftest clone
   (testing "invokes `git-clone` without checking out"
-    (with-redefs [git/git-clone (fn [& args]
-                                  args)]
-      (is (= ["http://url" :branch "master" :dir "tmp"]
-             (sut/clone {:url "http://url"
-                         :branch "master"
-                         :dir "tmp"})))))
+    (let [calls (atom {})]
+      (with-redefs [git/clone-cmd (fn [url]
+                                    (reset! calls {:url url})
+                                    (fake-clone-cmd calls))]
+        (is (nil? (sut/clone {:url "http://url"
+                              :branch "master"
+                              :dir "tmp"})))
+        (is (= {:url "http://url"
+                :dir (fs/file "tmp")
+                :branch "master"}
+               @calls)))))
 
   (testing "can check out tags"
-    (with-redefs [git/git-clone (fn [& args]
-                                  args)]
-      (is (= ["http://url" :branch "test-tag" :dir "tmp"]
-             (sut/clone {:url "http://url"
-                         :tag "test-tag"
-                         :dir "tmp"}))))))
+    (let [calls (atom {})]
+      (with-redefs [git/clone-cmd (fn [url]
+                                    (reset! calls {:url url})
+                                    (fake-clone-cmd calls))]
+        (is (nil? (sut/clone {:url "http://url"
+                              :tag "test-tag"
+                              :dir "tmp"})))
+        (is (= {:url "http://url"
+                :branch "test-tag"
+                :dir (fs/file "tmp")}
+               @calls))))))
 
 (deftest checkout
   (testing "invokes `git-checkout`"

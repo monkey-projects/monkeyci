@@ -97,7 +97,7 @@
                        first
                        :type)))))
 
-(deftest job-load-logs
+(deftest job-load-loki-logs
   (is (some? (reset! app-db (r/set-current {}
                                            {:parameters
                                             {:path
@@ -112,7 +112,7 @@
                                          :body {}}})
    
    (let [e (h/catch-fx :martian.re-frame/request)]
-     (is (nil? (rf/dispatch [:job/load-logs
+     (is (nil? (rf/dispatch [:job/load-loki-logs
                              {:id "test-job"
                               :start-time 100000
                               :end-time 200000}
@@ -129,6 +129,38 @@
      (testing "marks loading"
        (is (db/logs-loading? @app-db "test/path"))))))
 
+(deftest job-load-log-ingest-logs
+  (is (some? (reset! app-db (r/set-current {}
+                                           {:parameters
+                                            {:path
+                                             {:org-id "test-org"
+                                              :repo-id "test-repo"
+                                              :build-id "test-build"
+                                              :job-id "test-job"}}}))))
+
+  (rft/run-test-sync
+
+   (h/initialize-martian {:download-job-log {:error-code :no-error
+                                             :body {}}})
+   
+   (let [e (h/catch-fx :martian.re-frame/request)]
+     (is (nil? (rf/dispatch [:job/load-log-ingest-logs
+                             {:id "test-job"
+                              :start-time 100000
+                              :end-time 200000}
+                             "test/path"])))
+     (is (= 1 (count @e)))
+     
+     (testing "specifies file"
+       (is (= "test/path"
+              (-> @e first (nth 3) :file))))
+
+     (testing "sets org id in request"
+       (is (= "test-org" (-> @e first (nth 3) :org-id))))
+
+     (testing "marks loading"
+       (is (db/logs-loading? @app-db "test/path"))))))
+
 (deftest job-load-logs--success
   (testing "clears alerts"
     (let [path "test/path"]
@@ -136,10 +168,18 @@
       (rf/dispatch-sync [:job/load-logs--success path {}])
       (is (nil? (db/path-alerts @app-db path)))))
   
-  (testing "sets log lines in db"
+  (testing "sets log lines in db, marks src"
     (is (empty? (reset! app-db {})))
-    (rf/dispatch-sync [:job/load-logs--success "test/path" {:body ::logs}])
-    (is (= ::logs (db/get-logs @app-db "test/path")))))
+    (rf/dispatch-sync [:job/load-logs--success "test/path" :test-src {:body {:data ::logs}}])
+    (is (= {:src :test-src
+            :data ::logs}
+           (db/get-logs @app-db "test/path"))))
+
+  (testing "handles empty result"
+    (is (empty? (reset! app-db {})))
+    (rf/dispatch-sync [:job/load-logs--success "test/path" :test-src {:body ""
+                                                                      :status 204}])
+    (is (nil? (db/get-logs @app-db "test/path")))))
 
 (deftest job-load-logs--failed
   (testing "sets error alert"
@@ -151,8 +191,12 @@
 
 (deftest job-toggle-logs
   (rft/run-test-sync
-   (h/initialize-martian {:download-log {:error-code :no-error
-                                         :body {}}})
+   (h/initialize-martian {:download-log
+                          {:error-code :no-error
+                           :body {}}
+                          :download-job-log
+                          {:error-code :no-error
+                           :body {}}})
    
    (let [e (h/catch-fx :martian.re-frame/request)
          job-id "test-job"
@@ -165,24 +209,56 @@
                                                      {:job-id job-id}}}))))))
      
      (testing "when collapsed"
-       (is (nil? (rf/dispatch [:job/toggle-logs 0 {:out "/path/to/out"
-                                                   :err "/path/to/err"}])))
+       (testing "loki src"
+         (is (nil? (rf/dispatch [:job/toggle-logs 0 {:out "/path/to/out"
+                                                     :err "/path/to/err"
+                                                     :log-src :loki}])))
 
-       (testing "fetches out and err logs for given line from backend"
-         (is (= 2 (count @e)))
-         (is (-> @e
-                 first
-                 (nth 3)
-                 :query
-                 (cs/includes? "filename=\"/path/to/out\"")))
-         (is (-> @e
-                 second
-                 (nth 3)
-                 :query
-                 (cs/includes? "filename=\"/path/to/err\""))))
+         (testing "fetches out and err logs for given line from loki style backend"
+           (is (= 2 (count @e)))
+           (is (every? (comp (partial = :download-log)
+                             #(nth % 2))
+                       @e))
+           (is (-> @e
+                   first
+                   (nth 3)
+                   :query
+                   (cs/includes? "filename=\"/path/to/out\"")))
+           (is (-> @e
+                   second
+                   (nth 3)
+                   :query
+                   (cs/includes? "filename=\"/path/to/err\""))))
 
-       (testing "marks as expanded"
-         (is (db/log-expanded? @app-db 0))))
+         (testing "marks as expanded"
+           (is (db/log-expanded? @app-db 0))))
+
+       (testing "log ingest src"
+         (is (empty? (reset! e [])))
+         (is (some? (swap! app-db (fn [db]
+                                    (db/set-log-expanded db 0 false)))))
+         (is (nil? (rf/dispatch [:job/toggle-logs 0 {:out "/path/to/out"
+                                                     :err "/path/to/err"
+                                                     :log-src :log-ingest}])))
+
+         (testing "fetches out and err logs for given line from log ingest style backend"
+           (is (= 2 (count @e)))
+           (is (every? (comp (partial = :download-job-log)
+                             #(nth % 2))
+                       @e))
+           (is (= "/path/to/out"
+                  (-> @e
+                      first
+                      (nth 3)
+                      :file)))
+           (is (= "/path/to/err"
+                  (-> @e
+                      second
+                      (nth 3)
+                      :file))))
+
+         (testing "marks as expanded"
+           (is (db/log-expanded? @app-db 0)))))
 
      (testing "when expanded"
        (is (empty? (reset! e [])))
@@ -201,5 +277,51 @@
                                    db
                                    (assoc-in (bdb/get-build db)
                                              [:script :jobs job-id :status] :success))))))
-       (is (nil? (rf/dispatch [:job/toggle-logs 0 {:out "/path/to/out"}])))
+       (is (nil? (rf/dispatch [:job/toggle-logs 0 {:out "/path/to/out" :log-src :log-ingest}])))
        (is (empty? @e))))))
+
+(deftest job-unblock
+  (rft/run-test-sync
+   (h/initialize-martian {:unblock-job {:error-code :no-error
+                                        :body {}}})
+   (is (some? (swap! app-db (fn [db]
+                              (r/set-current db {:parameters
+                                                 {:path
+                                                  {:org-id "test-org"}}})))))
+   (let [c (h/catch-fx :martian.re-frame/request)]
+     (is (nil? (rf/dispatch [:job/unblock {:id "test-job"}])))
+
+     (testing "invokes unblock endpoint"
+       (is (= 1 (count @c)))
+       (is (= :unblock-job (-> @c first (nth 2))))
+       (is (= {:job-id "test-job"
+               :org-id "test-org"}
+              (-> @c first (nth 3)))
+           "passes job sid as params"))
+
+     (testing "marks unblocking"
+       (is (true? (db/unblocking? @app-db)))))))
+
+(deftest job-unblock--success
+  (is (some? (reset! app-db (db/set-unblocking {}))))
+  (is (nil? (rf/dispatch-sync [:job/unblock--success {}])))
+  
+  (testing "unmarks unblocking"
+    (is (false? (db/unblocking? @app-db)))))
+
+(deftest job-unblock--failure
+  (is (some? (reset! app-db (db/set-unblocking {}))))
+  (is (nil? (rf/dispatch-sync [:job/unblock--failure {:message "test error"}])))
+  
+  (testing "unmarks unblocking"
+    (is (false? (db/unblocking? @app-db))))
+
+  (testing "sets error alert"
+    (is (= [:danger]
+           (->> (db/get-alerts @app-db)
+                (map :type))))))
+
+(deftest job-wrap-logs-changed
+  (testing "toggles job wrap logs flag"
+    (rf/dispatch-sync [:job/wrap-logs-changed true])
+    (is (true? (db/wrap-logs? @app-db)))))

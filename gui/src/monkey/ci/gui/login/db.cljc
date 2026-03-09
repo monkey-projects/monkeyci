@@ -43,19 +43,25 @@
 (defn set-provider-token [db t]
   (assoc-in db [provider-auth :token] t))
 
+(defn- reset-token [db provider t]
+  (cond-> db
+    t (set-provider-auth {:provider provider
+                          :token t})))
+
 (def github-token provider-token)
 
 (defn set-github-token [db t]
-  (cond-> db
-    t (set-provider-auth {:provider :github
-                          :token t})))
+  (reset-token db :github t))
 
 (def bitbucket-token provider-token)
 
 (defn set-bitbucket-token [db t]
-  (cond-> db
-    t (set-provider-auth {:provider :bitbucket
-                          :token t})))
+  (reset-token db :bitbucket t))
+
+(def codeberg-token provider-token)
+
+(defn set-codeberg-token [db t]
+  (reset-token db :codeberg t))
 
 (def github-config :auth/github-config)
 
@@ -67,6 +73,11 @@
 (defn set-bitbucket-config [db c]
   (assoc db bitbucket-config c))
 
+(def codeberg-config :auth/codeberg-config)
+
+(defn set-codeberg-config [db c]
+  (assoc db codeberg-config c))
+
 (def github-user ::github-user)
 
 (defn set-github-user [db u]
@@ -76,3 +87,8 @@
 
 (defn set-bitbucket-user [db u]
   (assoc db bitbucket-user u))
+
+(def codeberg-user ::codeberg-user)
+
+(defn set-codeberg-user [db u]
+  (assoc db codeberg-user u))

@@ -5,7 +5,7 @@
             [monkey.ci.gui.forms :as f]
             [monkey.ci.gui.layout :as l]
             [monkey.ci.gui.modals :as m]
-            [monkey.ci.gui.repo.events]
+            [monkey.ci.gui.repo.events :as e]
             [monkey.ci.gui.repo.subs]
             [monkey.ci.gui.repo-settings.views :as settings]
             [monkey.ci.gui.routing :as r]
@@ -266,34 +266,37 @@
     (cs/includes? url "github.com")))
 
 (defn- github-id-input [r]
-  (let [gh? (github-url? r)]
-    [:<>
-     [:label.form-label {:for :github-id} "Github Id"]
-     [:div.input-group
-      [:input.form-control
-       {:id :github-id
-        :name :github-id
-        :value (:new-github-id r)
-        :read-only (not gh?)
-        :disabled (not gh?)
-        :maxlength 20
-        :on-change (u/form-evt-handler [:repo/github-id-changed])}]
-      (if (nil? (:github-id r))
-        [:button.btn.btn-icon
-         {:class :btn-primary
-          :title "Look up the Github id for this repo"
-          :type :button
-          :on-click (u/link-evt-handler [:repo/lookup-github-id {:monkeyci/repo r}])}
-         [co/icon :eye]]
-        ;; Only allow unwatching if the original repo had an id
-        [:button.btn.btn-icon
-         {:class :btn-danger
-          :title "Stop watching this repo"
-          :type :button
-          :on-click (u/link-evt-handler [:repo/unwatch-github {:monkeyci/repo r}])}
-         [co/icon :eye-slash]])]
-     [:span.form-text {:id :github-id-help}
-      "If you have installed the Github MonkeyCI app, the native id is used for watching the repo."]]))
+  (fn [r]
+    (let [gh? (github-url? @r)]
+      [:<>
+       [:label.form-label {:for :github-id} "Github Id"]
+       [:div.input-group
+        [:input.form-control
+         {:id :github-id
+          :name :github-id
+          :value (:github-id @r)
+          :read-only (not gh?)
+          :disabled (not gh?)
+          :maxlength 20
+          :on-change (u/form-evt-handler [:repo/github-id-changed])}]
+        (if (nil? (:github-id @r))
+          [:button.btn.btn-icon
+           {:class :btn-primary
+            :title "Look up the Github id for this repo"
+            :read-only (not gh?)
+            :disabled (not gh?)
+            :type :button
+            :on-click (u/link-evt-handler [:repo/lookup-github-id {:monkeyci/repo @r}])}
+           [co/icon :eye]]
+          ;; Only allow unwatching if the original repo had an id
+          [:button.btn.btn-icon
+           {:class :btn-danger
+            :title "Stop watching this repo"
+            :type :button
+            :on-click (u/link-evt-handler [::e/unwatch-github {:monkeyci/repo @r}])}
+           [co/icon :eye-slash]])]
+       [:span.form-text {:id :github-id-help}
+        "If you have installed the Github MonkeyCI app, the native id is used for watching the repo."]])))
 
 (defn- edit-form [close-btn]
   (let [e (rf/subscribe [:repo/editing])]
@@ -308,7 +311,7 @@
                        :value (:url @e)
                        :extra-opts
                        {:on-change (u/form-evt-handler [:repo/url-changed])
-                        :maxlength 300}
+                        :max-length 300}
                        :help-msg (str "This is used when manually triggering a build from the UI. "
                                       "Use an ssh url for private repos.")}]]
        [:div.mb-2
@@ -317,14 +320,14 @@
                        :value (:name @e)
                        :extra-opts
                        {:on-change (u/form-evt-handler [:repo/name-changed])
-                        :maxlength 200}}]]
+                        :max-length 200}}]]
        [:div.mb-2
         [f/form-input {:id :main-branch
                        :label "Main branch"
                        :value (:main-branch @e)
                        :extra-opts
                        {:on-change (u/form-evt-handler [:repo/main-branch-changed])
-                        :maxlength 100}
+                        :max-length 100}
                        :help-msg
                        "Required when you want to determine the 'main branch' in the build script."}]]
        [:div.mb-2.form-check.form-switch
@@ -338,7 +341,7 @@
          {:for :public}
          "Public visibility"]]
        [:div.mb-2
-        [github-id-input @e]]]
+        [github-id-input e]]]
       [:div.col
        [:h5 [co/icon-text :tags "Labels"]]
        [:p.text-body-secondary
@@ -371,18 +374,21 @@
 
 (defn new [route]
   (rf/dispatch-sync [:repo/new])
-  (l/default
-   [:<>
-    [co/page-title [:span.me-2 co/repo-icon] "Watch Repository"]
-    [:p
-     "Configure a new repository to be watched by " [:i "MonkeyCI"] ". After saving, "
-     "the repository will show up in the list on your overview page. If a " [:b "webhook"]
-     " is configured, any push will result in a new build."]
-    [:div.card
-     [:div.card-body
-      [co/alerts [:repo/edit-alerts]]
-      [edit-form [co/cancel-btn
-                  [:route/goto :page/org (r/path-params route)]]]]]]))
+  ;; Use component fn otherwise the repo is constantly cleared
+  (fn [route]
+    (l/default
+     [:<>
+      [co/page-title [:span.me-2 co/repo-icon] "Watch Repository"]
+      [:p
+       "Configure a new repository to be watched by " [:i "MonkeyCI"] ". After saving, "
+       "the repository will show up in the list on your overview page. If a "
+       [co/docs-link "articles/webhooks" "webhook"] " is configured, any push "
+       "will result in a new build."]
+      [:div.card
+       [:div.card-body
+        [co/alerts [:repo/edit-alerts]]
+        [edit-form [co/cancel-btn
+                    [:route/goto :page/org (r/path-params route)]]]]]])))
 
 (defn settings-page [route]
   [:<>

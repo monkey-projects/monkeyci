@@ -2,13 +2,17 @@
   "Sets up the runtime that is used by a build agent."
   (:require [aleph.http :as http]
             [aleph.http.client-middleware :as ahmw]
+            [babashka.fs :as fs]
             [clojure.tools.logging :as log]
             [com.stuartsierra.component :as co]
+            [manifold.stream :as ms]
+            [medley.core :as mco]
             [monkey.ci
              [artifacts :as a]
              [build :as b]
              [cache :as c]
              [edn :as edn]
+             [params :as params]
              [protocols :as p]
              [utils :as u]]
             [monkey.ci.agent
@@ -18,11 +22,13 @@
              [api-server :as bas]
              [api :as ba]]
             [monkey.ci.containers
+             [log-ingest :as cl]
              [oci :as c-oci]
              [podman :as c-podman]]
             [monkey.ci.events
              [mailman :as em]
              [polling :as ep]]
+            [monkey.ci.logging.log-ingest :as log-ingest]
             [monkey.ci.metrics.core :as mc]
             [monkey.ci.runners.runtime :as rr]
             [monkey.ci.web.auth :as auth]
@@ -41,11 +47,20 @@
 (defn new-api-server [config]
   (->ApiServer nil (:agent config)))
 
+(defmulti make-route-options :type)
+
+(defmethod make-route-options :default [_]
+  {})
+
+(defmethod make-route-options :nats [conf]
+  (select-keys conf [:stream :consumer]))
+
 (defn new-agent-routes [config]
   (letfn [(make-routes [co]
             (e/make-routes (-> (:agent config)
                                (merge co))))]
-    (em/map->RouteComponent {:make-routes make-routes})))
+    (em/map->RouteComponent {:make-routes make-routes
+                             :options (make-route-options (:mailman config))})))
 
 (defn- make-token [pk sid]
   (-> (auth/build-token sid)
@@ -59,32 +74,41 @@
   (fn [sid]
     (assoc (:api config) :token (make-token (get-privkey config) sid))))
 
-(defrecord ApiBuildParams [api-maker]
-  p/BuildParams
-  (get-build-params [this build]
-    (bas/get-params-from-api (api-maker (b/sid build)) build)))
-
 (defn new-params [config]
-  (->ApiBuildParams (api-with-token-maker config)))
+  (params/->ApiBuildParams (comp (api-with-token-maker config) b/sid)))
 
 ;; TODO Move this implementation to api-server ns
 (defn new-ssh-keys-fetcher [config]
   (let [client (ahmw/wrap-request http/request)
-        maker (api-with-token-maker config)]
+        maker (api-with-token-maker config)
+        try-slurp (fn [x]
+                    (try
+                      (slurp x)
+                      (catch Exception ex x)))]
     (fn [[org-id repo-id :as sid]]
       (let [api (maker sid)]
         (log/debug "Retrieving ssh keys for" sid)
-        (-> {:url (format "%s/org/%s/repo/%s/ssh-keys"
-                          (:url api)
-                          org-id
-                          repo-id)
-             :method :get
-             :oauth-token (:token api)
-             :accept "application/edn"}
-            (client)
-            (deref)
-            :body
-            (edn/edn->))))))
+        (try
+          (-> {:url (format "%s/org/%s/repo/%s/ssh-keys"
+                            (:url api)
+                            org-id
+                            repo-id)
+               :method :get
+               :oauth-token (:token api)
+               :accept "application/edn"}
+              (client)
+              (deref)
+              :body
+              (edn/edn->))
+          (catch Exception ex
+            ;; On error, rethrow but read the response body
+            (let [resp (some-> (ex-data ex)
+                               :body
+                               try-slurp)]
+              (throw (if resp
+                       (ex-info (str (ex-message ex) ": " resp)
+                                (ex-data ex))
+                       ex)))))))))
 
 (defn new-build-key-decrypter
   "Build key decrypter, to decrypt the build data encryption key, which is then
@@ -131,10 +155,20 @@
   (log/warn "Unknown container runner type:" (:type conf))
   [])
 
+(defn- make-log-ingest-routes
+  "Creates routes that monitor command events for log ingestion."
+  [config {:keys [log-ingest]}]
+  (-> config
+      (merge (select-keys log-ingest [:stream-creator]))
+      (cl/make-routes)))
+
 (defn new-container-routes [config]
   (em/map->RouteComponent
    {:make-routes (fn [co]
-                   (make-container-routes (:containers config) co))}))
+                   (cond-> (make-container-routes (:containers config) co)
+                     (not-empty (:log-ingest co))
+                     (em/merge-routes (make-log-ingest-routes (:log-ingest config) co))))
+    :options (make-route-options (:mailman config))}))
 
 (def global-to-local-events #{:build/queued :build/canceled})
 
@@ -210,7 +244,25 @@
     (ep/map->PollLoop {:running? (atom false)
                        :config (->> (select-keys (:poll-loop conf) (keys defaults))
                                     (merge defaults))
+                       ;; TODO Reset job count after some timeout (resilience)
                        :max-reached? max-jobs-reached?})))
+
+(defn new-log-ingest
+  "Creates log ingestion client, if configured.  It is tied to the log ingestion routes,
+   which use this client to provide a stream creator function, which receives raw byte
+   data from job log files.  Configuration options include `url`, `buf-size` and `interval`."
+  [{conf :log-ingest}]
+  (if (not-empty conf)
+    (let [client (log-ingest/make-client conf)]
+      (log/info "Sending ingested logs to " (:url conf))
+      (letfn [(file->path [f {:keys [sid job-id]}]
+                (vec (concat sid [job-id (fs/file-name f)])))
+              (make-ingest-sink [f evt]
+                (log-ingest/make-sink client (file->path f evt) conf))]
+        {:client client
+         :stream-creator make-ingest-sink}))
+    ;; Not configured, provide empty component
+    {}))
 
 (defn make-container-system
   "Creates a component system to be used by container agents"
@@ -224,7 +276,7 @@
      :workspace (rr/new-workspace conf)
      :container-routes (co/using
                         (new-container-routes conf)
-                        [:mailman :artifacts :cache :workspace :state :key-decrypter])
+                        [:mailman :artifacts :cache :workspace :state :key-decrypter :log-ingest])
      ;; Set up separate mailman to poll only the container/job-queued subject
      :poll-mailman (new-poll-mailman conf)
      :poll-loop (co/using
@@ -234,5 +286,6 @@
                   :routes :container-routes
                   :state :state})
      :key-decrypter (new-container-key-decrypter conf)
+     :log-ingest (new-log-ingest conf)
      ;; Shared state between container routes and poll loop for capacity calculation
      :state (atom {}))))

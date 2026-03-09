@@ -6,11 +6,13 @@
             [medley.core :as mc]
             [monkey.ci.build
              [api :as ba]
-             [core :as bc]
-             [v2 :as v2]]
-            [monkey.ci.events.mailman :as em]
+             [core :as bc]]
+            [monkey.ci.events
+             [mailman :as em]
+             [spec :as es]]
             [monkey.ci.events.mailman.interceptors :as emi]
             [monkey.ci
+             [api :as api]
              [cuid :as cuid]
              [extensions :as ext]
              [jobs :as j]
@@ -18,7 +20,6 @@
             [monkey.ci.script
              [core :as sc]
              [events :as sut]]
-            [monkey.ci.spec.events :as se]
             [monkey.ci.test
              [extensions :as te]
              [helpers :as h]
@@ -85,14 +86,27 @@
             (is (= (vc/encrypt dek (v/cuid->iv org-id) "secret-value")
                    (-> res
                        (sut/get-jobs)
-                       (get-in ["job-with-env" :container/env "env-var"]))))))))))
+                       (get-in ["job-with-env" :container/env "env-var"]))))))))
+
+    (testing "applies job filter"
+      (let [job-ctx (atom nil)]
+        (with-redefs [sc/load-jobs (fn [_ _]
+                                     [{:id "first"}
+                                      {:id "second"}])]
+          (is (= ["first"]
+                 (-> {}
+                     (emi/set-state {:filter ["first"]})
+                     (enter)
+                     (sut/get-jobs)
+                     (keys)))))))))
 
 (deftest add-job-ctx
   (let [{:keys [enter] :as i} sut/add-job-ctx
         job (h/gen-job)
+        other-job (h/gen-job)
         ctx (-> {:event {:job-id (:id job)}}
                 (sut/set-initial-job-ctx {::key ::value})
-                (sut/set-jobs (jobs->map [job]))
+                (sut/set-jobs (jobs->map [job other-job]))
                 (enter)
                 (emi/get-job-ctx))]
     (is (keyword? (:name i)))
@@ -250,13 +264,48 @@
                     (emi/set-state {:build {:sid build-sid}})
                     (enter))))))))
 
+(deftest add-job-retriever
+  (let [s (atom {:jobs {"test-job" ::test-job}})
+        {:keys [enter] :as i} (sut/add-job-retriever s)]
+    (is (keyword? (:name i)))
+    
+    (testing "adds job retriever api fn to to job context"
+      (let [f (-> {}
+                  (enter)
+                  (emi/get-job-ctx)
+                  (get-in [:api :jobs]))]
+        (is (fn? f))
+        (is (= ::test-job (f "test-job")))))))
+
+(deftest update-job-init
+  (let [{:keys [leave] :as i} sut/update-job-init]
+    (is (keyword? (:name i)))
+    
+    (testing "`leave` adds agent details to job"
+      (let [r (-> {:event
+                   {:job-id "test-job"
+                    :agent
+                    {:address "test-addr"
+                     :ports {10000 8080}}}}
+                  (sut/set-jobs {"test-job"
+                                 {:type :container}})
+                  (leave))]
+        (is (= "test-addr"
+               (-> r
+                   (sut/get-jobs)
+                   (get "test-job")
+                   :agent
+                   :address)))))))
+
 (deftest routes
   (let [types [:script/initializing
                :script/start
                :script/end
                :job/queued
+               :job/initializing
                :job/executed
                :job/end
+               :job/unblocked
                :build/canceled]
         routes (->> (sut/make-routes {})
                     (into {}))]
@@ -264,21 +313,36 @@
       (testing (format "handles `%s` event type" t)
         (is (contains? routes t))))
 
-    (testing "`script/initializing` passes api client for loading"
-      (let [fake-loader {:name ::sut/load-jobs
-                         :enter (fn [ctx]
-                                  (cond-> ctx
-                                    (= ::test-client (-> ctx
-                                                         (sut/get-initial-job-ctx)
-                                                         (ba/ctx->api-client)))
-                                    (sut/set-jobs {"test-job" {:id "test-job"}})))}
-            r (-> (sut/make-routes {:api-client ::test-client})
-                  (mmc/router)
-                  (mmc/replace-interceptors [fake-loader]))]
-        (is (not-empty (-> (r {:type :script/initializing})
-                           (first)
-                           :result
-                           :jobs)))))
+    (testing "`script/initializing`"
+      (testing "passes api client for loading"
+        (let [fake-loader {:name ::sut/load-jobs
+                           :enter (fn [ctx]
+                                    (cond-> ctx
+                                      (= ::test-client (-> ctx
+                                                           (sut/get-initial-job-ctx)
+                                                           (ba/ctx->api-client)))
+                                      (sut/set-jobs {"test-job" {:id "test-job"}})))}
+              r (-> (sut/make-routes {:api-client ::test-client})
+                    (mmc/router)
+                    (mmc/replace-interceptors [fake-loader]))]
+          (is (not-empty (-> (r {:type :script/initializing})
+                             (first)
+                             :result
+                             :jobs)))))
+
+      (testing "applies filter when loading jobs"
+        (let [f ["test-job"]
+              fake-loader {:name ::sut/load-jobs
+                           :enter (fn [ctx]
+                                    (when (= f (sut/get-job-filter ctx))
+                                      (sut/set-jobs ctx {"test-job" {:id "test-job"}})))}
+              r (-> (sut/make-routes {:filter f})
+                    (mmc/router)
+                    (mmc/replace-interceptors [fake-loader]))]
+          (is (not-empty (-> (r {:type :script/initializing})
+                             (first)
+                             :result
+                             :jobs))))))
 
     (testing "`job/executed` adds result from extensions to event"
       (let [ext-id ::test-ext
@@ -304,14 +368,33 @@
                      :result
                      first
                      :result
-                     ext-id))))))))
+                     ext-id))))))
+
+    (testing "`job/queued`"
+      (let [exec-ctx (atom nil)
+            job (api/action-job "test-job" (fn [ctx]
+                                             (reset! exec-ctx ctx)
+                                             api/success))
+            test-state (atom {:jobs (jobs->map [job])})
+            r (-> (sut/make-routes {:api-client ::test-client
+                                    :state test-state})
+                  (mmc/router))]
+        (testing "executes action job"
+          (is (some? (-> {:type :job/queued
+                          :job-id (:id job)}
+                         (r))))
+          (is (some? @exec-ctx)))
+
+        (testing "passes job retriever in job ctx"
+          (is (fn? (-> @exec-ctx :api :jobs)))
+          (is (= job (api/get-job @exec-ctx "test-job"))))))))
 
 (deftest make-job-ctx
   (testing "passes archs from config"
     (let [archs [:arch-1 :arch-2]]
       (is (= archs (-> {:archs archs}
                        (sut/make-job-ctx)
-                       (v2/archs)))))))
+                       (api/archs)))))))
 
 (deftest script-init
   (testing "fires `script/start` event with pending jobs"
@@ -320,8 +403,8 @@
                 (sut/set-build (h/gen-build))
                 (sut/set-jobs jobs)
                 (sut/script-init))]
-      (is (spec/valid? ::se/event r)
-          (spec/explain-str ::se/event r))
+      (is (spec/valid? ::es/event r)
+          (spec/explain-str ::es/event r))
       (is (= :script/start (:type r)))
       (is (= ["test-job"]
              (->> r :jobs (map bc/job-id))))
@@ -336,8 +419,8 @@
                 (sut/set-build (h/gen-build))
                 (sut/set-jobs (jobs->map [job]))
                 (sut/script-init))]
-      (is (spec/valid? ::se/event r)
-          (spec/explain-str ::se/event r))
+      (is (spec/valid? ::es/event r)
+          (spec/explain-str ::es/event r))
       (is (= "test-img" (-> r :jobs first :image)))
       (is (= :ext-value (-> r :jobs first :ext-key))))))
 
@@ -358,15 +441,28 @@
         (testing "queues jobs without dependencies"
           (is (= 1 (count r)))
           (is (every? (comp (partial = :job/queued) :type) r))
-          (is (spec/valid? ::se/event (first r))
-              (spec/explain-str ::se/event (first r)))
+          (is (spec/valid? ::es/event (first r))
+              (spec/explain-str ::es/event (first r)))
           (is (= [(get jobs "start")]
                  (map :job r)))))))
 
-  (testing "returns `script/end` when no jobs"
-    (let [r (sut/script-start {:event {:script {:jobs []}}})]
-      (is (= [:script/end] (map :type r)))
-      (is (bc/failed? (first r))))))
+  (testing "returns `script/end`"
+    (testing "when no jobs"
+      (let [r (sut/script-start {:event {:script {:jobs []}}})]
+        (is (= [:script/end] (map :type r)))
+        (is (bc/failed? (first r)))))
+
+    (testing "when no start jobs found"
+      (let [jobs [{:id "start"
+                   :status :pending
+                   :dependencies ["nonexisting"]}]
+            r (-> {:event
+                   {:script
+                    {:jobs jobs}}}
+                  (sut/set-jobs (jobs->map jobs))
+                  (sut/script-start))]
+        (is (= [:script/end] (map :type r)))
+        (is (bc/failed? (first r)))))))
 
 (deftest script-end
   (testing "sets event in result for realization"
@@ -423,6 +519,14 @@
                first
                :status)))))
 
+(deftest job-unblocked
+  (testing "returns `job/queued` event"
+    (let [r (->> {:event
+                  {:job-id "test-job"}}
+                 (sut/job-unblocked))]
+      (is (= [:job/queued]
+             (map :type r))))))
+
 (deftest job-end
   (testing "when more jobs to run"
     (testing "queues pending jobs with completed dependencies"
@@ -456,6 +560,22 @@
                   (sut/set-jobs jobs)
                   (sut/job-end))]
         (is (empty? r))))
+
+    (testing "marks blocked jobs as blocked"
+      (let [jobs (jobs->map
+                  [{:id "first"
+                    :status :success}
+                   {:id "blocked"
+                    :dependencies ["first"]
+                    :blocked true
+                    :status :pending}])
+            r (-> {:event
+                   {:job-id "first"
+                    :status :success}}
+                  (sut/set-jobs jobs)
+                  (sut/job-end))]
+        (is (= [:job/blocked] (map :type r)))
+        (is (= "blocked" (-> r first :job-id)))))
 
     (testing "returns `script/end` with status `canceled` if build canceled"
       (let [r (-> {:event
@@ -497,6 +617,20 @@
                  (sut/job-end)
                  first
                  :status))))
+
+    (testing "ends script if remaining jobs have nonexisting dependencies"
+      (is (= :script/end
+             (-> {:event
+                  {:job-id "success"
+                   :status :success}}
+                 (sut/set-jobs (jobs->map [{:id "success"
+                                            :status :success}
+                                           {:id "unreachable"
+                                            :status :pending
+                                            :dependencies ["nonexisting"]}]))
+                 (sut/job-end)
+                 first
+                 :type))))
     
     (testing "marks remaining pending jobs as skipped"
       (let [jobs (jobs->map [{:id "first"
@@ -511,3 +645,32 @@
                         (sut/job-end))
                     (filter (comp (partial = :job/skipped) :type))
                     (map :job-id))))))))
+
+(deftest build-canceled
+  (testing "marks all pending and blocked jobs as skipped"
+    (let [jobs (jobs->map [{:id "pending"
+                            :status :pending}
+                           {:id "blocked"
+                            :status :blocked}
+                           {:id "running"
+                            :status :running}])
+          r (-> {:event
+                 {:type :build/canceled}}
+                (sut/set-jobs jobs)
+                (sut/build-canceled))]
+      (is (every? (comp (partial = :job/skipped) :type) r))
+      (is (= #{"pending" "blocked"}
+             (->> (map :job-id r)
+                  set)))))
+
+  (testing "when no active jobs, marks script end"
+    (let [jobs (jobs->map [{:id "pending"
+                            :status :pending}])
+          r (-> {:event
+                 {:type :build/canceled}}
+                (sut/set-jobs jobs)
+                (sut/build-canceled))
+          e (->> (filter (comp (partial = :script/end) :type) r)
+                 (first))]
+      (is (some? e))
+      (is (= :canceled (:status e))))))

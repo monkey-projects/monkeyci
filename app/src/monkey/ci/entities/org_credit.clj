@@ -11,7 +11,7 @@
 
 (defn select-org-credits [conn f]
   (->> (assoc base-query
-              :select [:cc.amount :cc.from-time :cc.type :cc.reason
+              :select [:cc.amount :cc.valid-from :cc.valid-until :cc.type :cc.reason
                        [:cc.cuid :id]
                        [:c.cuid :org-id]
                        [:cs.cuid :subscription-id]
@@ -20,12 +20,20 @@
        (ec/select conn)
        (map ec/convert-credit-select)))
 
-(defn select-avail-credits-amount [conn org-id]
-  (let [avail (-> (ec/select
+(defn select-avail-credits-amount [conn org-id ts]
+  (let [at (when ts (ec/->ts ts))
+        avail (-> (ec/select
                    conn
                    (assoc base-query
                           :select [[[:sum :cc.amount] :avail]]
-                          :where [:= :c.cuid org-id]))
+                          :where (cond->> [:= :c.cuid org-id]
+                                   at (conj [:and
+                                             [:or
+                                              [:= :cc.valid-from nil]
+                                              [:<= :cc.valid-from at]]
+                                             [:or
+                                              [:= :cc.valid-until nil]
+                                              [:<= at :cc.valid-until]]]))))
                   (first)
                   :avail
                   (or 0M))
@@ -36,12 +44,12 @@
                               :where (ecc/by-org org-id))))
                   (first)
                   :used)]
-    (- (or avail 0) (or used 0))))
+    (max 0M (- (or avail 0) (or used 0)))))
 
 (defn select-avail-credits [conn org-id]
   (->> (ec/select
         conn
-        {:select [:cc.amount :cc.from-time :cc.type :cc.reason
+        {:select [:cc.amount :cc.valid-from :cc.valid-until :cc.type :cc.reason
                   [:cc.cuid :id]
                   [:c.cuid :org-id]
                   [:cs.cuid :subscription-id]
@@ -69,6 +77,5 @@
   [:and
    (by-org org-id)
    [:or
-    [:is :cc.from-time nil]
-    [:<= :cc.from-time (ec/->ts ts)]]])
-
+    [:is :cc.valid-from nil]
+    [:<= :cc.valid-from (ec/->ts ts)]]])

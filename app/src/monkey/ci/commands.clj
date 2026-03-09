@@ -35,8 +35,8 @@
             [monkey.ci.script.core :as script]
             [monkey.ci.sidecar
              [core :as sc]
-             [runtime :as rs]]
-            [monkey.ci.spec.sidecar :as ss]
+             [runtime :as rs]
+             [spec :as ss]]
             [monkey.ci.web
              [auth :as auth]
              [http :as wh]]))
@@ -93,35 +93,45 @@
                  str)
         cwd)))
 
-(defn args->build
-  "Creates a build object from the command line args"
-  [{:keys [workdir dir git-url commit-id branch tag] :as args}]
-  ;; TODO Merge this with build/make-build-ctx?
-  (cond-> {:checkout-dir (args->checkout-dir args)
-           :org-id "local-cust"
-           :repo-id "local-repo"
+(defn config->build
+  "Creates a build object from the command line args or global config"
+  [{{:keys [dir git-url commit-id branch tag] :as args} :args wd :work-dir :as config}]
+  (cond-> {:checkout-dir (some-> wd
+                                 (fs/canonicalize)
+                                 str)
+           :org-id (get-in config [:account :org-id] "local-org")
+           :repo-id (get-in config [:account :repo-id] "local-repo")
            :build-id (b/local-build-id)
            :dek (codecs/bytes->b64-str (v/generate-key))}
     git-url (assoc-in [:git :url] git-url)
     commit-id (assoc-in [:git :ref] commit-id)
     branch (assoc-in [:git :branch] branch)
     tag (assoc-in [:git :tag] tag)
-    (and git-url workdir) (assoc-in [:git :dir] workdir)
+    (and git-url wd) (assoc-in [:git :dir] wd)
     dir (b/set-script-dir dir)))
+
+(defn cli->rt-conf
+  "Creates runtime configuration from the cli options or configuration."
+  [{:keys [args] :as opts}]
+  ;; Allow mailman override for testing
+  (-> (select-keys opts [:mailman :lib-coords :log-opts :podman])
+      (lc/set-build (config->build opts))
+      (lc/set-quiet (:quiet args))
+      (lc/set-job-filter (:filter args))
+      (lc/set-params (concat (parse-params (:param args))
+                             (load-param-files (:param-file args))))
+      (lc/set-global-api (-> (select-keys (:account opts) [:url :token])
+                             (update :url #(or % "https://api.monkeyci.com/v1"))))))
 
 (defn run-build-local
   "Run a build locally, normally from local source but can also be from a git checkout.
    Returns a deferred that will hold zero if the build succeeds, nonzero if it fails."
-  [{:keys [args] :as config}]
+  [config]
   (let [wd (fs/create-temp-dir)
-        build (args->build args)
-        ;; Allow mailman override for testing
-        conf (-> (select-keys config [:mailman :lib-coords :log-config :podman])
-                 (lc/set-work-dir wd)
-                 (lc/set-build build)
-                 (lc/set-params (concat (parse-params (get-in config [:args :param]))
-                                        (load-param-files (get-in config [:args :param-file])))))]
-    (log/info "Running local build for src at:" (:checkout-dir build))
+        conf (-> (cli->rt-conf config)
+                 (lc/set-work-dir wd))
+        build (lc/get-build conf)]
+    (log/info "Running local build for src at:" (b/checkout-dir build))
     (log/debug "Using working directory" (str wd))
     (lr/start-and-post conf (ec/make-event :build/pending
                                            :build build))))
@@ -131,7 +141,11 @@
   [conf]
   (ra/with-cli-runtime conf
     (fn [rt]
-      (let [res (script/verify (get-in rt [:build :script :script-dir]))]
+      (let [build (config->build conf)
+            d (b/checkout-dir build)
+            res (->> (b/script-dir build)
+                     (u/abs-path-safe d)
+                     (script/verify))]
         (rt/report rt {:type :verify/result :result res})
         (if (->> res
                  (map :result)
@@ -144,9 +158,16 @@
   [conf]
   (ra/with-cli-runtime conf
     (fn [rt]
-      (rt/report rt {:type :test/starting
-                     :build (:build rt)})
-      (:exit @(proc/test! (:build rt) rt)))))
+      (let [build (config->build conf)
+            opts {:watch? (true? (get-in conf [:args :watch]))
+                  :dev-mode? (rt/dev-mode? rt)}]
+        (rt/report rt {:type :test/starting
+                       :build build})
+        (-> (b/checkout-dir build)
+            (u/abs-path-safe (b/script-dir build))
+            (proc/test! opts)
+            (deref)
+            :exit)))))
 
 (defn ^:deprecated list-builds [rt]
   (->> (http/get (apply format "%s/customer/%s/repo/%s/builds"

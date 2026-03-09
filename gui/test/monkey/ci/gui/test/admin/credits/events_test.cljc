@@ -56,7 +56,7 @@
      (rf/dispatch [:credits/save-issue
                    {:amount [1000]
                     :reason ["test reason"]
-                    :from-time ["2025-01-01"]}])
+                    :valid-from ["2025-01-01"]}])
      (testing "saves to backend"
        (is (= 1 (count @c)))
        (is (= :create-credit-issue (-> @c first (nth 2)))))
@@ -66,7 +66,7 @@
          (is (= {:amount 1000
                  :reason "test reason"}
                 (select-keys params [:amount :reason])))
-         (is (number? (:from-time params)))))
+         (is (number? (:valid-from params)))))
 
      (testing "adds org id"
        (is (= "test-org"

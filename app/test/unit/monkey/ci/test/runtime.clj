@@ -1,11 +1,11 @@
 (ns monkey.ci.test.runtime
   "Helper functions for working with runtime in tests"
-  (:require
-   [manifold.deferred :as md]
-   [monkey.ci.storage :as s]
-   [monkey.ci.test.helpers :as h]
-   [monkey.ci.test.mailman :as tmm]
-   [monkey.ci.web.auth :as auth]))
+  (:require [manifold.deferred :as md]
+            [monkey.ci.storage :as s]
+            [monkey.ci.test
+             [helpers :as h]
+             [mailman :as tmm]]
+            [monkey.ci.web.auth :as auth]))
 
 (def empty-runtime {})
 
@@ -53,6 +53,12 @@
 (defn set-encrypter [rt f]
   (assoc-in rt [:crypto :encrypter] f))
 
+(defn set-mailer [rt m]
+  (assoc rt :mailer m))
+
+(defn set-invoicing-client [rt c]
+  (assoc-in rt [:invoicing :client] c))
+
 (defn test-runtime []
   (-> empty-runtime
       (set-artifacts (h/fake-blob-store))
@@ -67,4 +73,8 @@
       (set-vault (h/fake-vault))
       (set-dek-generator (constantly nil))
       (set-decrypter (constantly nil))
-      (set-encrypter (constantly nil))))
+      (set-encrypter (constantly nil))
+      (set-mailer (h/fake-mailer))
+      (set-invoicing-client (constantly
+                             (md/success-deferred {:status 200
+                                                   :body nil})))))

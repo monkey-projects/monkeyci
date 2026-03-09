@@ -2,7 +2,8 @@
   "Functions for working with errors and exceptions.  This provides a uniform way
    to handle exceptions and convert them into a usable format for internal 
    propagation and to give useful feedback to the user."
-  (:require [clj-commons.byte-streams :as bs]))
+  (:require [clj-commons.byte-streams :as bs]
+            [medley.core :as mc]))
 
 (def exception? (partial instance? java.lang.Exception))
 
@@ -26,7 +27,11 @@
 (def error-msg (get-prop :message))
 (def error-cause (get-prop :cause))
 
-(defn unwrap-exception [ex]
+(defn unwrap-exception
+  "Unwraps the exception to its cause, if any.  If the exception contains a body, 
+   returns a new exception with the body converted into  a string.  This is useful
+   when logging HTTP client errors."
+  [ex]
   (let [ex (or (ex-cause ex) ex)
         data (ex-data ex)]
     ;; If it's a http error, there may be a body that can be read

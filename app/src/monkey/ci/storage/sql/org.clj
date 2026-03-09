@@ -6,8 +6,9 @@
              [utils :as u]]
             [monkey.ci.entities
              [core :as ec]
-             [org :as ecu]]
-            [monkey.ci.spec.entities]
+             [org :as ecu]
+             [spec :as es]]
+            [monkey.ci.storage.spec :as ss]
             [monkey.ci.storage.sql
              [common :as sc]
              [repo :as sr]]))
@@ -36,14 +37,14 @@
 
 (defn- update-org [conn org existing]
   (let [ce (org->db org)]
-    (spec/valid? :db/org ce)
+    (spec/valid? ::es/org ce)
     (when (not= ce existing)
       (ec/update-org conn (merge existing ce)))
     (sr/upsert-repos conn org (:id existing))
     org))
 
 (defn upsert-org [conn org]
-  (spec/valid? :entity/org org)
+  (spec/valid? ::ss/org org)
   (if-let [existing (ec/select-org conn (ec/by-cuid (:id org)))]
     (update-org conn org existing)
     (insert-org conn org)))
@@ -64,16 +65,19 @@
                             first
                             :id)]
       (ec/insert-user-orgs conn uid [org-id]))
-    (when-let [{:keys [amount from]} (:credits opts)]
-      (let [cse {:cuid (st/new-id)
-                 :org-id org-id
-                 :amount amount
-                 :valid-from from}]
+    (doseq [{:keys [amount from until period] :as conf} (:credits opts)]
+      (let [cse (-> conf
+                    (dissoc :from :until :period)
+                    (assoc :cuid (st/new-id)
+                           :org-id org-id
+                           :valid-from from
+                           :valid-until until
+                           :valid-period period))]
         (when-let [cs (ec/insert-credit-subscription conn cse)]
           (ec/insert-org-credit conn {:cuid (st/new-id)
                                       :org-id org-id
                                       :amount amount
-                                      :from-time from
+                                      :valid-from from
                                       :type :subscription
                                       :subscription-id (:id cs)}))))
     (when-let [dek (:dek opts)]
@@ -114,8 +118,9 @@
          (map db->org-with-repos))))
 
 (defn select-orgs-by-id [st ids]
-  (->> (ec/select-orgs (sc/get-conn st) [:in :cuid (distinct ids)])
-       (map db->org)))
+  (when (not-empty ids)
+    (->> (ec/select-orgs (sc/get-conn st) [:in :cuid (distinct ids)])
+         (map db->org))))
 
 (defn count-orgs [st]
   (ec/count-entities (sc/get-conn st) :orgs))

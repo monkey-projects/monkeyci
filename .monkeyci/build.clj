@@ -1,78 +1,19 @@
 ;; Build script for Monkey-ci itself
 (ns build
   (:require [babashka.fs :as fs]
-            [clojure.java.io :as io]
+            [clojars :as clojars]
             [clojure.string :as cs]
+            [config :as config]
             [medley.core :as mc]
+            [minio :as minio]
             [monkey.ci.api :as m]
-            [monkey.ci.build
-             [api :as api]
-             [core :as core]]
+            [monkey.ci.build.api :as api]
             [monkey.ci.ext.junit]
             [monkey.ci.plugin
              [github :as gh]
              [kaniko :as kaniko]
-             [pushover :as po]])
-  (:import [io.minio MinioClient PutObjectArgs]))
-
-(def tag-regex #"^refs/tags/(\d+\.\d+\.\d+(\.\d+)?$)")
-
-(defn ref?
-  "Returns a predicate that checks if the ref matches the given regex"
-  [re]
-  #(core/ref-regex % re))
-
-(def release?
-  (ref? tag-regex))
-
-(def api-trigger?
-  (comp (partial = :api)
-        m/source))
-
-(def should-publish?
-  (some-fn m/main-branch? release?))
-
-(defn- dir-changed?
-  "True if files have been touched for the given regex, or the 
-   build was triggered from the api."
-  [ctx re]
-  (or (m/touched? ctx re)      
-      (api-trigger? ctx)))
-
-(defn app-changed? [ctx]
-  (dir-changed? ctx #"^app/.*"))
-
-(defn gui-changed? [ctx]
-  (dir-changed? ctx #"^gui/.*"))
-
-(defn test-lib-changed? [ctx]
-  (dir-changed? ctx #"^test-lib/.*"))
-
-(def build-app? (some-fn app-changed? release?))
-(def build-gui? (some-fn gui-changed? release?))
-(def build-test-lib? (some-fn test-lib-changed? release?))
-
-(def publish-app? (some-fn (every-pred app-changed? should-publish?)
-                           release?))
-(def publish-gui? (some-fn (every-pred gui-changed? should-publish?)
-                           release?))
-(def publish-test-lib? (some-fn (every-pred test-lib-changed? should-publish?) release?))
-
-(defn tag-version
-  "Extracts the version from the tag"
-  [ctx]
-  (some->> (m/git-ref ctx)
-           (re-matches tag-regex)
-           (second)))
-
-(defn image-version
-  "Retrieves image version from the tag, or the build id if this is the main branch."
-  [ctx]
-  ;; Prefix prod images with "release" for image retention policies
-  (or (some->> (tag-version ctx) (str "release-"))
-      (m/build-id ctx)
-      ;; Fallback
-      "latest"))
+             [pushover :as po]]
+            [predicates :as p]))
 
 (defn clj-container 
   "Executes script in clojure container"
@@ -96,22 +37,32 @@
    (str dir "-coverage")
    (str dir "/target/coverage")))
 
-(defn test-app [ctx]
-  (let [junit-artifact (junit-artifact "app")]
-    (when (build-app? ctx)
-      (-> (clj-container "test-app" "app" "-M:test:coverage")
-          (assoc :save-artifacts [junit-artifact
-                                  (coverage-artifact "app")]
-                 :junit {:artifact-id (:id junit-artifact)
-                         :path "junit.xml"})))))
-
-(defn test-test-lib [ctx]
-  (let [junit-artifact (junit-artifact "test-lib")]
-    (when (build-test-lib? ctx)
-      (-> (clj-container "test-test-lib" "test-lib" "-X:test:junit")
+(defn- run-tests [ctx {:keys [id dir cmd should-test?] :or {cmd "-X:test:junit"}}]
+  (let [junit-artifact (junit-artifact dir)]
+    (when (should-test? ctx)
+      (-> (clj-container id dir cmd)
           (assoc :save-artifacts [junit-artifact]
                  :junit {:artifact-id (:id junit-artifact)
                          :path "junit.xml"})))))
+
+(defn test-app [ctx]
+  (some-> (run-tests ctx {:id "test-app"
+                          :dir "app"
+                          :cmd "-M:test:coverage"
+                          :should-test? p/build-app?})
+          (update :save-artifacts conj (coverage-artifact "app"))
+          (cond->
+            (p/build-common? ctx) (m/depends-on ["test-common"]))))
+
+(defn test-test-lib [ctx]
+  (run-tests ctx {:id "test-test-lib"
+                  :dir "test-lib"
+                  :should-test? p/build-test-lib?}))
+
+(defn test-common [ctx]
+  (run-tests ctx {:id "test-common"
+                  :dir "common"
+                  :should-test? p/build-common?}))
 
 (def uberjar-artifact
   (m/artifact "uberjar" "app/target/monkeyci-standalone.jar"))
@@ -123,46 +74,19 @@
   (update art :path (comp str fs/parent)))
 
 (defn app-uberjar [ctx]
-  (when (publish-app? ctx)
-    (let [v (tag-version ctx)]
+  (when (p/publish-app? ctx)
+    (let [v (config/tag-version ctx)]
       (cond-> (-> (clj-container "app-uberjar" "app" "-X:jar:uber")
                   (m/depends-on ["test-app"])
                   (m/save-artifacts uberjar-artifact))
         v (m/env {"MONKEYCI_VERSION" v})))))
-
-(defn make-s3-client [url access-key secret]
-  (.. (MinioClient/builder)
-      (endpoint url)
-      (credentials access-key secret)
-      (build)))
-
-(defn put-object-args [bucket dest stream size]
-  (.. (PutObjectArgs/builder)
-      (bucket bucket)
-      (object dest)
-      (stream stream size -1)
-      ;; Make file publicly available
-      (headers {"x-amz-acl" "public-read"})
-      (build)))
-
-(defn put-s3-object
-  "Uploads the file `f` to given bucket destination"
-  [client bucket dest stream size]
-  (with-open [s stream]
-    (let [args (put-object-args bucket dest s size)]
-      (.putObject client args))))
-
-(defn put-s3-file
-  "Uploads the file `f` to given bucket destination"
-  [client bucket dest f]
-  (put-s3-object client bucket dest (io/input-stream f) (fs/size f)))
 
 (defn- upload-to-bucket [ctx do-put]
   (let [params (api/build-params ctx)
         url (get params "s3-url")
         access-key (get params "s3-access-key")
         secret-key (get params "s3-secret-key")
-        client (make-s3-client url access-key secret-key)
+        client (minio/make-s3-client url access-key secret-key)
         bucket (get params "s3-bucket")]
     (if (some? (do-put client bucket))
       m/success
@@ -172,15 +96,16 @@
   "Job that uploads the uberjar to configured s3 bucket.  From there it 
    will be downloaded by Ansible scripts."
   [ctx]
-  (when (publish-app? ctx)
+  (when (p/publish-app? ctx)
     (-> (m/action-job
          "upload-uberjar"
          (fn [ctx]
            (upload-to-bucket
             ctx
-            #(put-s3-file %1 %2
-                          (format "monkeyci/%s.jar" (image-version ctx))
-                          (m/in-work ctx (:path uberjar-artifact))))))
+            #(minio/put-s3-file %1 %2
+                                (format "monkeyci/%s.jar" (config/image-version ctx))
+                                (m/in-work ctx (:path uberjar-artifact))
+                                {"env" (if (p/release? ctx) "prod" "staging")}))))
         (m/depends-on ["app-uberjar"])
         (m/restore-artifacts [(as-dir uberjar-artifact)]))))
 
@@ -189,43 +114,28 @@
    script contents."
   [ctx]
   (cs/replace (slurp (m/in-work ctx "app/dev-resources/install-cli.sh"))
-              "{{version}}" (tag-version ctx)))
+              "{{version}}" (config/tag-version ctx)))
 
 (defn upload-install-script [ctx]
-  (when (release? ctx)
+  (when (p/release? ctx)
     (-> (m/action-job
          "upload-install-script"
          (fn [ctx]
            (let [script (prepare-install-script ctx)]
              (upload-to-bucket
               ctx
-              #(put-s3-object %1 %2
-                              "install-cli.sh"
-                              (java.io.ByteArrayInputStream. (.getBytes script))
-                              (count script))))))
+              #(minio/put-s3-object %1 %2
+                                    "install-cli.sh"
+                                    (java.io.ByteArrayInputStream. (.getBytes script))
+                                    (count script))))))
         (m/depends-on ["upload-uberjar"]))))
 
-(def img-base "rg.fr-par.scw.cloud/monkeyci")
-(def app-img (str img-base "/monkeyci-api"))
-(def gui-img (str img-base "/monkeyci-gui"))
-
-(defn oci-app-image [ctx]
-  (str app-img ":" (image-version ctx)))
-
-(defn archs [ctx]
-  ;; Use fallback for safety
-  #_(or (m/archs ctx) [:amd])
-  ;; Using single arch for now.  When using a container agent, it may happen that
-  ;; multiple builds run on the same agent but for different architectures, which may
-  ;; mess up the result (e.g. amd container but actually arm arch)
-  [:amd])
-
 (defn build-app-image [ctx]
-  (when (publish-app? ctx)
+  (when (p/publish-app? ctx)
     (kaniko/multi-platform-image
      {:dockerfile "docker/Dockerfile"
-      :archs (archs ctx)
-      :target-img (oci-app-image ctx)
+      :archs (config/archs ctx)
+      :target-img (config/app-image ctx)
       :image
       {:job-id "publish-app-img"
        :container-opts
@@ -246,7 +156,7 @@
    :image
    {:job-id (str "publish-" id)
     :container-opts
-    {:memory 3                          ;GB
+    {:size 2
      ;; Restore artifacts but modify the path because work dir is not the same
      :restore-artifacts [(update gui-release-artifact :path (partial str "gui/"))]
      :dependencies ["release-gui"]}}
@@ -254,32 +164,57 @@
    {:job-id (str id "-manifest")}})
 
 (defn build-gui-image [ctx]
-  (when (publish-gui? ctx)
+  (when (p/publish-gui? ctx)
     (kaniko/multi-platform-image
-     (gui-image-config "gui-img" gui-img (image-version ctx) (archs ctx))
+     (gui-image-config "gui-img" config/gui-img (config/image-version ctx) (config/archs ctx))
      ctx)))
+
+(defn- clojars-latest-version
+  "Fetches latest version from the lib declared in the `deps.edn` in given dir."
+  [dir ctx]
+  (->> [(m/checkout-dir ctx) dir "deps.edn"]
+       (cs/join "/")
+       (clojars/extract-lib)
+       (apply clojars/latest-version)))
+
+(defn- publish-env
+  "Creates clojars env vars for publishing a lib"
+  [ctx version]
+  (-> (api/build-params ctx)
+      (select-keys ["CLOJARS_USERNAME" "CLOJARS_PASSWORD"])
+      (mc/assoc-some "MONKEYCI_VERSION" version)))
 
 (defn publish 
   "Executes script in clojure container that has clojars publish env vars"
   [ctx id dir & [version]]
-  (let [env (-> (api/build-params ctx)
-                (select-keys ["CLOJARS_USERNAME" "CLOJARS_PASSWORD"])
-                (mc/assoc-some "MONKEYCI_VERSION" (or version (tag-version ctx))))]
-    (-> (clj-container id dir
-                       "-X:jar:deploy")
-        (assoc :container/env env))))
+  (let [v (or version (config/tag-version ctx))]
+    ;; If this is a release, and it's already been deployed, then skip this.
+    ;; This is to be able to re-run a release build when a job down the road has
+    ;; previously failed.
+    (if (or (nil? v) (not= v (clojars-latest-version dir ctx)))
+      (-> (clj-container id dir "-X:jar:deploy")
+          (assoc :container/env (publish-env ctx v)))
+      (m/action-job id (constantly (m/with-message m/success "Version was already published"))))))
 
 (defn publish-app [ctx]
-  (when (publish-app? ctx)
+  (when (p/publish-app? ctx)
     (some-> (publish ctx "publish-app" "app")
-            (m/depends-on ["test-app"]))))
+            (m/depends-on (cond-> ["test-app"]
+                            ;; TODO Since this job may also be excluded depending
+                            ;; on clojars, this could still be incorrect
+                            (p/publish-common? ctx) (conj "publish-common"))))))
 
 (defn publish-test-lib [ctx]
-  (when (publish-test-lib? ctx)
+  (when (p/publish-test-lib? ctx)
     ;; TODO Overwrite monkeyci version if necessary
-    ;; (format "-Sdeps '{:override-deps {:mvn/version \"%s\"}}'" (tag-version ctx))
+    ;; (format "-Sdeps '{:override-deps {:mvn/version \"%s\"}}'" (config/tag-version ctx))
     (some-> (publish ctx "publish-test-lib" "test-lib")
             (m/depends-on ["test-test-lib"]))))
+
+(defn publish-common [ctx]
+  (when (p/publish-common? ctx)
+    (some-> (publish ctx "publish-common" "common")
+            (m/depends-on ["test-common"]))))
 
 (def github-release
   "Creates a release in github"
@@ -287,7 +222,7 @@
 
 (defn- shadow-release [id build]
   (-> (m/container-job id)
-      (m/image "docker.io/monkeyci/clojure-node:1.11.4")
+      (m/image "docker.io/monkeyci/clojure-node:1.12.3")
       (m/work-dir "gui")
       (m/script
        ["npm install"
@@ -297,7 +232,7 @@
                  (m/cache "node-modules" "node_modules")])))
 
 (defn test-gui [ctx]
-  (when (build-gui? ctx)
+  (when (p/build-gui? ctx)
     (let [art-id "junit-gui"
           junit "junit.xml"]
       (-> (shadow-release "test-gui" :test/node)
@@ -308,28 +243,29 @@
                          :path junit})))))
 
 (defn- gen-idx [ctx type]
-  (format "clojure -X%s:gen-%s" (if (release? ctx) "" ":staging") (name type)))
+  (format "clojure -X%s:gen-%s" (if (p/release? ctx) "" ":staging") (name type)))
 
 (defn build-gui-release [ctx]
-  (when (publish-gui? ctx)
+  (when (p/publish-gui? ctx)
     (-> (shadow-release "release-gui" :frontend)
         (m/depends-on ["test-gui"])
         ;; Also generate index pages for app and admin sites
         (update :script (partial concat [(gen-idx ctx :main)
-                                         (gen-idx ctx :admin)]))
+                                         (gen-idx ctx :admin)
+                                         (gen-idx ctx :404)]))
         (assoc :save-artifacts [gui-release-artifact]))))
 
 (defn scw-images
   "Generates a job that patches the scw-images repo in order to build a new
    Scaleway-specific image, using the version associated with this build."
   [ctx]
-  (let [v (image-version ctx)
+  (let [v (config/image-version ctx)
         patches (->> [{:dir "api"
                        :dep "app-img-manifest"
-                       :checker publish-app?}
+                       :checker p/publish-app?}
                       {:dir "gui"
                        :dep "gui-img-manifest"
-                       :checker publish-gui?}]
+                       :checker p/publish-gui?}]
                      (filter (fn [{:keys [checker]}]
                                (checker ctx)))
                      (map (fn [{:keys [dir dep]}]
@@ -347,27 +283,22 @@
           (m/depends-on (map :dep patches))))))
 
 (defn notify [ctx]
-  (when (release? ctx)
+  (when (p/release? ctx)
     (po/pushover-msg
-     {:msg (str "MonkeyCI version " (tag-version ctx) " has been released.")
+     {:msg (str "MonkeyCI version " (config/tag-version ctx) " has been released.")
       :dependencies ["app-img-manifest" "gui-img-manifest"]})))
-
-;; TODO Add jobs that auto-deploy to staging after running some sanity checks
-;; We could do a git push with updated kustomization file.
-;; But running sanity checks requires a running app.  Either we could rely on
-;; argocd to do a blue/green deploy, or start it as a service (somehow) and
-;; run the checks here.  The latter is preferred as it is contained inside the
-;; build process.
 
 ;; List of jobs
 (def jobs
-  [test-app
+  [test-common
+   test-app
    test-gui
    test-test-lib
            
    app-uberjar
    upload-uberjar
    upload-install-script
+   publish-common
    publish-app
    publish-test-lib
    github-release
@@ -377,7 +308,7 @@
    build-app-image
    build-gui-image
    
-   ;; Scaleway images
+   ;; Trigger scaleway images
    scw-images
    
    notify])

@@ -97,7 +97,7 @@
    runner async and returns a 202 accepted."
   [{p :parameters :as req}]
   (log/trace "Got incoming webhook with body:" (prn-str (body req)))
-  (log/debug "Event type:" (get-in req [:headers "x-github-event"]))
+  (log/debug "Event type:" (github-event req))
   (if (should-trigger-build? req)
     (let [rt (c/req->rt req)]
       (if-let [build (create-webhook-build rt (get-in p [:path :id]) (body req))]
@@ -111,7 +111,7 @@
 
 (defn app-webhook [req]
   (log/trace "Got github app webhook event:" (pr-str (body req)))
-  (log/debug "Event type:" (get-in req [:headers "x-github-event"]))
+  (log/debug "Event type:" (github-event req))
   (if (should-trigger-build? req)
     (let [github-id (get-in (body req) [:repository :id])
           builds (->> (s/find-watched-github-repos (c/req->storage req) github-id)
@@ -158,65 +158,22 @@
   [req]
   (c/from-rt req (comp :github rt/config)))
 
-(defn- request-access-token [client-id client-secret opts]
-  (-> (http/post "https://github.com/login/oauth/access_token"
-                 {:query-params (merge {:client_id client-id
-                                        :client_secret client-secret}
-                                       opts)
-                  :headers {"Accept" "application/json"
-                            "User-Agent" user-agent}
-                  :throw-exceptions false})
-      (md/chain c/parse-body)
-      deref))
-
-(defn- request-new-token [req]
-  (let [code (get-in req [:parameters :query :code])
-        {:keys [client-secret client-id]} (github-config req)]
-    (request-access-token client-id client-secret {:code code})))
-
 (defn- ->oauth-user [{:keys [id email]}]
   {:email email
    :sid [:github id]})
 
-(defn request-user-info
-  "Fetch github user details in order to get the id and email (although
-   the latter is not strictly necessary).  We need the id in order to
-   link the Github user to the MonkeyCI user."
-  [token]
-  (-> (http/get "https://api.github.com/user"
-                {:headers {"Accept" "application/json"
-                           "Authorization" (str "Bearer " token)
-                           ;; Required by github
-                           "User-Agent" user-agent}
-                 :throw-exceptions false})
-      (md/chain
-       c/parse-body
-       :body
-       ->oauth-user)
-      deref))
+(def oidc-config
+  {:get-creds github-config
+   :request-token-url "https://github.com/login/oauth/access_token"
+   :user-info-url "https://api.github.com/user"
+   :convert-user ->oauth-user
+   :set-params (fn [req params]
+                 (assoc req :query-params params))})
 
-(def login (oauth2/login-handler
-            request-new-token
-            request-user-info))
+(def login (oauth2/oidc-login oidc-config))
+(def refresh (oauth2/oidc-refresh oidc-config))
 
 (defn get-config
   "Lists public github configuration to use"
   [req]
   (rur/response {:client-id (c/from-rt req (comp :client-id :github rt/config))}))
-
-(defn refresh-token
-  "Refreshes a github token using the refresh token"
-  [req]
-  (let [{:keys [client-secret client-id]} (github-config req)
-        refresh-token (get-in req [:parameters :body :refresh-token])]
-    (request-access-token client-id
-                          client-secret
-                          {:grant_type "refresh_token"
-                           :refresh_token refresh-token})))
-
-(def refresh
-  "Refreshing a token follows the same flow as login, but with a slightly different
-   request to github oauth."
-  (oauth2/login-handler
-   refresh-token
-   request-user-info))

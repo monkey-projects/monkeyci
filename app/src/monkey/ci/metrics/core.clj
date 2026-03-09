@@ -3,9 +3,8 @@
             [com.stuartsierra.component :as co]
             [medley.core :as mc]
             [monkey.ci.common.preds :as cp]
-            [monkey.ci.metrics
-             [entity-stats :as es]
-             [prometheus :as prom]]
+            [monkey.ci.metrics.entity-stats :as es]
+            [monkey.metrics.prometheus :as prom]
             [taoensso.telemere :as t]))
 
 (defn make-registry []
@@ -64,7 +63,8 @@
 (defn- add-entity-metrics [reg st]
   (->> [es/user-count-gauge
         es/org-count-gauge
-        es/repo-count-gauge]
+        es/repo-count-gauge
+        es/email-reg-count-gauge]
        (reduce (fn [r f]
                  (f st r)
                  r)

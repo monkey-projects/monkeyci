@@ -13,8 +13,16 @@
        (map ec/convert-inv-select)
        first))
 
-(defn select-invoices-for-org [conn cust-cuid]
+(defn select-invoices-for-org [conn org-cuid]
   (->> (assoc base-query
-              :where [:= :c.cuid cust-cuid])
+              :where [:= :c.cuid org-cuid])
        (ec/select conn)
        (map ec/convert-inv-select)))
+
+(defn select-org-invoicing-for-org [conn org-cuid]
+  (->> {:select [:i.*]
+        :from [[:org-invoicings :i]]
+        :join [[:orgs :o] [:= :o.id :i.org-id]]
+        :where [:= :o.cuid org-cuid]}
+       (ec/select conn)
+       first))

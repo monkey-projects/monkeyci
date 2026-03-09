@@ -6,6 +6,7 @@
             [monkey.ci.gui.job.subs :as sut]
             [monkey.ci.gui.routing :as r]
             [monkey.ci.gui.test.fixtures :as tf]
+            [monkey.ci.gui.test.helpers :as h]
             [re-frame.core :as rf]
             [re-frame.db :refer [app-db]]))
 
@@ -62,6 +63,7 @@
 
     (testing "converts loki format"
       (let [loki {:status "success"
+                  :src :loki
                   :data
                   {:resultType "streams"
                    :result
@@ -72,6 +74,20 @@
                      [["100" "Line 1"]
                       ["200" "Line 2"]]}]}}]
         (is (some? (reset! app-db (db/set-logs {} path loki))))
+        (is (= ["Line 1"
+                [:br]
+                "Line 2"]
+               @s))))
+
+    (testing "converts log ingest format"
+      (let [data {:status "success"
+                  :src :log-ingest
+                  :entries
+                  [{:ts 100
+                    :contents "Line 1\n"}
+                   {:ts 200
+                    :contents "Line 2\n"}]}]
+        (is (some? (reset! app-db (db/set-logs {} path data))))
         (is (= ["Line 1"
                 [:br]
                 "Line 2"]
@@ -181,12 +197,73 @@
                                          "script line 2"]}}}})))))
       (is (= [{:cmd "script line 1"
                :out "/var/log/0_out.log"
-               :err "/var/log/0_err.log"}
+               :err "/var/log/0_err.log"
+               :log-src :loki}
               {:cmd "script line 2"
-               :out "/var/log/1_out.log"}]
+               :out "/var/log/1_out.log"
+               :log-src :loki}]
              @l)))
 
     (testing "includes expanded state"
       (is (some? (swap! app-db (fn [db]
                                  (db/set-log-expanded db 1 true)))))
       (is (true? (-> @l second :expanded?))))))
+
+(deftest script-with-implied-logs
+  (let [l (rf/subscribe [:job/script-with-implied-logs])]
+    (testing "exists"
+      (is (some? l)))
+
+    (testing "empty when no job"
+      (is (empty? @l)))
+    
+    (is (some? (reset! app-db
+                       (-> {}
+                           (r/set-current
+                            {:parameters
+                             {:path
+                              {:job-id "test-job"}}})
+                           (bdb/set-build
+                            {:id "test-build"
+                             :script
+                             {:jobs {"test-job"
+                                     {:id "test-job"
+                                      :script
+                                      ["script line 1"
+                                       "script line 2"]}}}})))))
+
+    (testing "when logs present, returns as-is"
+      (is (some? (swap! app-db
+                        (fn [db]
+                          (db/set-log-files db
+                           ["/var/log/0_out.log"
+                            "/var/log/0_err.log"
+                            "/var/log/1_out.log"])))))
+      (is (= [{:cmd "script line 1"
+               :out "/var/log/0_out.log"
+               :err "/var/log/0_err.log"
+               :log-src :loki}
+              {:cmd "script line 2"
+               :out "/var/log/1_out.log"
+               :log-src :loki}]
+             @l)))
+
+    (testing "when no logs present, adds implied and marks src"
+      (is (some? (swap! app-db
+                        (fn [db]
+                          (db/set-log-files db nil)))))
+      (is (= [{:cmd "script line 1"
+               :out "0_out.log"
+               :err "0_err.log"
+               :log-src :log-ingest}
+              {:cmd "script line 2"
+               :out "1_out.log"
+               :err "1_err.log"
+               :log-src :log-ingest}]
+             @l)))))
+
+(deftest unblocking?
+  (h/verify-sub [::sut/unblocking?] db/set-unblocking true false))
+
+(deftest wrap-logs?
+  (h/verify-sub [::sut/wrap-logs?] #(db/set-wrap-logs % true) true false))

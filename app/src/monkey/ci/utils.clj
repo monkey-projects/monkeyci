@@ -11,7 +11,9 @@
              [walk :as cw]]
             [clojure.java.io :as io]
             [clojure.tools.logging :as log]
-            [manifold.deferred :as md]
+            [manifold
+             [deferred :as md]
+             [stream :as ms]]
             [medley.core :as mc]
             [monkey.ci
              [edn :as ce]
@@ -36,6 +38,10 @@
    (some-> p
            (fs/canonicalize)
            (str))))
+
+(defn abs-path-safe [a b]
+  (when (and a b)
+    (abs-path a b)))
 
 (defn combine
   "Returns the canonical path of combining `a` and `b`"
@@ -216,3 +222,43 @@
         (recur (str new-id "-" idx)
                (inc idx))
         id))))
+
+(defn wait-until
+  "Periodically invokes predicate `p`.  Returns a deferred that realizes when `p`
+   becomes truthy.  Returns the first truthy return value of `p`."
+  [p & {:keys [period] :or {period 100}}]
+  (->> (ms/periodically period p)
+       (ms/filter (every-pred some? (complement false?)))
+       (ms/take!)))
+
+(defn wait-for-file
+  "Periodically checks if given file exists.  Returns a deferred that holds
+   the path if it exists."
+  [f & opts]
+  (wait-until #(when (fs/exists? f) f) opts))
+
+(defn get-all-ip-addresses
+  "Lists all non-loopback, non-virtual site local ip addresses"
+  []
+  (->> (enumeration-seq (java.net.NetworkInterface/getNetworkInterfaces))
+       (remove (some-fn (memfn isLoopback) (memfn isVirtual)))
+       (mapcat (comp enumeration-seq (memfn getInetAddresses)))))
+
+(defn get-ip-addr
+  "Determines the ip address of this VM by selecting the first of all available addresses.
+   This could be an ipv4 or ipv6 address."
+  []
+  (first (get-all-ip-addresses)))
+
+(defprotocol InetAddressString
+  (inetaddr->str [a] "Returns textual representation of the inet address"))
+
+(extend-protocol InetAddressString
+  java.net.Inet4Address
+  (inetaddr->str [a]
+    (.getHostName a))
+
+  java.net.Inet6Address
+  (inetaddr->str [a]
+    ;; Drop the scope id
+    (.getHostAddress (java.net.InetAddress/getByAddress nil (.getAddress a)))))

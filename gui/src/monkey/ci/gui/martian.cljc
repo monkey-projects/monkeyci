@@ -3,6 +3,8 @@
             [martian.cljs-http :as mh]
             [martian.interceptors :as mi]
             [martian.re-frame :as mr]
+            [monkey.ci.common.schemas :as cs]
+            [monkey.ci.gui.edn]
             [monkey.ci.gui.local-storage]
             [monkey.ci.gui.logging :as log]
             [monkey.ci.gui.login.db :as ldb]
@@ -12,8 +14,10 @@
 (def org-path ["/org/" :org-id])
 (def repo-path (into org-path ["/repo/" :repo-id]))
 (def build-path (into repo-path ["/builds/" :build-id]))
+(def job-path (into build-path ["/job/" :job-id]))
 (def param-path (into org-path ["/param/" :param-id]))
 (def user-path ["/user/" :user-id])
+(def mailing-path ["/admin/mailing/" :mailing-id])
 
 (def org-schema
   {:org-id s/Str})
@@ -24,6 +28,9 @@
 
 (def build-schema
   (assoc repo-schema :build-id s/Str))
+
+(def job-schema
+  (assoc build-schema :job-id s/Str))
 
 (def param-schema
   (assoc org-schema
@@ -46,17 +53,6 @@
 (s/defschema Label
   {:name s/Str
    :value s/Str})
-
-(s/defschema UpdateRepo
-  {:org-id s/Str
-   :name s/Str
-   :url s/Str
-   (s/optional-key :main-branch) s/Str
-   (s/optional-key :public) s/Bool
-   (s/optional-key :github-id) s/Int
-   (s/optional-key :labels) [Label]})
-
-(def NewRepo UpdateRepo)
 
 (s/defschema log-query-schema
   {:query s/Str
@@ -91,16 +87,6 @@
    :public-key s/Str
    :label-filters [LabelFilterDisjunction]})
 
-(s/defschema UserCredits
-  {:amount s/Int
-   (s/optional-key :reason) s/Str
-   :from-time s/Int})
-
-(s/defschema CreditSubscription
-  {:amount s/Int
-   :valid-from s/Int
-   (s/optional-key :valid-until) s/Int})
-
 (s/defschema NewWebhook
   {:org-id s/Str
    :repo-id s/Str})
@@ -127,10 +113,10 @@
 
 (defn api-route [conf]
   (-> conf
-      (assoc :headers-schema {(s/optional-key :authorization) s/Str})
+      (assoc-in [:headers-schema (s/optional-key :authorization)] s/Str)
       (public-route)))
 
-(def routes
+(def org-routes
   [(api-route
     {:route-name :get-org
      :path-parts org-path
@@ -156,6 +142,42 @@
                     (s/optional-key :id) s/Str}})
 
    (api-route
+    {:route-name :get-org-stats
+     :path-parts (into org-path ["/stats"])
+     :path-schema org-schema
+     :query-schema {(s/optional-key :since) s/Int
+                    (s/optional-key :until) s/Int}
+     :method :get})])
+
+(def repo-routes
+  [(api-route
+    {:route-name :get-repo
+     :method :get
+     :path-parts repo-path
+     :path-schema repo-schema})
+
+   (api-route
+    {:route-name :create-repo
+     :method :post
+     :path-parts (into org-path ["/repo"])
+     :path-schema org-schema
+     :body-schema {:repo cs/NewRepo}})
+
+   (api-route
+    {:route-name :update-repo
+     :method :put
+     :path-parts repo-path
+     :path-schema repo-schema
+     :body-schema {:repo cs/UpdateRepo}})
+
+   (api-route
+    {:route-name :delete-repo
+     :method :delete
+     :path-parts repo-path
+     :path-schema repo-schema})])
+
+(def build-routes
+  [(api-route
     {:route-name :get-recent-builds
      :path-parts (into org-path ["/builds/recent"])
      :path-schema org-schema
@@ -168,6 +190,36 @@
      :path-schema org-schema})
 
    (api-route
+    {:route-name :get-builds
+     :path-parts (into repo-path ["/builds"])
+     :path-schema repo-schema})
+
+   (api-route
+    {:route-name :trigger-build
+     :method :post
+     :path-parts (into repo-path ["/builds/trigger"])
+     :path-schema repo-schema
+     :body-schema {:trigger TriggerParams}})
+
+   (api-route
+    {:route-name :get-build
+     :path-parts build-path
+     :path-schema build-schema})
+
+   (api-route
+    {:route-name :retry-build
+     :method :post
+     :path-parts (conj build-path "/retry")
+     :path-schema build-schema})
+
+   (api-route
+    {:route-name :cancel-build
+     :method :post
+     :path-parts (conj build-path "/cancel")
+     :path-schema build-schema})])
+
+(def params-routes
+  [(api-route
     {:route-name :get-org-params
      :path-parts (into org-path ["/param"])
      :path-schema org-schema})
@@ -197,9 +249,10 @@
     {:route-name :delete-param-set
      :path-parts param-path
      :path-schema param-schema
-     :method :delete})
+     :method :delete})])
 
-   (api-route
+(def ssh-keys-routes
+  [(api-route
     {:route-name :get-org-ssh-keys
      :path-parts (into org-path ["/ssh-keys"])
      :path-schema org-schema})
@@ -209,36 +262,11 @@
      :path-parts (into org-path ["/ssh-keys"])
      :path-schema org-schema
      :method :put
-     :body-schema {:ssh-keys [SshKey]}})
+     :body-schema {:ssh-keys [SshKey]}
+     :headers-schema {(s/optional-key :content-type) s/Str}})])
 
-   (api-route
-    {:route-name :get-org-stats
-     :path-parts (into org-path ["/stats"])
-     :path-schema org-schema
-     :query-schema {(s/optional-key :since) s/Int
-                    (s/optional-key :until) s/Int}
-     :method :get})
-
-   (api-route
-    {:route-name :get-org-tokens
-     :path-parts (into org-path ["/token"])
-     :path-schema org-schema
-     :method :get})
-
-   (api-route
-    {:route-name :create-org-token
-     :path-parts (into org-path ["/token"])
-     :path-schema org-schema
-     :body-schema {:token ApiToken}
-     :method :post})
-
-   (api-route
-    {:route-name :delete-org-token
-     :path-parts (into org-path ["/token" :token-id])
-     :path-schema (assoc org-schema :token-id s/Str)
-     :method :delete})
-
-   (api-route
+(def credit-routes
+  [(api-route
     {:route-name :get-org-credits
      :path-parts (into org-path ["/credits"])
      :path-schema org-schema
@@ -254,7 +282,7 @@
     {:route-name :create-credit-issue
      :path-parts ["/admin/credits/" :org-id "/issue"]
      :path-schema org-schema
-     :body-schema {:credits UserCredits}
+     :body-schema {:credits cs/UserCredits}
      :method :post})
 
    (api-route
@@ -273,26 +301,28 @@
     {:route-name :create-credit-sub
      :path-parts ["/admin/credits/" :org-id "/subscription"]
      :path-schema org-schema
-     :body-schema {:sub CreditSubscription}
+     :body-schema {:sub cs/CreditSubscription}
+     :method :post})])
+
+(def token-routes
+  [(api-route
+    {:route-name :get-org-tokens
+     :path-parts (into org-path ["/token"])
+     :path-schema org-schema
+     :method :get})
+
+   (api-route
+    {:route-name :create-org-token
+     :path-parts (into org-path ["/token"])
+     :path-schema org-schema
+     :body-schema {:token ApiToken}
      :method :post})
 
    (api-route
-    {:route-name :get-user-orgs
-     :path-parts (into user-path ["/orgs"])
-     :path-schema user-schema})
-
-   (api-route
-    {:route-name :get-user-join-requests
-     :path-parts (into user-path "/join-request")
-     :path-schema user-schema})
-
-   (api-route
-    {:route-name :create-user-join-request
-     :method :post
-     :path-parts (into user-path "/join-request")
-     :path-schema user-schema
-     :body-schema {:join-request
-                   {:org-id s/Str}}})
+    {:route-name :delete-org-token
+     :path-parts (into org-path ["/token/" :token-id])
+     :path-schema (assoc org-schema :token-id s/Str)
+     :method :delete})
 
    (api-route
     {:route-name :get-user-tokens
@@ -311,35 +341,41 @@
     {:route-name :delete-user-token
      :path-parts (into user-path ["/token" :token-id])
      :path-schema (assoc user-schema :token-id s/Str)
-     :method :delete})
+     :method :delete})])
+
+(def user-routes
+  [(api-route
+    {:route-name :get-user-orgs
+     :path-parts (into user-path ["/orgs"])
+     :path-schema user-schema})
 
    (api-route
-    {:route-name :get-repo
-     :method :get
-     :path-parts repo-path
-     :path-schema repo-schema})
+    {:route-name :get-user-join-requests
+     :path-parts (into user-path "/join-request")
+     :path-schema user-schema})
 
    (api-route
-    {:route-name :create-repo
+    {:route-name :create-user-join-request
      :method :post
-     :path-parts (into org-path ["/repo"])
-     :path-schema org-schema
-     :body-schema {:repo NewRepo}})
+     :path-parts (into user-path "/join-request")
+     :path-schema user-schema
+     :body-schema {:join-request
+                   {:org-id s/Str}}})
 
    (api-route
-    {:route-name :update-repo
+    {:route-name :get-user-settings
+     :path-parts (into user-path "/settings")
+     :path-schema user-schema})
+
+   (api-route
+    {:route-name :update-user-settings
      :method :put
-     :path-parts repo-path
-     :path-schema repo-schema
-     :body-schema {:repo UpdateRepo}})
+     :path-parts (into user-path "/settings")
+     :path-schema user-schema
+     :body-schema {:settings cs/UserSettings}})])
 
-   (api-route
-    {:route-name :delete-repo
-     :method :delete
-     :path-parts repo-path
-     :path-schema repo-schema})
-
-   (api-route
+(def webhook-routes
+  [(api-route
     {:route-name :get-repo-webhooks
      :method :get
      :path-parts (conj repo-path "/webhooks")
@@ -355,38 +391,10 @@
     {:route-name :delete-webhook
      :method :delete
      :path-parts ["/webhook/" :webhook-id]
-     :path-schema webhook-schema})
+     :path-schema webhook-schema})])
 
-   (api-route
-    {:route-name :get-builds
-     :path-parts (into repo-path ["/builds"])
-     :path-schema repo-schema})
-
-   (api-route
-    {:route-name :trigger-build
-     :method :post
-     :path-parts (into repo-path ["/builds/trigger"])
-     :path-schema repo-schema
-     :body-schema {:trigger TriggerParams}})
-
-   (api-route
-    {:route-name :get-build
-     :path-parts build-path
-     :path-schema build-schema})
-
-   (api-route
-    {:route-name :retry-build
-     :method :post
-     :path-parts (conj build-path "/retry")
-     :path-schema build-schema})
-
-   (api-route
-    {:route-name :cancel-build
-     :method :post
-     :path-parts (conj build-path "/cancel")
-     :path-schema build-schema})
-
-   (api-route
+(def log-routes
+  [(api-route
     {:route-name :download-log
      :path-parts ["/logs/" :org-id "/entries"]
      :path-schema org-schema
@@ -406,8 +414,15 @@
      :path-schema (assoc org-schema :label s/Str)
      :query-schema log-query-schema
      :produces #{"application/json"}})
-   
+
    (api-route
+    {:route-name :download-job-log
+     :path-parts (into job-path ["/logs"])
+     :path-schema job-schema
+     :query-schema {:file s/Str}})])
+
+(def github-routes
+  [(api-route
     {:route-name :watch-github-repo
      :method :post
      :path-parts (conj org-path "/repo/github/watch")
@@ -415,10 +430,32 @@
      :body-schema {:repo {:name s/Str
                           :url s/Str
                           :org-id s/Str
-                          :github-id s/Int}}
-     :consumes ["application/edn"]})
+                          :github-id s/Int}}})
 
    (api-route
+    {:route-name :unwatch-github-repo
+     :method :post
+     :path-parts (conj repo-path "/github/unwatch")
+     :path-schema repo-schema})
+
+   (public-route
+    {:route-name :github-login
+     :method :post
+     :path-parts ["/github/login"]
+     :query-schema {:code s/Str}})
+
+   (public-route
+    {:route-name :github-refresh
+     :method :post
+     :path-parts ["/github/refresh"]
+     :body-schema {:refresh {:refresh-token s/Str}}})   
+   
+   (public-route
+    {:route-name :get-github-config
+     :path-parts ["/github/config"]})])
+
+(def bitbucket-routes
+  [(api-route
     {:route-name :watch-bitbucket-repo
      :method :post
      :path-parts (conj org-path "/repo/bitbucket/watch")
@@ -428,14 +465,8 @@
                           :org-id s/Str
                           :workspace s/Str
                           :repo-slug s/Str
-                          :token s/Str}}
-     :consumes ["application/edn"]})
+                          :token s/Str}}})
 
-   (api-route
-    {:route-name :unwatch-github-repo
-     :method :post
-     :path-parts (conj repo-path "/github/unwatch")
-     :path-schema repo-schema})
 
    (api-route
     {:route-name :unwatch-bitbucket-repo
@@ -453,32 +484,6 @@
                     (s/optional-key :repo-slug) s/Str
                     (s/optional-key :bitbucket-id) s/Str}})
 
-   (api-route
-    {:route-name :admin-reaper
-     :method :post
-     :path-parts ["/admin/reaper"]})
-
-   (public-route
-    {:route-name :get-version
-     :method :get
-     :path-parts ["/version"]})
-   
-   (public-route
-    {:route-name :github-login
-     :method :post
-     :path-parts ["/github/login"]
-     :query-schema {:code s/Str}})
-
-   (public-route
-    {:route-name :github-refresh
-     :method :post
-     :path-parts ["/github/refresh"]
-     :body-schema {:refresh {:refresh-token s/Str}}})
-   
-   (public-route
-    {:route-name :get-github-config
-     :path-parts ["/github/config"]})
-
    (public-route
     {:route-name :bitbucket-login
      :method :post
@@ -493,14 +498,137 @@
 
    (public-route
     {:route-name :get-bitbucket-config
-     :path-parts ["/bitbucket/config"]})
+     :path-parts ["/bitbucket/config"]})])
+
+(def codeberg-routes
+  [(public-route
+    {:route-name :codeberg-login
+     :method :post
+     :path-parts ["/codeberg/login"]
+     :query-schema {:code s/Str}})
 
    (public-route
+    {:route-name :codeberg-refresh
+     :method :post
+     :path-parts ["/codeberg/refresh"]
+     :body-schema {:refresh {:refresh-token s/Str}}})
+
+   (public-route
+    {:route-name :get-codeberg-config
+     :path-parts ["/codeberg/config"]})])
+
+(def reaper-routes
+  [(api-route
+    {:route-name :admin-reaper
+     :method :post
+     :path-parts ["/admin/reaper"]})])
+
+(def mailing-routes
+  [(api-route
+    {:route-name :get-mailings
+     :method :get
+     :path-parts ["/admin/mailing"]})
+
+   (api-route
+    {:route-name :create-mailing
+     :method :post
+     :path-parts ["/admin/mailing"]
+     :body-schema {:mailing cs/Mailing}})
+
+   (api-route
+    {:route-name :update-mailing
+     :method :put
+     :path-parts mailing-path
+     :path-schema {:mailing-id s/Str}
+     :body-schema {:mailing cs/Mailing}})
+
+   (api-route
+    {:route-name :delete-mailing
+     :method :delete
+     :path-parts mailing-path})
+
+   (api-route
+    {:route-name :get-sent-mailings
+     :method :get
+     :path-parts (conj mailing-path "/send")
+     :path-schema {:mailing-id s/Str}})
+
+   (api-route
+    {:route-name :create-send-mailing
+     :method :post
+     :path-parts (conj mailing-path "/send")
+     :path-schema {:mailing-id s/Str}
+     :body-schema {:send cs/SentMailing}})])
+
+(def general-routes
+  [(public-route
+    {:route-name :get-version
+     :method :get
+     :path-parts ["/version"]})])
+
+(def login-routes
+  [(public-route
     {:route-name :admin-login
      :method :post
      :path-parts ["/admin/login"]
      :body-schema {:creds {:username s/Str
-                           :password s/Str}}})])
+                           :password s/Str}}})
+
+   (public-route
+    {:route-name :unregister-email
+     :method :post
+     :path-parts ["/email-registration/unregister"]
+     :query-schema cs/EmailUnregistrationQuery})])
+
+(def invoicing-routes
+  [(api-route
+    {:route-name :get-org-invoices
+     :method :get
+     :path-parts (into org-path ["/invoice"])
+     :path-schema org-schema
+     :query-schema cs/InvoiceSearchFilter})
+
+   (api-route
+    {:route-name :get-org-invoicing-settings
+     :method :get
+     :path-parts (into org-path ["/invoice/settings"])
+     :path-schema org-schema})
+
+   (api-route
+    {:route-name :update-org-invoicing-settings
+     :method :put
+     :path-parts (into org-path ["/invoice/settings"])
+     :path-schema org-schema
+     :body-schema {:settings cs/OrgInvoicing}})])
+
+(def job-routes
+  [(api-route
+    {:route-name :unblock-job
+     :method :post
+     :path-parts (into job-path ["/unblock"])
+     :path-schema job-schema})])
+
+(def routes
+  (concat
+   bitbucket-routes
+   build-routes
+   codeberg-routes
+   credit-routes
+   general-routes
+   github-routes
+   invoicing-routes
+   job-routes
+   log-routes
+   login-routes
+   mailing-routes
+   org-routes
+   params-routes
+   reaper-routes
+   repo-routes
+   ssh-keys-routes
+   token-routes
+   user-routes
+   webhook-routes))
 
 ;; The api url.  This should be configured in a `config.js`.
 (def url #?(:clj "http://localhost:3000"
@@ -523,11 +651,10 @@
    [::mr/init (martian/bootstrap
                url
                routes
-               {:interceptors (concat martian/default-interceptors
-                                      [mi/default-coerce-response
-                                       mi/default-encode-body
-                                       disable-with-credentials
-                                       mh/perform-request])})]))
+               {:interceptors (-> mh/default-interceptors
+                                  (mi/inject disable-with-credentials
+                                             :before
+                                             ::mh/perform-request))})]))
 
 (defn- set-token [opts t]
   (cond-> opts
@@ -554,7 +681,8 @@
  (fn [{:keys [db]} [_ refresh-token orig-evt]]
    (let [req (case (ldb/provider db)
                :github :github-refresh
-               :bitbucket :bitbucket-refresh)]
+               :bitbucket :bitbucket-refresh
+               :codeberg :codeberg-refresh)]
      (log/debug "Attempting to refresh using token" refresh-token)
      {:dispatch [:martian.re-frame/request
                  req
@@ -567,9 +695,10 @@
  [(rf/inject-cofx :local-storage ldb/storage-token-id)]
  (fn [{:keys [db local-storage]} [_ orig-evt {{:keys [token] :as body} :body}]]
    (letfn [(update-token [evt t]
-             (vec (concat (take 2 evt)
-                          [(set-token (nth evt 2) t)]
-                          (drop 3 evt))))]
+             (when (<= 3 (count evt))
+               (vec (concat (take 2 evt)
+                            [(set-token (nth evt 2) t)]
+                            (drop 3 evt)))))]
      (log/debug "Token successfully refreshed, dispatching original event:" (str orig-evt))
      {:db (-> db
               (ldb/set-token token)

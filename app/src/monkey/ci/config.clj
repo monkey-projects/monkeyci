@@ -96,9 +96,10 @@
             (update x :work-dir (comp u/abs-path #(or (:workdir args) % (u/cwd)))))
           (account [x]
             (let [acc (-> (select-keys args [:org-id :repo-id])
-                          (mc/assoc-some :url (:server args)))]
+                          (mc/assoc-some :url (:api args)
+                                         :token (:api-key args)))]
               (cond-> x
-                (not-empty acc) (assoc :account acc))))
+                (not-empty acc) (update :account merge acc))))
           (do-apply [conf f]
             (f conf))]
     (let [cli-args [http-port

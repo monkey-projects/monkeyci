@@ -5,10 +5,9 @@
    application that executes the script.
 
    This namespace provides low-level functions.  For more user-friendly functionality,
-   check out the `monkey.ci.build.v2` namespace."
+   check out the `monkey.ci.api` namespace."
   (:require [clojure.spec.alpha :as s]
-            [medley.core :as mc]
-            [monkey.ci.build.spec]))
+            [medley.core :as mc]))
 
 (defn status [v]
   {:status v})
@@ -42,6 +41,8 @@
   "Gets result warnings"
   :warnings)
 
+(def job-type :type)
+
 (defn action-job
   "Creates a new job"
   ([id action opts]
@@ -49,7 +50,7 @@
   ([id action]
    (action-job id action {})))
 
-(def action-job? (comp (partial = :action) :type))
+(def action-job? (comp (partial = :action) job-type))
 
 (defn container-job
   "Creates a job that executes in a container"
@@ -58,7 +59,7 @@
          :type :container
          :id id))
 
-(def container-job? (comp (partial = :container) :type))
+(def container-job? (comp (partial = :container) job-type))
 
 (defn job-id [x]
   (or (:id x) (:job/id (meta x))))
@@ -175,3 +176,8 @@
 (def trigger-src
   "Returns build trigger source (api, github-app, etc..."
   (comp :source :build))
+
+(defn job-schema
+  "Determines schema version of this job"
+  [job]
+  (or (:schema job) :v1))

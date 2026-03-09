@@ -11,7 +11,6 @@
              [edn :as edn]]
             [monkey.ci.events.mailman.interceptors :as emi]
             [monkey.ci.script.config :as sc]
-            [monkey.ci.spec.script :as ss]
             [monkey.ci.test
              [helpers :as h]
              [mailman :as tm]]
@@ -149,7 +148,9 @@
                                    :mailman broker
                                    :api-server
                                    {:port 1234}
-                                   :log-config "test-log-config"})
+                                   :log-config "test-log-config"
+                                   :resources {:memory "2g"
+                                               :cpus "0.5"}})
                   (sut/prepare-build-cmd))]
       (testing "executes podman"
         (is (= "podman" (-> cmd :cmd first))))
@@ -182,10 +183,10 @@
       (testing "runs in host network"
         (is (contains? (set (:cmd cmd)) "--network=host")))
 
-      (testing "applies resource limits"
+      (testing "applies configured resource limits"
         (let [c (set (:cmd cmd))]
           (is (contains? c "--cpus=0.5"))
-          (is (contains? c "--memory=1g"))))
+          (is (contains? c "--memory=2g"))))
 
       (testing "deps"
         (let [deps (->> cmd
@@ -201,7 +202,10 @@
               (is (map? args)))
             
             (testing "contains api server url"
-              (is (re-matches #"^http://\d+\.\d+.\d+.\d+:\d+$" (:url (sc/api args))))))
+              (is (some? (-> (sc/api args)
+                             :url
+                             (java.net.URI.)
+                             (.toURL))))))
 
           (testing "adds logback configuration"
             (let [args (get-in deps [:aliases :monkeyci/build :jvm-opts])]
@@ -212,7 +216,7 @@
             (is (= "/home/monkeyci"
                    (-> deps
                        (get-in [:aliases :monkeyci/build :exec-args :config])
-                       ::ss/build
+                       ::sc/build
                        :checkout-dir))))))
 
       (testing "on exit, fires `build/end` event"
@@ -245,8 +249,8 @@
                                     :credit-multiplier 7})
                    (sut/set-token "test-token")
                    (sut/generate-script-config build))]
-      (is (spec/valid? ::ss/config conf)
-          (spec/explain-str ::ss/config conf))
+      (is (spec/valid? ::sc/config conf)
+          (spec/explain-str ::sc/config conf))
 
       (is (= [:amd] (sc/archs conf))
           "passes architectures from config")

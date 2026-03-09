@@ -87,3 +87,17 @@
       (let [evt {:type ::test-event}]
         (is (some? (sut/post-events broker [evt])))
         (is (= evt (deref (ms/take! s) 1000 :timeout)))))))
+
+(deftest merge-routes
+  (testing "concatenates multiple route structs"
+    (is (= [[:type-1 [::handler-1]]
+            [:type-2 [::handler-2]]]
+           (sut/merge-routes
+            [[:type-1 [::handler-1]]]
+            [[:type-2 [::handler-2]]]))))
+
+  (testing "merges multiple handlers for same type"
+    (is (= [[:type-1 [::handler-1 ::handler-2]]]
+           (sut/merge-routes
+            [[:type-1 [::handler-1]]]
+            [[:type-1 [::handler-2]]])))))

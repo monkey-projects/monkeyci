@@ -11,6 +11,7 @@
              [storage :as st]
              [utils :as u]
              [vault :as v]]
+            [monkey.ci.logging.log-ingest :as li]
             [monkey.ci.metrics.otlp :as mo]
             [monkey.ci.runtime.app :as sut]
             [monkey.ci.vault
@@ -68,7 +69,16 @@
             (is (fn? (get-in rt [:crypto :encrypter]))))
 
           (testing "provides decrypter"
-            (is (fn? (get-in rt [:crypto :decrypter]))))))
+            (is (fn? (get-in rt [:crypto :decrypter]))))
+
+          (testing "has mailer"
+            (is (some? (:mailer rt))))
+
+          (testing "has invoicing client"
+            (is (fn? (get-in rt [:invoicing :client]))))
+
+          (testing "has log retriever"
+            (is (fn? (get rt :log-retriever))))))
 
       (testing "provides metrics routes"
         (is (some? (:metrics-routes sys))))
@@ -246,3 +256,17 @@
                       (co/stop)
                       :client)))
         (is (true? @closed?))))))
+
+(deftest log-retriever
+  (testing "when no log ingester configured, always `nil`"
+    (is (nil? ((sut/new-log-retriever {}) ["test"] "file.log"))))
+
+  (testing "when log ingester configured, uses it to fetch logs"
+    (with-redefs [li/fetch-logs (fn [client path]
+                                  (if (and (fn? client)
+                                           (= ["test" "file.log"] path))
+                                    (md/success-deferred "test log contents")
+                                    (md/error-deferred (ex-info "invalid args" {:path path}))))]
+      (let [lr (sut/new-log-retriever {:log-ingest {:url "http://test"}})]
+        (is (= "test log contents"
+               (lr ["test"] "file.log")))))))

@@ -6,11 +6,13 @@
              [build :as b]
              [cuid :as cuid]
              [storage :as st]]
-            [monkey.ci.events.mailman :as em]
+            [monkey.ci.events
+             [mailman :as em]
+             [spec :as se]]
             [monkey.ci.events.mailman
              [db :as sut]
              [interceptors :as emi]]
-            [monkey.ci.spec.events :as se]
+            [monkey.ci.storage.spec :as ss]
             [monkey.ci.test.helpers :as h]))
 
 (defn- validate-spec [spec obj]
@@ -193,6 +195,54 @@
         (testing "creates job event"
           (is (= 1 (count (st/list-job-events s (conj (b/sid build) (:id job)))))))))))
 
+(deftest save-event
+  (h/with-memory-store s
+    (let [{:keys [enter] :as i} sut/save-event]
+      (is (keyword? (:name i)))
+      
+      (testing "`enter` saves the event to storage"
+        (let [job (h/gen-job)
+              build (h/gen-build)
+              sid (sut/build->sid build)
+              evt {:type :container/pending
+                   :job-id (:id job)
+                   :sid sid
+                   :time 100}]
+          (is (some? (st/save-build s build)))
+          (is (some? (-> {:event evt}
+                         (emi/set-db s)
+                         (enter))))
+          (let [m (st/list-job-events s (vec (concat sid [(:id job)])))]
+            (is (= 1 (count m)))
+            (is (= [:container/pending]
+                   (map :event m)))))))))
+
+(deftest load-job-events
+  (h/with-memory-store s
+    (let [job (h/gen-job)
+          build (-> (h/gen-build)
+                    (dissoc :sid)
+                    (assoc-in [:script :jobs] {(:id job) job}))
+          sid (sut/build->sid build)
+          evt {:job-id (:id job)
+               :sid sid
+               :time 100
+               :type :job/initializing}
+          {:keys [enter] :as i} sut/load-job-events]
+      (is (keyword? (:name i)))
+      (is (some? (st/save-build s build)))
+      (is (some? (st/save-job-event s (st/event->storage evt))))
+
+      (testing "loads events for job into ctx"
+        (is (= [:job/initializing]
+               (-> {:event {:type :job/start
+                            :sid sid
+                            :job-id (:id job)}}
+                   (emi/set-db s)
+                   (enter)
+                   (sut/get-job-events)
+                   (as-> e (map :type e)))))))))
+
 (deftest save-credit-consumption
   (let [{:keys [leave] :as i} sut/save-credit-consumption]
     (is (keyword? (:name i)))
@@ -245,7 +295,7 @@
       (let [res (-> ctx
                     (sut/set-credits 100M)
                     (sut/check-credits))]
-        (validate-spec :entity/build (:build res))
+        (validate-spec ::ss/build (:build res))
         (is (= :build/pending (:type res)))))
 
     (testing "returns `build/end` event with status `error` if no credits available"
@@ -443,7 +493,8 @@
 
 (deftest job-end
   (let [job (-> (h/gen-job)
-                (assoc :status :running))
+                (assoc :status :running)
+                (dissoc :credit-multiplier))
         build (-> (h/gen-build)
                   (assoc-in [:script :jobs] {(:id job) job}))
         r (-> {:event {:type :job/end
@@ -454,6 +505,11 @@
                        :time 1000}}
               (sut/set-build build)
               (sut/set-job job)
+              (sut/set-job-events [{:type :job/initializing
+                                    :time 900
+                                    :credit-multiplier 2}
+                                   {:type :job/start
+                                    :time 950}])
               (sut/job-end))]
     (testing "returns `build/updated` event"
       (validate-spec ::se/event r)
@@ -467,7 +523,10 @@
         (is (= 1000 (:end-time res))))
       
       (testing "sets result if specified"
-        (is (= ::test-result (:result res)))))))
+        (is (= ::test-result (:result res))))
+
+      (testing "merges job events"
+        (is (= 2 (:credit-multiplier res)))))))
 
 (deftest job-skipped
   (let [job (-> (h/gen-job)
@@ -488,6 +547,44 @@
       (testing "marks job skipped"
         (is (= :skipped (:status res)))))))
 
+(deftest job-blocked
+  (let [job (-> (h/gen-job)
+                (assoc :status :running))
+        build (-> (h/gen-build)
+                  (assoc-in [:script :jobs] {(:id job) job}))
+        r (-> {:event {:type :job/blocked
+                       :sid (sut/build->sid build)
+                       :job-id (:id job)}}
+              (sut/set-build build)
+              (sut/set-job job)
+              (sut/job-blocked))]
+    (testing "returns `build/updated` event"
+      (validate-spec ::se/event r)
+      (is (= :build/updated (:type r))))
+
+    (let [res (get-in r [:build :script :jobs (:id job)])]
+      (testing "marks job blocked"
+        (is (= :blocked (:status res)))))))
+
+(deftest job-unblocked
+  (let [job (-> (h/gen-job)
+                (assoc :status :running))
+        build (-> (h/gen-build)
+                  (assoc-in [:script :jobs] {(:id job) job}))
+        r (-> {:event {:type :job/unblocked
+                       :sid (sut/build->sid build)
+                       :job-id (:id job)}}
+              (sut/set-build build)
+              (sut/set-job job)
+              (sut/job-unblocked))]
+    (testing "returns `build/updated` event"
+      (validate-spec ::se/event r)
+      (is (= :build/updated (:type r))))
+
+    (let [res (get-in r [:build :script :jobs (:id job)])]
+      (testing "marks job queued"
+        (is (= :queued (:status res)))))))
+
 (deftest routes
   (let [routes (->> (sut/make-routes (st/make-memory-storage)
                                      (mb/event-bus))
@@ -504,7 +601,12 @@
                      :job/initializing
                      :job/start
                      :job/end
-                     :job/skipped]]
+                     :job/skipped
+                     :job/blocked
+                     :job/unblocked
+                     :container/pending
+                     :container/start
+                     :container/end]]
     (doseq [t event-types]
       (testing (format "`%s` is handled" (str t))
         (is (contains? routes t))))))
@@ -523,11 +625,14 @@
                        (assoc :org-id (:id org)))
               creds {:id (cuid/random-cuid)
                      :org-id (:id org)
-                     :amount 100M}]
+                     :amount 100M
+                     :valid-from nil
+                     :valid-until nil}
+              time 1000]
           (is (some? (st/save-org st org)))
           (is (some? (st/save-org-credit st creds)))
           (is (some? (st/save-repo st repo)))
-          
+
           (let [res (-> {:type :build/triggered
                          :build (-> (h/gen-build)
                                     (assoc :org-id (:id org)

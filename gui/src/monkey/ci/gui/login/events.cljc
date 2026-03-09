@@ -2,6 +2,7 @@
   (:require [monkey.ci.gui.alerts :as a]
             [monkey.ci.gui.apis.bitbucket :as bitbucket]
             [monkey.ci.gui.apis.github :as github]
+            [monkey.ci.gui.apis.codeberg :as codeberg]
             [monkey.ci.gui.local-storage :as ls]
             [monkey.ci.gui.logging :as log]
             [monkey.ci.gui.login.db :as db]
@@ -15,8 +16,12 @@
 (rf/reg-event-fx
  :login/login-and-redirect
  (fn [{:keys [db]} _]
-   (let [next-route (:path (r/current db))]
-     {:local-storage [storage-redir-id {:redirect-to next-route}]
+   (let [cr (r/current db)
+         next-route (:path cr)]
+     {:local-storage [storage-redir-id
+                      ;; Ignore public routes to avoid redirecting to the callback pages
+                      (when-not (r/public? (r/route-name cr))
+                        {:redirect-to next-route})]
       :dispatch [:route/goto :page/login]})))
 
 (rf/reg-event-db
@@ -88,10 +93,10 @@
  :github/load-user--success
  [(rf/inject-cofx :local-storage storage-redir-id)]
  (fn [{:keys [db local-storage]} [_ github-user]]
-   (let [redir (:redirect-to local-storage)]
-     {:db (db/set-github-user db github-user)
-      :dispatch (redirect-evt (db/user db) local-storage)
-      :local-storage [storage-redir-id (dissoc local-storage :redirect-to)]})))
+   (log/debug "Github user loaded, redirecting to page as stored locally")
+   {:db (db/set-github-user db github-user)
+    :dispatch (redirect-evt (db/user db) local-storage)
+    :local-storage [storage-redir-id (dissoc local-storage :redirect-to)]}))
 
 (rf/reg-event-fx
  :github/load-user--failed
@@ -119,7 +124,7 @@
 
 (rf/reg-event-db
  :login/load-github-config--success
- (fn [db [_ {config :body}]]
+ (fn [db [_ {config :body :as resp}]]
    (db/set-github-config db config)))
 
 (rf/reg-event-db
@@ -203,6 +208,88 @@
  :login/bitbucket-login--failed
  (fn [db [_ err]]
    (db/set-alerts db [(a/bitbucket-login-failed err)])))
+
+(rf/reg-event-fx
+ :login/load-codeberg-config
+ (fn [{:keys [db]} [_ code]]
+   {:dispatch [:martian.re-frame/request
+               :get-codeberg-config
+               {}
+               [:login/load-codeberg-config--success]
+               [:login/load-codeberg-config--failed]]}))
+
+(rf/reg-event-db
+ :login/load-codeberg-config--success
+ (fn [db [_ {config :body :as resp}]]
+   (db/set-codeberg-config db config)))
+
+(rf/reg-event-db
+ :login/load-codeberg-config--failed
+ (fn [db [_ err]]
+   (db/set-alerts db
+                  [(a/codeberg-load-config-failed err)])))
+
+(rf/reg-event-fx
+ :login/codeberg-code-received
+ (fn [{:keys [db]} [_ code]]
+   {:dispatch [:martian.re-frame/request
+               :codeberg-login
+               {:code code}
+               [:login/codeberg-login--success]
+               [:login/codeberg-login--failed]]
+    :db (-> db
+            (db/clear-alerts)
+            (db/set-user nil))}))
+
+
+(defn try-load-codeberg-user
+  "Adds a request to the fx to load codeberg user details, if a token is provided."
+  [{:keys [db] :as fx} codeberg-token]
+  (cond-> fx
+    codeberg-token (assoc :http-xhrio
+                          (codeberg/api-request
+                           db
+                           {:method :get
+                            :path "/api/v1/user"
+                            :token codeberg-token
+                            :on-success [:codeberg/load-user--success]
+                            :on-failure [:codeberg/load-user--failed]}))))
+
+(rf/reg-event-fx
+ :codeberg/load-user--success
+ [(rf/inject-cofx :local-storage storage-redir-id)]
+ (fn [{:keys [db local-storage]} [_ codeberg-user]]
+   (log/debug "Codeberg user loaded, redirecting to page as stored locally")
+   {:db (db/set-codeberg-user db codeberg-user)
+    :dispatch (redirect-evt (db/user db) local-storage)
+    :local-storage [storage-redir-id (dissoc local-storage :redirect-to)]}))
+
+(rf/reg-event-fx
+ :codeberg/load-user--failed
+ [(rf/inject-cofx :local-storage storage-token-id)]
+ (fn [{:keys [db] :as ctx} [_ err]]
+   (log/warn "Unable to load codeberg user:" (str err))
+   (let [rt (get-in ctx [:local-storage :refresh-token])]
+     (if (and (= 401 (:status err)) rt)
+       {:dispatch [:monkey.ci.gui.martian/refresh-token rt [:codeberg/load-user]]}
+       {:db (db/set-alerts db [(a/codeberg-load-user-failed err)])}))))
+
+(rf/reg-event-fx
+ :login/codeberg-login--success
+ (fn [{:keys [db local-storage]} [_ {{:keys [codeberg-token] :as u} :body}]]
+   (-> {:db (-> db
+                (db/set-user (dissoc u :token :codeberg-token))
+                (db/set-token (:token u))
+                (db/set-codeberg-token codeberg-token))
+        ;; Store full user details locally, so we can retrieve them on page reload without having
+        ;; to re-authenticate.
+        :local-storage [storage-token-id u]}
+       (try-load-codeberg-user codeberg-token))))
+
+(rf/reg-event-db
+ :login/codeberg-login--failed
+ (fn [db [_ err]]
+   (db/set-alerts db [(a/codeberg-login-failed err)])))
 
 (rf/reg-event-fx
  :login/sign-off

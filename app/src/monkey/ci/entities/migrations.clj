@@ -26,6 +26,7 @@
 (defrecord SqlMigration [id up down]
   Migratable
   (->migration [m opts]
+    ;; TODO Allow for different sql formats depending on dialect
     (-> (format-migration (:sql-opts opts) m)
         (rj/sql-migration))))
 
@@ -57,8 +58,11 @@
   [id up down]
   (->SqlMigration id up down))
 
+(defn as-pk [col]
+  (conj col [:primary-key]))
+
 ;;; Common column definitions
-(def id-col [:id :integer [:not nil] :auto-increment [:primary-key]])
+(def id-col (as-pk [:id :integer [:not nil] :auto-increment]))
 (def cuid-col [:cuid [:char 24] [:not nil]])
 (def description-col [:description [:varchar 300]])
 (def label-filters-col [:label-filters :text])
@@ -482,7 +486,7 @@
      (col-idx :credit-consumptions :build-id)])
 
    (entity-table-migration
-    ;; Caching table that holds the current available credits value for each customer
+    ;; Caching table that holds the current available credits value for each org
     24 :available-credits
     [customer-col
      amount-col
@@ -680,7 +684,100 @@
      [:valid-until :timestamp]
      [:description [:varchar 200]]
      fk-org]
-    [(h/create-index [:unique :org-token-idx] [:org-tokens :token])])])
+    [(h/create-index [:unique :org-token-idx] [:org-tokens :token])])
+
+   (entity-table-migration
+    53 :mailings
+    [[:subject [:varchar 300] [:not nil]]
+     [:text-body :mediumtext]
+     [:html-body :mediumtext]
+     [:creation-time :timestamp [:not nil]]]
+    [])
+
+   (entity-table-migration
+    54 :sent-mailings
+    [(fk-col :mailing-id)
+     [:sent-at :timestamp [:not nil]]
+     [:mail-id [:varchar 100]]
+     [:to-users :boolean]
+     [:to-subscribers :boolean]
+     [:other-dests :text]
+     (fk :mailing-id :mailings :id)]
+    [(col-idx :sent-mailings :mailing-id)])
+
+   (migration
+    (mig-id 55 :sub-description)
+    [{:alter-table :credit-subscriptions
+      :add-column [:description [:varchar 300]]}]
+    [{:alter-table :credit-subscriptions
+      :drop-column :description}])
+
+   (table-migration
+    56 :user-settings
+    [(as-pk user-col)
+     [:receive-mailing :boolean]
+     fk-user]
+    [(col-idx :user-settings :user-id)])
+
+   (migration
+    (mig-id 57 :email-reg-confirmation)
+    ;; Adding multiple columns at once has different syntax in h2 and mysql
+    ;; so we use multiple statements instead (bad for performance though).
+    [{:alter-table :email-registrations
+      :add-column [:creation-time :timestamp]}
+     {:alter-table :email-registrations
+      :add-column [:confirmed :boolean]}]
+    [{:alter-table :email-registrations
+      :drop-column :creation-time}
+     {:alter-table :email-registrations
+      :drop-column :confirmed}])
+
+   (migration
+    (mig-id 58 :drop-sent-mail-id)
+    [{:alter-table :sent-mailings
+      :drop-column :mail-id}]
+    [{:alter-table :sent-mailings
+      :add-column [:mail-id [:varchar 100]]}])
+
+   (migration
+    (mig-id 59 :invoices-ext-id)
+    [{:alter-table :invoices
+      :alter-column [:invoice-nr [:varchar 50] nil]}
+     {:alter-table :invoices
+      :add-column [:ext-id [:varchar 20]]}]
+    [{:alter-table :invoices
+      :alter-column [:invoice-nr [:varchar 50] [:not nil]]}
+     {:alter-table :invoices
+      :drop-column :ext-id}])
+
+   (table-migration
+    60 :org-invoicings
+    [(as-pk org-col)
+     [:vat-nr [:varchar 50]]
+     [:currency [:varchar 3]]
+     [:ext-id [:varchar 20]]
+     [:country [:char 3]]
+     [:address :text]
+     fk-org]
+    [(col-idx :org-invoicings :org-id)])
+
+   (migration
+    (mig-id 61 :org-credits-valid-until)
+    [{:alter-table :org-credits
+      :rename-column [:from-time :valid-from]}
+     {:alter-table :org-credits
+      :add-column [:valid-until :timestamp]}]
+    [{:alter-table :org-credits
+      :rename-column [:valid-from :from-time]}
+     {:alter-table :org-credits
+      :drop-column :valid-until}])
+
+   (migration
+    (mig-id 62 :subs-valid-period)
+    [{:alter-table :credit-subscriptions
+      :add-column [:valid-period [:varchar 20]]}]
+    [{:alter-table :credit-subscriptions
+      :drop-column :valid-period}])])
 
 (defn prepare-migrations
   "Prepares all migrations by formatting to sql, creates a ragtime migration object from it."
@@ -697,8 +794,9 @@
 
 (defn- load-and-run-migrations [conn]
   (let [[db mig idx :as r] (load-migrations conn)]
-    (log/info "Applying" (count mig) "migrations with db" db)
+    (log/info "Applying" (count mig) "migrations...")
     (rt/migrate-all db idx mig)
+    (log/info "Migrations applied.")
     r))
 
 (defn run-migrations!

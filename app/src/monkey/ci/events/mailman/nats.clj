@@ -5,9 +5,19 @@
             [com.stuartsierra.component :as co]
             [medley.core :as mc]
             [monkey.ci.events.mailman.jms :as jms]
-            [monkey.ci.protocols :as p]
+            [monkey.ci
+             [edn :as edn]
+             [protocols :as p]]
             [monkey.mailman.core :as mmc]
-            [monkey.mailman.nats.core :as mnc]))
+            [monkey.mailman.nats.core :as mnc]
+            [monkey.nats.core :as nats]))
+
+(def default-broker-opts
+  {:serializer   (comp nats/to-bytes edn/->edn)
+   :deserializer (fn [msg]
+                   (some-> msg
+                           (.getData)
+                           (edn/edn->)))})
 
 (def ^:private subject-types
   ;; Use the same as jms
@@ -25,15 +35,21 @@
 (defn types-to-subjects [prefix]
   (make-subject-mapping prefix))
 
+(defn log-errors [err]
+  ;; Just log it for now
+  (log/error "Got NATS error:" err))
+
 (defrecord NatsComponent [broker]
   co/Lifecycle
   (start [this]
     (log/debug "Connecting to NATS broker at" (get-in this [:config :urls]))
     (let [conf (:config this)
-          conn (nats/make-connection conf)
+          conn (-> conf
+                   (assoc :error-listener (nats/->error-listener log-errors))
+                   (nats/make-connection))
           subjects (types-to-subjects (:prefix conf))
           broker-conf (-> conf
-                          (select-keys [:stream :consumer :poll-opts])
+                          (select-keys [:stream :consumer :poll-opts :serializer :deserializer])
                           (merge {:subject-mapper (comp subjects :type)}))]
       (log/debug "Using broker configuration:" broker-conf)
       (-> this
@@ -55,6 +71,7 @@
                          (-> {:handler router
                               :subject s}
                              (merge (select-keys opts [:queue :stream :consumer]))))]
+      (log/debug "Adding NATS router with options" opts)
       ;; If we're using jetstream consumers, only register listener once and ignore
       ;; the subjects because they are configured on jetstream level.
       (if ((every-pred :stream :consumer) opts)

@@ -100,7 +100,9 @@
   "Handles the success response for given id"
   [db id resp]
   (-> db
-      (set-value id (:body resp))
+      ;; If status is "no content", body is empty which is interpreted as an empty string.
+      ;; So in that case, just set value to nil
+      (set-value id (when (not= 204 (:status resp)) (:body resp)))
       (reset-loading id)
       (set-loaded id)))
 

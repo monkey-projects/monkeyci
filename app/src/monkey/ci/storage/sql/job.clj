@@ -23,7 +23,7 @@
 (defn select-build-jobs [conn build-id]
   (->> (ec/select-jobs conn (ec/by-build build-id))
        (map db->job)
-       (map (fn [j] [(:id j) j]))
+       (map (juxt :id identity))
        (into {})))
 
 (defn- insert-job [conn job build-sid]

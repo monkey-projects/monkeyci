@@ -1,6 +1,6 @@
 (ns cache
   (:require [config :as co]
-            [monkey.ci.logging :as l]
+            [monkey.ci.logging.oci :as lo]
             [monkey.oci.os.core :as os]))
 
 (defn- call-os [f opts]
@@ -13,11 +13,11 @@
 (defn list-caches
   [sid]
   (let [conf (co/oci-config :cache)
-        path (l/sid->path conf nil sid)]
+        path (lo/sid->path conf nil sid)]
     (call-os os/list-objects (when path {:prefix path}))))
 
 (defn delete-cache
   [sid n]
   (let [conf (co/oci-config :cache)
-        path (l/sid->path conf nil sid)]
+        path (lo/sid->path conf nil sid)]
     (call-os os/delete-object {:object-name (str path "/" n)})))

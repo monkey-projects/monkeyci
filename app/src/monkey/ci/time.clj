@@ -43,3 +43,12 @@
        (map (comp #(jt/as % :day-of-month)
                   epoch->date))
        (apply =)))
+
+(defn plus-period
+  "Adds given period to timestamp, returns a new timestamp."
+  [ts p]
+  (-> ts
+      (jt/instant)
+      (jt/offset-date-time (jt/zone-offset))
+      (jt/plus p)
+      (jt/to-millis-from-epoch)))

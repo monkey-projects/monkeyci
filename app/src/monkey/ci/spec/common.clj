@@ -1,4 +1,5 @@
 (ns monkey.ci.spec.common
+  "Common specs, used by other spec definitions"
   (:require [clojure.spec.alpha :as s]
             [clojure.spec.gen.alpha :as gen]
             [java-time.api :as jt]
@@ -10,7 +11,7 @@
 (def ts-gen (gen/choose (jt/to-millis-from-epoch (jt/offset-date-time 2020 1 1))
                         (jt/to-millis-from-epoch (jt/offset-date-time 2030 1 1))))
 
-(def id? string?)
+(def id? (s/and string? not-empty))
 (def ts? (s/with-gen int?
            (constantly ts-gen)))
 (def path? string?)
@@ -38,6 +39,15 @@
                 cuid/cuid?
                 #(gen/return (cuid/random-cuid))))
 
+(s/def ::sid (s/coll-of id?))
+
+;; Start and end time for build, script, job, etc...
+(s/def ::start-time ts?)
+(s/def ::end-time ts?)
+
+(s/def ::timed
+  (s/keys :opt-un [::start-time ::end-time]))
+
 ;; Just using string to avoid "no gen" errors
 (s/def ::url string? #_(s/with-gen url?
                          #(gen/return "http://test-url")))
@@ -58,12 +68,6 @@
 (s/def :bb/workspace string?)
 (s/def :bb/repo-slug string?)
 
-(s/def :invoice/invoice-nr string?)
-(s/def :invoice/net-amount (s/and decimal? pos?))
-(s/def :invoice/vat-perc (s/and decimal? pos?))
-(s/def :invoice/currency string?)
-(s/def :invoice/kind #{:invoice :creditnote})
-(s/def :invoice/date date?)
 
 (s/def :queued-task/creation-time ts?)
 (s/def :queued-task/task map?)
@@ -73,3 +77,4 @@
 (s/def ::token (s/with-gen
                  string?
                  #(sg/fixed-string token-size)))
+(s/def ::port (s/and int? pos?))

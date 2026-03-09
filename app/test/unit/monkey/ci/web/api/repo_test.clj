@@ -29,6 +29,40 @@
                   :body)]
         (is (= "test-repo-2" (:id r)))))))
 
+(deftest update-repo
+  (let [repo {:name "Test repo"
+              :id "test-repo"
+              :org-id (st/new-id)
+              :github-id 1234}
+        {st :storage :as rt} (trt/test-runtime)]
+
+    (is (some? (st/save-repo st repo)))
+    
+    (testing "updates repo in storage"
+      (let [r (-> rt
+                  (h/->req)
+                  (assoc-in [:parameters :path] {:org-id (:org-id repo)
+                                                 :repo-id (:id repo)})
+                  (h/with-body (assoc repo :name "updated repo"))
+                  (sut/update-repo)
+                  :body)]
+        (is (not-empty r))
+        (is (= "updated repo" (:name r)))
+        (is (= "updated repo" (-> (st/find-repo st [(:org-id repo) (:id repo)])
+                                  :name)))))
+
+    (testing "clears github id when `nil`"
+      (let [r (-> rt
+                  (h/->req)
+                  (assoc-in [:parameters :path] {:org-id (:org-id repo)
+                                                 :repo-id (:id repo)})
+                  (h/with-body (assoc repo :github-id nil))
+                  (sut/update-repo)
+                  :body)]
+        (is (nil? (:github-id r)))
+        (is (nil? (-> (st/find-repo st [(:org-id repo) (:id repo)])
+                      :github-id)))))))
+
 (deftest list-webhooks
   (h/with-memory-store st
     (testing "lists all webhooks for repo"

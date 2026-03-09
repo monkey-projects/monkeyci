@@ -6,6 +6,7 @@
             [clj-yaml.core :as yaml]
             [clojure.java.io :as io]
             [clojure.tools.logging :as log]
+            [medley.core :as mc]
             [monkey.ci
              [build :as build]
              [edn :as edn]
@@ -98,7 +99,6 @@
   [p rt]
   (log/debug "Resolving:" p)
   (-> (j/resolve-jobs p rt)
-      ;; TODO Wrap errors and extensions here?
       (assign-ids)))
 
 (defn load-jobs

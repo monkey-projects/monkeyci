@@ -11,7 +11,6 @@
              [build :as b]
              [cache :as ca]
              [cuid :as cuid]
-             [logging :as l]
              [protocols :as p]
              [workspace :as ws]]
             [monkey.ci.sidecar.core :as sut]
@@ -19,11 +18,6 @@
              [helpers :as h]
              [mailman :as tm]]
             [monkey.ci.test.runtime.sidecar :as trs]))
-
-(defrecord TestLogger [streams path]
-  l/LogCapturer
-  (handle-stream [_ _]
-    (swap! streams conj path)))
 
 (defn- wait-for-exit [c]
   (:exit (deref c 500 :timeout)))
@@ -103,31 +97,7 @@
         (is (= evt (-> (tm/get-posted mailman)
                        (first)
                        (select-keys (keys evt)))))
-        (is (= 0 (wait-for-exit c))))))
-
-  #_(testing "logs using job sid and file path"
-    (h/with-tmp-dir dir
-      (let [f (io/file dir "events.edn")
-            logfile (io/file dir "out.log")
-            _ (spit logfile "test log")
-            evt {:type :test/event
-                 :message "This is a test event"
-                 :stdout (.getCanonicalPath logfile)
-                 :exit 0
-                 :done? true}
-            streams (atom [])
-            rt (-> (trs/make-test-rt)
-                   (trs/set-events-file f)
-                   (trs/set-poll-interval 10)
-                   (trs/set-log-maker (fn [_ path]
-                                        (->TestLogger streams path)))
-                   (trs/set-sid ["test-cust" "test-repo" "test-build"])
-                   (trs/set-job {:id "test-job"}))
-            c (sut/poll-events rt)]
-        (is (nil? (spit f (prn-str evt))))
-        (is (not= :timeout (h/wait-until #(not-empty @streams) 500)))
-        (is (= 0 (wait-for-exit c)))
-        (is (= ["test-build" "test-job" "out.log"] (first @streams)))))))
+        (is (= 0 (wait-for-exit c)))))))
 
 (deftest mark-start
   (testing "creates start file"
@@ -143,32 +113,6 @@
             rt {:paths {:start-file (.getCanonicalPath start)}}]
         (is (= rt (sut/mark-start rt)))
         (is (.exists start))))))
-
-#_(deftest upload-logs
-  (testing "does nothing if no logger"
-    (is (nil? (sut/upload-logs {} nil))))
-
-  (testing "does nothing if no output files"
-    (is (nil? (sut/upload-logs {} (fn [_]
-                                    (throw (ex-info "This should not be called" {})))))))
-
-  (testing "does nothing if files are empty"
-    (h/with-tmp-dir dir
-      (let [f (io/file dir "test.txt")]
-        (is (some? (fs/create-file f)))
-        (is (nil? (sut/upload-logs {:stdout (.getCanonicalPath f)}
-                                   (fn [_]
-                                     (throw (ex-info "This should not be called" {})))))))))
-
-  (testing "opens output file and handles stream, stores using file name"
-    (h/with-tmp-dir dir
-      (let [c (atom [])
-            f (io/file dir "test.txt")
-            _ (spit f "This is a test file")]
-        (is (nil? (sut/upload-logs {:stdout (.getCanonicalPath f)}
-                                   (fn [p]
-                                     (->TestLogger c p)))))
-        (is (= [["test.txt"]] @c))))))
 
 (defrecord SlowBlobStore [delay]
   p/BlobStore
@@ -209,7 +153,6 @@
                      test-rt
                      {:sid sid
                       :checkout-dir dir
-                      :logging {:maker (l/make-logger {})}
                       :cache cache
                       :job 
                       {:id "test-job"
@@ -236,7 +179,6 @@
                       {:containers {:type :podman}
                        :sid sid
                        :work-dir dir
-                       :logging {:maker (l/make-logger {})}
                        :artifacts repo
                        :job 
                        {:id "test-job"
@@ -263,7 +205,6 @@
                      test-rt
                      {:containers {:type :podman}
                       :sid sid
-                      :logging {:maker (l/make-logger {})}
                       :artifacts repo
                       :job 
                       {:id "test-job"

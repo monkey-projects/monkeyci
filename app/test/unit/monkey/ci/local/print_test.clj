@@ -4,6 +4,19 @@
             [monkey.ci.local.print :as sut]
             [monkey.mailman.core :as mmc]))
 
+(deftest printer-interceptor
+  (let [{:keys [leave] :as i} (sut/printer-interceptor
+                               (fn [p]
+                                 {:printed p}))]
+    (is (keyword? (:name i)))
+    
+    (testing "`leave` invokes printer with result"
+      (is (= {:printed ::to-print} 
+             (-> {}
+                 (assoc :result ::to-print)
+                 (leave)
+                 :result))))))
+
 (deftest routes
   (testing "handles build and job events"
     (let [exp [:build/initializing

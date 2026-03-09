@@ -28,8 +28,6 @@
 (def args (from-config :args))
 (def reporter :reporter)
 (def api-url (comp :url account))
-(def log-maker (comp :maker :logging))
-(def log-retriever (comp :retriever :logging))
 (def work-dir (from-config :work-dir))
 (def dev-mode? (from-config :dev-mode))
 (def runner :runner)

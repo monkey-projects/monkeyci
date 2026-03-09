@@ -3,11 +3,10 @@
              [string :as cs]
              [test :refer [deftest is testing]]]
             [com.stuartsierra.component :as co]
-            [monkey.ci.metrics
-             [core :as sut]
-             [prometheus :as prom]]
+            [monkey.ci.metrics.core :as sut]
             [monkey.ci.storage :as st]
             [monkey.ci.test.helpers :as h]
+            [monkey.metrics.prometheus :as prom]
             [taoensso.telemere :as t]))
 
 (deftest metrics
@@ -94,6 +93,9 @@
 
       (testing "contains repo count"
         (is (cs/includes? (sut/scrape (:registry co)) "monkeyci_repo_count")))
+
+      (testing "contains email registration count"
+        (is (cs/includes? (sut/scrape (:registry co)) "monkeyci_emailreg_count")))
       
       (finally
         (co/stop co)))))

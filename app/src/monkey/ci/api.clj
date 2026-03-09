@@ -25,7 +25,8 @@
   bc/action-job?)
 
 ;; Job return values
-(def success "Indicates the job was successful"
+(def success
+  "Job result that indicates the job was successful"
   bc/success)
 
 (def failure
@@ -93,6 +94,13 @@
   ([job script]
    (try-unwrap job assoc :script script)))
 
+(defn expose
+  "Gets or sets exposed ports"
+  ([job]
+   (:expose job))
+  ([job ports]
+   (try-unwrap job assoc :expose ports)))
+
 (defn- set-env [job e]
   (cond
     (action-job? job) (assoc job :env e)
@@ -120,6 +128,23 @@
   ([job s]
    (try-unwrap job assoc :size s)))
 
+(defn blocked
+  "Gets or sets job blocked status.  A blocked job will be marked as `blocked` once it
+   is eligible for execution.  An explicit unblock action is required to execute it."
+  [job]
+  (assoc job :blocked true))
+
+(defn unblocked
+  "Unmarks a previously blocked job as unblocked.  Note that this has no effect if the
+   job lifecycle status is already blocked, it only affects the job `blocked` status 
+   before the script is started."
+  [job]
+  (dissoc job :blocked))
+
+(def blocked?
+  "Checks if given job is marked as blocked"
+  (comp true? :blocked))
+
 (defn artifact
   "Defines a new artifact with given id, located at given `path`.  This can be passed
    to `save-artifacts` or `restore-artifacts`."
@@ -129,28 +154,31 @@
 
 (defn dir-artifact
   "Converts artifact that points to a file, to one that points to its parent
-   directory."
+   directory.  If there is no parent directory, uses the current directory."
   [art]
-  (update art :path (comp str fs/parent)))
+  (update art :path (comp str #(or % ".") fs/parent)))
 
-(defn save-artifacts
+(defn- get-or-update-list-prop [p]
+  (fn [job & xs]
+    (if (empty? xs)
+      (try-unwrap job p)
+      (try-unwrap job update p concat (flatten xs)))))
+
+(def save-artifacts
   "Configures the artifacts to save on a job."
-  [job & arts]
-  (try-unwrap job update :save-artifacts concat (flatten arts)))
+  (get-or-update-list-prop :save-artifacts))
 
-(defn restore-artifacts
+(def restore-artifacts
   "Configures the artifacts to restore on a job."
-  [job & arts]
-  (try-unwrap job update :restore-artifacts concat (flatten arts)))
+  (get-or-update-list-prop :restore-artifacts))
 
 (def cache
   "Defines a cache with given id an path, that can be passed to `caches`"
   artifact)
 
-(defn caches
+(def caches
   "Configures the caches a job uses."
-  [job & arts]
-  (try-unwrap job update :caches concat (flatten arts)))
+  (get-or-update-list-prop :caches))
 
 (defn- file-test [tester]
   (fn test-fn
@@ -261,3 +289,31 @@
 (def manual?
   "Alias for `api-trigger?`"
   api-trigger?)
+
+(defmulti job-result
+  "Retrieves the result of the job, if it has finished"
+  bc/job-schema)
+
+(defmethod job-result :v1 [job]
+  (:result job))
+
+(defmethod job-result :v2 [job]
+  (get-in job [:status :result]))
+
+(defn get-job
+  "Retrieves job by id in the current build"
+  [ctx id]
+  ((get-in ctx [:api :jobs]) id))
+
+(defn get-job-exposed-addr
+  "If the given job exposes a port, looks it up in the context and returns the
+   externally accessible address as a map with `:port` and `:address` keys.  If
+   the job is not found, or the given port is not mapped, returns `nil`."
+  [ctx id port]
+  (when-let [a (some-> (get-job ctx id)
+                       :agent)]
+    (when-let [[p _] (->> (:ports a)
+                          (filter (comp (partial = port) second))
+                          first)]
+      {:address (:address a)
+       :port p})))

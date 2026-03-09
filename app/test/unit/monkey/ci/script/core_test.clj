@@ -146,3 +146,4 @@
                           "#invalid edn")))
           (let [r (sut/verify src)]
             (is (= :errors (-> r (first) :result)))))))))
+

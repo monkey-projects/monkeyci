@@ -11,6 +11,15 @@
     (testing "valid user has been created"
       (is (some? u)))
 
+    (testing "user has settings"
+      (let [r (-> (c/request :get (str "/user/" (:id u) "/settings"))
+                  (c/set-token (c/user-token u))
+                  (c/accept-edn)
+                  (http/request)
+                  (deref))]
+        (is (= 200 (:status r)))
+        (is (not-empty (c/try-parse-body r)))))
+
     (let [org {:name (str "test-" (t/now))}
           token (c/user-token u)
           request (fn [method path & [body]]
@@ -34,6 +43,31 @@
                      (c/try-parse-body)
                      :orgs))))
 
+        (testing "repo"
+          (let [repo {:org-id (:id org)
+                      :name "test repo"
+                      :url "http://github.com/test"
+                      :main-branch "main"}
+                path (str "/org/" (:id org) "/repo")
+                reply (request :post path repo)
+                repo-id (:id (c/try-parse-body reply))]
+            (testing "can create"
+              (is (= 201 (:status reply)))
+              (is (string? repo-id)))
+
+            (testing "can update"
+              (is (= 200 (-> (request :put (str path "/" repo-id)
+                                      (assoc repo :github-id 1234))
+                             :status))))
+
+            (testing "can create with github id"
+              (is (= 201 (->> {:org-id (:id org)
+                               :name "other repo"
+                               :url "http://github.com/other"
+                               :github-id 5678}
+                              (request :post path)
+                              :status))))))
+        
         (testing "can delete org"
           (is (= 204 (-> (request :delete (str "/org/" (:id org)))
                          :status))))))

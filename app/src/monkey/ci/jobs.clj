@@ -25,7 +25,13 @@
 (def job-id "Gets job id" :id)
 (def work-dir "Gets job work dir" :work-dir)
 
-(def max-job-timeout (* 20 60 1000))
+(def default-job-timeout
+  "Default timeout for a job"
+  (* 20 60 1000))
+
+(def max-job-timeout
+  "Maximum allowed timeout for a job"
+  (* 6 60 60 1000))
 
 (def job-types
   "Known job types"
@@ -48,6 +54,7 @@
 (def failed?  (comp #{:error :failure} status))
 (def success? (comp (partial = :success) status))
 (def active?  (comp #{:queued :initializing :running} status))
+(def blocked? (comp (partial = :blocked) status))
 
 (def as-serializable eb/job->event)
 (def job->event eb/job->event)
@@ -56,6 +63,7 @@
 (def job-pending-evt eb/job-pending-evt)
 (def job-queued-evt eb/job-queued-evt)
 (def job-skipped-evt eb/job-skipped-evt)
+(def job-blocked-evt eb/job-blocked-evt)
 (def job-initializing-evt eb/job-initializing-evt)
 (def job-start-evt eb/job-start-evt)
 (def job-executed-evt eb/job-executed-evt)
@@ -152,12 +160,12 @@
             (em/post-events (:mailman ctx) [(job-executed-evt (job-id job) build-sid r)])
             (constantly r)))))))
 
-(defn- find-dependents
+(defn find-dependents
   "Finds all jobs that are dependent on this job"
   [job others]
   (letfn [(dependent? [j]
             (and (some? (deps j))
-                 ((deps j) job)))]
+                 ((set (deps j)) job)))]
     (filterv dependent? others)))
 
 (defn- find-job
@@ -277,6 +285,23 @@
         (vals r)
         (recur r (add-missing-deps r))))))
 
+;; Alternative algorithm
+#_(defn filter-jobs
+    "Applies filter fn to the given list of jobs, but also includes any dependencies."
+    [f jobs]
+    (let [by-id (->> (group-by j/job-id jobs)
+                     (mc/map-vals first))]
+      (loop [r {}
+             ;; Use set for deduplication
+             todo (set (filter f jobs))]
+        (if (empty? todo)
+          (vals r)
+          (let [n (first todo)]
+            (recur (assoc r (j/job-id n) n)
+                   (-> (rest todo)
+                       (concat (map by-id (j/deps n)))
+                       (set))))))))
+
 (defn label-filter
   "Predicate function that matches a job by its labels"
   [f]
@@ -301,3 +326,7 @@
   (or (some-> (:size job) (* 2))
       (:memory job)
       2))
+
+(def should-block?
+  "True if the block should be blocked"
+  (comp true? :blocked))

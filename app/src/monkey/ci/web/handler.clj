@@ -13,12 +13,14 @@
              [storage :as st]
              [utils :as u]
              [version :as v]]
+            [monkey.ci.common.schemas :as schemas]
             [monkey.ci.metrics.core :as metrics]
             [monkey.ci.web
              [admin :as admin]
              [api :as api]
              [auth :as auth]
              [bitbucket :as bitbucket]
+             [codeberg :as codeberg]
              [common :as c]
              [github :as github]
              [http :as wh]
@@ -27,11 +29,13 @@
              [crypto :as crypto-api]
              [org :as org-api]
              [invoice :as inv-api]
+             [job :as job-api]
              [join-request :as jr-api]
              [params :as param-api]
              [repo :as repo-api]
              [ssh-keys :as ssh-api]
-             [token :as token-api]]
+             [token :as token-api]
+             [user :as user-api]]
             [reitit.coercion.schema]
             [reitit.ring :as ring]
             [ring.middleware.cors :as cors]
@@ -41,6 +45,7 @@
 (defn resolve-id-from-db
   "Tries to resolve an org cuid from its display id."
   [req org-id]
+  ;; FIXME This could theoretically cause problems if an org has another org's id as display id
   (or (st/find-org-id-by-display-id (c/req->storage req) org-id)
       org-id))
 
@@ -52,10 +57,8 @@
       (-> (cache/through-cache c org-id (partial target req))
           (get org-id)))))
 
-(def default-id-resolver (cached-id-resolver resolve-id-from-db))
-
-(def org-body-checker (auth/org-body-checker default-id-resolver))
-(def org-path-checker (auth/org-auth-checker default-id-resolver))
+(defn default-id-resolver []
+  (cached-id-resolver resolve-id-from-db))
 
 (defn health [_]
   ;; TODO Make this more meaningful
@@ -69,15 +72,11 @@
     (wh/text-response (metrics/scrape m))
     (rur/status 204)))
 
-(def Id c/Id)
-(def Name c/Name)
+(def Id schemas/Id)
+(def Name schemas/Name)
 
 (defn- assoc-id [s]
   (assoc s (s/optional-key :id) Id))
-
-(s/defschema Label
-  {:name Name
-   :value c/not-empty-str})
 
 (s/defschema NewOrg
   {:name Name})
@@ -96,26 +95,13 @@
 (s/defschema UpdateWebhook
   (assoc-id NewWebhook))
 
-(s/defschema NewRepo
-  {:org-id Id
-   :name Name
-   :url s/Str
-   (s/optional-key :main-branch) Id
-   (s/optional-key :labels) [Label]
-   (s/optional-key :public) s/Bool})
-
-(s/defschema UpdateRepo
-  (-> NewRepo
-      (assoc-id)
-      (assoc (s/optional-key :github-id) s/Int)))
-
 (s/defschema WatchGithubRepo
-  (-> NewRepo
-      (assoc-id)
+  (-> schemas/UpdateRepo
+      (dissoc (s/optional-key :github-id))
       (assoc :github-id s/Int)))
 
 (s/defschema WatchBitBucketRepo
-  (-> NewRepo
+  (-> schemas/NewRepo
       (assoc-id)
       (assoc :workspace s/Str
              :repo-slug s/Str
@@ -177,7 +163,7 @@
 (def webhook-routes
   ["/webhook"
    [[""
-     {:auth-chain [org-body-checker]}
+     {:auth-chain [auth/org-body-checker]}
      [["" {:post {:handler    api/create-webhook
                   :parameters {:body NewWebhook}}}]]]
     ["/health"
@@ -236,26 +222,18 @@
 
 (def repo-parameter-routes
   ["/param"
-   {:auth-chain ^:replace [org-path-checker]}
+   {:auth-chain ^:replace [auth/org-auth-checker]}
    [["" {:get {:handler param-api/get-repo-params}}]]])
 
 (def repo-ssh-keys-routes
   ["/ssh-keys"
-   {:auth-chain ^:replace [org-path-checker]}
+   {:auth-chain ^:replace [auth/org-auth-checker]}
    [["" {:get {:handler ssh-api/get-repo-ssh-keys}}]]])
 
 (def repo-webhook-routes
   ["/webhooks"
-   {:auth-chain ^:replace [org-path-checker]}
+   {:auth-chain ^:replace [auth/org-auth-checker]}
    [["" {:get {:handler repo-api/list-webhooks}}]]])
-
-(def log-routes
-  ["/logs"                              ; Deprecated, use loki instead
-   [[""
-     {:get {:handler api/list-build-logs}}]
-    ["/download"
-     {:get {:handler api/download-build-log
-            :parameters {:query {:path s/Str}}}}]]])
 
 (def artifact-routes
   ["/artifact"
@@ -267,8 +245,20 @@
       ["/download"
        {:get {:handler api/download-artifact}}]]]]])
 
+(def job-routes
+  ["/job"
+   [["/:job-id"
+     {:parameters {:path {:job-id s/Str}}}
+     [[""
+       {:get {:handler job-api/get-job}}]
+      ["/unblock"
+       {:post {:handler job-api/unblock-job}}]
+      ["/logs"
+       {:get {:handler job-api/download-job-log
+              :parameters {:query {:file s/Str}}}}]]]]])
+
 (def build-routes
-  ["/builds" ; TODO Replace with singular
+  ["/builds"                            ; TODO Replace with singular
    {:conflicting true}
    [["" {:get {:handler api/get-builds}}]
     ["/trigger"
@@ -286,8 +276,8 @@
        {:post {:handler api/retry-build}}]
       ["/cancel"
        {:post {:handler api/cancel-build}}]
-      log-routes
-      artifact-routes]]]])
+      artifact-routes
+      job-routes]]]])
 
 (def watch-routes
   ["" [["/github"
@@ -315,8 +305,8 @@
            :updater repo-api/update-repo
            :getter  repo-api/get-repo
            :deleter repo-api/delete-repo
-           :new-schema NewRepo
-           :update-schema UpdateRepo
+           :new-schema schemas/NewRepo
+           :update-schema schemas/UpdateRepo
            :id-key :repo-id
            :child-routes [repo-parameter-routes
                           repo-ssh-keys-routes
@@ -375,19 +365,24 @@
                                   (s/optional-key :repo-slug) s/Str
                                   (s/optional-key :bitbucket-id) s/Str}}}}]]])
 
-(s/defschema InvoiceSearchFilter
-  {(s/optional-key :from-date) s/Str
-   (s/optional-key :until-date) s/Str
-   (s/optional-key :invoice-nr) s/Str})
-
 (def invoice-routes
   ["/invoice"
    [[""
      {:get {:handler inv-api/search-invoices
             :parameters
-            {:query InvoiceSearchFilter}}}]
+            {:query schemas/InvoiceSearchFilter}}
+      :post {:handler inv-api/create-invoice
+             :parameters
+             {:body schemas/NewInvoice}}}]
+    ["/settings"
+     {:conflicting true
+      :put {:handler inv-api/update-org-settings
+            :parameters
+            {:body schemas/OrgInvoicing}}
+      :get {:handler inv-api/get-org-settings}}]
     ["/:invoice-id"
-     {:get {:handler inv-api/get-invoice
+     {:conflicting true
+      :get {:handler inv-api/get-invoice
             :parameters
             {:path {:invoice-id Id}}}}]]])
 
@@ -410,7 +405,7 @@
 
 (def org-routes
   ["/org"
-   {:auth-chain [org-path-checker]}
+   {:auth-chain [auth/org-auth-checker]}
    (c/generic-routes
     {:creator org-api/create-org
      :updater org-api/update-org
@@ -462,6 +457,20 @@
      {:get
       {:handler bitbucket/get-config}}]]])
 
+(def codeberg-routes
+  ["/codeberg"
+   [["/login"
+     {:post
+      {:handler codeberg/login
+       :parameters {:query {:code s/Str}}}}]
+    ["/refresh"
+     {:post
+      {:handler codeberg/refresh
+       :parameters {:body {:refresh-token s/Str}}}}]
+    ["/config"
+     {:get
+      {:handler codeberg/get-config}}]]])
+
 (def auth-routes
   ["/auth/jwks" {:get
                  {:handler auth/jwks
@@ -488,6 +497,13 @@
      :id-key :token-id
      :new-schema ApiToken})])
 
+(def user-settings-routes
+  ["/settings"
+   {:auth-chain [auth/current-user-checker]}
+   [["" {:get {:handler user-api/get-user-settings}
+         :put {:handler user-api/update-user-settings
+               :parameters {:body schemas/UserSettings}}}]]])
+
 (def user-routes
   ["/user"
    {:conflicting true
@@ -495,20 +511,21 @@
     :auth-chain [auth/deny-all auth/sysadmin-checker]}
    [[""
      {:post
-      {:handler api/create-user
+      {:handler user-api/create-user
        :parameters {:body User}}}]
-    ;; TODO Add endpoints that use the cuid instead for consistency
+    ;; TODO Add more endpoints that use the cuid instead for consistency
     ["/:user-id"
      {:parameters
       {:path {:user-id s/Str}}}
      [[""
-       {:delete {:handler api/delete-user}}]
+       {:delete {:handler user-api/delete-user}}]
       ["/orgs"
        {:auth-chain ^:replace []
         :get
-        {:handler api/get-user-orgs}}]
+        {:handler user-api/get-user-orgs}}]
       user-join-request-routes
-      user-token-routes]]
+      user-token-routes
+      user-settings-routes]]
     ["/:user-type/:type-id"
      {:parameters
       {:path {:user-type s/Str
@@ -516,18 +533,26 @@
       ;; Allow get requests
       :auth-chain [auth/readonly-checker]
       :get
-      {:handler api/get-user}
+      {:handler user-api/get-user}
       :put
-      {:handler api/update-user
+      {:handler user-api/update-user
        :parameters {:body User}}}]]])
 
 (def email-registration-routes
   ["/email-registration"
-   (c/generic-routes {:getter api/get-email-registration
-                      :creator api/create-email-registration
-                      :deleter api/delete-email-registration
-                      :id-key :email-registration-id
-                      :new-schema EmailRegistration})])
+   ["/unregister"
+    {:conflicting true
+     :post
+     {:handler api/unregister-email
+      :parameters
+      {:query schemas/EmailUnregistrationQuery}}}]
+   ["" (-> (c/generic-routes
+            {:getter api/get-email-registration
+             :creator api/create-email-registration
+             :deleter api/delete-email-registration
+             :id-key :email-registration-id
+             :new-schema EmailRegistration})
+           (u/update-nth 1 u/update-nth 1 assoc :conflicting true))]])
 
 (def routes
   [["/health" {:get health}]
@@ -537,6 +562,7 @@
    org-routes
    github-routes
    bitbucket-routes
+   codeberg-routes
    auth-routes
    user-routes
    email-registration-routes
@@ -552,25 +578,27 @@
   ([rt routes]
    (ring/router
     routes
-    {:data {:middleware (vec (concat [wm/stringify-body
-                                      [cors/wrap-cors
-                                       :access-control-allow-origin #".*"
-                                       :access-control-allow-methods [:get :put :post :delete]
-                                       :access-control-allow-credentials true]]
-                                     ;; TODO Transactions for sql storage
-                                     wm/default-middleware
-                                     [wm/kebab-case-query
-                                      wm/log-request
-                                      wm/post-events
-                                      :resolve-org-id
-                                      :auth-chain]))
-            :muuntaja (c/make-muuntaja)
-            :coercion reitit.coercion.schema/coercion
-            ;; Wrap the runtime in a type, so reitit doesn't change the records into maps
-            ::c/runtime (c/->RuntimeWrapper rt)}
+    {:data (-> {:middleware (vec (concat [wm/stringify-body
+                                          [cors/wrap-cors
+                                           :access-control-allow-origin #".*"
+                                           :access-control-allow-methods [:get :put :post :delete]
+                                           :access-control-allow-credentials true]]
+                                         ;; TODO Transactions for sql storage
+                                         wm/default-middleware
+                                         [wm/kebab-case-query
+                                          wm/log-request
+                                          wm/post-events
+                                          :resolve-org-id
+                                          :auth-chain]))
+                :muuntaja (c/make-muuntaja)
+                :coercion reitit.coercion.schema/coercion
+                ;; Wrap the runtime in a type, so reitit doesn't change the records into maps
+                ::c/runtime (c/->RuntimeWrapper rt)}
+               (c/set-id-resolver (default-id-resolver)))
      ;; Disabled, results in 405 errors for some reason
      ;;:compile rc/compile-request-coercers
      :reitit.middleware/registry
+     ;; Security, only enabled in non-dev mode
      (-> {:github-security
           [github/validate-security]
           :github-app-security
@@ -583,7 +611,7 @@
           [auth/sysadmin-authorization]}
          ;; TODO Move the dev-mode checks into the runtime startup code
          (as-> m (mc/map-vals (partial non-dev rt) m))
-         (assoc :resolve-org-id [wm/resolve-org-id default-id-resolver]))}))
+         (assoc :resolve-org-id [wm/resolve-org-id]))}))
   ([rt]
    (make-router rt routes)))
 

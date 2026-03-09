@@ -3,13 +3,18 @@
    can be used to simulate a MonkeyCI build environment."
   (:require [babashka.fs :as fs]
             [monkey.ci
+             [api :as a]
              [build :as b]
              [jobs :as j]]
-            [monkey.ci.build.api :as ba]
+            [monkey.ci.build
+             [api :as ba]
+             [core :as bc]]
             [monkey.ci.protocols :as p]))
 
 (defn with-build-params* [params f]
-  (with-redefs [ba/build-params (constantly params)]
+  (with-redefs [a/build-params (constantly params)
+                ;; For backwards compatibility
+                ba/build-params (constantly params)]
     (f)))
 
 (defmacro with-build-params
@@ -24,7 +29,8 @@
     {:main-branch "main"}}
    :api
    ;; Dummy api client
-   {:client (constantly (atom {}))}
+   {:client (constantly (atom {}))
+    :jobs (constantly nil)}
    :archs [:amd]})
 
 (defn with-git-ref
@@ -121,3 +127,25 @@
   "Sets build trigger source (e.g. `:api`, `:github-webhook`)"
   [ctx src]
   (assoc-in ctx [:build :source] src))
+
+(defn set-main-branch
+  "Sets the configured main branch for the repo in the context.  See also 
+   `monkey.ci.api/main-branch`."
+  [ctx b]
+  (assoc-in ctx [:build :git :main-branch] b))
+
+(def action-job?
+  "Checks if the argument is an action job"
+  bc/action-job?)
+
+(def container-job?
+  "Checks if the argument is a container job"
+  bc/container-job?)
+
+(def success?
+  "Checks if the job return value is successful"
+  bc/success?)
+
+(def failure?
+  "Checks if the job return value is a failure"
+  bc/failed?)

@@ -26,7 +26,7 @@
                                           :user-id (:id user))))))
 
 (defn- update-org-credit [conn cred existing]
-  (ec/update-org-credit conn (merge existing (select-keys cred [:amount :from-time]))))
+  (ec/update-org-credit conn (merge existing (select-keys cred [:amount :valid-from :valid-until]))))
 
 (defn upsert-org-credit [conn cred]
   (if-let [existing (ec/select-org-credit conn (ec/by-cuid (:id cred)))]
@@ -46,9 +46,9 @@
   (->> (ecc/select-org-credits (sc/get-conn st) (ecc/by-org org-id))
        (map db->org-credit)))
 
-(defn select-avail-credits-amount [st org-id]
+(defn select-avail-credits-amount [st org-id ts]
   ;; TODO Use the available-credits table for faster lookup
-  (ecc/select-avail-credits-amount (sc/get-conn st) org-id))
+  (ecc/select-avail-credits-amount (sc/get-conn st) org-id ts))
 
 (defn select-avail-credits [st org-id]
   (->> (ecc/select-avail-credits (sc/get-conn st) org-id)

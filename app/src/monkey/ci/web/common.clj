@@ -3,16 +3,21 @@
             [clojure.string :as cs]
             [clojure.tools.logging :as log]
             [monkey.ci
+             [edn :as edn]
              [labels :as lbl]
              [storage :as st]
              [time :as t]
-             [utils :as u]]
+             [utils :as u]
+             [version :as v]]
+            [monkey.ci.common.schemas :as schemas]
             [muuntaja.core :as mc]
             [reitit.ring :as ring]
             [ring.util.response :as rur]
             [schema.core :as s]))
 
-(def not-empty-str (s/constrained s/Str not-empty))
+(def user-agent (str "MonkeyCI:" (v/version)))
+
+(def not-empty-str schemas/not-empty-str)
 (def Id not-empty-str)
 (def Name not-empty-str)
 
@@ -101,6 +106,16 @@
 (def req->mailman
   "Retrieves mailman component from request"
   #(from-rt % :mailman))
+
+(def req->id-resolver
+  "Retrieves the id resolver from route match data"
+  (comp ::id-resolver route-data))
+
+(defn set-id-resolver
+  "Sets given id resolver in the route data.  The id resolver is used to determine the actual
+   org id should a display id be provided."
+  [data r]
+  (assoc data ::id-resolver r))
 
 (defn id-getter [id-key]
   (comp id-key :path :parameters))
@@ -223,6 +238,9 @@
         ;; Convert keys to kebab-case
         [:formats "application/json" :decoder-opts]
         {:decode-key-fn csk/->kebab-case-keyword})
+       (assoc-in
+        [:formats "application/edn" :decoder-opts]
+        edn/default-opts)
        (assoc-in
         [:formats "application/json" :encoder-opts]
         {:encode-key-fn (comp csk/->camelCase name)}))))

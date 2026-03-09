@@ -12,12 +12,14 @@
              [artifacts :as a]
              [build :as b]
              [cache :as c]
+             [params :as params]
              [protocols :as p]]
             [monkey.ci.blob.disk :as blob]
             [monkey.ci.containers.podman :as cp]
             [monkey.ci.events.mailman :as em]
             [monkey.ci.local
              [config :as lc]
+             [console :as lco]
              [events :as le]
              [print :as lp]]
             [monkey.ci.runners.runtime :as rr]
@@ -39,9 +41,18 @@
     (em/map->RouteComponent {:config conf :make-routes make-routes})))
 
 (defn- new-print-routes [conf]
-  (letfn [(make-routes [_]
-            (lp/make-routes {:printer lp/console-printer}))]
+  (letfn [(make-routes [{:keys [state]}]
+            ;; TODO Switch to "dumb" printing if console is not an xterm
+            #_(lp/make-routes {:printer lp/console-printer})
+            (lco/make-routes {:state state}))]
     (em/map->RouteComponent {:config conf :make-routes make-routes})))
+
+(defn- new-renderer [conf]
+  (if-not (lc/get-quiet conf)
+    (lco/map->PeriodicalRenderer {:renderer (lco/console-renderer lco/render-state)
+                                  :interval 200})
+    ;; No rendering
+    {}))
 
 (defn- new-podman-routes [conf]
   (letfn [(make-routes [{:keys [config build] :as c}]
@@ -64,14 +75,12 @@
 (defn- new-cache [conf]
   (blob-store (lc/get-cache-dir conf)))
 
-(defrecord FixedBuildParams [params]
-  p/BuildParams
-  (get-build-params [_ _]
-    (log/debug "Returning fixed build params:" (map :name params))
-    (md/success-deferred params)))
-
-(defn- new-params [conf]
-  (->FixedBuildParams (lc/get-params conf)))
+(defn new-params [conf]
+  (let [global (lc/get-global-api conf)
+        p (params/->FixedBuildParams (lc/get-params conf))]
+    (if (not-empty (:token global))
+      (params/->MultiBuildParams [(params/->CliBuildParams global) p])
+      p)))
 
 (defn- new-api-server []
   (rr/new-api-server {}))
@@ -120,9 +129,13 @@
    :routes       (co/using
                   (new-routes conf)
                   [:mailman :api-config])
+   :state        (atom {})
    :print-routes (co/using
                   (new-print-routes conf)
-                  [:mailman])
+                  [:mailman :state])
+   :renderer     (co/using
+                  (new-renderer conf)
+                  [:state])
    :podman       (co/using
                   (new-podman-routes conf)
                   [:mailman :artifacts :cache :workspace :build :key-decrypter])

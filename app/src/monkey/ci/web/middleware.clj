@@ -82,11 +82,12 @@
    delegated to a resolver fn that takes the req and the org display id.  Since
    there is no sure way to distinguish between a display id and a cuid, the
    resolver should be able to handle both situations."
-  [h resolver]
+  [h]
   (fn [req]
-    (-> req
-        (mc/update-existing-in [:parameters :path :org-id] (partial resolver req))
-        (h))))
+    (let [resolver (c/req->id-resolver req)]
+      (-> req
+          (mc/update-existing-in [:parameters :path :org-id] (partial resolver req))
+          (h)))))
 
 (defn replace-body-org-id
   "Since the `org-id` can be a cuid or a display id, this interceptor replaces the

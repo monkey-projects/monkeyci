@@ -1,5 +1,6 @@
 (ns monkey.ci.gui.components
   (:require [monkey.ci.gui.alerts :as a]
+            [monkey.ci.gui.routing :as r]
             [monkey.ci.gui.template :as templ]
             [monkey.ci.gui.time :as t]
             [monkey.ci.gui.subs]
@@ -20,6 +21,18 @@
     [:span.avatar.avatar-sm.avatar-circle
      [:img.avatar-img {:src avatar-url :alt "Avatar"}]]))
 
+
+(defn user-info []  
+  (let [u (rf/subscribe [:login/user])]
+    (when @u
+      [:div
+       [:a {:href (r/path-for :page/user {:user-id (:id @u)})}
+        [user-avatar @u]]
+       [:p (:name @u) 
+        " | "
+        [:a {:href "" :on-click (u/link-evt-handler [:login/sign-off])}
+         "sign off"]]])))
+
 (defn icon [n]
   [:i {:class (str "bi bi-" (name n))}])
 
@@ -27,6 +40,11 @@
   "Displays text with an icon prefix"
   [i & txt]
   (into [:<> [:span.me-2 [icon i]]] txt))
+
+(defn spinner-text
+  "Displays spinner with text, similar to `icon-text`"
+  [txt]
+  [:<> [:div.me-2.spinner-border.spinner-border-sm] txt])
 
 (defn icon-btn [i lbl evt & [opts]]
   [:button.btn.btn-primary
@@ -100,6 +118,8 @@
                :running :bg-info
                :canceled :bg-warning
                :skipped :bg-warning
+               :blocked :bg-warning
+               :queued  :bg-warning
                :bg-secondary)]
     [:span {:class (str "badge " (name type))} r]))
 
@@ -108,9 +128,11 @@
                      :error        [:text-danger :exclamation-circle]
                      :failure      [:text-danger :exclamation-circle]
                      :running      [:text-info :play-circle]
+                     :queued       [:text-warning :clock]
                      :pending      [:text-warning :pause-circle]
                      :initializing [:text-warning :play-circle]
-                     :canceled     [:text-warning :x-circle]}
+                     :canceled     [:text-warning :x-circle]
+                     :blocked      [:text-warning :slash-circle]}
                     status
                     [:text-default :question-circle])]
     [:div (cond-> {:style {:font-size size}
@@ -172,15 +194,16 @@
 (defn colored [s color]
   (str "\033[" color "m" s "\033[0m"))
 
-(defn log-viewer [contents]
-  (into [:div.bg-dark.text-white.font-monospace.overflow-auto.text-nowrap.p-1
-         {:style {:min-height "20em"}}]
+(defn log-viewer [contents & [opts]]
+  (into [:div.bg-dark.text-white.font-monospace.overflow-auto.p-1
+         (cond-> {:style {:min-height "20em"}}
+           (not (:wrap? opts)) (assoc :class "text-nowrap"))]
         contents))
 
-(defn log-contents [raw]
-  (->> raw
-       (map ->html)
-       (log-viewer)))
+(defn log-contents [raw & [opts]]
+  (-> raw
+      (as-> h (map ->html h))
+      (log-viewer opts)))
 
 (defn build-elapsed [b]
   (let [e (u/build-elapsed b)]
@@ -195,8 +218,7 @@
 (defn tab-header [i lbl]
   [:span [:span.me-2 [icon i]] lbl])
 
-(defn docs-link [page title]
-  [:a {:href (templ/docs-url (str "/" page)) :target :_blank} title])
+(def docs-link templ/docs-link)
 
 (defn bg-shape []
   [:div.shape-container
@@ -208,3 +230,4 @@
 
 (defn page-title [& contents]
   (into [:h3.text-primary] contents))
+

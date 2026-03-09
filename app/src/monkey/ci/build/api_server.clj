@@ -1,36 +1,32 @@
 (ns ^:no-doc monkey.ci.build.api-server
   "Functions for setting up a build script API.  The build runner starts its own
-   API server, which is only accessible by the build script and any containers it
-   starts.  This is for security reasons, since the build script is untrusted code.
+   API server, which is only accessible by the build script.  This is for security
+   reasons, since the build script is untrusted code.
    Restricting access to the API server is done on infra level, by setting up network
    security rules.  Piping all traffic through the build runner also ensures that
    the global API will not be overloaded by malfunctioning (or misbehaving) builds."
   (:require [aleph
              [http :as http]
              [netty :as an]]
-            [aleph.http.client-middleware :as acmw]
             [buddy.core
              [codecs :as bcc]
              [nonce :as bcn]]
-            [clj-commons.byte-streams :as bs]
             [clojure.tools.logging :as log]
             [manifold.deferred :as md]
-            [medley.core :as mc]
             [monkey.ci
              [artifacts :as art]
              [build :as build]
              [cache :as cache]
-             [edn :as edn]
              [protocols :as p]
              [spec :as spec]
              [utils :as u]]
+            [monkey.ci.build.api :as ba]
             [monkey.ci.events
              [http :as eh]
              [mailman :as em]]
             [monkey.ci.spec.api-server :as aspec]
             [monkey.ci.web
              [common :as c]
-             [crypto :as wc]
              [handler :as h]
              [middleware :as wm]]
             [reitit.coercion.schema]
@@ -82,41 +78,23 @@
 (def repo-id
   (comp (juxt :org-id :repo-id) req->build))
 
-(def api-client (acmw/wrap-request #'http/request))
-
-(defn- api-request
-  "Sends a request to the global API according to configuration"
-  [{:keys [url token]} req]
-  (letfn [(handle-error [ex]
-            (throw (ex-info
-                    (ex-message ex)
-                    (-> (ex-data ex)
-                        ;; Read the response body in case of error
-                        (mc/update-existing :body bs/to-string)))))]
-    (log/debug "Sending API request:" (:path req))
-    (-> req
-        (assoc :url (str url (:path req))
-               :accept "application/edn"
-               :oauth-token token)
-        (dissoc :path)
-        (api-client)
-        (md/chain
-         :body
-         edn/edn->)
-        (md/catch handle-error))))
-
 (defn get-params-from-api [api build]
-  (api-request api {:path (format "/org/%s/repo/%s/param" (:org-id build) (:repo-id build))
-                    :method :get}))
+  (md/chain
+   (ba/api-request api (ba/as-edn
+                        {:path (format "/org/%s/repo/%s/param" (:org-id build) (:repo-id build))
+                         :method :get}))
+   :body))
 
 (defn decrypt-key-from-api [api org-id enc-key]
   (let [body (pr-str {:enc enc-key})]
-    (-> (api-request api {:path (format "/org/%s/crypto/decrypt-key" org-id)
+    (-> (ba/api-request api
+                        (ba/as-edn
+                         {:path (format "/org/%s/crypto/decrypt-key" org-id)
                           :method :post
                           :body body
                           :headers {"content-type" "application/edn"
-                                    "content-length" (str (count body))}})
-        (md/chain :key))))
+                                    "content-length" (str (count body))}}))
+        (md/chain :body :key))))
 
 (defn- invalid-config [& _]
   (-> (rur/response {:error "Invalid or incomplete API context configuration"})
@@ -127,19 +105,20 @@
       (u/maybe-deref)
       (rur/response)))
 
-(defn get-all-ip-addresses
-  "Lists all non-loopback, non-virtual site local ip addresses"
-  []
-  (->> (enumeration-seq (java.net.NetworkInterface/getNetworkInterfaces))
-       (remove (some-fn (memfn isLoopback) (memfn isVirtual)))
-       (mapcat (comp enumeration-seq (memfn getInetAddresses)))
-       (filter (memfn isSiteLocalAddress))
-       (map (memfn getHostAddress))))
+(def get-all-ip-addresses u/get-all-ip-addresses)
+(def get-ip-addr u/get-ip-addr)
 
-(defn get-ip-addr
-  "Determines the ip address of this VM"
-  []
-  (first (get-all-ip-addresses)))
+(defprotocol ApiHostAddress
+  (->url [this port] "Converts this host address to a url with given port"))
+
+(extend-protocol ApiHostAddress
+  java.net.Inet4Address
+  (->url [this port]
+    (format "http://%s:%d" (.getHostAddress this) port))
+
+  java.net.Inet6Address
+  (->url [this port]
+    (format "http://[%s]:%d" (.getHostAddress this) port)))
 
 (defn post-events [req]
   (let [evt (get-in req [:parameters :body])]
@@ -302,9 +281,7 @@
               workspace-routes
               artifact-routes
               cache-routes
-              crypto-routes
-              ;; TODO Log uploads
-              ]])
+              crypto-routes]])
 
 (defn security-middleware
   "Middleware that checks if the authorization header matches the specified token"
@@ -364,4 +341,4 @@
   [{:keys [port] :as conf}]
   (-> conf
       (select-keys [:port :token])
-      (assoc :url (format "http://%s:%d" (get-ip-addr) port))))
+      (assoc :url (->url (get-ip-addr) port))))

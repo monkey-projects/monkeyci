@@ -222,7 +222,7 @@
     (is (= 4 (sut/credit-multiplier :arm 2 2))))
 
   (testing "calculates according to container instance settings"
-    (is (= 4 (sut/credit-multiplier {:shape "CI.Standard.E4.Flex"
+    (is (= 3 (sut/credit-multiplier {:shape "CI.Standard.E4.Flex"
                                      :shape-config {:ocpus 1
                                                     :memory-in-g-bs 2}})))))
 

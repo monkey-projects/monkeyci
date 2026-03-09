@@ -30,23 +30,26 @@
         (log/error "Failed to run command" t)
         1))))
 
-(defn make-cli-config [{:keys [cmd-invoker env] :or {cmd-invoker system-invoker}}]
+(defn make-cli-config [conf {:keys [cmd-invoker env] :or {cmd-invoker system-invoker}}]
   (letfn [(invoker [cmd]
             (cmd-invoker cmd env))]
     ;; Wrap the run functions in the invoker
-    (mcli/set-invoker mcli/base-config invoker)))
+    (mcli/set-invoker conf invoker)))
 
-(defn -main
-  "Main entry point for the application."
-  [& args]
+(defn run-cli [cli-config args]
   ;; If the logback config is provided in an env var, load it first
   (ll/configure-from-env "MONKEYCI_LOGBACK")
   (try
     (log/info "Starting MonkeyCI version" (v/version))
-    (cli/run-cmd args (make-cli-config {:env env}))
+    (cli/run-cmd args (make-cli-config cli-config {:env env}))
     (catch Throwable ex
       (log/error "Failed to run application" ex)
       1)
     (finally
       ;; Shutdown the agents otherwise the app will block for a while here
       (shutdown-agents))))
+
+(defn -main
+  "Main entry point for the application."
+  [& args]
+  (run-cli mcli/user-config args))

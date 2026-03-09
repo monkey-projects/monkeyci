@@ -1,7 +1,6 @@
 (ns monkey.ci.events.mailman.db
   "Event handlers that write stuff to the database"
-  (:require #_[clojure.spec.alpha :as spec]
-            [clojure.tools.logging :as log]
+  (:require [clojure.tools.logging :as log]
             [medley.core :as mc]
             [monkey.ci
              [build :as b]
@@ -29,7 +28,15 @@
 (defn set-job [ctx job]
   (assoc ctx ::job job))
 
+(def get-job-events ::job-events)
+
+(defn set-job-events [ctx evt]
+  (assoc ctx ::job-events evt))
+
 (def build->sid b/sid)
+
+(defn job-sid [{{:keys [sid job-id]} :event}]
+  (vec (concat sid [job-id])))
 
 (defn- without-jobs
   "Removes the jobs from the build, ensuring they are not updated.  This eliminates
@@ -37,21 +44,6 @@
    multiple replicas."
   [build]
   (update build :script dissoc :jobs))
-
-;;; Interceptors for side effects
-
-(def org-credits
-  "Interceptor that fetches available credits for the org associated with the build.
-   Assumes that the db is in the context."
-  {:name ::org-credits
-   :enter (fn [ctx]
-            (set-credits ctx (st/calc-available-credits (get-db ctx)
-                                                        (get-in ctx [:event :build :org-id]))))})
-
-(def load-build
-  {:name ::load-build
-   :enter (fn [ctx]
-            (set-build ctx (st/find-build (get-db ctx) (get-in ctx [:event :sid]))))})
 
 (defn- transactional
   "Wraps interceptor fn `f` in a transaction"
@@ -64,6 +56,25 @@
              (f (emi/set-db ctx db))))
           ;; Restore original db conn
           (emi/set-db orig-db)))))
+
+(defn- store-evt [ctx evt]
+  (st/save-job-event (get-db ctx) (st/event->storage evt)))
+
+;;; Interceptors for side effects
+
+(def org-credits
+  "Interceptor that fetches available credits for the org associated with the build.
+   Assumes that the db is in the context."
+  {:name ::org-credits
+   :enter (fn [ctx]
+            (set-credits ctx (st/calc-available-credits (get-db ctx)
+                                                        (get-in ctx [:event :build :org-id])
+                                                        (t/now))))})
+
+(def load-build
+  {:name ::load-build
+   :enter (fn [ctx]
+            (set-build ctx (st/find-build (get-db ctx) (get-in ctx [:event :sid]))))})
 
 (def assign-build-idx
   "Interceptor that assigns a new index to the build"
@@ -112,8 +123,8 @@
 
 (def load-job
   {:name ::load-job
-   :enter (fn [{{:keys [sid job-id]} :event :as ctx}]
-            (set-job ctx (st/find-job (get-db ctx) (concat sid [job-id]))))})
+   :enter (fn [ctx]
+            (set-job ctx (st/find-job (get-db ctx) (job-sid ctx))))})
 
 (def save-job
   "Saves the job found in the result build by id specified in the event."
@@ -124,21 +135,30 @@
                    job (let [j (-> ctx (em/get-result) (get-in [:build :script :jobs job-id]))]
                          (if (and j (st/save-job db sid j))
                            (do (log/debug "Updated job in db:" j)
-                               (st/save-job-event db (-> st/build-sid-keys
-                                                         (zipmap sid)
-                                                         (assoc :job-id job-id
-                                                                :event (:type evt)
-                                                                :time (:time evt)
-                                                                :details evt)))
+                               (store-evt ctx evt)
                                j)
                            (log/warn "Failed to update job in db:" j)))]
                (cond-> ctx
                  job (set-job job)))))})
 
+(def save-event
+  "Interceptor that just saves the event for future reference"
+  {:name ::save-event
+   :enter (fn [ctx]
+            (store-evt ctx (:event ctx))
+            ctx)})
+
 (def with-job
   {:name ::with-job
    :enter (:enter load-job)
    :leave (:leave save-job)})
+
+(def load-job-events
+  {:name ::load-job-events
+   :enter (fn [ctx]
+            (->> (st/list-job-events (get-db ctx) (job-sid ctx))
+                 (map :details)
+                 (set-job-events ctx )))})
 
 (def save-credit-consumption
   "Assuming the result contains a build with credits, creates a credit consumption for
@@ -269,15 +289,38 @@
                            :start-time (:time event))
                     (merge (select-keys event [:credit-multiplier]))))))
 
+(defn- merge-history
+  "Merges job event history into a single object.  Newer events overwrite older ones."
+  [ctx]
+  (->> ctx
+       (get-job-events)
+       (sort-by :time)
+       (apply merge)))
+
 (def job-end
-  (job-update (fn [job {:keys [event]}]
-                (-> job
+  (job-update (fn [job {:keys [event] :as ctx}]
+                (log/debug "Job ended, merging history:" (get-in ctx [:event :job-id]))
+                (-> (merge-history ctx)
+                    (merge job)
                     (assoc :end-time (:time event))
                     (merge (select-keys event [:status :result]))))))
 
 (def job-skipped
   (job-update (fn [job _]
                 (assoc job :status :skipped))))
+
+(def job-blocked
+  (job-update (fn [job _]
+                (assoc job :status :blocked))))
+
+(def job-unblocked
+  ;; FIXME Should not allow unblocking a job when build has finished
+  (job-update (fn [job _]
+                ;; When a job is unblocked, it is immediately scheduled for execution
+                ;; Perhaps we should change the state here to unblocked for tracing purposes?
+                (assoc job :status :queued))))
+
+(def noop-handler (constantly nil))
 
 ;;; Event routing configuration
 
@@ -287,7 +330,10 @@
                    with-build]
         job-int [use-db
                  load-build
-                 with-job]]
+                 with-job]
+        only-save [{:handler noop-handler
+                    :interceptors [use-db
+                                   save-event]}]]
     [[:build/triggered
       ;; Checks if the org has credits available, and creates the build in db
       [{:handler check-credits
@@ -344,8 +390,22 @@
 
      [:job/end
       [{:handler job-end
-        :interceptors job-int}]]
+        :interceptors (conj job-int load-job-events)}]]
 
      [:job/skipped
       [{:handler job-skipped
-        :interceptors job-int}]]]))
+        :interceptors job-int}]]
+
+     [:job/blocked
+      [{:handler job-blocked
+        :interceptors job-int}]]
+
+     [:job/unblocked
+      [{:handler job-unblocked
+        :interceptors job-int}]]
+
+     [:container/pending only-save]
+     
+     [:container/start only-save]
+     
+     [:container/end only-save]]))

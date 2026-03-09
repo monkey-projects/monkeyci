@@ -94,7 +94,7 @@
           (mmc/post-events events)))
 
 (defmethod make-component :nats [config]
-  (emn/map->NatsComponent {:config config}))
+  (emn/map->NatsComponent {:config (merge emn/default-broker-opts config)}))
 
 (defn listener-stream
   "Registers a listener that posts received events to a stream.
@@ -108,3 +108,14 @@
     (ms/on-closed s (fn []
                       (mmc/unregister-listener l)))
     s))
+
+(defn merge-routes
+  "Merges multiple route structures into one"
+  [& routes]
+  (->> routes
+       (apply concat)
+       (reduce (fn [r [t h]]
+                 (update r t (comp vec concat) h))
+               {})
+       (into [])))
+

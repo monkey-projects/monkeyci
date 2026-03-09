@@ -63,7 +63,7 @@
     header]])
 
 (defn settings-tabs
-  "Renders vertical tabs, used for setting pages.  Each tab pages has an id,
+  "Renders vertical tabs, used for setting pages.  Each tab page has an id,
    a header and an associated link.  The current route parameters are passed
    to the link."
   [tabs active]

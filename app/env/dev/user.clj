@@ -29,6 +29,7 @@
   (c/reset-config!)
   (c/load-config! "local.edn")
   (c/load-config! "github/staging.edn")
+  (c/load-config! "codeberg/staging.edn")
   (c/load-config! "bitbucket/dev.edn")
   (c/load-config! "scw/crypto.edn")
   (server/start-server))
@@ -77,6 +78,6 @@
 
 (defn generate-token
   ([config uid]
-   (server/generate-jwt (get-in config [:runner :jwk :priv]) uid))
+   (server/generate-jwt (get-in config [:jwk :priv]) uid))
   ([uid]
    (generate-token (global-config) uid)))
