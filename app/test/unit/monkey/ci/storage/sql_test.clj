@@ -652,6 +652,27 @@
         (is (true? (st/delete-email-registration s (:id er))))
         (is (empty? (st/list-email-registrations s)))))))
 
+(deftest ^:sql email-confirmations
+  (with-storage conn s
+    (let [er (-> (h/gen-email-registration)
+                 (assoc :confirmed true
+                        :creation-time (t/now)))
+          c (-> (h/gen-email-confirmation)
+                (assoc :email-reg-id (:id er)
+                       :creation-time (t/now)))]
+      (is (some? (st/save-email-registration s er)))
+      
+      (testing "can create and retrieve"
+        (is (sid/sid? (st/save-email-confirmation s c)))
+        (is (= c (st/find-email-confirmation s (:id c)))))
+
+      (testing "can list by email reg id"
+        (is (= [c] (st/list-email-confirmations s (:id er)))))
+
+      (testing "can delete"
+        (is (true? (st/delete-email-confirmation s (:id c))))
+        (is (empty? (st/list-email-confirmations s (:id er))))))))
+
 (deftest ^:sql credit-subscriptions
   (with-storage conn s
     (let [org (h/gen-org)

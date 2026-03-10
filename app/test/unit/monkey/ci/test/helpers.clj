@@ -256,6 +256,9 @@
 (defn gen-email-registration []
   (gen-entity ::ss/email-registration))
 
+(defn gen-email-confirmation []
+  (gen-entity ::ss/email-confirmation))
+
 (defn- update-amount [x]
   (update x :amount bigdec))
 

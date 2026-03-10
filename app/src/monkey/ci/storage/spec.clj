@@ -120,6 +120,14 @@
               :opt-un [::creation-time ::confirmed])
       (s/merge ::common)))
 
+(s/def ::code string?)
+(s/def ::email-reg-id ::id)
+
+(s/def ::email-confirmation
+  (-> (s/keys :req-un [::email-reg-id ::code]
+              :opt-un [::creation-time])
+      (s/merge ::common)))
+
 (s/def ::amount (s/int-in 0 1000000))
 (s/def ::valid-from c/ts?)
 (s/def ::valid-until c/ts?)

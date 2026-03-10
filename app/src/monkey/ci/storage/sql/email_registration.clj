@@ -19,9 +19,7 @@
 
 (defn insert-email-registration [conn reg]
   ;; Updates not supported
-  (ec/insert-email-registration conn (-> reg
-                                         (assoc :cuid (:id reg))
-                                         (dissoc :id))))
+  (ec/insert-email-registration conn (sc/id->cuid reg)))
 
 (defn delete-email-registration [conn cuid]
   (ec/delete-email-registrations conn (ec/by-cuid cuid)))

@@ -777,7 +777,15 @@
     [{:alter-table :credit-subscriptions
       :add-column [:valid-period [:varchar 20]]}]
     [{:alter-table :credit-subscriptions
-      :drop-column :valid-period}])])
+      :drop-column :valid-period}])
+
+   (entity-table-migration
+    63 :email-confirmations
+    [(fk-col :email-reg-id)
+     [:code [:varchar 100] [:not nil]]
+     [:creation-time :timestamp]
+     (fk :email-reg-id :email-registrations :id)]
+    [(col-idx :email-confirmations :email-reg-id)])])
 
 (defn prepare-migrations
   "Prepares all migrations by formatting to sql, creates a ragtime migration object from it."

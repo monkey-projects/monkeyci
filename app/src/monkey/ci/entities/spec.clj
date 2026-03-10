@@ -120,6 +120,14 @@
               :opt-un [::creation-time ::confirmed])
       (s/merge ::common)))
 
+(s/def ::code string?)
+(s/def ::email-reg-id ::id)
+
+(s/def ::email-confirmation
+  (-> (s/keys :req-un [::code ::email-reg-id]
+              :opt-un [::creation-time])
+      (s/merge ::common)))
+
 ;;; Credits
 
 (s/def ::valid-from ts?)
