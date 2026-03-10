@@ -295,7 +295,7 @@
               params?
               (sp/upsert-params conn (last sid) obj)
               email-registration?
-              (ser/insert-email-registration conn obj)
+              (ser/upsert-email-registration conn obj)
               email-confirmation?
               (sec/insert-email-confirmation conn obj)
               credit-subscription?

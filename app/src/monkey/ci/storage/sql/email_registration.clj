@@ -17,9 +17,16 @@
   (->> (ec/select-email-registrations (sc/get-conn st) nil)
        (map db->email-registration)))
 
-(defn insert-email-registration [conn reg]
-  ;; Updates not supported
+(defn- insert-email-registration [conn reg]
   (ec/insert-email-registration conn (sc/id->cuid reg)))
+
+(defn- update-email-registration [conn reg orig]
+  (ec/update-email-registration conn (merge orig (dissoc reg :id))))
+
+(defn upsert-email-registration [conn reg]
+  (if-let [m (ec/select-email-registration conn (ec/by-cuid (:id reg)))]
+    (update-email-registration conn reg m)
+    (insert-email-registration conn reg)))
 
 (defn delete-email-registration [conn cuid]
   (ec/delete-email-registrations conn (ec/by-cuid cuid)))

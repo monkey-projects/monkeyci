@@ -78,5 +78,18 @@
       (rur/status 204))))
 
 (defn confirm-email [req]
-  ;; TODO
-  (rur/response {}))
+  (let [b (c/body req)
+        st (c/req->storage req)]
+    (if-let [reg (st/find-email-registration st (:id b))]
+      (if (:confirmed reg)
+        (rur/status 204)
+        (if-let [c (->> (st/list-email-confirmations st (:id reg))
+                        (filter (comp (partial = (:code b)) :code))
+                        (first))]
+          (do
+            (st/save-email-registration st (assoc reg :confirmed true))
+            ;; TODO Delete any other confirmations as well
+            (st/delete-email-confirmation st (:id c))
+            (rur/response reg))
+          (c/error-response "Invalid confirmation code")))
+      (rur/not-found nil))))

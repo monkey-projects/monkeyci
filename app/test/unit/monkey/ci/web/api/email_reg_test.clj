@@ -82,13 +82,57 @@
 
 (deftest confirm-email
   (let [{st :storage :as rt} (trt/test-runtime)
-        reg (h/gen-email-registration)]
+        reg (-> (h/gen-email-registration)
+                (assoc :confirmed false))
+        c (-> (h/gen-email-confirmation)
+              (assoc :email-reg-id (:id reg)))]
     (is (some? (st/save-email-registration st reg)))
+    (is (some? (st/save-email-confirmation st c)))
     
-    (testing "400 if invalid code")
+    (testing "400 if invalid code"
+      (is (= 400 (-> (h/->req rt)
+                     (assoc :parameters
+                            {:body
+                             {:id (:id reg)
+                              :code "invalid"}})
+                     (sut/confirm-email)
+                     :status))))
 
-    (testing "204 if already confirmed")
+    (testing "400 if confirmation expired")
 
-    (testing "200 if valid code")
+    (testing "when valid code"
+      (let [r (-> (h/->req rt)
+                  (assoc :parameters
+                         {:body
+                          {:id (:id reg)
+                           :code (:code c)}})
+                  (sut/confirm-email))]
+        (testing "returns status 200"
+          (is (= 200 (:status r))))
 
-    (testing "404 if no email registration found")))
+        (testing "deletes confirmation"
+          (is (nil? (st/find-email-confirmation st (:id c)))))
+
+        (testing "deletes other pending confirmations too")
+
+        (testing "marks email reg as confirmed"
+          (is (true? (-> (st/find-email-registration st (:id reg))
+                         :confirmed))))))
+
+    (testing "204 if already confirmed"
+      (is (= 204 (-> (h/->req rt)
+                     (assoc :parameters
+                            {:body
+                             {:id (:id reg)
+                              :code (:code c)}})
+                     (sut/confirm-email)
+                     :status))))
+
+    (testing "404 if no email registration found"
+      (is (= 404 (-> (h/->req rt)
+                     (assoc :parameters
+                            {:body
+                             {:id "invalid"
+                              :code "test"}})
+                     (sut/confirm-email)
+                     :status))))))
