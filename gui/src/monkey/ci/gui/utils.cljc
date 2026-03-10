@@ -122,3 +122,21 @@
                     (assoc :org-id customer-id))))
 
 (def org-id (some-fn :display-id :id))
+
+(defn ->b64
+  "Converts string to base64 text"
+  [s]
+  #?(:clj (.. (java.util.Base64/getEncoder)
+              (.encodeToString (.getBytes s)))
+     :cljs (.. (js/TextEncoder.)
+               (encode s)
+               (toBase64))))
+
+(defn b64->
+  "Converts base64 text to string"
+  [b]
+  #?(:clj (.. (java.util.Base64/getDecoder)
+              (.decode s)
+              (String.))
+     :cljs (.. (js/TextDecoder.)
+               (decode (js/Uint8Array.fromBase64 b)))))

@@ -559,7 +559,13 @@
     {:route-name :unregister-email
      :method :post
      :path-parts ["/email-registration/unregister"]
-     :query-schema cs/EmailUnregistrationQuery})])
+     :query-schema cs/EmailUnregistrationQuery})
+
+   (public-route
+    {:route-name :confirm-email
+     :method :post
+     :path-parts ["/email-registration/cnofirm"]
+     :body-schema cs/EmailConfirmation})])
 
 (def invoicing-routes
   [(api-route

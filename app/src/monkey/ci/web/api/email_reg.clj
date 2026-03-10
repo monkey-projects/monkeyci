@@ -91,5 +91,6 @@
             ;; TODO Delete any other confirmations as well
             (st/delete-email-confirmation st (:id c))
             (rur/response reg))
+          ;; TODO Also fail if confirmation has expired
           (c/error-response "Invalid confirmation code")))
       (rur/not-found nil))))

@@ -4,4 +4,5 @@
             [re-frame.core :as rf]))
 
 (u/db-sub ::unregistering? (comp true? db/unregistering?))
+(u/db-sub ::confirming? (comp true? db/confirming?))
 (u/db-sub ::alerts db/alerts)

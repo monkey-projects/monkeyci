@@ -15,6 +15,9 @@
 (deftest unregistering?
   (h/verify-sub [::sut/unregistering?] db/set-unregistering true false))
 
+(deftest confirming?
+  (h/verify-sub [::sut/confirming?] db/set-confirming true false))
+
 (deftest alerts
   (h/verify-sub [::sut/alerts] #(db/set-alerts % ::test-alert) ::test-alert nil))
 

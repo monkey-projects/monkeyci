@@ -1553,11 +1553,18 @@
       (testing "returns 200 if matching user"
         (h/with-memory-store st
           (let [app (make-test-app st)
-                email "user@monkeyci.com"]
-            (is (some? (st/save-email-registration st {:email email})))
+                email "user@monkeyci.com"
+                reg (-> (h/gen-email-registration)
+                        (assoc :email email
+                               :confirmed false))
+                conf {:id (cuid/random-cuid)
+                      :email-reg-id (:id reg)
+                      :code "test-code"}]
+            (is (some? (st/save-email-registration st reg)))
+            (is (some? (st/save-email-confirmation st conf)))
             (is (= 200
                    (-> (h/json-request :post "/email-registration/confirm"
-                                       {:email email
+                                       {:id (:id reg)
                                         :code "test-code"})
                        (app)
                        :status)))))))))
