@@ -79,8 +79,7 @@
 
 ;; TODO Move this implementation to api-server ns
 (defn new-ssh-keys-fetcher [config]
-  (let [client (ahmw/wrap-request http/request)
-        maker (api-with-token-maker config)
+  (let [maker (api-with-token-maker config)
         try-slurp (fn [x]
                     (try
                       (slurp x)
@@ -88,27 +87,12 @@
     (fn [[org-id repo-id :as sid]]
       (let [api (maker sid)]
         (log/debug "Retrieving ssh keys for" sid)
-        (try
-          (-> {:url (format "%s/org/%s/repo/%s/ssh-keys"
-                            (:url api)
-                            org-id
-                            repo-id)
-               :method :get
-               :oauth-token (:token api)
-               :accept "application/edn"}
-              (client)
-              (deref)
-              :body
-              (edn/edn->))
-          (catch Exception ex
-            ;; On error, rethrow but read the response body
-            (let [resp (some-> (ex-data ex)
-                               :body
-                               try-slurp)]
-              (throw (if resp
-                       (ex-info (str (ex-message ex) ": " resp)
-                                (ex-data ex))
-                       ex)))))))))
+        (-> (ba/api-request api {:path (format "/org/%s/repo/%s/ssh-keys" org-id repo-id)
+                                 :method :get
+                                 :accept "application/edn"})
+            (deref)
+            :body
+            (edn/edn->))))))
 
 (defn new-build-key-decrypter
   "Build key decrypter, to decrypt the build data encryption key, which is then

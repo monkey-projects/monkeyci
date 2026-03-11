@@ -21,10 +21,6 @@
       (assoc :accept :edn
              :as :clojure)))
 
-(def api-middleware
-  (conj mw/default-middleware
-        mw/wrap-exceptions))
-
 (defn api-request
   "Sends a request to the api at configured url"
   [{:keys [url token]} req]
@@ -32,7 +28,7 @@
             (assoc req
                    :url (str url (:path req))
                    :oauth-token token
-                   :middelware api-middleware))
+                   :middelware mw/default-middleware))
           (handle-error [ex]
             (throw (err/unwrap-exception ex)))]
     (-> req

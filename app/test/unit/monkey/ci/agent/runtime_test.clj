@@ -3,7 +3,9 @@
             [buddy.sign.jwt :as jwt]
             [clojure.test :refer [deftest testing is]]
             [com.stuartsierra.component :as co]
-            [manifold.stream :as ms]
+            [manifold
+             [deferred :as md]
+             [stream :as ms]]
             [monkey.ci.agent.runtime :as sut]
             [monkey.ci.build.api-server :as bas]
             [monkey.ci
@@ -87,14 +89,14 @@
           (is (= "http://test-api" (:url req))))))))
 
 (deftest ssh-keys-fetcher
-  (let [sid ["test-cust" "test-repo" "test-build"]
+  (let [sid ["test-org" "test-repo" "test-build"]
         kp (auth/generate-keypair)
         conf {:api {:url "http://test-api"}
               :jwk {:priv (.getPrivate kp)}}
         pubkey (.getPublic kp)]
     (testing "retrieves from global api for repo"
       (ta/with-fake-http
-          ["http://test-api/org/test-cust/repo/test-repo/ssh-keys"
+          ["http://test-api/org/test-org/repo/test-repo/ssh-keys"
            (fn [req]
              {:status 200
               :body (pr-str ["test-key"])})]
@@ -103,16 +105,16 @@
 
     (testing "passes valid token for build"
       (ta/with-fake-http
-          ["http://test-api/org/test-cust/repo/test-repo/ssh-keys"
+          ["http://test-api/org/test-org/repo/test-repo/ssh-keys"
            (fn [req]
-             (let [token (get-in req [:headers "authorization"])]
+             (let [token (:oauth-token req)]
                {:status 200
                 :body (pr-str [token])}))]
         (let [fetcher (sut/new-ssh-keys-fetcher conf)
               token (->> (fetcher sid)
                          (first)
-                         (re-matches #"^Bearer (.*)$")
-                         (second))]
+                         #_(re-matches #"^Bearer (.*)$")
+                         #_(second))]
           (is (string? token))
           (is (= sid (-> (jwt/unsign token pubkey {:alg :rs256})
                          :sub
@@ -120,10 +122,12 @@
 
     (testing "throws on error response"
       (ta/with-fake-http
-          ["http://test-api/org/test-cust/repo/test-repo/ssh-keys"
+          ["http://test-api/org/test-org/repo/test-repo/ssh-keys"
            (fn [req]
-             {:status 400
-              :body (java.io.ByteArrayInputStream. (.getBytes "Test client error"))})]
+             (md/error-deferred
+              (ex-info "Test error"
+                       {:status 400
+                        :body (java.io.ByteArrayInputStream. (.getBytes "Test client error"))})))]
         (let [fetcher (sut/new-ssh-keys-fetcher conf)]
           (is (thrown-with-msg? Exception #"Test client error" (fetcher sid))))))))
 

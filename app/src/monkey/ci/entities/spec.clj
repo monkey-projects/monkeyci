@@ -26,7 +26,7 @@
 (s/def :github/secret string?)
 (s/def ::name (s/and string? not-empty))
 (s/def ::description string?)
-(s/def ::display-id (s/and string? not-empty))
+(s/def ::display-id (s/and string? not-empty #(<= (count %) 30)))
 
 (s/def ::common
   (s/keys :req-un [::cuid]

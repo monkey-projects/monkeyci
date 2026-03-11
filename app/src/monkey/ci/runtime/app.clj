@@ -212,7 +212,10 @@
 (defn new-app-routes [conf]
   (letfn [(make-routes [{:keys [storage update-bus mailer]}]
             (em/merge-routes (emd/make-routes storage update-bus)
-                             (mailing-evt/make-routes {:mailer mailer})))]
+                             (mailing-evt/make-routes (-> conf
+                                                          :mailer
+                                                          (select-keys [:site-url])
+                                                          (assoc :mailer mailer)))))]
     (em/map->RouteComponent {:make-routes make-routes})))
 
 (defn new-update-routes []
