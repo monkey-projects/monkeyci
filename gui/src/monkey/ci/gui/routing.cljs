@@ -81,6 +81,7 @@
     ["/o/:org-id/r/:repo-id/b/:build-id" :page/build]
     ["/o/:org-id/r/:repo-id/b/:build-id/j/:job-id" :page/job]
     ["/u/:user-id" :page/user]
+    ["/email/confirm" :page/confirm-email]
     ["/email/unsubscribe" :page/unsubscribe-email]
     ;; TODO Moved to oauth2 endpoint, remove these
     ["/github/callback" :page/github-callback-old]

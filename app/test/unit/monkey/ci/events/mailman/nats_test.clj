@@ -29,7 +29,10 @@
           (verify-types es/job-event-types))
 
         (testing "container types"
-          (verify-types es/container-event-types))))))
+          (verify-types es/container-event-types))
+
+        (testing "email types"
+          (verify-types es/email-event-types))))))
 
 (deftest nats-component
   (with-redefs [nats/make-connection (constantly ::nats)]

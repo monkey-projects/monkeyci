@@ -40,6 +40,11 @@
    (s/optional-key :email) s/Str
    (s/optional-key :user-id) Id})
 
+(s/defschema EmailConfirmation
+  {(s/optional-key :id) Id
+   (s/optional-key :email) s/Str
+   :code s/Str})
+
 (s/defschema UserCredits
   {:amount s/Int
    (s/optional-key :reason) s/Str

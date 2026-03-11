@@ -743,6 +743,25 @@
       (testing "can find by email"
         (is (= r (sut/find-email-registration-by-email st (:email r))))))))
 
+(deftest email-confirmations
+  (h/with-memory-store st
+    (let [reg (h/gen-email-registration)
+          r (-> (h/gen-email-confirmation)
+                (assoc :email-reg-id (:id reg)))]
+      (is (some? (sut/save-email-registration st reg)))
+      
+      (testing "can save and find"
+        (is (sid/sid? (sut/save-email-confirmation st r)))
+        (is (= r (sut/find-email-confirmation st (:id r)))))
+
+      (testing "can list for email reg"
+        (is (some? (sut/save-email-confirmation st (h/gen-email-confirmation))))
+        (is (= [r] (sut/list-email-confirmations st (:id reg)))))
+
+      (testing "can delete"
+        (is (true? (sut/delete-email-confirmation st (:id r))))
+        (is (empty? (sut/list-email-confirmations st (:id reg))))))))
+
 (deftest user-settings
   (h/with-memory-store st
     (let [u (h/gen-user)

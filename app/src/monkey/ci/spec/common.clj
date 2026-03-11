@@ -78,3 +78,4 @@
                  string?
                  #(sg/fixed-string token-size)))
 (s/def ::port (s/and int? pos?))
+(s/def ::email string?)

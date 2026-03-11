@@ -27,6 +27,7 @@
              [middleware :as wm]]
             [monkey.ci.web.api
              [crypto :as crypto-api]
+             [email-reg :as ereg-api]
              [org :as org-api]
              [invoice :as inv-api]
              [job :as job-api]
@@ -543,13 +544,19 @@
    ["/unregister"
     {:conflicting true
      :post
-     {:handler api/unregister-email
+     {:handler ereg-api/unregister-email
       :parameters
       {:query schemas/EmailUnregistrationQuery}}}]
+   ["/confirm"
+    {:conflicting true
+     :post
+     {:handler ereg-api/confirm-email
+      :parameters
+      {:body schemas/EmailConfirmation}}}]
    ["" (-> (c/generic-routes
-            {:getter api/get-email-registration
-             :creator api/create-email-registration
-             :deleter api/delete-email-registration
+            {:getter ereg-api/get-email-registration
+             :creator ereg-api/create-email-registration
+             :deleter ereg-api/delete-email-registration
              :id-key :email-registration-id
              :new-schema EmailRegistration})
            (u/update-nth 1 u/update-nth 1 assoc :conflicting true))]])

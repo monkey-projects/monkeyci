@@ -383,7 +383,7 @@
           (is (some? (-> {:type :job/queued
                           :job-id (:id job)}
                          (r))))
-          (is (some? @exec-ctx)))
+          (is (not= :timeout (h/wait-until #(some? @exec-ctx) 1000))))
 
         (testing "passes job retriever in job ctx"
           (is (fn? (-> @exec-ctx :api :jobs)))

@@ -33,7 +33,11 @@
    [:k8s/build-scheduled :k8s/job-scheduled]
    ;; Consolidated build events
    "%s.build.updates"
-   [:build/updated]})
+   [:build/updated]
+   ;; Emails and registrations
+   "%s.emails"
+   [:email/registration-created :email/registration-deleted
+    :email/confirmation-created :email/confirmation-expired :email/confirmed]})
 
 (defn- make-dest [prefix dest]
   (format dest prefix))

@@ -35,6 +35,13 @@
 (def k8s-event-types
   #{:k8s/build-scheduled :k8s/job-scheduled})
 
+(def email-event-types
+  #{:email/registration-created
+    :email/registration-deleted
+    :email/confirmation-created
+    :email/confirmation-expired
+    :email/confirmed})
+
 (def event-types
   (set/union build-event-types
              script-event-types
@@ -43,7 +50,8 @@
              sidecar-event-types
              command-event-types
              oci-event-types
-             k8s-event-types))
+             k8s-event-types
+             email-event-types))
 
 (s/def ::type event-types)
 (s/def ::message string?)
@@ -174,5 +182,23 @@
 (defmethod event-type :container/script-end [_]
   (s/merge ::job-event
            (s/keys :req-un [::done? ::jc/result])))
+
+(s/def ::id ::c/cuid)
+(s/def ::code string?)
+
+(defmethod event-type :email/registration-created [_]
+  (s/keys :req-un [::c/email ::id]))
+
+(defmethod event-type :email/registration-deleted [_]
+  (s/keys :req-un [::c/email ::id]))
+
+(defmethod event-type :email/confirmation-created [_]
+  (s/keys :req-un [::c/email ::id ::code]))
+
+(defmethod event-type :email/confirmation-expired [_]
+  (s/keys :req-un [::c/email ::id]))
+
+(defmethod event-type :email/confirmed [_]
+  (s/keys :req-un [::c/email ::id]))
 
 (s/def ::event (s/multi-spec event-type :type))

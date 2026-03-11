@@ -727,6 +727,27 @@
      (-> (p/list-obj s (email-registration-sid))
          (count)))))
 
+(def email-confirmations :email-confirmations)
+(def email-confirmation-sid (partial global-sid email-confirmations))
+
+(defn save-email-confirmation [s reg]
+  (p/write-obj s (email-confirmation-sid (:id reg)) reg))
+
+(defn find-email-confirmation [s id]
+  (p/read-obj s (email-confirmation-sid id)))
+
+(def list-email-confirmations
+  "Retrieves all email confirmations for the registration id"
+  (override-or
+   [:email-confirmation :list]
+   (fn [s reg-id]
+     (->> (p/list-obj s (email-confirmation-sid))
+          (map (partial find-email-confirmation s))
+          (filter (comp (partial = reg-id) :email-reg-id))))))
+
+(defn delete-email-confirmation [s id]
+  (p/delete-obj s (email-confirmation-sid id)))
+
 (def org-credits :org-credits)
 (def org-credit-sid (partial global-sid org-credits))
 

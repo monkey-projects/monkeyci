@@ -1537,16 +1537,37 @@
                             :can-update? false
                             :can-delete? true})
 
-  (testing "POST `/email-registration/unregister`"
-    (testing "returns 200 if matching user"
-      (h/with-memory-store st
-        (let [app (make-test-app st)
-              email "existing@monkeyci.com"]
-          (is (some? (st/save-email-registration st {:email email})))
-          (is (= 200
-                 (-> (mock/request :post (str "/email-registration/unregister?email=" email))
-                     (app)
-                     :status))))))))
+  (testing "`/email-registration`"
+    (testing "POST `/unregister`"
+      (testing "returns 200 if matching user"
+        (h/with-memory-store st
+          (let [app (make-test-app st)
+                email "existing@monkeyci.com"]
+            (is (some? (st/save-email-registration st {:email email})))
+            (is (= 200
+                   (-> (mock/request :post (str "/email-registration/unregister?email=" email))
+                       (app)
+                       :status)))))))
+
+    (testing "POST `/confirm`"
+      (testing "returns 200 if matching user"
+        (h/with-memory-store st
+          (let [app (make-test-app st)
+                email "user@monkeyci.com"
+                reg (-> (h/gen-email-registration)
+                        (assoc :email email
+                               :confirmed false))
+                conf {:id (cuid/random-cuid)
+                      :email-reg-id (:id reg)
+                      :code "test-code"}]
+            (is (some? (st/save-email-registration st reg)))
+            (is (some? (st/save-email-confirmation st conf)))
+            (is (= 200
+                   (-> (h/json-request :post "/email-registration/confirm"
+                                       {:id (:id reg)
+                                        :code "test-code"})
+                       (app)
+                       :status)))))))))
 
 (deftest admin-routes
   (testing "`/admin`"

@@ -6,6 +6,7 @@
              [protocols :as p]
              [storage :as st]
              [time :as t]]
+            [monkey.ci.mailing.template :as mt]
             [monkey.ci.web.common :as c]
             [ring.util.response :as rur]))
 
@@ -48,9 +49,8 @@
    (:other-dests m)))
 
 (defn- email-subst [txt]
-  ;; TODO Make more generic?
   (fn [rcpt]
-    (.replace txt "{{EMAIL}}" rcpt)))
+    (mt/apply-template txt {:EMAIL rcpt})))
 
 (defn create-sent-mailing [req]
   (let [b (c/body req)

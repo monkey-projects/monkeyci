@@ -609,3 +609,17 @@
 
 (defaggregate user-setting
   {:id-col :user-id})
+
+(def prepare-email-conf
+  (partial int->time :creation-time))
+(def convert-email-conf-select
+  (partial time->int :creation-time))
+(def convert-email-conf
+  (partial copy-prop :creation-time))
+
+(defentity email-confirmation
+  {:before-insert prepare-email-conf
+   :after-insert  convert-email-conf
+   :before-update prepare-email-conf
+   :after-update  convert-email-conf
+   :after-select  convert-email-conf-select})

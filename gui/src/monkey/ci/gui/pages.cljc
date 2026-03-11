@@ -42,6 +42,7 @@
    :page/repo-settings repo/settings-page
    :page/job job/page
    :page/webhooks webhooks/page
+   :page/confirm-email notifications/confirm-email
    :page/unsubscribe-email notifications/unsubscribe-email
    :page/user user/overview})
 
