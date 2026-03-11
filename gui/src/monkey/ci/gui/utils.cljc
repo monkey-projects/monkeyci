@@ -128,9 +128,12 @@
   [s]
   #?(:clj (.. (java.util.Base64/getEncoder)
               (.encodeToString (.getBytes s)))
+     ;; Preferred but not yet suppored everywhere
      :cljs (.. (js/TextEncoder.)
-               (encode s)
-               (toBase64))))
+                 (encode s)
+                 (toBase64))
+;;     :cljs (js/btoa s)
+     ))
 
 (defn b64->
   "Converts base64 text to string"
@@ -138,5 +141,8 @@
   #?(:clj (.. (java.util.Base64/getDecoder)
               (.decode s)
               (String.))
+     ;; Preferred but not yet suppored everywhere
      :cljs (.. (js/TextDecoder.)
-               (decode (js/Uint8Array.fromBase64 b)))))
+               (decode (js/Uint8Array.fromBase64 b)))
+;;     :cljs (js/atob b)
+     ))
