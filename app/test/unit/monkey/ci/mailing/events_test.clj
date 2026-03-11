@@ -74,6 +74,6 @@
 
     (testing "includes url with confirmation code"
       (let [tb (-> r first :text-body (.replaceAll "\n" ""))
-            [_ v] (re-matches #"^.*http://test-url\?code=(\S+).*$" tb)]
+            [_ v] (re-matches #"^.*http://test-url/email/confirm\?code=(\S+).*$" tb)]
         (is (some? v))
         (is (= code (some-> v h/base64-> edn/edn-> :code)))))))
