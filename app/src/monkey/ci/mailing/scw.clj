@@ -1,6 +1,7 @@
 (ns monkey.ci.mailing.scw
   "Scaleway implementation of the Mailer, that uses transactional emails to send mails."
-  (:require [com.stuartsierra.component :as co]
+  (:require [clojure.tools.logging :as log]
+            [com.stuartsierra.component :as co]
             [manifold.deferred :as md]
             [martian.core :as mc]
             [medley.core :as m]
@@ -23,7 +24,8 @@
     (b rcpt)
     b))
 
-(defn- send-one [rcpt {uh :unsubscribe :as config} ctx {:keys [subject text-body html-body destinations]}]
+(defn- send-one [rcpt {uh :unsubscribe :as config} ctx {:keys [subject text-body html-body]}]
+  (log/info "Sending email to " rcpt ":" subject)
   (md/chain
    (->> (select-keys config [:project-id :from :bcc])
         (merge (cond-> (->> [subject text-body html-body]

@@ -21,7 +21,9 @@
              [interceptors :as emi]
              [jms :as emj]]
             [monkey.ci.logging.log-ingest :as li]
-            [monkey.ci.mailing.scw :as mailing-scw]
+            [monkey.ci.mailing
+             [events :as mailing-evt]
+             [scw :as mailing-scw]]
             [monkey.ci.metrics
              [core :as m]
              [events :as me]
@@ -208,8 +210,9 @@
   (make-queue-options (:mailman conf)))
 
 (defn new-app-routes [conf]
-  (letfn [(make-routes [{:keys [storage update-bus]}]
-            (emd/make-routes storage update-bus))]
+  (letfn [(make-routes [{:keys [storage update-bus mailer]}]
+            (em/merge-routes (emd/make-routes storage update-bus)
+                             (mailing-evt/make-routes {:mailer mailer})))]
     (em/map->RouteComponent {:make-routes make-routes})))
 
 (defn new-update-routes []
@@ -330,7 +333,7 @@
    :queue-options (new-queue-options config)
    :mailman-routes (co/using
                     (new-app-routes config)
-                    (-> (as-map [:mailman :storage])
+                    (-> (as-map [:mailman :storage :mailer])
                         (assoc :options :queue-options)))
    :update-routes (co/using
                    (new-update-routes)

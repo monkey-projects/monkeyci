@@ -66,6 +66,7 @@
         org.eclipse.jgit/org.eclipse.jgit {:mvn/version "7.5.0.202512021534-r"}
         org.slf4j/jul-to-slf4j {:mvn/version "2.0.17"}
         ring-cors/ring-cors {:mvn/version "0.1.13"}
+        selmer/selmer {:mvn/version "1.13.1"}
         yogthos/config {:mvn/version "1.2.1"}}
 
  :paths ["src" "resources"]
