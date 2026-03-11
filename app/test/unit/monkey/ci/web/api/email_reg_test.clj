@@ -1,27 +1,44 @@
 (ns monkey.ci.web.api.email-reg-test
   (:require [clojure.test :refer [deftest testing is]]
+            [clojure.spec.alpha :as spec]
+            [monkey.ci.events.spec :as es]
             [monkey.ci.storage :as st]
             [monkey.ci.test
              [helpers :as h]
              [runtime :as trt]]
-            [monkey.ci.web.api.email-reg :as sut]))
+            [monkey.ci.web.api.email-reg :as sut]
+            [monkey.ci.web.response :as wr]))
+
+(defn- validate-event [r t]
+  (let [m (->> (wr/get-events r)
+               (filter (comp (partial = t) :type))
+               (first))]
+    (is (some? m) (str "Expected event of type " t))
+    (is (spec/valid? ::es/event m))))
 
 (deftest create-email-registration
   (let [{st :storage :as rt} (trt/test-runtime)
         email "duplicate@monkeyci.com"
         req (-> rt
                 (h/->req)
-                (h/with-body {:email email}))]
+                (h/with-body {:email email}))
+        r (sut/create-email-registration req)]
     (testing "sets creation time"
-      (let [r (sut/create-email-registration req)]
-        (is (= 201 (:status r)))
-        (is (some? (get-in r [:body :creation-time])))))
+      (is (= 201 (:status r)))
+      (is (some? (get-in r [:body :creation-time]))))
 
     (testing "does not create same email twice"
       (is (= 200 (:status (sut/create-email-registration req))))
       (is (= 1 (count (st/list-email-registrations st)))))
 
-    (testing "creates pending confirmation")))
+    (testing "creates pending confirmation"
+      (is (= 1 (count (st/list-email-confirmations st (get-in r [:body :id]))))))
+
+    (testing "sends `email/confirmation-created` event"
+      (validate-event r :email/registration-created))
+
+    (testing "sends `email/confirmation-created` event"
+      (validate-event r :email/confirmation-created))))
 
 (deftest unregister-email
   (let [{st :storage :as rt} (trt/test-runtime)]

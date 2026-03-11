@@ -3,13 +3,18 @@
   (:require [monkey.ci
              [storage :as st]
              [time :as t]]
-            [monkey.ci.web.common :as c]
+            [monkey.ci.web
+             [common :as c]
+             [response :as wr]]
             [ring.util.response :as rur]))
 
 (c/make-entity-endpoints "email-registration"
                          {:get-id (c/id-getter :email-registration-id)
                           :getter st/find-email-registration
                           :deleter st/delete-email-registration})
+
+(defn new-confirmation-code []
+  (str (random-uuid)))
 
 (defn create-email-registration
   "Custom creation endpoint that ensures emails are not registered twice."
@@ -21,8 +26,22 @@
                                             :confirmed false))]
     (if-let [existing (st/find-email-registration-by-email st email)]
       (rur/response existing)
-      (when (st/save-email-registration st body)
-        (rur/created (:id body) body)))))
+      (st/with-transaction st trx
+        (when (st/save-email-registration trx body)
+          (let [conf {:email-reg-id (:id body)
+                      :id (st/new-id)
+                      :creation-time (:creation-time body)
+                      :code (new-confirmation-code)}]
+            (st/save-email-confirmation trx conf)
+            (-> (rur/created (:id body) body)
+                ;; Also send events, so confirmation email can be sent
+                (wr/add-events [(-> body
+                                    (select-keys [:id :email :creation-time])
+                                    (assoc :type :email/registration-created))
+                                (-> conf
+                                    (select-keys [:code :creation-time])
+                                    (merge (select-keys body [:id :email]))
+                                    (assoc :type :email/confirmation-created))]))))))))
 
 (defn- unregister-by-id [req]
   (st/delete-email-registration (c/req->storage req)
