@@ -101,6 +101,13 @@
   ([job ports]
    (try-unwrap job assoc :expose ports)))
 
+(defn init
+  "Gets or sets container job initializer"
+  ([job]
+   (:init job))
+  ([job init]
+   (try-unwrap job assoc :init init)))
+
 (defn- set-env [job e]
   (cond
     (action-job? job) (assoc job :env e)
