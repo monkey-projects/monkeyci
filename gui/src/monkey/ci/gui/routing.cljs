@@ -113,7 +113,7 @@
     :page/github-callback :page/github-callback-old
     :page/bitbucket-callback :page/bitbucket-callback-old
     :page/codeberg-callback
-    :page/unsubscribe-email})
+    :page/unsubscribe-email :page/confirm-email})
 
 (defn on-route-change [match _]
   (log/debug "Route changed:" match)
