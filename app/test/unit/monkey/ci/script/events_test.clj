@@ -499,7 +499,40 @@
                    (sut/set-build (assoc (h/gen-build) :dek "encrypted-dek"))
                    (sut/job-queued)
                    (first)
-                   :dek)))))))
+                   :dek))))
+
+      (testing "with `init` fn"
+        (testing "invokes initializer, and posts `container/job-queued` with result"
+          (let [job-id "dynamic-container"
+                r (-> {:event
+                       {:job-id job-id}}
+                      (sut/set-jobs
+                       (jobs->map [(bc/container-job
+                                    job-id
+                                    {:init (constantly {:image "test-img"
+                                                        :script ["test-script"]})})]))
+                      (sut/job-queued)
+                      (first))]
+            (is (some? r))
+            (is (= :container/job-queued
+                   (:type r)))
+            (is (= "test-img" (get-in r [:job :image])))
+            (is (= ["test-script"] (get-in r [:job :script])))))
+
+        (testing "posts `job/skipped` when initializer returns `nil`"
+          (let [job-id "dynamic-container"
+                r (-> {:event
+                       {:job-id job-id}}
+                      (sut/set-jobs
+                       (jobs->map [(bc/container-job
+                                    job-id
+                                    {:init (constantly nil)})]))
+                      (sut/job-queued)
+                      (first))]
+            (is (some? r))
+            (is (= :job/skipped
+                   (:type r)))
+            (is (= job-id (:job-id r)))))))))
 
 (deftest job-executed
   (testing "returns `job/end` event"

@@ -280,7 +280,15 @@
           dek (:dek (get-build ctx))]
       ;; Action jobs do not result in an event, instead they are executed immediately.
       (when (bc/container-job? job)
-        [(job-queued-evt :container/job-queued job dek)]))))
+        ;; If the container job has an initializer, invoke it with the context to
+        ;; configure additional props.
+        (let [i (:init job)
+              job (if (fn? i)
+                    (some->> (i (emi/get-job-ctx ctx)) (merge job))
+                    job)]
+          [(if job
+             (job-queued-evt :container/job-queued job dek)
+             (j/job-skipped-evt (job-id ctx) (build-sid ctx)))])))))
 
 (defn job-unblocked
   "Received when a blocked job becomes unblocked: schedule it immediately."

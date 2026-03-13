@@ -17,7 +17,7 @@
 
 (defmethod job-spec :container [_]
   (-> (s/keys :req-un [::jc/image]
-              :opt-un [::jc/size ::jc/arch ::jc/script ::jc/env ::jc/expose])
+              :opt-un [::jc/size ::jc/arch ::jc/script ::jc/env ::jc/expose ::jc/init])
       (s/merge ::job-common)))
 
 ;; Job definitions, as configured in build scripts
