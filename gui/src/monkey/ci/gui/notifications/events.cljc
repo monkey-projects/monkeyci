@@ -9,12 +9,13 @@
 (rf/reg-event-fx
  ::confirm-email
  (fn [{:keys [db]} [_ {:keys [code]}]]
+   (println "Confirmation email with code:" (-> code (u/b64->) (edn/read-string)))
    {:dispatch [:martian.re-frame/request
                :confirm-email
                ;; The code is actually a base64 encoded edn string
-               (some-> code
-                       (u/b64->)
-                       (edn/read-string))
+               {:confirmation (some-> code
+                                      (u/b64->)
+                                      (edn/read-string))}
                [::confirm-email--success]
                [::confirm-email--failure]]
     :db (-> db

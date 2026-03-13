@@ -27,7 +27,7 @@
        (is (= :confirm-email (-> @c first (nth 2)))))
 
      (testing "passes parsed code"
-       (let [params (-> @c first (nth 3))]
+       (let [params (-> @c first (nth 3) :confirmation)]
          (is (= "test-id" (:id params)))
          (is (= "test-code" (:code params)))))
 

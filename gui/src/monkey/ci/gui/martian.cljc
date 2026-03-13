@@ -583,8 +583,8 @@
    (public-route
     {:route-name :confirm-email
      :method :post
-     :path-parts ["/email-registration/cnofirm"]
-     :body-schema cs/EmailConfirmation})])
+     :path-parts ["/email-registration/confirm"]
+     :body-schema {:confirmation cs/EmailConfirmation}})])
 
 (def invoicing-routes
   [(api-route

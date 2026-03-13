@@ -8,24 +8,27 @@
             [monkey.ci.gui.notifications.subs :as s]
             [re-frame.core :as rf]))
 
-(defn confirm-status [busy?]
-  (if busy?
-    [:<>
-     [:p "Confirming your email address, one moment please..."]
-     [:img {:src "/img/oc-thinking.svg" :width "300em"}]]
-    [:<>
-     [:p "Your email address has been confirmed.  Welcome!"]
-     [:p "You may now close this screen."]
-     [:img {:src "/img/oc-hi-five.svg" :width "300em"}]]))
+(defn confirm-status
+  ([busy?]
+   (if busy?
+     [:<>
+      [:p "Confirming your email address, one moment please..."]
+      [:img {:src "/img/oc-thinking.svg" :width "300em"}]]
+     [:<>
+      [:p "Your email address has been confirmed.  Welcome!"]
+      [:p "You may now close this screen."]
+      [:img {:src "/img/oc-hi-five.svg" :width "300em"}]]))
+  ([]
+   (confirm-status @(rf/subscribe [::s/confirming?]))))
 
 (defn confirm-email [route]
-  (rf/dispatch-sync [::e/confirm-email (get-in route [:parameters :query :code])])
+  (rf/dispatch-sync [::e/confirm-email (get-in route [:parameters :query])])
   (fn [_]
     [l/public
      [:<>
       [:h3 "Confirm Email Address"]
       [a/component [::s/alerts]]
-      [confirm-status @(rf/subscribe [::s/confirming?])]]]))
+      [confirm-status]]]))
 
 (defn status-desc
   ([u?]
