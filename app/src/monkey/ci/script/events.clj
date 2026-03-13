@@ -281,6 +281,14 @@
   ;; Just set the event in the result, so it can be passed to the deferred
   (:event ctx))
 
+(defn- apply-init [{:keys [init] :as job} ctx]
+  (if (fn? init)
+    (some-> (init (emi/get-job-ctx ctx))
+            ;; Encrypt any additional env vars
+            (encrypt-env-vars #(@(get-encrypter ctx) %))
+            (as-> upd (mm/meta-merge job upd)))
+    job))
+
 (defn job-queued
   "Dispatches queued event for action or container job, depending on the type."
   [ctx]
@@ -294,16 +302,10 @@
       (when (bc/container-job? job)
         ;; If the container job has an initializer, invoke it with the context to
         ;; configure additional props.
-        (let [i (:init job)
-              job (if (fn? i)
-                    (some-> (i (emi/get-job-ctx ctx))
-                            ;; Encrypt any additional env vars
-                            (encrypt-env-vars #(@(get-encrypter ctx) %))
-                            (as-> upd (mm/meta-merge job upd)))
-                    job)]
-          [(if job
-             (job-queued-evt :container/job-queued job dek)
-             (j/job-skipped-evt (job-id ctx) (build-sid ctx)))])))))
+        [(if-let [job (apply-init job ctx)]
+           (job-queued-evt :container/job-queued job dek)
+           ;; If the initializer returns `nil`, then the job should be skipped.
+           (j/job-skipped-evt (job-id ctx) (build-sid ctx)))]))))
 
 (defn job-unblocked
   "Received when a blocked job becomes unblocked: schedule it immediately."
