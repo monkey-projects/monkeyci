@@ -245,15 +245,25 @@
 (defn- gen-idx [ctx type]
   (format "clojure -X%s:gen-%s" (if (p/release? ctx) "" ":staging") (name type)))
 
+(defn- override-gui-version
+  "Overrides the shadow build version with the specified one in the script.  This assumes
+   the command to modify is the last one."
+  [script v]
+  (conj (vec (butlast script))
+        (str (last script)
+             (format " --config-merge '{:closure-defines {monkey.ci.gui.version/VERSION \"%s\"}'" v))))
+
 (defn build-gui-release [ctx]
   (when (p/publish-gui? ctx)
-    (-> (shadow-release "release-gui" :frontend)
-        (m/depends-on ["test-gui"])
-        ;; Also generate index pages for app and admin sites
-        (update :script (partial concat [(gen-idx ctx :main)
-                                         (gen-idx ctx :admin)
-                                         (gen-idx ctx :404)]))
-        (assoc :save-artifacts [gui-release-artifact]))))
+    (cond->
+        (-> (shadow-release "release-gui" :frontend)
+            (m/depends-on ["test-gui"])
+            ;; Also generate index pages for app and admin sites
+            (update :script (partial concat [(gen-idx ctx :main)
+                                             (gen-idx ctx :admin)
+                                             (gen-idx ctx :404)]))
+            (assoc :save-artifacts [gui-release-artifact]))
+        (p/release? ctx) (update :script override-gui-version (config/tag-version ctx)))))
 
 (defn scw-images
   "Generates a job that patches the scw-images repo in order to build a new
