@@ -1,0 +1,84 @@
+@import "tailwindcss";
+
+@layer base {
+    :root {
+	--bg: #f5f7f5;
+	--surface: #ffffff;
+	--border: #d8e8d8;
+	--accent: #1a9e3f;
+	--accent2: #e03535;
+	--accent3: #16a34a;
+	--accent-light: #e8f5ec;
+	--accent-mid: #4ade80;
+	--muted: #b0c8b0;
+	--text: #1a2e1a;
+	--text-dim: #6b8f6b;
+
+	--text-xs: 9px;
+	--text-sm: 10px;
+	--text-base: 12px;
+	--text-lg: 14px;
+	--text-xl: 19px;
+	--text-2xl: 22px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+	background: var(--bg);
+	color: var(--text);
+	font-family: 'IBM Plex Mono', monospace;
+	min-height: 100vh;
+	overflow-x: hidden;
+    }
+
+    h1, h2, .logo { font-family: 'Syne', sans-serif; }
+
+    /* Subtle dot overlay */
+    body::before {
+	content: '';
+	position: fixed;
+	inset: 0;
+	background: radial-gradient(circle, rgba(26,158,63,0.04) 1px, transparent 1px);
+	background-size: 24px 24px;
+	pointer-events: none;
+	z-index: 9999;
+    }
+
+    #app {
+	display: flex;
+	height: 100vh;
+	flex-direction: column;
+    }
+
+    .grid-bg {
+	background-image:
+            linear-gradient(rgba(26,158,63,0.05) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(26,158,63,0.05) 1px, transparent 1px);
+	background-size: 32px 32px;
+    }
+}
+
+/*
+@layer components {
+    .btn {
+	padding-block: var(--spacing);
+	padding-inline: calc(var(--spacing) * 4);
+	border-radius: var(--radius-sm);
+	cursor: pointer;
+    }
+}
+
+@theme {
+    --font-sans: inter, sans-serif;
+}
+
+@import "./common.css";
+@import "./footer.css";
+*/
+
+@import "./base.css";
+@import "./nav.css";
+@import "./badge.css";
+@import "./status.css";
+@import "./dashboard.css";

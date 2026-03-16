@@ -2,9 +2,15 @@
 {:deps {:aliases [:dev :test]}
  :dev-http {8080 ["target/js/frontend" "dev-resources/sites/public" "resources/public"]
             8081 ["target/js/frontend" "dev-resources/sites/admin" "resources/public"]
-            ;;8082 ["target/v2" "dev-resources/sites/v2" "resources/public"]
-            8002 ["dev-resources/portfolio" "target/js/frontend" "resources/public" "classpath:public"]
-            8003 ["target/js/test-shadow"]}
+            ;; Dashboard, uses tailwind css
+            8082 ["target/js/dashboard" "dev-resources/sites/dashboard" "resources/public"]
+            ;; Testing
+            8002 ["target/js/test-shadow"]
+            ;; Portfolio scenes
+            8003 ["dev-resources/portfolio" "target/js/frontend" "resources/public" "classpath:public"
+                  "target/js/portfolio"]
+            8004 ["dev-resources/portfolio-dashboard" "target/js/portfolio-dashboard" "classpath:public"
+                  "target/js/dashboard"]}
 
  :builds
  {:frontend
@@ -28,11 +34,14 @@
      {"re_frame.trace.trace_enabled_QMARK_" true
       monkey.ci.gui.version/VERSION "dev"}}}}
 
-  ;; :v2
-  ;; {:target :browser
-  ;;  :output-dir "target/v2/js"
-  ;;  :modules
-  ;;  {}}
+  :dashboard
+  {:target :browser
+   :output-dir "target/js/dashboard/js"
+   :asset-path "/js"
+   :modules
+   {:dashboard
+    {:entries [monkey.ci.gui.dashboard.core]
+     :init-fn monkey.ci.gui.dashboard.core/init}}}
 
   :test/browser
   {:target :browser-test
@@ -58,6 +67,12 @@
 
   :portfolio
   {:target :browser-test
-   :ns-regexp "-scenes$" ;; Pick up all files that end with -cards
-   :test-dir "dev-resources/portfolio"
-   :runner-ns monkey.ci.gui.test.scenes}}}
+   :ns-regexp "-scenes$"
+   :test-dir "target/js/portfolio"
+   :runner-ns monkey.ci.gui.test.scenes}
+
+  :portfolio-dashboard
+  {:target :browser-test
+   :ns-regexp "dashboard-scenes$"
+   :test-dir "target/js/portfolio-dashboard"
+   :runner-ns monkey.ci.gui.test.scenes-v2}}}

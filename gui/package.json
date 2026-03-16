@@ -1,12 +1,29 @@
 {
     "name": "monkeyci-gui",
-    "version": "0.22.0-SNAPSHOT",
+    "version": "0.25.1-SNAPSHOT",
     "private": true,
+    "scripts": {
+        "shadow:watch": "shadow-cljs watch dashboard",
+        "shadow:release": "shadow-cljs release dashboard",
+        "postcss:build": "cross-env postcss ./dev-resources/css/tailwind.css -o ./target/js/dashboard/css/main.css --verbose",
+        "postcss:watch": "cross-env postcss ./dev-resources/css/tailwind.css -o ./target/js/dashboard/css/main.css --verbose -w --poll 1000ms",
+	"postcss:release": "cross-env NODE_ENV=production postcss ./dev-resources/css/tailwind.css -o ./target/js/dashboard/css/main.css --verbose",
+        "dev": "run-p -l *:watch",
+	"prod": "run-s -l *:release"
+    },
     "devDependencies": {
         "highlight.js": "^10.7.3",
         "marked": "^2.1.3",
         "process": "^0.11.10",
-        "shadow-cljs": "^3.3.1"
+        "shadow-cljs": "^3.3.1",
+        "@tailwindcss/postcss": "^4.1.16",
+        "autoprefixer": "^10.4.21",
+        "cross-env": "^10.1.0",
+        "cssnano": "^7.1.2",
+        "npm-run-all": "^4.1.5",
+        "postcss": "^8.5.6",
+        "postcss-cli": "^11.0.1",
+        "tailwindcss": "^4.1.16"
     },
     "dependencies": {
         "ansi_up": "^6.0.6",
@@ -26,6 +43,6 @@
         "stack-trace": "0.0.10",
         "stacktrace-js": "2.0.2",
         "ws": "^8.18.3",
-        "xml": "1.0.1"
+        "xml": "1.0.1"	
     }
 }

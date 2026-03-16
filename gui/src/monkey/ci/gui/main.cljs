@@ -1,6 +1,7 @@
 (ns monkey.ci.gui.main
   "Main application site, for regular users"
   (:require [monkey.ci.gui.core :as c]
+            [monkey.ci.gui.events]
             [monkey.ci.gui.martian :as m]
             [monkey.ci.gui.pages :as p]
             [monkey.ci.gui.routing :as routing]

@@ -1,0 +1,76 @@
+
+@layer components {
+    .project-dot {
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	display: inline-block;
+    }
+
+    .status-dot {
+	width: 7px; height: 7px; border-radius: 50%; display: inline-block; margin-right: 7px; flex-shrink: 0;
+    }
+
+    .status-text {
+	font-size: 10px;
+	color: var(--accent);
+    }
+
+    .badge {
+      font-size: 9.5px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      padding: 2px 7px;
+      border-radius: 2px;
+      text-transform: uppercase;
+    }
+}
+
+@layer utilities {
+    .dot-success {
+	background: var(--accent3);
+	box-shadow: 0 0 6px var(--accent3);
+    }
+
+    .dot-fail {
+	background: var(--accent2);
+	box-shadow: 0 0 6px var(--accent2);
+    }
+
+    .dot-running {
+	background: var(--accent);
+	box-shadow: 0 0 8px rgba(26,158,63,0.5);
+	animation: pulse 1.2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+	0%, 100% { opacity: 1; transform: scale(1); }
+	50% { opacity: 0.5; transform: scale(0.8); }
+    }
+
+    .dot-queued {
+	background: var(--muted);
+    }
+
+    .project-success {
+	background: var(--accent3);
+    }
+
+    .project-running {
+	background: var(--muted);
+    }
+
+    .project-fail {
+	background: var(--accent2);
+    }
+
+    .blink {
+	animation: blink 1s step-end infinite;
+    }
+    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+    .badge-success { background: #dcfce7; color: #15803d; border: 1px solid #86efac; }
+    .badge-fail { background: #fee2e2; color: #dc2626; border: 1px solid #fca5a5; }
+    .badge-running { background: #d1fae5; color: var(--accent); border: 1px solid #6ee7b7; }
+    .badge-queued { background: #f0f9f0; color: var(--text-dim); border: 1px solid var(--border); }
+}

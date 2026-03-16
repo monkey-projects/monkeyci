@@ -1,15 +1,9 @@
 (ns monkey.ci.gui.core
   (:require [day8.re-frame.http-fx]
             [monkey.ci.gui.download]
-            [monkey.ci.gui.events]
-            [monkey.ci.gui.login.views :as lv]
-            [monkey.ci.gui.pages :as p]
             [monkey.ci.gui.server-events]
-            [monkey.ci.gui.utils :as u]
-            [reagent.core :as rc]
             [reagent.dom.client :as rd]
-            [re-frame.core :as rf]
-            [re-frame.db :refer [app-db]]))
+            [re-frame.core :as rf]))
 
 (defonce app-root (atom nil))
 

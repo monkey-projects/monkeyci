@@ -1,0 +1,59 @@
+@layer components {
+    .title {
+	font-size: 9px;
+	letter-spacing: 0.18em;
+	text-transform: uppercase;
+	color: var(--text-dim);
+    }
+
+    .chip {
+	background: var(--accent-light);
+	border: 1px solid var(--border);
+	color: var(--text-dim);
+	font-size: 9.5px;
+	padding: 3px 8px;
+	letter-spacing: 0.06em;
+	border-radius: 2px;
+	cursor: pointer;
+    }
+}
+
+@layer utilities {
+    .animate-in {
+	animation: slideIn 0.3s ease forwards;
+    }
+
+    .delay-1 { animation-delay: 0.05s; opacity: 0; }
+    .delay-2 { animation-delay: 0.1s; opacity: 0; }
+    .delay-3 { animation-delay: 0.15s; opacity: 0; }
+    .delay-4 { animation-delay: 0.2s; opacity: 0; }
+
+    @keyframes slideIn {
+	from { opacity: 0; transform: translateY(6px); }
+	to { opacity: 1; transform: translateY(0); }
+    }
+
+    .color-text {
+	color: var(--text);
+    }
+
+    .color-dim {
+	color: var(--text-dim);
+    }
+
+    .color-info {
+	color: var(--accent);
+    }
+
+    .color-success {
+	color: var(--accent3);
+    }
+    
+    .color-danger {
+	color: var(--accent2);
+    }
+
+    .bg-border {
+	background: var(--border);
+    }
+}
