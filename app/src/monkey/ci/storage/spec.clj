@@ -18,8 +18,10 @@
              [user :as user]]
             [monkey.ci.spec.job.common :as jc]))
 
+(def display-id-size 50)
+
 (s/def ::id ::c/cuid)
-(s/def ::display-id (s/and string? not-empty))
+(s/def ::display-id (s/and string? not-empty #(<= (count %) display-id-size)))
 
 (s/def ::name (s/and string? not-empty))
 (s/def ::description string?)

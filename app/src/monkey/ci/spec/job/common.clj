@@ -46,6 +46,7 @@
 (s/def ::env (s/map-of string? string?))
 (s/def ::port int?)
 (s/def ::expose (s/coll-of ::port))
+(s/def ::init fn?)
 
 (s/def ::address string?)
 (s/def ::ports (s/map-of int? int?))

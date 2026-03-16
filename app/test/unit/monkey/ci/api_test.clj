@@ -363,3 +363,11 @@
 
     (testing "`nil` if port not mapped"
       (is (nil? (sut/get-job-exposed-addr ctx "test-job" 12342))))))
+
+(deftest init
+  (testing "retrieves container initializer fn"
+    (let [init (fn [ctx] (println "just testing"))]
+      (is (= init
+             (-> (sut/container-job "test-job")
+                 (sut/init init)
+                 (sut/init)))))))

@@ -15,7 +15,8 @@
              [ssh :as ssh]
              [user :as user]]
             [monkey.ci.spec.job.common :as job]
-            [monkey.ci.events.spec :as evt]))
+            [monkey.ci.events.spec :as evt]
+            [monkey.ci.storage.spec :as ss]))
 
 (def id? int?)
 (def ts? int?)
@@ -26,7 +27,7 @@
 (s/def :github/secret string?)
 (s/def ::name (s/and string? not-empty))
 (s/def ::description string?)
-(s/def ::display-id (s/and string? not-empty #(<= (count %) 30)))
+(s/def ::display-id (s/and string? not-empty #(<= (count %) ss/display-id-size)))
 
 (s/def ::common
   (s/keys :req-un [::cuid]
