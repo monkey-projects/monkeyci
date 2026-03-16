@@ -30,3 +30,18 @@
   [sut/success-rate-metrics
    {:value 0.87
     :diff -2.1}])
+
+(defscene avg-duration-metrics--good
+  [sut/avg-duration-metrics
+   {:value "3m24s"
+    :diff 5.1}])
+
+(defscene avg-duration-metrics--bad
+  [sut/avg-duration-metrics
+   {:value "5m16s"
+    :diff -6.3}])
+
+(defscene failures-metrics
+  [sut/failures-metrics
+   {:value 75
+    :diff 6}])

@@ -132,24 +132,35 @@
     :status (if (pos? diff) :success :danger)
     :anim-delay 2}])
 
+(defn avg-duration-metrics
+  [v]
+  [metrics-card
+   {:title "Avg Duration"
+    :value (:value v)
+    :details (if (neg? (:diff v))
+               [:span.color-danger (str arrow-down " " (- (:diff v))"% slower today")]
+               [:span.color-success (str arrow-up " " (:diff v)"% faster today")])
+    :progress 0
+    :status :neutral
+    :anim-delay 3}])
+
+(defn failures-metrics
+  [v]
+  [metrics-card
+   {:title "Failures"
+    :value (:value v)
+    :details (str arrow-up " " (:diff v) " new in last hour")
+    :progress (float (- 1 (/ (:diff v) (:value v))))
+    :status :danger
+    :anim-delay 4}])
+
 (defn dashboard-metrics []
-  (let [metrics [{:title "Avg Duration"
-                  :value "4m38s"
-                  :details [:span.color-danger "↓ 8% slower today"]
-                  :progress 0
-                  :status :neutral}
-                 {:title "Failures"
-                  :value "74"
-                  :details "↑ 5 new in last hour"
-                  :progress 0.22
-                  :status :danger}]]
-    [:div.dashboard-metrics.flex.flex-col.gap-4.px-6
-     (->> metrics
-          (map-indexed (fn [idx m]
-                         [metrics-card (assoc m :anim-delay (inc idx))]))
-          (into [:div.grid.grid-cols-4.gap-3.animate-in
-                 [total-runs-metrics]
-                 [success-rate-metrics {:value 0.94 :diff 2.1}]]))]))
+  [:div.dashboard-metrics.flex.flex-col.gap-4.px-6
+   [:div.grid.grid-cols-4.gap-3.animate-in
+    [total-runs-metrics]
+    [success-rate-metrics {:value 0.94 :diff 2.1}]
+    [avg-duration-metrics {:value "4m38s" :diff -8}]
+    [failures-metrics {:value 74 :diff 5}]]])
 
 (defn builds-filter-btn [lbl]
   [:button.chip.uppercase lbl])
