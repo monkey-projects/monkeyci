@@ -85,7 +85,18 @@
       (is (= "clojure -X:gen-404"
              (-> (sut/build-gui-release ctx)
                  :script
-                 (nth 2)))))))
+                 (nth 2))))))
+
+  (testing "overrides version on release"
+    (let [cmd (-> mt/test-ctx
+                  (mt/with-git-ref "refs/tags/0.1.0")
+                  (sut/build-gui-release)
+                  :script
+                  last)]
+      (is (cs/starts-with? cmd "clojure"))
+      (is (cs/includes? cmd "release :frontend"))
+      (is (cs/ends-with?
+           cmd "--config-merge '{:closure-defines {monkey.ci.gui.version/VERSION \"0.1.0\"}'")))))
 
 (deftest publish
   (with-redefs [clojars/latest-version (constantly "1.0.0")]
