@@ -100,15 +100,18 @@
    [:div.progress-track
     [:div.progress-fill {:style {:width (str (* progress 100) "%")}}]]])
 
-(defn- total-runs-metrics []
-  (let [v (rf/subscribe [::s/metrics-total-runs])]
-    [metrics-card
-     {:title "Total Runs"
-      :value (:value @v)
-      :details [:span.color-success (str "↑ " (:diff @v) "% vs yesterday")]
-      :progress (:progress @v)
-      :status (:status @v)
-      :anim-delay 1}]))
+(defn total-runs-metrics
+  ([v]
+   [metrics-card
+    {:title "Total Runs"
+     :value (:value v)
+     :details [:span.color-success (str "↑ " (:diff v) "% vs yesterday")]
+     :progress (:progress v)
+     :status (:status v)
+     :anim-delay 1}])
+  ([]
+   (let [v (rf/subscribe [::s/metrics-total-runs])]
+     [total-runs-metrics @v])))
 
 (defn dashboard-metrics []
   (let [metrics [{:title "Success Rate"
@@ -227,7 +230,24 @@
           (map build-row)
           (into [:<>]))]))
 
-(defn- live-log-entries []
+(defn- live-log-entries [entries]
+  (letfn [(log-entry [[ts lvl msg]]
+            [:div.log-line {:class lvl}
+             [:span.ts ts]
+             (condp = lvl
+               :ok "✓ "
+               :warn "⚠ "
+               :running "▶ "
+               "")
+             msg
+             (when (= :running lvl)
+               [:span.blink "█"])])]
+    (->> entries
+         (map log-entry)
+         (into [:div.overflow-y-auto.scrollbar-hide.px-3.py-4
+                {:class "max-h-[240px]"}]))))
+
+(defn live-log [{:keys [repo-id build-idx]}]
   (let [entries [["09:14:02" :info "Pulling docker image node:20-alpine"]
                  ["09:14:05" :ok "Image cached, skipping pull"]
                  ["09:14:05" :notify "Starting unit-tests job..."]
@@ -237,32 +257,15 @@
                  ["09:15:35" :ok "215/215 tests passed"]
                  ["09:15:46" :ok "Artifacts saved"]
                  ["09:15:47" :running "Starting publish job..."]]]
-    (letfn [(log-entry [[ts lvl msg]]
-              [:div.log-line {:class lvl}
-               [:span.ts ts]
-               (condp = lvl
-                 :ok "✓ "
-                 :warn "⚠ "
-                 :running "▶ "
-                 "")
-               msg
-               (when (= :running lvl)
-                 [:span.blink "█"])])]
-      (->> entries
-           (map log-entry)
-           (into [:div.overflow-y-auto.scrollbar-hide.px-3.py-4
-                  {:class "max-h-[240px]"}])))))
-
-(defn live-log []
-  [:div.live-log.flex-1.dashboard-card
-   [:div.header
-    [:div.title "Live Log"]
-    ;; Selected build
-    [:div.flex.items-center.gap-1
-     [:div.dot-running.status-dot]
-     [:div.color-info.font-semibold.text-xs
-      "monkeyci #1256"]]]
-   [live-log-entries]])
+    [:div.live-log.flex-1.dashboard-card
+     [:div.header
+      [:div.title "Live Log"]
+      ;; Selected build
+      [:div.flex.items-center.gap-1
+       [:div.dot-running.status-dot]
+       [:div.color-info.font-semibold.text-xs
+        (str repo-id " #" build-idx)]]]
+     [live-log-entries entries]]))
 
 (defn job-throughput []
   (let [throughput [0.00 0.05 0.06 0.15 0.25 0.26 0.35 0.60 0.80 0.75 0.40 0.55]]
@@ -285,7 +288,7 @@
    [:div.grid.gap-4.px-6.flex-1.pb-5 {:class "grid-cols-[1fr_320px]"}
     [active-builds-table]
     [:div.flex.flex-col.gap-3
-     [live-log]
+     [live-log {:repo-id "monkeyci" :build-idx 1409}]
      [job-throughput]]]])
 
 (defn dashboard []
