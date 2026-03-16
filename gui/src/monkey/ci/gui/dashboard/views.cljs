@@ -4,6 +4,12 @@
             [monkey.ci.gui.dashboard.subs :as s]
             [re-frame.core :as rf]))
 
+(def arrow-up "↑")
+(def arrow-down "↓")
+
+(defn- arrow-up-down [v]
+  (if (neg? v) arrow-down arrow-up))
+
 (defn running-indicator []
   (let [n (rf/subscribe [::s/n-running-builds])]
     [:div.flex.items-center.gap-2
@@ -105,7 +111,7 @@
    [metrics-card
     {:title "Total Runs"
      :value (:value v)
-     :details [:span.color-success (str "↑ " (:diff v) "% vs yesterday")]
+     :details [:span.color-success (str (arrow-up-down (:diff v)) " " (:diff v) "% vs yesterday")]
      :progress (:progress v)
      :status (:status v)
      :anim-delay 1}])
@@ -113,13 +119,21 @@
    (let [v (rf/subscribe [::s/metrics-total-runs])]
      [total-runs-metrics @v])))
 
+(defn success-rate-metrics
+  [{:keys [value diff]}]
+  [metrics-card
+   {:title "Success Rate"
+    :value [:span {:class (if (pos? diff) :color-success :color-danger)}
+            (str (* 100 value)) [:span.text-base "%"]]
+    :details (if (neg? diff)
+               (str arrow-down " " diff "% worse")
+               (str arrow-up " " diff "% improvement"))
+    :progress value
+    :status (if (pos? diff) :success :danger)
+    :anim-delay 2}])
+
 (defn dashboard-metrics []
-  (let [metrics [{:title "Success Rate"
-                  :value [:span.color-success "94.2" [:span.text-base "%"]]
-                  :details "↑ 2.1% improvement"
-                  :progress 0.942
-                  :status :success}
-                 {:title "Avg Duration"
+  (let [metrics [{:title "Avg Duration"
                   :value "4m38s"
                   :details [:span.color-danger "↓ 8% slower today"]
                   :progress 0
@@ -134,7 +148,8 @@
           (map-indexed (fn [idx m]
                          [metrics-card (assoc m :anim-delay (inc idx))]))
           (into [:div.grid.grid-cols-4.gap-3.animate-in
-                 [total-runs-metrics]]))]))
+                 [total-runs-metrics]
+                 [success-rate-metrics {:value 0.94 :diff 2.1}]]))]))
 
 (defn builds-filter-btn [lbl]
   [:button.chip.uppercase lbl])

@@ -20,3 +20,13 @@
     :diff 2.45
     :progress 0.85
     :status :success}])
+
+(defscene success-rate-metrics--good
+  [sut/success-rate-metrics
+   {:value 0.94
+    :diff 2.1}])
+
+(defscene success-rate-metrics--bad
+  [sut/success-rate-metrics
+   {:value 0.87
+    :diff -2.1}])
