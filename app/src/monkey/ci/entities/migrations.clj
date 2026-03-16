@@ -785,7 +785,14 @@
      [:code [:varchar 100] [:not nil]]
      [:creation-time :timestamp]
      (fk :email-reg-id :email-registrations :id)]
-    [(col-idx :email-confirmations :email-reg-id)])])
+    [(col-idx :email-confirmations :email-reg-id)])
+
+   (migration
+    (mig-id 64 :org-display-id-size)
+    [{:alter-table :orgs
+      :alter-column [:display-id [:varchar 50]]}]
+    [{:alter-table :orgs
+      :alter-column [:display-id [:varchar 30]]}])])
 
 (defn prepare-migrations
   "Prepares all migrations by formatting to sql, creates a ragtime migration object from it."
