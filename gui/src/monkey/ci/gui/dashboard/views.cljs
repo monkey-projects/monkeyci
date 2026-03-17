@@ -133,24 +133,24 @@
     :anim-delay 2}])
 
 (defn avg-duration-metrics
-  [v]
+  [{:keys [diff] :as v}]
   [metrics-card
    {:title "Avg Duration"
     :value (:value v)
-    :details (if (neg? (:diff v))
-               [:span.color-danger (str arrow-down " " (- (:diff v))"% slower today")]
-               [:span.color-success (str arrow-up " " (:diff v)"% faster today")])
+    :details (if (neg? diff)
+               [:span.color-danger (str arrow-down " " (- diff) "% slower today")]
+               [:span.color-success (str arrow-up " " diff "% faster today")])
     :progress 0
     :status :neutral
     :anim-delay 3}])
 
 (defn failures-metrics
-  [v]
+  [{:keys [diff value]}]
   [metrics-card
    {:title "Failures"
-    :value (:value v)
-    :details (str arrow-up " " (:diff v) " new in last hour")
-    :progress (float (- 1 (/ (:diff v) (:value v))))
+    :value value
+    :details (str arrow-up " " diff " new in last hour")
+    :progress (float (- 1 (/ diff value)))
     :status :danger
     :anim-delay 4}])
 
@@ -158,6 +158,7 @@
   [:div.dashboard-metrics.flex.flex-col.gap-4.px-6
    [:div.grid.grid-cols-4.gap-3.animate-in
     [total-runs-metrics]
+    ;; TODO Make dynamic
     [success-rate-metrics {:value 0.94 :diff 2.1}]
     [avg-duration-metrics {:value "4m38s" :diff -8}]
     [failures-metrics {:value 74 :diff 5}]]])

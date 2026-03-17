@@ -50,3 +50,8 @@
           :build-idx 453
           :trigger-type :push
           :status :success}]))))
+
+(rf/reg-event-fx
+ ::list-orgs
+ (fn [_ _]
+   ))

@@ -4,9 +4,12 @@
             [day8.re-frame.test :as rf-test]
             [monkey.ci.gui.apis.bitbucket :as sut]
             [monkey.ci.gui.login.db :as ldb]
+            [monkey.ci.gui.test.fixtures :as f]
             [monkey.ci.gui.test.helpers :as h]
             [re-frame.core :as rf]
             [re-frame.db :refer [app-db]]))
+
+(use-fixtures :once f/main-router)
 
 (deftest bitbucket-load-repos
   (testing "clears repos"

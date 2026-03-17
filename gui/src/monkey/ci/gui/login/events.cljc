@@ -20,7 +20,7 @@
          next-route (:path cr)]
      {:local-storage [storage-redir-id
                       ;; Ignore public routes to avoid redirecting to the callback pages
-                      (when-not (r/public? (r/route-name cr))
+                      (when-not (r/public? cr)
                         {:redirect-to next-route})]
       :dispatch [:route/goto :page/login]})))
 
