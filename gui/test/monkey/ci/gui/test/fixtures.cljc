@@ -1,5 +1,6 @@
 (ns monkey.ci.gui.test.fixtures
   (:require [monkey.ci.gui.admin.routing :as ar]
+            [monkey.ci.gui.dashboard.routing :as dr]
             [monkey.ci.gui.main.routing :as mr]
             [monkey.ci.gui.routing :as r]
             [re-frame.core :as rf]
@@ -26,3 +27,6 @@
 
 (def admin-router
   (with-router ar/admin-router))
+
+(def dashboard-router
+  (with-router dr/router))

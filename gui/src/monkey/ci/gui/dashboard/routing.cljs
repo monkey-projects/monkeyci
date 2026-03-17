@@ -5,10 +5,11 @@
 (def routes
   "Dashboard nav routes"
   [["/" :page/root]
+   ["/login" {:name :page/login
+              :public? true}]
    ["/d/:org-id" :page/org-dashboard]])
 
-(defonce router (r/make-router routes))
+(def router (r/make-router routes))
 
 (defn start! []
-  (reset! r/router router)
-  (r/start-router))
+  (r/start-router router))

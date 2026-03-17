@@ -1,6 +1,9 @@
-(ns monkey.ci.gui.dashboard.subs
-  (:require [monkey.ci.gui.dashboard.db :as db]
+(ns monkey.ci.gui.dashboard.main.subs
+  (:require [monkey.ci.gui.dashboard.main.db :as db]
+            [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
+
+(u/db-sub ::recent-builds db/get-recent-builds)
 
 (rf/reg-sub
  ::assets-url
@@ -31,14 +34,42 @@
  (fn [db _]
    (:jobs db)))
 
+(defn- parse-trigger [src]
+  (condp = src
+    "github-app" :push
+    ;; TODO More trigger types
+    :api))
+
+(defn- parse-ref [ref]
+  (when-let [[_ t r] (re-matches #"^refs/([^/]+)/(.+)$" ref)]
+    [r t]))
+
+(defn- build-progress [{:keys [status]}]
+  (case (keyword status)
+    :running 0.5
+    :success 1
+    :failed 1
+    :error 1
+    0))
+
+(defn- ->active-build [b]
+  {:repo (:repo-id b)
+   :status (keyword (:status b))
+   :build-idx (:idx b)
+   :trigger-type (parse-trigger (:source b))
+   :git-ref (first (parse-ref (get-in b [:git :ref])))
+   :progress (build-progress b)
+   :elapsed (u/build-elapsed b)})
+
 (rf/reg-sub
  ::active-builds
- (fn [db _]
-   (db/get-active-builds db)))
+ :<- [::recent-builds]
+ (fn [rb _]
+   (map ->active-build rb)))
 
 (rf/reg-sub
  ::n-running-builds
- :<- [::active-builds]
+ :<- [::recent-builds]
  (fn [a _]
    (->> a
         (filter (comp (partial = :running) :status))

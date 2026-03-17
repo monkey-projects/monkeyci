@@ -59,26 +59,9 @@
     }
 }
 
-/*
-@layer components {
-    .btn {
-	padding-block: var(--spacing);
-	padding-inline: calc(var(--spacing) * 4);
-	border-radius: var(--radius-sm);
-	cursor: pointer;
-    }
-}
-
-@theme {
-    --font-sans: inter, sans-serif;
-}
-
-@import "./common.css";
-@import "./footer.css";
-*/
-
 @import "./base.css";
 @import "./nav.css";
 @import "./badge.css";
 @import "./status.css";
 @import "./dashboard.css";
+@import "./login.css";

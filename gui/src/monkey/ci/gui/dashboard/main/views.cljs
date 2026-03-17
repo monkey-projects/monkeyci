@@ -1,7 +1,8 @@
-(ns monkey.ci.gui.dashboard.views
-  (:require [monkey.ci.gui.dashboard.events :as e]
-            [monkey.ci.gui.dashboard.icons :as i]
-            [monkey.ci.gui.dashboard.subs :as s]
+(ns monkey.ci.gui.dashboard.main.views
+  (:require [monkey.ci.gui.dashboard.icons :as i]
+            [monkey.ci.gui.dashboard.main.events :as e]
+            [monkey.ci.gui.dashboard.main.subs :as s]
+            [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
 
 (def arrow-up "↑")
@@ -164,7 +165,9 @@
     [failures-metrics {:value 74 :diff 5}]]])
 
 (defn builds-filter-btn [lbl]
-  [:button.chip.uppercase lbl])
+  [:button.chip.uppercase
+   {:on-click (u/link-evt-handler [::e/recent-builds])}
+   lbl])
 
 (defn table-header []
   (->> ["repo / branch"
