@@ -1,12 +1,10 @@
-(ns monkey.ci.gui.dashboard.login.http)
+(ns monkey.ci.gui.dashboard.login.http
+  (:require [monkey.ci.gui.martian :as m]))
 
-(def base-url
-  (if ^boolean goog.DEBUG
-    "http://localhost:3000/api"
-    "https://api.monkeyci.io/api"))
+;; TODO Replace this with martian code
 
 (defn endpoint [path]
-  (str base-url path))
+  (str m/url path))
 
 (def default-headers
   {"Content-Type"  "application/json"
