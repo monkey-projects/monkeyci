@@ -154,6 +154,20 @@
     [:p desc]
     contents]])
 
+(defn- calc-perc [v ok err]
+  (let [s (reduce + 0 (map ok v))
+        e (reduce + 0 (map err v))]
+    (when (and s e)
+      (int (* 100 (/ s (+ s e)))))))
+
+(defn- builds-lbl []
+  (let [stats (rf/subscribe [:org/build-stats])]
+    (let [r (:results @stats)
+          p (calc-perc r :success :error)]
+      (if p
+        (str p "% of your builds have passed.")
+        "Percentage of successful builds"))))
+
 (defn builds-charts [org-id]
   (rf/dispatch [:org/load-build-stats org-id stats-period-days])
   (fn [_]
@@ -161,13 +175,21 @@
      [:div.col-4
       [stats-card
        "Build Success Overall"
-       "Percentage of successful builds"
+       [builds-lbl]
        [builds-success-chart]]]
      [:div.col-8
       [stats-card
        "Build Success per Day"
        "The number of successful builds for this period."
        [builds-history-chart]]]]))
+
+(defn- jobs-lbl []
+  (let [stats (rf/subscribe [:org/job-stats])]
+    (let [r (:results @stats)
+          p (calc-perc r :success :failure)]
+      (if p
+        (str p "% of your jobs have passed.")
+        "Percentage of successful jobs."))))
 
 (defn jobs-charts [org-id]
   (rf/dispatch [:org/load-job-stats org-id stats-period-days])
@@ -181,7 +203,7 @@
      [:div.col-4
       [stats-card
        "Job Success Overall"
-       "Percentage of successful jobs"
+       [jobs-lbl]
        [jobs-success-chart]]]]))
 
 (defn org-stats [org-id]
