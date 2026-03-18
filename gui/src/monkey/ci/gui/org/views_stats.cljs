@@ -5,8 +5,9 @@
 
 (def stats-period-days 30)
 (def color-ok "#91c9ae")
-(def color-ok-2 "#5ea814")
+(def color-ok-2 "#008060")
 (def color-err "#FFB1C1")
+(def color-err-2 "#7a3350")
 
 (defn elapsed-chart-config [{:keys [elapsed-seconds consumed-credits]}]
   (let [dates (->> (concat (map :date elapsed-seconds)
@@ -113,7 +114,7 @@
               :backgroundColor color-ok-2}
              {:label "Failed jobs"
               :data (map :failure results)
-              :backgroundColor color-err}]}
+              :backgroundColor color-err-2}]}
      :options
      {:scales
       {"x"
@@ -139,7 +140,7 @@
               :datasets
               [{:label "Jobs"
                 :data [s e]
-                :backgroundColor [color-ok-2 color-err]}]}})))
+                :backgroundColor [color-ok-2 color-err-2]}]}})))
 
 (defn jobs-success-chart []
   (let [stats (rf/subscribe [:org/job-stats])]
