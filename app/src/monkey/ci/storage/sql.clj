@@ -461,7 +461,8 @@
    :job
    {:save sj/upsert-job
     :find sj/select-job
-    :list-events select-job-events}
+    :list-events select-job-events
+    :list-for-period sj/select-for-period}
    :email-registration
    {:list ser/select-email-registrations
     :find-by-email ser/select-email-registration-by-email

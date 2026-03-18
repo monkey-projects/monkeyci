@@ -335,20 +335,28 @@
 
 (deftest jobs
   (h/with-memory-store st
-    (testing "can save and retrieve"
-      (let [[cust-id repo-id build-id :as sid] (repeatedly 3 cuid/random-cuid)
-            build (-> (h/gen-build)
-                      (assoc :org-id cust-id
-                             :repo-id repo-id
-                             :build-id build-id
-                             :script {}))
-            job {:id "test-job"}]
-        (is (sid/sid? (sut/save-build st build)))
+    (let [[org-id repo-id build-id :as sid] (repeatedly 3 cuid/random-cuid)
+          build (-> (h/gen-build)
+                    (assoc :org-id org-id
+                           :repo-id repo-id
+                           :build-id build-id
+                           :script {}))
+          job {:id "test-job"
+               :start-time 1000}]
+      (is (sid/sid? (sut/save-org st {:id org-id
+                                      :repos {repo-id {:id repo-id}}})))
+      (is (sid/sid? (sut/save-build st build)))
+      
+      (testing "can save and retrieve"
         (is (sid/sid? (sut/save-job st sid job)))
         (is (= job (sut/find-job st (concat sid [(:id job)]))))
         (is (= job (-> (sut/find-build st sid)
                        (get-in [:script :jobs (:id job)])))
-            "updates job in build")))))
+            "updates job in build"))
+
+      (testing "can list for period for org"
+        (is (= [job] (sut/list-jobs-for-period st org-id 0 2000)))
+        (is (empty? (sut/list-jobs-for-period st org-id 2000 3000)))))))
 
 (deftest save-ssh-keys
   (testing "writes ssh keys object"

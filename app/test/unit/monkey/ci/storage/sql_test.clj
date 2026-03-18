@@ -580,7 +580,8 @@
                            :org-id (:id org)
                            :repo-id (:id repo)))
           sid [(:id org) (:id repo) (:build-id build)]
-          job {:id "test-job"}]
+          job {:id "test-job"
+               :start-time 1000}]
       (is (some? (st/save-org s org)))
       (is (some? (st/save-repo s repo)))
       (is (some? (st/save-build s build)))
@@ -599,7 +600,12 @@
           (is (= {"test-job" upd}
                  (-> (st/find-build s sid)
                      :script
-                     :jobs))))))))
+                     :jobs)))))
+
+      (testing "can list for period"
+        (is (= [(:id job)]
+               (map :id (st/list-jobs-for-period s (:id org) 0 2000))))
+        (is (empty? (st/list-jobs-for-period s (:id org) 2000 3000)))))))
 
 (deftest ^:sql join-requests
   (with-storage conn s

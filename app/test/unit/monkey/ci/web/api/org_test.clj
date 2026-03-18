@@ -516,7 +516,7 @@
                  :script
                  {:jobs {"third" {:job-id "third"
                                   :start-time (ms 2026 3 19 10 0 0)
-                                  :status :failed}}}}]]
+                                  :status :failure}}}}]]
     (is (some? (st/save-org st org)))
     (is (every? some?
                 (->> builds
@@ -546,12 +546,12 @@
                 (t/epoch->date (:date v1)))
             (is (= 0 (:n v1)))
             (is (= 0 (:success v1)))
-            (is (= 0 (:failed v1)))
+            (is (= 0 (:failure v1)))
 
             (is (= 2 (:n v2)))
             (is (= 2 (:success v2)))
-            (is (= 0 (:failed v2)))
+            (is (= 0 (:failure v2)))
 
             (is (= 1 (:n v3)))
             (is (= 0 (:success v3)))
-            (is (= 1 (:failed v3)))))))))
+            (is (= 1 (:failure v3)))))))))

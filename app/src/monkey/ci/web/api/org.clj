@@ -248,13 +248,11 @@
 (defn stats-job-results
   "Similar to `build-result-stats` but for jobs."
   [req]
-  (let [defaults (zipmap [:success :failed :canceled] (repeat 0))]
-    (with-builds-for-period
-      req
-      (fn [by-date]
-        (->> by-date
-             (map (fn [[k v]]
-                    [k (mapcat (comp vals :jobs :script) v)]))
-             (map (partial calc-stats-results defaults))
-             (hash-map :results)
-             (rur/response))))))
+  (let [st (c/req->storage req)
+        {:keys [since until dates zone]} (req->stats-dates req)
+        jobs (st/list-jobs-for-period st (c/org-id req) since until)
+        defaults (zipmap [:success :failure :canceled] (repeat 0))]
+    (->> (group-by-date dates zone jobs :start-time)
+         (map (partial calc-stats-results defaults))
+         (hash-map :results)
+         (rur/response))))

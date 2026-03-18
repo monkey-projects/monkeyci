@@ -496,30 +496,42 @@
   (override-or
    [:job :find]
    (fn [s job-sid]
-     ;;(log/debug "Looking up job" job-sid)
      (some-> (find-build s (sid/->sid (take 3 job-sid)))
-             (log/spy)
              (get-in [:script :jobs (nth job-sid 3)])))))
+
+(def list-jobs-for-period
+  "Retrieves all jobs for given org over a period of time"
+  (override-or
+   [:job :list-for-period]
+   (fn [s org-id from until]
+     (letfn [(between? [{:keys [start-time]}]
+               (<= from start-time until))]
+       (->> (find-org s org-id)
+            :repos
+            keys
+            (mapcat (comp (partial list-builds s) (partial vector org-id)))
+            (mapcat (comp vals :jobs :script))
+            (filter between?))))))
 
 (defn params-sid [org-id & [param-id]]
   ;; All parameters for a org are stored together
   (cond-> ["build-params" org-id]
     param-id (conj param-id)))
 
-(defn find-params [s cust-id]
-  (p/read-obj s (params-sid cust-id)))
+(defn find-params [s org-id]
+  (p/read-obj s (params-sid org-id)))
 
 (defn save-params
   "Saves all org parameters at once"
-  [s cust-id p]
-  (p/write-obj s (params-sid cust-id) p))
+  [s org-id p]
+  (p/write-obj s (params-sid org-id) p))
 
 (def find-param
   "Retrieves a single parameter by sid"
   (override-or
    [:param :find]
-   (fn [s [_ cust-id param-id]]
-     (->> (find-params s cust-id)
+   (fn [s [_ org-id param-id]]
+     (->> (find-params s org-id)
           (filter (cp/prop-pred :id param-id))
           (first)))))
 
