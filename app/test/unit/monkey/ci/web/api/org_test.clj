@@ -440,3 +440,56 @@
                         :available))))
 
       (testing "contains last credit provision"))))
+
+(deftest stats-build-results
+  (let [{st :storage :as rt} (trt/test-runtime)
+        repo (h/gen-repo)
+        org (assoc (h/gen-org) :repos {(:id repo) repo})
+        ms (fn [& d]
+             (-> (apply jt/offset-date-time d)
+                 (jt/instant)
+                 (jt/to-millis-from-epoch)))
+        builds [{:start-time (ms 2026 3 18 10 0 0)
+                 :status :success}
+                {:start-time (ms 2026 3 18 10 30 0)
+                 :status :error}
+                {:start-time (ms 2026 3 19 10 0 0)
+                 :status :error}]]
+    (is (some? (st/save-org st org)))
+    (is (every? some?
+                (->> builds
+                     (map-indexed (fn [idx b]
+                                    (assoc b
+                                           :org-id (:id org)
+                                           :repo-id (:id repo)
+                                           :build-id (str "build-" (inc idx))
+                                           :end-time (+ (:start-time b) 1000))))
+                     (mapv (partial st/save-build st)))))
+    
+    (testing "build results grouped by status and by date over given period for org"
+      (let [r (-> rt
+                  (h/->req)
+                  (assoc :parameters
+                         {:path
+                          {:org-id (:id org)}
+                          :query
+                          {:since (ms 2026 3 18)
+                           :until (ms 2026 3 20)}})
+                  (sut/stats-build-results))]
+        (is (= 200 (:status r)))
+        (let [b (get-in r [:body :results])]
+          (is (= 3 (count b)))
+          (let [[v1 v2 v3] b]
+            (is (= (ms 2026 3 17 1) (:date v1))
+                (t/epoch->date (:date v1)))
+            (is (= 0 (:n v1)))
+            (is (= 0 (:success v1)))
+            (is (= 0 (:error v1)))
+
+            (is (= 2 (:n v2)))
+            (is (= 1 (:success v2)))
+            (is (= 1 (:error v2)))
+
+            (is (= 1 (:n v3)))
+            (is (= 0 (:success v3)))
+            (is (= 1 (:error v3)))))))))

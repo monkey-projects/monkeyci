@@ -3,7 +3,6 @@
             [monkey.ci.gui.time :as time]
             [re-frame.core :as rf]))
 
-
 (defn build-chart-config [{:keys [elapsed-seconds consumed-credits]}]
   (let [dates (->> (concat (map :date elapsed-seconds)
                            (map :date consumed-credits))

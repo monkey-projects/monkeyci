@@ -475,13 +475,13 @@
   "Retrieves all builds for org since the given timestamp"
   (override-or
    [:build :list-since]
-   (fn [s cust-id ts]
+   (fn [s org-id ts]
      (letfn [(since? [b]
                (>= (:start-time b) ts))]
-       (->> (find-org s cust-id)
+       (->> (find-org s org-id)
             :repos
             keys
-            (mapcat #(list-builds s [cust-id %]))
+            (mapcat #(list-builds s [org-id %]))
             (filter since?))))))
 
 (def save-job

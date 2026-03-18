@@ -426,10 +426,31 @@
                            (app)
                            :status)))))
 
-        (testing "`GET /stats` retrieves org statistics"
-          (is (= 200 (-> (mock/request :get (str "/org/" (:id org) "/stats"))
-                         (app)
-                         :status))))
+        (testing "`/stats`"
+          (testing "`GET /` retrieves multiple org statistics"
+            (is (= 200 (-> (mock/request :get (str "/org/" (:id org) "/stats"))
+                           (app)
+                           :status))))
+
+          (testing "`GET /elapsed` retrieves build elapsed statistics"
+            (is (= 200 (-> (mock/request :get (str "/org/" (:id org) "/stats/elapsed"))
+                           (app)
+                           :status))))
+          
+          (testing "`GET /credits` retrieves credits statistics"
+            (is (= 200 (-> (mock/request :get (str "/org/" (:id org) "/stats/credits"))
+                           (app)
+                           :status))))
+
+          (testing "`GET /builds` retrieves build statistics"
+            (is (= 200 (-> (mock/request :get (str "/org/" (:id org) "/stats/builds"))
+                           (app)
+                           :status))))
+
+          (testing "`GET /jobs` retrieves job statistics"
+            (is (= 200 (-> (mock/request :get (str "/org/" (:id org) "/stats/jobs"))
+                           (app)
+                           :status)))))
 
         (testing "`/credits`"
           (testing "`GET` retrieves org credit details"

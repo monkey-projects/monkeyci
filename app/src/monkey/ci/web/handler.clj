@@ -161,6 +161,10 @@
   {:query {(s/optional-key :since) s/Int
            (s/optional-key :until) s/Int}})
 
+(def stats-params
+  (assoc-in since-params
+            [:query (s/optional-key :zone-offset)] s/Str))
+
 (def webhook-routes
   ["/webhook"
    [[""
@@ -350,9 +354,18 @@
      {:get {:handler org-api/latest-builds}}]]])
 
 (def stats-routes
-  ["/stats" {:get {:handler org-api/stats
-                   :parameters (assoc-in since-params
-                                         [:query (s/optional-key :zone-offset)] s/Str)}}])
+  ["/stats"
+   {:parameters stats-params}
+   [[""
+     {:get {:handler org-api/stats}}]
+    ["/elapsed"
+     {:get {:handler org-api/stats-elapsed-req}}]
+    ["/credits"
+     {:get {:handler org-api/stats-credits-req}}]
+    ["/builds"
+     {:get {:handler org-api/stats-build-results}}]
+    ["/jobs"
+     {:get {:handler org-api/stats-job-results}}]]])
 
 (def credit-routes
   ["/credits" {:get {:handler org-api/credits}}])

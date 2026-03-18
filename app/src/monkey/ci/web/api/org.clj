@@ -151,31 +151,62 @@
          (map day-consumed)
          (sort-by :date))))
 
+(defn- stats-period [req]
+  {:zone  (-> (get-in req [:parameters :query :zone-offset] default-tz)
+              (jt/zone-offset))
+   :since (or (query->since req)
+              (hours-ago (* 24 31)))
+   :until (or (query->until req)
+              (t/now))})
+
+(defn- req->stats-dates
+  "Extracts time zone, since/until dates from the request and returns a sequence
+   of dates for statistics generation."
+  [req]
+  (let [{:keys [zone since until]} (stats-period req)
+        dates (->> (t/date-seq (jt/offset-date-time since zone))
+                   (take-while (partial jt/after? (jt/offset-date-time until zone))))]
+    {:since since
+     :until until
+     :zone  zone
+     :dates dates}))
+
+(defn- stats-elapsed [req]
+  (let [st (c/req->storage req)
+        {:keys [since dates zone]} (req->stats-dates req)
+        builds (st/list-builds-since st (c/org-id req) since)]
+    (-> (group-by-date dates zone builds :start-time)
+        (elapsed-seconds))))
+
+(defn- stats-credits [req]
+  (let [st (c/req->storage req)
+        {:keys [since dates zone]} (req->stats-dates req)
+        cid (c/org-id req)
+        ccos (st/list-org-credit-consumptions-since st cid since)]
+    (-> (group-by-date dates zone ccos :consumed-at)
+        (consumed-credits))))
+
+(def stats-elapsed-req
+  "Elapsed build duration statistics"
+  (comp rur/response stats-elapsed))
+
+(def stats-credits-req
+  "Consumed credits over period statistics"
+  (comp rur/response stats-credits))
+
 (defn stats
   "Retrieves org statistics, since given time and grouped by specified zone
-   offset (or UTC if none given)"
+   offset (or UTC if none given).  This combines both elapsed seconds and
+   consumed credits over period stats."
   [req]
   (try
-    (let [zone     (-> (get-in req [:parameters :query :zone-offset] default-tz)
-                       (jt/zone-offset))
-          st       (c/req->storage req)
-          since    (or (query->since req)
-                       (hours-ago (* 24 31)))
-          until    (or (query->until req)
-                       (t/now))
-          dates    (->> (t/date-seq (jt/offset-date-time since zone))
-                        (take-while (partial jt/after? (jt/offset-date-time until zone))))
-          cid      (c/org-id req)
-          builds   (st/list-builds-since st cid since)
-          ccos     (st/list-org-credit-consumptions-since st cid since)
-          elapsed  (-> (group-by-date dates zone builds :start-time)
-                       (elapsed-seconds))
-          consumed (-> (group-by-date dates zone ccos :consumed-at)
-                       (consumed-credits))]
-      (rur/response {:period      {:start (t/now)
-                                   :end   (t/now)}
+    (let [{:keys [since until zone]} (stats-period req)
+          elapsed (stats-elapsed req)
+          consumed (stats-credits req)]
+      (rur/response {:period      {:start since
+                                   :end   until}
                      :zone-offset (str zone)
-                     :stats       {:elapsed-seconds elapsed
+                     :stats       {:elapsed-seconds  elapsed
                                    :consumed-credits consumed}}))
     (catch java.time.DateTimeException ex
       ;; Most likely invalid zone offset
@@ -188,3 +219,25 @@
         org-id (c/org-id req)
         avail (st/calc-available-credits s org-id (t/now))]
     (rur/response {:available avail})))
+
+(defn stats-build-results
+  "Statistics about build success and failure over period"
+  [req]
+  (let [{:keys [dates since zone]} (req->stats-dates req)
+        builds (st/list-builds-since (c/req->storage req) (c/org-id req) since)]
+    (letfn [(calc-results [[d b]]
+              (->> (group-by :status b)
+                   (mc/map-vals count)
+                   (merge {:date d
+                           :n (count b)}
+                          (zipmap [:success :error :canceled] (repeat 0)))))]
+      (->> (group-by-date dates zone builds :start-time)
+           (map calc-results)
+           (hash-map :results)
+           (rur/response)))))
+
+(defn stats-job-results
+  "Similar to `build-result-stats` but for jobs."
+  [req]
+  ;; TODO
+  (rur/response {}))
