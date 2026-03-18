@@ -42,6 +42,10 @@
 (def webhook-schema
   {:webhook-id s/Str})
 
+(def stats-schema
+  {(s/optional-key :since) s/Int
+   (s/optional-key :until) s/Int})
+
 ;; TODO Use the same source as backend for this
 (s/defschema NewOrg
   {:name s/Str})
@@ -145,8 +149,21 @@
     {:route-name :get-org-stats
      :path-parts (into org-path ["/stats"])
      :path-schema org-schema
-     :query-schema {(s/optional-key :since) s/Int
-                    (s/optional-key :until) s/Int}
+     :query-schema stats-schema
+     :method :get})
+
+   (api-route
+    {:route-name :get-org-build-stats
+     :path-parts (into org-path ["/stats/builds"])
+     :path-schema org-schema
+     :query-schema stats-schema
+     :method :get})
+
+   (api-route
+    {:route-name :get-org-job-stats
+     :path-parts (into org-path ["/stats/jobs"])
+     :path-schema org-schema
+     :query-schema stats-schema
      :method :get})])
 
 (def repo-routes

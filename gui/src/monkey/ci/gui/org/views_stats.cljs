@@ -3,7 +3,11 @@
             [monkey.ci.gui.time :as time]
             [re-frame.core :as rf]))
 
-(defn build-chart-config [{:keys [elapsed-seconds consumed-credits]}]
+(def stats-period-days 30)
+(def color-ok "#91c9ae")
+(def color-err "#FFB1C1")
+
+(defn elapsed-chart-config [{:keys [elapsed-seconds consumed-credits]}]
   (let [dates (->> (concat (map :date elapsed-seconds)
                            (map :date consumed-credits))
                    (set)
@@ -26,9 +30,11 @@
         :position :left
         :stacked true}}}}))
 
-(defn history-chart []
-  (let [stats (rf/subscribe [:org/stats])]
-    [charts/chart-component :org/builds (build-chart-config (:stats @stats))]))
+(defn elapsed-chart [org-id]
+  (rf/dispatch [:org/load-stats org-id stats-period-days])
+  (fn [_]
+    (let [stats (rf/subscribe [:org/stats])]
+      [charts/chart-component :org/builds (elapsed-chart-config (:stats @stats))])))
 
 (defn credits-chart-config [stats]
   (when-let [{:keys [consumed available]} stats]
@@ -40,28 +46,92 @@
             [{:label "Credits"
               :data [available consumed]}]}}))
 
-(defn credits-chart []
-  (let [stats (rf/subscribe [:org/credit-stats])]
-    (when @stats
-      [charts/chart-component :org/credits (credits-chart-config @stats)])))
+(defn credits-chart [org-id]
+  (rf/dispatch [:org/load-credits org-id])
+  (fn [_]
+    (let [stats (rf/subscribe [:org/credit-stats])]
+      (when @stats
+        [charts/chart-component :org/credits (credits-chart-config @stats)]))))
 
-(def stats-period-days 30)
+(defn builds-chart-config [{:keys [results]}]
+  (let [dates (->> (map :date results)
+                   (set)
+                   (sort))]
+    {:type :bar
+     :data {:labels (->> dates
+                         (map (comp time/format-date time/parse-epoch)))
+            :datasets
+            [{:label "Successful builds"
+              :data (map :success results)
+              :backgroundColor color-ok}
+             {:label "Failed builds"
+              :data (map :error results)
+              :backgroundColor color-err}]}
+     :options
+     {:scales
+      {"x"
+       {:stacked true}
+       "y"
+       {:type :linear
+        :display true
+        :position :left
+        :stacked true}}}}))
+
+(defn builds-history-chart []
+  (let [stats (rf/subscribe [:org/build-stats])]
+    (when @stats
+      [charts/chart-component :org/build-success-history-stats (builds-chart-config @stats)])))
+
+(defn build-success-chart-config [stats]
+  (when-let [{:keys [results]} stats]
+    (let [s (reduce + (map :success results))
+          e (reduce + (map :error results))]
+      {:type :doughnut
+       :data {:labels [(str s " passed")
+                       (str e " failed")]
+              :datasets
+              [{:label "Builds"
+                :data [s e]
+                :backgroundColor [color-ok color-err]}]}})))
+
+(defn builds-success-chart []
+  (let [stats (rf/subscribe [:org/build-stats])]
+    (when @stats
+      [charts/chart-component :org/build-success-stats (build-success-chart-config @stats)])))
+
+(defn stats-card [title desc contents]
+  [:div.card.h-100
+   [:div.card-body
+    [:h5 title]
+    [:p desc]
+    contents]])
+
+(defn builds-charts [org-id]
+  (rf/dispatch [:org/load-build-stats org-id stats-period-days])
+  (fn [_]
+    [:div.row
+     [:div.col-4
+      [stats-card
+       "Build Success Overall"
+       "Percentage of successful builds"
+       [builds-success-chart]]]
+     [:div.col-8
+      [stats-card
+       "Build Success by Day"
+       "The number of successful builds for this period."
+       [builds-history-chart]]]]))
 
 (defn org-stats [org-id]
-  (rf/dispatch [:org/load-stats org-id stats-period-days])
-  (rf/dispatch [:org/load-credits org-id])
-  (fn [org-id]
-    [:div.row
-     [:div.col-8
-      [:div.card
-       [:div.card-body
-        [:h5 "History"]
-        [:p
-         (str "Build elapsed times and consumed credits over the past " stats-period-days " days.")]
-        [history-chart]]]]
-     [:div.col-4
-      [:div.card
-       [:div.card-body
-        [:h5 "Credits"]
-        [:p "Credit consumption for this month."]
-        [credits-chart]]]]]))
+  [:<>
+   [:div.row.mb-3
+    [:div.col-8
+     [stats-card
+      "Times and Credits"
+      (str "Build elapsed times and consumed credits over the past " stats-period-days " days.")
+      [elapsed-chart org-id]]]
+    [:div.col-4
+     [stats-card
+      "Credits"
+      [:p "Credit consumption for this month."]
+       [credits-chart org-id]]]]
+   [builds-charts org-id]])

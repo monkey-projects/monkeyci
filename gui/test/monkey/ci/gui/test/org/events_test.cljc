@@ -539,3 +539,28 @@
     (let [a (db/edit-alerts @app-db)]
       (is (= 1 (count a)))
       (is (= :danger (:type (first a)))))))
+
+(deftest org-build-stats
+  (testing "fetches from backend"
+    (rf-test/run-test-sync
+     (let [c (h/catch-fx :martian.re-frame/request)]
+       (h/initialize-martian {:get-org-build-stats
+                              {:status 200
+                               :body {}
+                               :error-code :no-error}})
+       (is (some? (:martian.re-frame/martian @app-db)))
+       (rf/dispatch [:org/load-build-stats "test-org"])
+       (is (= 1 (count @c)))
+       (is (= :get-org-build-stats (-> @c first (nth 2))))))))
+
+(deftest org-load-build-stats--success
+  (testing "sets builds in db"
+    (let [stats [{:stats {:elapsed-seconds []}}]]
+      (rf/dispatch-sync [:org/load-build-stats--success {:body stats}])
+      (is (= stats (lo/get-value @app-db db/build-stats))))))
+
+(deftest org-load-build-stats--failed
+  (testing "sets error in db"
+    (rf/dispatch-sync [:org/load-build-stats--failed "test error"])
+    (is (= [:danger] (->> (lo/get-alerts @app-db db/build-stats)
+                          (map :type))))))

@@ -283,6 +283,29 @@
    (lo/on-failure db db/stats a/org-stats-failed err)))
 
 (rf/reg-event-fx
+ :org/load-build-stats
+ [(rf/inject-cofx :time/now)]
+ (lo/loader-evt-handler
+  db/build-stats
+  (fn [_ ctx [_ org-id days]]
+    [:secure-request
+     :get-org-build-stats
+     (cond-> {:org-id org-id}
+       days (assoc :since (-> (:time/now ctx) (t/parse-epoch) (t/minus-days days) (t/to-epoch))))
+     [:org/load-build-stats--success]
+     [:org/load-build-stats--failed]])))
+
+(rf/reg-event-db
+ :org/load-build-stats--success
+ (fn [db [_ resp]]
+   (lo/on-success db db/build-stats resp)))
+
+(rf/reg-event-db
+ :org/load-build-stats--failed
+ (fn [db [_ err]]
+   (lo/on-failure db db/build-stats a/org-stats-failed err)))
+
+(rf/reg-event-fx
  :org/load-credits
  (lo/loader-evt-handler
   db/credits
