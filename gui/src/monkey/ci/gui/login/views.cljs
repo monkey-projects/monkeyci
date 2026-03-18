@@ -1,5 +1,6 @@
 (ns monkey.ci.gui.login.views
-  (:require [monkey.ci.gui.components :as c]
+  (:require [medley.core :as mc]
+            [monkey.ci.gui.components :as c]
             [monkey.ci.gui.forms :as f]
             [monkey.ci.gui.layout :as l]
             [monkey.ci.gui.login.events]
@@ -18,12 +19,12 @@
 (defn- oidc-login-btn [{:keys [label url path sub logo loader extra-params]}]
   (rf/dispatch loader)
   (fn []
-    (let [callback-url (str (r/origin) (r/path-for path))
+    (let [callback-url (when path (str (r/origin) (r/path-for path)))
           client-id (rf/subscribe sub)
-          params (->> {"client_id" @client-id
-                       "redirect_uri" callback-url}
-                      (merge extra-params)
-                      (r/url-encode-params))]
+          params (-> {"client_id" @client-id}
+                     (mc/assoc-some "redirect_uri" callback-url)
+                     (as-> p (merge extra-params p))
+                     (r/url-encode-params))]
       [login-btn
        label
        (str url "?" params)
@@ -49,6 +50,17 @@
                    :extra-params {"response_type" "code"}}))
 
 (defn- bitbucket-btn []
+  (oidc-login-btn {:label "Bitbucket"
+                   :url "https://bitbucket.com/site/oauth2/authorize"
+                   ;; Unfortunately, bitbucket does not allow to specify callback url, so it's the one
+                   ;; that is configured in the app.
+                   :sub [:login/bitbucket-client-id]
+                   :loader [:login/load-bitbucket-config]
+                   :logo "/img/mark-gradient-blue-bitbucket.svg"
+                   ;; TODO Also add state param to protect against CSRF attacks
+                   :extra-params {"response_type" "code"}}))
+
+#_(defn- bitbucket-btn []
   (rf/dispatch [:login/load-bitbucket-config])
   (fn []
     (let [bitbucket-client-id (rf/subscribe [:login/bitbucket-client-id])]

@@ -79,7 +79,7 @@
                                      :repo-id "repo"})))))
 
 (deftest route-goto
-  ;; Failsave
+  ;; Failsafe
   (h/catch-fx :route/goto)
   
   (testing "sets browser path using fx"

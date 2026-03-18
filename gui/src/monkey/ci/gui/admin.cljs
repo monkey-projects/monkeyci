@@ -100,7 +100,7 @@
 (defn render-admin []
   (let [r (rf/subscribe [:route/current])
         u (rf/subscribe [:login/user])]
-    (if (or (ar/public? @r) @u)
+    (if (or (r/public? @r) @u)
       (if @r
         (render-page @r)
         (admin-root))
