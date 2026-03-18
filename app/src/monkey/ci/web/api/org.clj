@@ -171,12 +171,18 @@
      :zone  zone
      :dates dates}))
 
-(defn- stats-elapsed [req]
+(defn- with-builds-for-period
+  "Retrieves all builds for the org over the period specified in the query params,
+   groups them by date and applies `f` to this map."
+  [req f]
   (let [st (c/req->storage req)
         {:keys [since dates zone]} (req->stats-dates req)
         builds (st/list-builds-since st (c/org-id req) since)]
     (-> (group-by-date dates zone builds :start-time)
-        (elapsed-seconds))))
+        (f))))
+
+(defn- stats-elapsed [req]
+  (with-builds-for-period req elapsed-seconds))
 
 (defn- stats-credits [req]
   (let [st (c/req->storage req)
@@ -220,24 +226,35 @@
         avail (st/calc-available-credits s org-id (t/now))]
     (rur/response {:available avail})))
 
+(defn- calc-stats-results [defaults [k v]]
+  (->> (group-by :status v)
+       (mc/map-vals count)
+       (merge {:date k
+               :n (count v)}
+              defaults)))
+
 (defn stats-build-results
   "Statistics about build success and failure over period"
   [req]
-  (let [{:keys [dates since zone]} (req->stats-dates req)
-        builds (st/list-builds-since (c/req->storage req) (c/org-id req) since)]
-    (letfn [(calc-results [[d b]]
-              (->> (group-by :status b)
-                   (mc/map-vals count)
-                   (merge {:date d
-                           :n (count b)}
-                          (zipmap [:success :error :canceled] (repeat 0)))))]
-      (->> (group-by-date dates zone builds :start-time)
-           (map calc-results)
-           (hash-map :results)
-           (rur/response)))))
+  (let [defaults (zipmap [:success :error :canceled] (repeat 0))]
+    (with-builds-for-period
+      req
+      (fn [by-date]
+        (->> by-date
+             (map (partial calc-stats-results defaults))
+             (hash-map :results)
+             (rur/response))))))
 
 (defn stats-job-results
   "Similar to `build-result-stats` but for jobs."
   [req]
-  ;; TODO
-  (rur/response {}))
+  (let [defaults (zipmap [:success :failed :canceled] (repeat 0))]
+    (with-builds-for-period
+      req
+      (fn [by-date]
+        (->> by-date
+             (map (fn [[k v]]
+                    [k (mapcat (comp vals :jobs :script) v)]))
+             (map (partial calc-stats-results defaults))
+             (hash-map :results)
+             (rur/response))))))

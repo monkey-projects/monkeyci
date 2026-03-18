@@ -493,3 +493,65 @@
             (is (= 1 (:n v3)))
             (is (= 0 (:success v3)))
             (is (= 1 (:error v3)))))))))
+
+(deftest stats-job-results
+  (let [{st :storage :as rt} (trt/test-runtime)
+        repo (h/gen-repo)
+        org (assoc (h/gen-org) :repos {(:id repo) repo})
+        ms (fn [& d]
+             (-> (apply jt/offset-date-time d)
+                 (jt/instant)
+                 (jt/to-millis-from-epoch)))
+        builds [{:start-time (ms 2026 3 18 10 0 0)
+                 :script
+                 {:jobs {"first" {:job-id "first"
+                                  :start-time (ms 2026 3 18 10 0 0)
+                                  :status :success}}}}
+                {:start-time (ms 2026 3 18 10 30 0)
+                 :script
+                 {:jobs {"second" {:job-id "second"
+                                   :start-time (ms 2026 3 18 10 30 0)
+                                   :status :success}}}}
+                {:start-time (ms 2026 3 19 10 0 0)
+                 :script
+                 {:jobs {"third" {:job-id "third"
+                                  :start-time (ms 2026 3 19 10 0 0)
+                                  :status :failed}}}}]]
+    (is (some? (st/save-org st org)))
+    (is (every? some?
+                (->> builds
+                     (map-indexed (fn [idx b]
+                                    (assoc b
+                                           :org-id (:id org)
+                                           :repo-id (:id repo)
+                                           :build-id (str "build-" (inc idx))
+                                           :end-time (+ (:start-time b) 1000))))
+                     (mapv (partial st/save-build st)))))
+    
+    (testing "job results grouped by status and by date over given period for org"
+      (let [r (-> rt
+                  (h/->req)
+                  (assoc :parameters
+                         {:path
+                          {:org-id (:id org)}
+                          :query
+                          {:since (ms 2026 3 18)
+                           :until (ms 2026 3 20)}})
+                  (sut/stats-job-results))]
+        (is (= 200 (:status r)))
+        (let [b (get-in r [:body :results])]
+          (is (= 3 (count b)))
+          (let [[v1 v2 v3] b]
+            (is (= (ms 2026 3 17 1) (:date v1))
+                (t/epoch->date (:date v1)))
+            (is (= 0 (:n v1)))
+            (is (= 0 (:success v1)))
+            (is (= 0 (:failed v1)))
+
+            (is (= 2 (:n v2)))
+            (is (= 2 (:success v2)))
+            (is (= 0 (:failed v2)))
+
+            (is (= 1 (:n v3)))
+            (is (= 0 (:success v3)))
+            (is (= 1 (:failed v3)))))))))
