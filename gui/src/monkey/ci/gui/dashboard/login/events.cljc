@@ -23,6 +23,7 @@
    {:db (-> db
             (assoc :oauth-loading provider)
             (dissoc :error-banner))
+    ;; TODO Use martian
     :http-xhrio {:method          :get
                  :uri             (http/endpoint
                                    (str "/auth/oauth/"

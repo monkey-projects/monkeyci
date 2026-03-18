@@ -1,5 +1,6 @@
 (ns monkey.ci.gui.dashboard.main.views
-  (:require [monkey.ci.gui.dashboard.icons :as i]
+  (:require [monkey.ci.gui.dashboard.components :as co]
+            [monkey.ci.gui.dashboard.icons :as i]
             [monkey.ci.gui.dashboard.main.events :as e]
             [monkey.ci.gui.dashboard.main.subs :as s]
             [monkey.ci.gui.utils :as u]
@@ -32,7 +33,7 @@
    [:div.flex.items-center.gap-3.ms-auto
     [running-indicator]
     [:div.chip "⌥K"]
-    [:div.chip "DOCS"]
+    [co/docs-btn]
     [:div.avatar "WN"]]])
 
 (defn- nav-item [{:keys [lbl active]}]
