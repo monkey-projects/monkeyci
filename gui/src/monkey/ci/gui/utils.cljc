@@ -1,4 +1,5 @@
 (ns monkey.ci.gui.utils
+  "Generic utility functions"
   (:require [clojure.string :as cs]
             [goog.string :as gstring]
             [medley.core :as mc]

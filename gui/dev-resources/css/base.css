@@ -16,6 +16,8 @@
 	border-radius: 2px;
 	cursor: pointer;
     }
+
+    h1, h2, .logo { font-family: 'Syne', sans-serif; }
 }
 
 @layer utilities {

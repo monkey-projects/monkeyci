@@ -2,7 +2,8 @@
   "Routing functionality, used to load the appropriate page according to browser path.
    The central part is the router, which is kept in state and referred to by various
    functions and event handlers."
-  (:require [monkey.ci.gui.logging :as log]
+  (:require [clojure.string :as cs]
+            [monkey.ci.gui.logging :as log]
             [re-frame.core :as rf]
             [reitit.frontend :as f]
             [reitit.frontend.easy :as rfe]))
@@ -125,3 +126,9 @@
  (fn [db [_ evt]]
    (update db on-page-leave (comp vec conj) evt)))
 
+(defn url-encode-params
+  "Encodes given parameter map so it can be added as query string to a url"
+  [params]
+  (->> params
+       (map #(str (name (first %)) "=" (uri-encode (second %))))
+       (cs/join "&")))

@@ -1,6 +1,5 @@
 (ns monkey.ci.gui.login.views
-  (:require [clojure.string :as cs]
-            [monkey.ci.gui.components :as c]
+  (:require [monkey.ci.gui.components :as c]
             [monkey.ci.gui.forms :as f]
             [monkey.ci.gui.layout :as l]
             [monkey.ci.gui.login.events]
@@ -22,10 +21,9 @@
     (let [callback-url (str (r/origin) (r/path-for path))
           client-id (rf/subscribe sub)
           params (->> {"client_id" @client-id
-                       "redirect_uri" (r/uri-encode callback-url)}
+                       "redirect_uri" callback-url}
                       (merge extra-params)
-                      (map #(str (first %) "=" (second %)))
-                      (cs/join "&"))]
+                      (r/url-encode-params))]
       [login-btn
        label
        (str url "?" params)

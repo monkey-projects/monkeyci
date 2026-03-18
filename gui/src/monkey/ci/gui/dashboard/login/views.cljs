@@ -4,9 +4,13 @@
             [monkey.ci.gui.dashboard.icons :as i]
             [monkey.ci.gui.dashboard.login.events :as e]
             [monkey.ci.gui.dashboard.login.subs :as s]
+            [monkey.ci.gui.template :as t]
             [re-frame.core :as rf]))
 
 ;; ── Sub-components ─────────────────────────────────────────────
+
+(defn logo [opts]
+  [:img (merge opts {:src (t/img-url "monkeyci-black.png")})])
 
 (defn oauth-button [{:keys [provider label icon]}]
   (let [oauth-loading @(rf/subscribe [::s/oauth-loading])
@@ -39,10 +43,13 @@
   [:div.login-card.md:basis-md
    ;; Header
    [:div {:style {:text-align "center" :margin-bottom "32px"}}
-    [:div.logo {:style {:font-size "22px" :font-weight 800 :letter-spacing "-0.02em" :margin-bottom "6px"}}
-     "🐒 MONKEY" [:span.color-info "CI"]]
-    [:div {:style {:font-size "11px" :color "var(--text-dim)" :letter-spacing "0.06em"}}
-     "Sign in to your account"]]
+    [:div.flex.flex-row
+     [logo {:style {:height "80px"}}]
+     [:div
+      [:div.logo {:style {:font-size "22px" :font-weight 800 :letter-spacing "-0.02em" :margin-bottom "6px"}}
+       "MONKEY" [:span.color-info "CI"]]
+      [:div {:style {:font-size "11px" :color "var(--text-dim)" :letter-spacing "0.06em"}}
+       "Sign in to your account"]]]]
 
    ;; OAuth
    [:div.login-btns
@@ -71,10 +78,14 @@
 
 (defn header []
   [:div.top-bar
-   [:div.logo.shrink-0.font-extrabold.text-xl.color-text
-    "🐒 MONKEY" [:span.color-info "CI"]]
+   [:div.flex.flex-row.gap-2.items-end
+    [logo {:style {:height "28px"}}]
+    [:div.logo.shrink-0.font-extrabold.text-xl.color-text
+     "MONKEY" [:span.color-info "CI"]]
+    [:span.ms-10.text-lg.color-text "Build your code in style"]]
    [:div.flex.gap-2.items-center.ms-auto
     [co/docs-btn]
+    ;; TODO
     [:a.chip {:href "#"} "Status"]]])
 
 (defn- footer-link [lbl url]
