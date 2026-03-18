@@ -259,51 +259,41 @@
  (fn [db [_ err]]
    (lo/on-failure db db/recent-builds a/org-recent-builds-failed err)))
 
+(defn- stats-loader [stats-id req-id]
+  (lo/loader-evt-handler
+   stats-id
+   (fn [_ ctx [_ org-id days]]
+     [:secure-request
+      req-id
+      (cond-> {:org-id org-id}
+        days (assoc :since (-> (:time/now ctx) (t/parse-epoch) (t/minus-days days) (t/to-epoch))))
+      [:org/load-stats--success stats-id]
+      [:org/load-stats--failed stats-id]])))
+
 (rf/reg-event-fx
  :org/load-stats
  [(rf/inject-cofx :time/now)]
- (lo/loader-evt-handler
-  db/stats
-  (fn [_ ctx [_ org-id days]]
-    [:secure-request
-     :get-org-stats
-     (cond-> {:org-id org-id}
-       days (assoc :since (-> (:time/now ctx) (t/parse-epoch) (t/minus-days days) (t/to-epoch))))
-     [:org/load-stats--success]
-     [:org/load-stats--failed]])))
+ (stats-loader db/stats :get-org-stats))
 
 (rf/reg-event-db
  :org/load-stats--success
- (fn [db [_ resp]]
-   (lo/on-success db db/stats resp)))
+ (fn [db [_ stats-id resp]]
+   (lo/on-success db stats-id resp)))
 
 (rf/reg-event-db
  :org/load-stats--failed
- (fn [db [_ err]]
-   (lo/on-failure db db/stats a/org-stats-failed err)))
+ (fn [db [_ stats-id err]]
+   (lo/on-failure db stats-id a/org-stats-failed err)))
 
 (rf/reg-event-fx
  :org/load-build-stats
  [(rf/inject-cofx :time/now)]
- (lo/loader-evt-handler
-  db/build-stats
-  (fn [_ ctx [_ org-id days]]
-    [:secure-request
-     :get-org-build-stats
-     (cond-> {:org-id org-id}
-       days (assoc :since (-> (:time/now ctx) (t/parse-epoch) (t/minus-days days) (t/to-epoch))))
-     [:org/load-build-stats--success]
-     [:org/load-build-stats--failed]])))
+ (stats-loader db/build-stats :get-org-build-stats))
 
-(rf/reg-event-db
- :org/load-build-stats--success
- (fn [db [_ resp]]
-   (lo/on-success db db/build-stats resp)))
-
-(rf/reg-event-db
- :org/load-build-stats--failed
- (fn [db [_ err]]
-   (lo/on-failure db db/build-stats a/org-stats-failed err)))
+(rf/reg-event-fx
+ :org/load-job-stats
+ [(rf/inject-cofx :time/now)]
+ (stats-loader db/job-stats :get-org-job-stats))
 
 (rf/reg-event-fx
  :org/load-credits

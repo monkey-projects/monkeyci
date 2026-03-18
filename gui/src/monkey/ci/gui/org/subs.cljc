@@ -116,6 +116,11 @@
  identity)
 
 (rf/reg-sub
+ :org/job-stats
+ :<- [:loader/value db/job-stats]
+ identity)
+
+(rf/reg-sub
  :org/credit-stats
  :<- [:org/stats]
  :<- [:org/credits]
