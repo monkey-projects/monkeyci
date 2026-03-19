@@ -4,10 +4,8 @@
             [re-frame.core :as rf]))
 
 (def stats-period-days 30)
-(def color-ok "#91c9ae")
-(def color-ok-2 "#008060")
-(def color-err "#FFB1C1")
-(def color-err-2 "#7a3350")
+(def color-ok "#008060")
+(def color-err "#7a3350")
 
 (defn elapsed-chart-config [{:keys [elapsed-seconds consumed-credits]}]
   (let [dates (->> (concat (map :date elapsed-seconds)
@@ -19,9 +17,11 @@
                          (map (comp time/format-date time/parse-epoch)))
             :datasets
             [{:label "Elapsed minutes"
-              :data (map (comp #(/ % 60) :seconds) elapsed-seconds)}
+              :data (map (comp #(/ % 60) :seconds) elapsed-seconds)
+              :backgroundColor color-ok}
              {:label "Consumed credits"
-              :data (map (comp - :credits) consumed-credits)}]}
+              :data (map (comp - :credits) consumed-credits)
+              :backgroundColor color-err}]}
      :options
      {:scales
       {"x"
@@ -46,7 +46,8 @@
                      (str consumed " consumed")]
             :datasets
             [{:label "Credits"
-              :data [available consumed]}]}}))
+              :data [available consumed]
+              :backgroundColor [color-ok color-err]}]}}))
 
 (defn credits-chart [org-id]
   (rf/dispatch [:org/load-credits org-id])
@@ -111,10 +112,10 @@
             :datasets
             [{:label "Successful jobs"
               :data (map :success results)
-              :backgroundColor color-ok-2}
+              :backgroundColor color-ok}
              {:label "Failed jobs"
               :data (map :failure results)
-              :backgroundColor color-err-2}]}
+              :backgroundColor color-err}]}
      :options
      {:scales
       {"x"
@@ -140,7 +141,7 @@
               :datasets
               [{:label "Jobs"
                 :data [s e]
-                :backgroundColor [color-ok-2 color-err-2]}]}})))
+                :backgroundColor [color-ok color-err]}]}})))
 
 (defn jobs-success-chart []
   (let [stats (rf/subscribe [:org/job-stats])]

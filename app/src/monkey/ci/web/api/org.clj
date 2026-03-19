@@ -242,6 +242,7 @@
       (fn [by-date]
         (->> by-date
              (map (partial calc-stats-results defaults))
+             (sort-by :date)
              (hash-map :results)
              (rur/response))))))
 
@@ -254,5 +255,6 @@
         defaults (zipmap [:success :failure :canceled] (repeat 0))]
     (->> (group-by-date dates zone jobs :start-time)
          (map (partial calc-stats-results defaults))
+         (sort-by :date)
          (hash-map :results)
          (rur/response))))
