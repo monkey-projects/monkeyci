@@ -6,6 +6,7 @@
 (def stats-period-days 30)
 (def color-ok "#008060")
 (def color-err "#7a3350")
+(def color-warn "#f1b980")
 
 (defn elapsed-chart-config [{:keys [elapsed-seconds consumed-credits]}]
   (let [dates (->> (concat (map :date elapsed-seconds)
@@ -69,7 +70,10 @@
               :backgroundColor color-ok}
              {:label "Failed builds"
               :data (map :error results)
-              :backgroundColor color-err}]}
+              :backgroundColor color-err}
+             {:label "Canceled builds"
+              :data (map :canceled results)
+              :backgroundColor color-warn}]}
      :options
      {:scales
       {"x"
@@ -87,15 +91,19 @@
 
 (defn build-success-chart-config [stats]
   (when-let [{:keys [results]} stats]
-    (let [s (reduce + (map :success results))
-          e (reduce + (map :error results))]
+    (let [v [[:success "passed" color-ok]
+             [:error "failed" color-err]
+             [:canceled "canceled" color-warn]]
+          vals (->> v
+                    (map first)
+                    (mapv #(reduce + (map % results))))]
       {:type :doughnut
-       :data {:labels [(str s " passed")
-                       (str e " failed")]
+       :data {:labels (->> [vals (map second v)]
+                           (apply mapv #(str %1 " " %2)))
               :datasets
               [{:label "Builds"
-                :data [s e]
-                :backgroundColor [color-ok color-err]}]}})))
+                :data vals
+                :backgroundColor (mapv #(nth % 2) v)}]}})))
 
 (defn builds-success-chart []
   (let [stats (rf/subscribe [:org/build-stats])]
@@ -181,7 +189,7 @@
      [:div.col-8
       [stats-card
        "Build Success per Day"
-       "The number of successful builds for this period."
+       "Builds per day, grouped by result status."
        [builds-history-chart]]]]))
 
 (defn- jobs-lbl []
@@ -199,7 +207,7 @@
      [:div.col-8
       [stats-card
        "Job Success per Day"
-       "The number of successful jobs for this period."
+       "The number of successful jobs for this period (excluding skipped jobs)."
        [jobs-history-chart]]]
      [:div.col-4
       [stats-card
@@ -209,7 +217,7 @@
 
 (defn org-stats [org-id]
   [:<>
-   [:div.row.mb-4
+   [:div.row.my-4
     [:div.col-8
      [stats-card
       "Times and Credits"
