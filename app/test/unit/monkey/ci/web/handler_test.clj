@@ -1113,7 +1113,7 @@
                   l (-> (mock/request :get (build-path sid))
                         (app))]
               (is (= 404 (:status l)))
-              (is (nil? (:body l))))))
+              (is (string? (:error (h/reply->json l)))))))
 
         (testing "`POST /retry` re-triggers build"
           (is (= 202 (-> (mock/request :post (str (build-path sid) "/retry"))
@@ -1139,7 +1139,8 @@
 
 (deftest job-endpoints
   (h/with-memory-store st
-    (let [repo (h/gen-repo)
+    (let [repo {:id (cuid/random-cuid)
+                :name "test repo"}
           org (-> (h/gen-org)
                   (assoc :repos {(:id repo) repo}))
           build (-> (h/gen-build)

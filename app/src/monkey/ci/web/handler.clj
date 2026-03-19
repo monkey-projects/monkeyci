@@ -1,9 +1,6 @@
 (ns monkey.ci.web.handler
   "Handler for the web server"
-  (:require [aleph
-             [http :as aleph]
-             [netty :as netty]]
-            [clojure.core.cache.wrapped :as cache]
+  (:require [clojure.core.cache.wrapped :as cache]
             [clojure.tools.logging :as log]
             [com.stuartsierra.component :as co]
             [manifold.deferred :as md]

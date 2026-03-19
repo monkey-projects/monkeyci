@@ -67,12 +67,6 @@
 (def uberjar-artifact
   (m/artifact "uberjar" "app/target/monkeyci-standalone.jar"))
 
-(defn- as-dir
-  "Converts artifact that points to a file, to one that points to its parent
-   directory."
-  [art]
-  (update art :path (comp str fs/parent)))
-
 (defn app-uberjar [ctx]
   (when (p/publish-app? ctx)
     (let [v (config/tag-version ctx)]
@@ -107,7 +101,7 @@
                                 (m/in-work ctx (:path uberjar-artifact))
                                 {"env" (if (p/release? ctx) "prod" "staging")}))))
         (m/depends-on ["app-uberjar"])
-        (m/restore-artifacts [(as-dir uberjar-artifact)]))))
+        (m/restore-artifacts [(m/dir-artifact uberjar-artifact)]))))
 
 (defn prepare-install-script
   "Prepares the cli install script by replacing the version.  Returns the
@@ -139,7 +133,7 @@
       :image
       {:job-id "publish-app-img"
        :container-opts
-       {:restore-artifacts [(as-dir uberjar-artifact)]
+       {:restore-artifacts [(m/dir-artifact uberjar-artifact)]
         :dependencies ["app-uberjar"]}}
       :manifest
       {:job-id "app-img-manifest"}}

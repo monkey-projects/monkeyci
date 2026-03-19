@@ -9,3 +9,13 @@
   [c/render-alert
    (sut/org-github-repos-failed
     (:msg params))])
+
+(defscene warning
+  [c/render-alert
+   {:type :warning
+    :message "Have you ever heard about global warning?"}])
+
+(defscene info
+  [c/render-alert
+   {:type :info
+    :message "Just telling you something useful."}])
