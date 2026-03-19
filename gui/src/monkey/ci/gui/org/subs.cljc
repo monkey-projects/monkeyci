@@ -89,8 +89,8 @@
  :org/recent-builds
  :<- [:loader/value db/org]
  :<- [:loader/value db/recent-builds]
- (fn [[cust rb] _]
-   (let [repos (->> cust
+ (fn [[org rb] _]
+   (let [repos (->> org
                     :repos
                     (group-by :id))
          add-repo (fn [{:keys [repo-id] :as b}]
@@ -111,6 +111,16 @@
  identity)
 
 (rf/reg-sub
+ :org/build-stats
+ :<- [:loader/value db/build-stats]
+ identity)
+
+(rf/reg-sub
+ :org/job-stats
+ :<- [:loader/value db/job-stats]
+ identity)
+
+(rf/reg-sub
  :org/credit-stats
  :<- [:org/stats]
  :<- [:org/credits]
@@ -124,8 +134,8 @@
 (rf/reg-sub
  :org/labels
  :<- [:org/info]
- (fn [cust _]
-   (->> cust
+ (fn [org _]
+   (->> org
         :repos
         (mapcat :labels)
         (map :name)

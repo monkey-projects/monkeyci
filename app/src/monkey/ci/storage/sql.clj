@@ -25,6 +25,7 @@
              [common :refer :all]
              [credit-cons :as scco]
              [credit-sub :as scs]
+             [email-confirmation :as sec]
              [email-registration :as ser]
              [invoice :as si]
              [job :as sj]
@@ -75,6 +76,7 @@
 (def join-request? (partial global-sid? st/join-requests))
 
 (def email-registration? (partial global-sid? st/email-registrations))
+(def email-confirmation? (partial global-sid? st/email-confirmations))
 
 (def credit-subscription? (partial global-sid? st/credit-subscriptions))
 
@@ -244,6 +246,8 @@
         (sp/select-params conn (second sid))
         join-request?
         (sjr/select-join-request conn (global-sid->cuid sid))
+        email-confirmation?
+        (sec/select-email-confirmation conn (global-sid->cuid sid))
         email-registration?
         (ser/select-email-registration conn (global-sid->cuid sid))
         credit-subscription?
@@ -291,7 +295,9 @@
               params?
               (sp/upsert-params conn (last sid) obj)
               email-registration?
-              (ser/insert-email-registration conn obj)
+              (ser/upsert-email-registration conn obj)
+              email-confirmation?
+              (sec/insert-email-confirmation conn obj)
               credit-subscription?
               (scs/upsert-credit-subscription conn obj)
               credit-consumption?
@@ -342,6 +348,8 @@
          (so/delete-org conn (global-sid->cuid sid))
          email-registration?
          (ser/delete-email-registration conn (global-sid->cuid sid))
+         email-confirmation?
+         (sec/delete-email-confirmation conn (global-sid->cuid sid))
          webhook?
          (sw/delete-webhook conn (last sid))
          credit-subscription?
@@ -453,11 +461,14 @@
    :job
    {:save sj/upsert-job
     :find sj/select-job
-    :list-events select-job-events}
+    :list-events select-job-events
+    :list-for-period sj/select-for-period}
    :email-registration
    {:list ser/select-email-registrations
     :find-by-email ser/select-email-registration-by-email
     :count ser/count-email-registrations}
+   :email-confirmation
+   {:list sec/select-email-confirmations-by-reg}
    :param
    {:save sp/upsert-org-param
     :find sp/select-org-param

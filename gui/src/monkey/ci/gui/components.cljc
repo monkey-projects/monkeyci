@@ -194,15 +194,16 @@
 (defn colored [s color]
   (str "\033[" color "m" s "\033[0m"))
 
-(defn log-viewer [contents]
-  (into [:div.bg-dark.text-white.font-monospace.overflow-auto.text-nowrap.p-1
-         {:style {:min-height "20em"}}]
+(defn log-viewer [contents & [opts]]
+  (into [:div.bg-dark.text-white.font-monospace.overflow-auto.p-1
+         (cond-> {:style {:min-height "20em"}}
+           (not (:wrap? opts)) (assoc :class "text-nowrap"))]
         contents))
 
-(defn log-contents [raw]
-  (->> raw
-       (map ->html)
-       (log-viewer)))
+(defn log-contents [raw & [opts]]
+  (-> raw
+      (as-> h (map ->html h))
+      (log-viewer opts)))
 
 (defn build-elapsed [b]
   (let [e (u/build-elapsed b)]
@@ -217,8 +218,7 @@
 (defn tab-header [i lbl]
   [:span [:span.me-2 [icon i]] lbl])
 
-(defn docs-link [page title]
-  [:a {:href (templ/docs-url (str "/" page)) :target :_blank} title])
+(def docs-link templ/docs-link)
 
 (defn bg-shape []
   [:div.shape-container
@@ -230,3 +230,4 @@
 
 (defn page-title [& contents]
   (into [:h3.text-primary] contents))
+

@@ -4,7 +4,7 @@
             [clojure.spec.gen.alpha :as gen]
             [config.core :as cc]
             [monkey.ci.entities.migrations :as m]
-            [monkey.ci.spec.db_entities]
+            [monkey.ci.entities.spec :as spec]
             [monkey.ci.test.helpers :as h]
             [next.jdbc.connection :as conn])
   (:import (com.zaxxer.hikari HikariDataSource)))
@@ -64,79 +64,79 @@
       (dissoc :id)))
 
 (defn gen-org []
-  (gen-spec :db/org))
+  (gen-spec ::spec/org))
 
 (def ^:deprecated gen-customer gen-org)
 
 (defn gen-repo []
-  (gen-spec :db/repo))
+  (gen-spec ::spec/repo))
 
 (defn gen-build []
-  (gen-spec :db/build))
+  (gen-spec ::spec/build))
 
 (defn gen-job []
-  (gen-spec :db/job))
+  (gen-spec ::spec/job))
 
 (defn gen-user []
-  (gen-spec :db/user))
+  (gen-spec ::spec/user))
 
 (defn gen-ssh-key []
-  (gen-spec :db/ssh-key))
+  (gen-spec ::spec/ssh-key))
 
 (defn gen-org-param []
-  (gen-spec :db/org-param))
+  (gen-spec ::spec/org-param))
 
 (def ^:deprecated gen-customer-param gen-org-param)
 
 (defn gen-param-value []
-  (gen-spec :db/parameter-value))
+  (gen-spec ::spec/parameter-value))
 
 (defn gen-join-request []
-  (gen-spec :db/join-request))
+  (gen-spec ::spec/join-request))
 
 (defn gen-email-registration []
-  (gen-spec :db/email-registration))
+  (gen-spec ::spec/email-registration))
 
 (defn gen-org-credit []
-  (gen-spec :db/org-credit))
+  (gen-spec ::spec/org-credit))
 
 (def ^:deprecated gen-cust-credit gen-org-credit)
 
 (defn gen-credit-subscription []
-  (gen-spec :db/credit-subscription))
+  (gen-spec ::spec/credit-subscription))
 
 (defn gen-credit-consumption []
-  (gen-spec :db/credit-consumption))
+  (gen-spec ::spec/credit-consumption))
 
 (defn gen-webhook []
-  (gen-spec :db/webhook))
+  (gen-spec ::spec/webhook))
 
 (defn gen-bb-webhook []
-  (gen-spec :db/bb-webhook))
+  (gen-spec ::spec/bb-webhook))
 
 (defn gen-invoice []
-  (gen-spec :db/invoice))
+  (gen-spec ::spec/invoice))
 
 (defn gen-queued-task []
-  (gen-spec :db/queued-task))
+  (gen-spec ::spec/queued-task))
 
 (defn gen-job-evt []
-  (gen-spec :db/job-event))
+  (gen-spec ::spec/job-event))
 
 (defn gen-user-token []
-  (gen-spec :db/user-token))
+  (gen-spec ::spec/user-token))
 
 (defn gen-user-settings []
-  (gen-spec :db/user-setting))
+  (gen-spec ::spec/user-setting))
 
 (defn gen-org-token []
-  (gen-spec :db/org-token))
+  (gen-spec ::spec/org-token))
 
 (defn gen-mailing []
-  (gen-spec :db/mailing))
+  (gen-spec ::spec/mailing))
 
 (defn gen-sent-mailing []
-  (gen-spec :db/sent-mailing))
+  (gen-spec ::spec/sent-mailing))
 
 (defn gen-org-invoicing []
-  (gen-spec :db/org-invoicing))
+  (gen-spec ::spec/org-invoicing))

@@ -25,7 +25,13 @@
 (def job-id "Gets job id" :id)
 (def work-dir "Gets job work dir" :work-dir)
 
-(def max-job-timeout (* 20 60 1000))
+(def default-job-timeout
+  "Default timeout for a job"
+  (* 20 60 1000))
+
+(def max-job-timeout
+  "Maximum allowed timeout for a job"
+  (* 6 60 60 1000))
 
 (def job-types
   "Known job types"

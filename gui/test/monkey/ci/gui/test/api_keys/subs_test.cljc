@@ -13,17 +13,19 @@
 
 (rf/clear-subscription-cache!)
 
-(deftest org-tokens-items
-  (h/verify-sub [:org-tokens/items]
-                #(db/set-org-tokens % ::test-tokens)
-                ::test-tokens
-                nil))
+(deftest tokens-items
+  (let [id (str (random-uuid))]
+    (h/verify-sub [:tokens/items id]
+                  #(db/set-tokens % id ::test-tokens)
+                  ::test-tokens
+                  nil)))
 
-(deftest org-tokens-loading?
-  (h/verify-sub [:org-tokens/loading?]
-                db/set-org-tokens-loading
-                true
-                false))
+(deftest tokens-loading?
+  (let [id (str (random-uuid))]
+    (h/verify-sub [:tokens/loading? id]
+                  #(db/set-loading % id)
+                  true
+                  false)))
 
 (deftest tokens-edit
   (let [t {:description "test"}]

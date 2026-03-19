@@ -14,6 +14,7 @@
 (def org-path ["/org/" :org-id])
 (def repo-path (into org-path ["/repo/" :repo-id]))
 (def build-path (into repo-path ["/builds/" :build-id]))
+(def job-path (into build-path ["/job/" :job-id]))
 (def param-path (into org-path ["/param/" :param-id]))
 (def user-path ["/user/" :user-id])
 (def mailing-path ["/admin/mailing/" :mailing-id])
@@ -28,6 +29,9 @@
 (def build-schema
   (assoc repo-schema :build-id s/Str))
 
+(def job-schema
+  (assoc build-schema :job-id s/Str))
+
 (def param-schema
   (assoc org-schema
          :param-id s/Str))
@@ -37,6 +41,10 @@
 
 (def webhook-schema
   {:webhook-id s/Str})
+
+(def stats-schema
+  {(s/optional-key :since) s/Int
+   (s/optional-key :until) s/Int})
 
 ;; TODO Use the same source as backend for this
 (s/defschema NewOrg
@@ -141,8 +149,21 @@
     {:route-name :get-org-stats
      :path-parts (into org-path ["/stats"])
      :path-schema org-schema
-     :query-schema {(s/optional-key :since) s/Int
-                    (s/optional-key :until) s/Int}
+     :query-schema stats-schema
+     :method :get})
+
+   (api-route
+    {:route-name :get-org-build-stats
+     :path-parts (into org-path ["/stats/builds"])
+     :path-schema org-schema
+     :query-schema stats-schema
+     :method :get})
+
+   (api-route
+    {:route-name :get-org-job-stats
+     :path-parts (into org-path ["/stats/jobs"])
+     :path-schema org-schema
+     :query-schema stats-schema
      :method :get})])
 
 (def repo-routes
@@ -318,6 +339,25 @@
     {:route-name :delete-org-token
      :path-parts (into org-path ["/token/" :token-id])
      :path-schema (assoc org-schema :token-id s/Str)
+     :method :delete})
+
+   (api-route
+    {:route-name :get-user-tokens
+     :path-parts (into user-path ["/token"])
+     :path-schema user-schema
+     :method :get})
+
+   (api-route
+    {:route-name :create-user-token
+     :path-parts (into user-path ["/token"])
+     :path-schema user-schema
+     :body-schema {:token ApiToken}
+     :method :post})
+
+   (api-route
+    {:route-name :delete-user-token
+     :path-parts (into user-path ["/token" :token-id])
+     :path-schema (assoc user-schema :token-id s/Str)
      :method :delete})])
 
 (def user-routes
@@ -390,7 +430,13 @@
      :path-parts ["/logs/" :org-id "/label/" :label "/values"]
      :path-schema (assoc org-schema :label s/Str)
      :query-schema log-query-schema
-     :produces #{"application/json"}})])
+     :produces #{"application/json"}})
+
+   (api-route
+    {:route-name :download-job-log
+     :path-parts (into job-path ["/logs"])
+     :path-schema job-schema
+     :query-schema {:file s/Str}})])
 
 (def github-routes
   [(api-route
@@ -549,7 +595,13 @@
     {:route-name :unregister-email
      :method :post
      :path-parts ["/email-registration/unregister"]
-     :query-schema cs/EmailUnregistrationQuery})])
+     :query-schema cs/EmailUnregistrationQuery})
+
+   (public-route
+    {:route-name :confirm-email
+     :method :post
+     :path-parts ["/email-registration/confirm"]
+     :body-schema {:confirmation cs/EmailConfirmation}})])
 
 (def invoicing-routes
   [(api-route
@@ -576,8 +628,8 @@
   [(api-route
     {:route-name :unblock-job
      :method :post
-     :path-parts (into build-path ["/job/" :job-id "/unblock"])
-     :path-schema (assoc build-schema :job-id s/Str)})])
+     :path-parts (into job-path ["/unblock"])
+     :path-schema job-schema})])
 
 (def routes
   (concat

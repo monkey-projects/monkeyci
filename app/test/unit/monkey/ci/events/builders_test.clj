@@ -42,4 +42,4 @@
                              :path "test/cache"
                              :other :prop}])
                (sut/job->event)
-               :caches)))))
+               (api/caches))))))

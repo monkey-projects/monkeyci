@@ -24,61 +24,52 @@
 
 (deftest ^:sql orgs
   (with-storage conn s
-    (testing "can write and read"
-      (let [org (h/gen-org)]
+    (let [org (h/gen-org)]
+      (testing "can write and read"
         (is (sid/sid? (st/save-org s org)))
         (is (= 1 (count (ec/select-orgs conn [:is :id [:not nil]]))))
         (is (some? (ec/select-org conn (ec/by-cuid (:id org)))))
         (is (= (assoc org :repos {})
-               (st/find-org s (:id org))))))
+               (st/find-org s (:id org)))))
 
-    (testing "can operate within a transaction"
-      (st/with-transaction s tx
-        (let [org (h/gen-org)]
-          (is (sid/sid? (st/save-org tx org)))
-          (is (some? (ec/select-org ((:get-conn tx) tx) (ec/by-cuid (:id org)))))
-          (is (= (assoc org :repos {})
-                 (st/find-org tx (:id org)))))))
+      (testing "can operate within a transaction"
+        (st/with-transaction s tx
+          (let [upd (assoc org :name "updated org")]
+            (is (sid/sid? (st/save-org tx upd)))
+            (is (some? (ec/select-org ((:get-conn tx) tx) (ec/by-cuid (:id upd)))))
+            (is (= (assoc upd :repos {})
+                   (st/find-org tx (:id upd)))))))
 
-    (testing "copies overrides in trx"
-      (st/with-transaction s tx
-        (is (= (:overrides s) (:overrides tx)))))
+      (testing "copies overrides in trx"
+        (st/with-transaction s tx
+          (is (= (:overrides s) (:overrides tx)))))
 
-    (testing "can write and read with repos"
-      (let [org (h/gen-org)
-            repo {:name "test repo"
-                  :org-id (:id org)
-                  :id "test-repo"
-                  :url "http://test-repo"}]
-        (is (sid/sid? (st/save-org s org)))
-        (is (sid/sid? (st/save-repo s repo)))
-        (is (= (assoc org :repos {(:id repo) (dissoc repo :org-id)})
-               (st/find-org s (:id org))))))
+      (testing "with repos"
+        (let [repo {:name "test repo"
+                    :org-id (:id org)
+                    :id "test-repo"
+                    :url "http://test-repo"}]
+          (testing "can write and read with repos"
+            (is (sid/sid? (st/save-org s org)))
+            (is (sid/sid? (st/save-repo s repo)))
+            (is (= (assoc org :repos {(:id repo) (dissoc repo :org-id)})
+                   (st/find-org s (:id org)))))
 
-    (testing "can delete with repos"
-      (let [org (h/gen-org)
-            repo {:name "test repo"
-                  :org-id (:id org)
-                  :id "test-repo"
-                  :url "http://test-repo"}]
-        (is (sid/sid? (st/save-org s org)))
-        (is (sid/sid? (st/save-repo s repo)))
-        (is (some? (st/find-org s (:id org))))
-        (is (true? (st/delete-org s (:id org)))
-            "expected to delete org record")
-        (is (nil? (st/find-org s (:id org)))
-            "did not expect to find org after deletion")))
+          (testing "can delete with repos"
+            (is (true? (st/delete-org s (:id org)))
+                "expected to delete org record")
+            (is (nil? (st/find-org s (:id org)))
+                "did not expect to find org after deletion"))))
 
-    (testing "can search"
-      (let [org (-> (h/gen-org)
-                    (assoc :name "test org"))]
-        (is (sid/sid? (st/save-org s org)))
-        
-        (testing "by name"
-          (is (= [org] (st/search-orgs s {:name "test"}))))
+      (testing "can search"
+        (let [org (assoc org :name "test org")]
+          (is (sid/sid? (st/save-org s org)))
+          
+          (testing "by name"
+            (is (= [org] (st/search-orgs s {:name "test"}))))
 
-        (testing "by id"
-          (is (= [org] (st/search-orgs s {:id (:id org)}))))))
+          (testing "by id"
+            (is (= [org] (st/search-orgs s {:id (:id org)})))))))
 
     (testing "can find multiple by id"
       (let [orgs (repeatedly 3 h/gen-org)]
@@ -112,7 +103,7 @@
     (let [org (-> (h/gen-org)
                   (assoc :name "test org"))
           user {:id (cuid/random-cuid)
-                :type "github"
+                :type :github
                 :type-id "12342"}
           _ (st/save-user s user)
           res (st/init-org s {:org org
@@ -420,15 +411,15 @@
                            :start-time (t/now)
                            :end-time (t/now))
                     (mc/update-existing :git dissoc :ssh-keys-dir :ssh-keys))
-          build-sid (st/ext-build-sid build)]
+          build-sid (st/ext-build-sid build)
+          sub (juxt :org-id :repo-id :build-id)]
       (is (sid/sid? (st/save-org s org)))
 
       (testing "can save and retrieve"
         (is (sid/sid? (st/save-build s build)))
         (is (= 1 (count (ec/select conn {:select :*
                                          :from :builds}))))
-        (is (= build (-> (st/find-build s build-sid)
-                         (select-keys (keys build))))))
+        (is (= (sub build) (sub (st/find-build s build-sid)))))
 
       (testing "can list"
         (is (= [(:build-id build)]
@@ -440,8 +431,8 @@
       (testing "can list with details, excluding jobs"
         (let [d (st/list-builds s (take 2 build-sid))]
           (is (= 1 (count d)))
-          (is (= (update build :script dissoc :jobs)
-                 (select-keys (first d) (keys build))))))
+          (is (= (sub (update build :script dissoc :jobs))
+                 (sub (first d))))))
 
       (testing "removes ssh private keys"
         (let [ssh-key {:id (st/new-id)
@@ -470,11 +461,13 @@
             old-build (-> (h/gen-build)
                           (assoc :org-id (:id org)
                                  :repo-id (:id repo)
+                                 :build-id (cuid/random-cuid)
                                  :start-time 100)
                           (dissoc :script))
             new-build (-> (h/gen-build)
                           (assoc :org-id (:id org)
                                  :repo-id (:id repo)
+                                 :build-id (cuid/random-cuid)
                                  :start-time 200)
                           (dissoc :script))]
         (is (sid/sid? (st/save-org s org)))
@@ -587,7 +580,8 @@
                            :org-id (:id org)
                            :repo-id (:id repo)))
           sid [(:id org) (:id repo) (:build-id build)]
-          job {:id "test-job"}]
+          job {:id "test-job"
+               :start-time 1000}]
       (is (some? (st/save-org s org)))
       (is (some? (st/save-repo s repo)))
       (is (some? (st/save-build s build)))
@@ -606,7 +600,12 @@
           (is (= {"test-job" upd}
                  (-> (st/find-build s sid)
                      :script
-                     :jobs))))))))
+                     :jobs)))))
+
+      (testing "can list for period"
+        (is (= [(:id job)]
+               (map :id (st/list-jobs-for-period s (:id org) 0 2000))))
+        (is (empty? (st/list-jobs-for-period s (:id org) 2000 3000)))))))
 
 (deftest ^:sql join-requests
   (with-storage conn s
@@ -636,7 +635,7 @@
 (deftest ^:sql email-registrations
   (with-storage conn s
     (let [er (-> (h/gen-email-registration)
-                 (assoc :confirmed true
+                 (assoc :confirmed false
                         :creation-time (t/now)))]
       (testing "can create and retrieve"
         (is (sid/sid? (st/save-email-registration s er)))
@@ -654,10 +653,36 @@
 
       (testing "can count"
         (is (= 1 (st/count-email-registrations s))))
+
+      (testing "can update"
+        (is (some? (st/save-email-registration s (assoc er :confirmed true))))
+        (is (true? (-> (st/find-email-registration s (:id er))
+                       :confirmed))))
       
       (testing "can delete"
         (is (true? (st/delete-email-registration s (:id er))))
         (is (empty? (st/list-email-registrations s)))))))
+
+(deftest ^:sql email-confirmations
+  (with-storage conn s
+    (let [er (-> (h/gen-email-registration)
+                 (assoc :confirmed true
+                        :creation-time (t/now)))
+          c (-> (h/gen-email-confirmation)
+                (assoc :email-reg-id (:id er)
+                       :creation-time (t/now)))]
+      (is (some? (st/save-email-registration s er)))
+      
+      (testing "can create and retrieve"
+        (is (sid/sid? (st/save-email-confirmation s c)))
+        (is (= c (st/find-email-confirmation s (:id c)))))
+
+      (testing "can list by email reg id"
+        (is (= [c] (st/list-email-confirmations s (:id er)))))
+
+      (testing "can delete"
+        (is (true? (st/delete-email-confirmation s (:id c))))
+        (is (empty? (st/list-email-confirmations s (:id er))))))))
 
 (deftest ^:sql credit-subscriptions
   (with-storage conn s

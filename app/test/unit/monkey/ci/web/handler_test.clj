@@ -11,7 +11,6 @@
              [artifacts :as a]
              [build :as b]
              [cuid :as cuid]
-             [logging :as l]
              [storage :as st]
              [time :as t]
              [utils :as u]
@@ -317,17 +316,6 @@
                        (dev-app)
                        :status)))))))
 
-(deftype TestLogRetriever [logs]
-  l/LogRetriever
-  (list-logs [_ sid]
-    (keys logs))
-
-  (fetch-log [_ sid p]
-    (some->> p
-             (get logs)
-             (.getBytes)
-             (java.io.ByteArrayInputStream.))))
-
 (deftest org-endpoints
   (verify-entity-endpoints {:name "org"
                             :base-entity {:name "test org"}
@@ -438,10 +426,31 @@
                            (app)
                            :status)))))
 
-        (testing "`GET /stats` retrieves org statistics"
-          (is (= 200 (-> (mock/request :get (str "/org/" (:id org) "/stats"))
-                         (app)
-                         :status))))
+        (testing "`/stats`"
+          (testing "`GET /` retrieves multiple org statistics"
+            (is (= 200 (-> (mock/request :get (str "/org/" (:id org) "/stats"))
+                           (app)
+                           :status))))
+
+          (testing "`GET /elapsed` retrieves build elapsed statistics"
+            (is (= 200 (-> (mock/request :get (str "/org/" (:id org) "/stats/elapsed"))
+                           (app)
+                           :status))))
+          
+          (testing "`GET /credits` retrieves credits statistics"
+            (is (= 200 (-> (mock/request :get (str "/org/" (:id org) "/stats/credits"))
+                           (app)
+                           :status))))
+
+          (testing "`GET /builds` retrieves build statistics"
+            (is (= 200 (-> (mock/request :get (str "/org/" (:id org) "/stats/builds"))
+                           (app)
+                           :status))))
+
+          (testing "`GET /jobs` retrieves job statistics"
+            (is (= 200 (-> (mock/request :get (str "/org/" (:id org) "/stats/jobs"))
+                           (app)
+                           :status)))))
 
         (testing "`/credits`"
           (testing "`GET` retrieves org credit details"
@@ -1114,36 +1123,7 @@
         (testing "`POST /cancel` cancels build"
           (is (= 202 (-> (mock/request :post (str (build-path sid) "/cancel"))
                          (app)
-                         :status))))
-
-        (testing "/logs"
-          (testing "`GET` retrieves list of available logs for build"
-            (let [app (sut/make-app (test-rt {:logging {:retriever (->TestLogRetriever {})}}))
-                  l (->> (str (build-path sid) "/logs")
-                         (mock/request :get)
-                         (app))]
-              (is (= 200 (:status l)))))
-
-          (testing "`GET /download`"
-            (testing "downloads log file by query param"
-              (let [app (sut/make-app (test-rt
-                                       {:logging
-                                        {:retriever
-                                         (->TestLogRetriever {"out.txt" "test log file"})}}))
-                    l (->> (str (build-path sid) "/logs/download?path=out.txt")
-                           (mock/request :get)
-                           (app))]
-                (is (= 200 (:status l)))))
-
-            (testing "404 when log file not found"
-              (let [app (sut/make-app (test-rt
-                                       {:logging
-                                        {:retriever
-                                         (->TestLogRetriever {})}}))
-                    l (->> (str (build-path sid) "/logs/download?path=out.txt")
-                           (mock/request :get)
-                           (app))]
-                (is (= 404 (:status l))))))))))
+                         :status)))))))
 
   (testing "can list if access granted to org"
     (h/with-memory-store st
@@ -1164,7 +1144,8 @@
           org (-> (h/gen-org)
                   (assoc :repos {(:id repo) repo}))
           build (-> (h/gen-build)
-                    (assoc :org-id (:id org)
+                    (assoc :build-id "test-build"
+                           :org-id (:id org)
                            :repo-id (:id repo)))
           job {:type :container
                :id "test-job"}]
@@ -1173,25 +1154,44 @@
       (is (some? (st/save-job st (b/sid build) job)))
       
       (testing "`/:job-id`"
-        (testing "`GET`"
-          (testing "retrieves job details"
-            (let [r (-> (mock/request :get (str (build-path (b/sid build)) "/job/" (:id job)))
+        (let [job-path (str (build-path (b/sid build)) "/job/" (:id job))]
+          (testing "`GET`"
+            (testing "retrieves job details"
+              (let [r (-> (mock/request :get job-path)
+                          (secure-app-req {:storage st :org-id (:id org)}))]
+                (is (= 200 (:status r)) (str "sid: " (b/sid build)))
+                (is (= {:id "test-job"
+                        :type "container"}
+                       (h/reply->json r)))))
+
+            (testing "`404` when job does not exist"
+              (is (= 404 (-> (mock/request :get (str (build-path (b/sid build)) "/job/nonexisting"))
+                             (secure-app-req {:storage st :org-id (:id org)})
+                             :status)))))
+
+          (testing "`POST /unblock` unblocks job"
+            (is (some? (st/save-job st (b/sid build) (assoc job :blocked true))))
+            (let [r (-> (mock/request :post (str job-path "/unblock"))
                         (secure-app-req {:storage st :org-id (:id org)}))]
-              (is (= 200 (:status r)))
-              (is (= {:id "test-job"
-                      :type "container"}
-                     (h/reply->json r)))))
+              (is (= 202 (:status r)))))
 
-          (testing "`404` when job does not exist"
-            (is (= 404 (-> (mock/request :get (str (build-path (b/sid build)) "/job/nonexisting"))
-                           (secure-app-req {:storage st :org-id (:id org)})
-                           :status)))))
+          (testing "GET `/logs`"
+            (testing "downloads log file by query param"
+              (let [app (sut/make-app (test-rt
+                                       {:log-retriever
+                                        (constantly (md/success-deferred "test log file"))}))
+                    l (->> (str job-path "/logs?file=out.txt")
+                           (mock/request :get)
+                           (app))]
+                (is (= 200 (:status l)))))
 
-        (testing "`POST /unblock` unblocks job"
-          (is (some? (st/save-job st (b/sid build) (assoc job :blocked true))))
-          (let [r (-> (mock/request :post (str (build-path (b/sid build)) "/job/" (:id job) "/unblock"))
-                      (secure-app-req {:storage st :org-id (:id org)}))]
-            (is (= 202 (:status r)))))))))
+            (testing "204 when log file not found"
+              (let [app (sut/make-app (test-rt
+                                       {:log-retriever (constantly nil)}))
+                    l (->> (str job-path "/logs?file=out.txt")
+                           (mock/request :get)
+                           (app))]
+                (is (= 204 (:status l)))))))))))
 
 (deftest event-stream
   (testing "`GET /org/:org-id/events` exists"
@@ -1559,16 +1559,37 @@
                             :can-update? false
                             :can-delete? true})
 
-  (testing "POST `/email-registration/unregister`"
-    (testing "returns 200 if matching user"
-      (h/with-memory-store st
-        (let [app (make-test-app st)
-              email "existing@monkeyci.com"]
-          (is (some? (st/save-email-registration st {:email email})))
-          (is (= 200
-                 (-> (mock/request :post (str "/email-registration/unregister?email=" email))
-                     (app)
-                     :status))))))))
+  (testing "`/email-registration`"
+    (testing "POST `/unregister`"
+      (testing "returns 200 if matching user"
+        (h/with-memory-store st
+          (let [app (make-test-app st)
+                email "existing@monkeyci.com"]
+            (is (some? (st/save-email-registration st {:email email})))
+            (is (= 200
+                   (-> (mock/request :post (str "/email-registration/unregister?email=" email))
+                       (app)
+                       :status)))))))
+
+    (testing "POST `/confirm`"
+      (testing "returns 200 if matching user"
+        (h/with-memory-store st
+          (let [app (make-test-app st)
+                email "user@monkeyci.com"
+                reg (-> (h/gen-email-registration)
+                        (assoc :email email
+                               :confirmed false))
+                conf {:id (cuid/random-cuid)
+                      :email-reg-id (:id reg)
+                      :code "test-code"}]
+            (is (some? (st/save-email-registration st reg)))
+            (is (some? (st/save-email-confirmation st conf)))
+            (is (= 200
+                   (-> (h/json-request :post "/email-registration/confirm"
+                                       {:id (:id reg)
+                                        :code "test-code"})
+                       (app)
+                       :status)))))))))
 
 (deftest admin-routes
   (testing "`/admin`"

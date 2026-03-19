@@ -18,9 +18,13 @@
 (s/def ::cpus int?)
 (s/def ::memory int?)
 
+(s/def :container/image string?)
+
 (defmethod job-spec :container [_]
-  (-> (s/keys :req-un [::jc/image]
-              :opt-un [::jc/env ::jc/script ::jc/cpus ::jc/memory ::jc/size ::jc/arch])
-      (s/merge ::common)))
+  (-> (s/keys :opt-un [::jc/image :container/image
+                       ::jc/env ::jc/script ::jc/cpus ::jc/memory ::jc/size ::jc/arch])
+      (s/merge ::common)
+      ;; Require an image
+      (s/and (some-fn :container/image :image))))
 
 (s/def ::job (s/multi-spec job-spec :type))

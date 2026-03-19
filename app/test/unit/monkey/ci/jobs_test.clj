@@ -7,7 +7,7 @@
              [edn :as edn]
              [jobs :as sut]]
             [monkey.ci.build.core :as bc]
-            [monkey.ci.spec.events :as se]
+            [monkey.ci.events.spec :as es]
             [monkey.ci.test
              [helpers :as h]
              [mailman :as tm]]))
@@ -227,14 +227,14 @@
       (let [evt (h/first-event-by-type :job/start (tm/get-posted mailman))]
         (is (some? evt))
         (is (= (sut/job-id job) (:job-id evt)))
-        (is (spec/valid? ::se/event evt))
+        (is (spec/valid? ::es/event evt))
         (is (= evt (edn/edn-> (edn/->edn evt))) "Event should be serializable to edn")
         (is (= 10 (:credit-multiplier evt)) "Adds credit multiplier from build")))
 
     (testing "fires `job/executed` event"
       (let [evt (h/first-event-by-type :job/executed (tm/get-posted mailman))]
         (is (some? evt))
-        (is (spec/valid? ::se/event evt))
+        (is (spec/valid? ::es/event evt))
         (is (= (sut/job-id job) (:job-id evt)))
         (is (= evt (edn/edn-> (edn/->edn evt))) "Event should be serializable to edn")))))
 

@@ -94,6 +94,20 @@
   ([job script]
    (try-unwrap job assoc :script script)))
 
+(defn expose
+  "Gets or sets exposed ports"
+  ([job]
+   (:expose job))
+  ([job ports]
+   (try-unwrap job assoc :expose ports)))
+
+(defn init
+  "Gets or sets container job initializer"
+  ([job]
+   (:init job))
+  ([job init]
+   (try-unwrap job assoc :init init)))
+
 (defn- set-env [job e]
   (cond
     (action-job? job) (assoc job :env e)
@@ -151,24 +165,27 @@
   [art]
   (update art :path (comp str #(or % ".") fs/parent)))
 
-(defn save-artifacts
-  "Configures the artifacts to save on a job."
-  [job & arts]
-  (try-unwrap job update :save-artifacts concat (flatten arts)))
+(defn- get-or-update-list-prop [p]
+  (fn [job & xs]
+    (if (empty? xs)
+      (try-unwrap job p)
+      (try-unwrap job update p concat (flatten xs)))))
 
-(defn restore-artifacts
+(def save-artifacts
+  "Configures the artifacts to save on a job."
+  (get-or-update-list-prop :save-artifacts))
+
+(def restore-artifacts
   "Configures the artifacts to restore on a job."
-  [job & arts]
-  (try-unwrap job update :restore-artifacts concat (flatten arts)))
+  (get-or-update-list-prop :restore-artifacts))
 
 (def cache
   "Defines a cache with given id an path, that can be passed to `caches`"
   artifact)
 
-(defn caches
+(def caches
   "Configures the caches a job uses."
-  [job & arts]
-  (try-unwrap job update :caches concat (flatten arts)))
+  (get-or-update-list-prop :caches))
 
 (defn- file-test [tester]
   (fn test-fn
@@ -294,3 +311,16 @@
   "Retrieves job by id in the current build"
   [ctx id]
   ((get-in ctx [:api :jobs]) id))
+
+(defn get-job-exposed-addr
+  "If the given job exposes a port, looks it up in the context and returns the
+   externally accessible address as a map with `:port` and `:address` keys.  If
+   the job is not found, or the given port is not mapped, returns `nil`."
+  [ctx id port]
+  (when-let [a (some-> (get-job ctx id)
+                       :agent)]
+    (when-let [[p _] (->> (:ports a)
+                          (filter (comp (partial = port) second))
+                          first)]
+      {:address (:address a)
+       :port p})))

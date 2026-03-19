@@ -1,5 +1,6 @@
 (ns monkey.ci.gui.template
-  (:require [monkey.ci.template.components :as tc]))
+  (:require [clojure.string :as cs]
+            [monkey.ci.template.components :as tc]))
 
 (def config
   "Template configuration, can be passed to template functions."
@@ -10,7 +11,11 @@
              (assoc :assets-url js/assetsUrl))))
 
 (defn docs-url [path]
-  (tc/docs-url config path))
+  (tc/docs-url config (cond->> path
+                        (not (cs/starts-with? path "/")) (str "/"))))
+
+(defn docs-link [path lbl]
+  [:a {:href (docs-url path) :target :_blank} lbl [:small.ms-1 [:i.bi.bi-box-arrow-up-right]]])
 
 (defn site-url [path]
   (tc/site-url config path))

@@ -8,7 +8,9 @@
             [monkey.ci.test
              [helpers :as h]
              [runtime :as trt]]
-            [monkey.ci.web.auth :as sut]))
+            [monkey.ci.web
+             [auth :as sut]
+             [common :as wc]]))
 
 (deftest generate-secret-key
   (testing "generates random string"
@@ -244,14 +246,17 @@
   (let [org-id (cuid/random-cuid)
         org {:id org-id
              :display-id "test-display-id"}
-        checker (sut/org-auth-checker (constantly org-id))]
+        checker (fn [req]
+                  (-> (wc/set-id-resolver {} (constantly org-id))
+                      (h/->match-data)
+                      (merge req)
+                      (as-> r (sut/org-auth-checker [] r))))]
     (testing "allows"
       (testing "if no org id in request path"
-        (is (nil? (checker [] {}))))
+        (is (nil? (checker {}))))
 
       (testing "if identity allows access to org id"
         (is (nil? (checker
-                   []
                    {:parameters
                     {:path
                      {:org-id org-id}}
@@ -265,11 +270,10 @@
                          {:org-id (:display-id org)}}
                         :identity
                         {:orgs #{(:id org)}}}
-                       (checker [])))))
+                       (checker)))))
 
       (testing "if sysadmin token"
         (is (nil? (checker
-                   []
                    {:parameters
                     {:path
                      {:org-id (:id org)}}
@@ -280,7 +284,6 @@
       (testing "if org id is not in identity"
         (is (sut/denied?
              (checker
-              []
               {:parameters
                {:path
                 {:org-id (:id org)}}
@@ -290,7 +293,6 @@
       (testing "if not authenticated"
         (is (sut/denied?
              (checker
-              []
               {:parameters
                {:path
                 {:org-id (:id org)}}})))))))

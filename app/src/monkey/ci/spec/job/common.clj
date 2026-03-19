@@ -27,11 +27,14 @@
     :blocked     ; Job is blocked and waits for approval
     })
 
+(s/def ::status ::lifecycle)
+
 (s/def ::result map?)
 (s/def ::output string?)
 (s/def ::runner map?)
 (s/def ::blocked boolean?)
-(s/def ::credit-multiplier int?)
+(s/def ::credit-multiplier (s/int-in 0 100))
+(s/def ::timeout pos-int?)
 
 (s/def ::action fn?)
 
@@ -40,3 +43,14 @@
 (s/def ::arch #{:arm :amd})
 (s/def ::command string?)
 (s/def ::script (s/coll-of ::command))
+(s/def ::env (s/map-of string? string?))
+(s/def ::port int?)
+(s/def ::expose (s/coll-of ::port))
+(s/def ::init fn?)
+
+(s/def ::address string?)
+(s/def ::ports (s/map-of int? int?))
+
+(s/def ::agent
+  (s/keys :req-un [::address]
+          :opt-un [::ports]))

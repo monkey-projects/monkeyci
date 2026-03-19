@@ -1,22 +1,62 @@
-(ns monkey.ci.spec.events-test
-  (:require
-   [clojure.spec.alpha :as s]
-   [clojure.test :refer [deftest is testing]]
-   [monkey.ci.spec.events :as sut]
-   [monkey.ci.test.helpers :as h]
-   [monkey.ci.time :as t]))
+(ns monkey.ci.events.spec-test
+  (:require [clojure.spec.alpha :as s]
+            [clojure.test :refer [deftest is testing]]
+            [monkey.ci.events.spec :as sut]
+            [monkey.ci.test.helpers :as h]
+            [monkey.ci.time :as t]))
 
 (deftest event-spec
-  (testing "validates `:build/initializing` event"
-    (is (not (s/valid? ::sut/event
-                       {:type :build/initializing
-                        :time (t/now)
-                        :sid (h/gen-build-sid)})))
-    (is (s/valid? ::sut/event
-                  {:type :build/initializing
-                   :time (t/now)
-                   :sid (h/gen-build-sid)
-                   :build {:build-id "test-build"}})))
+  (let [build {:org-id "test-org"
+               :repo-id "test-repo"
+               :build-id "test-build"
+               :source :api}]
+    (testing "validates `:build/triggered` event"
+      (is (not (s/valid? ::sut/event
+                         {:type :build/triggered
+                          :time (t/now)
+                          :sid (h/gen-build-sid)}))
+          "requires build")
+      (is (s/valid? ::sut/event
+                    {:type :build/triggered
+                     :time (t/now)
+                     :sid (h/gen-build-sid)
+                     :build build})))
+
+    (testing "validates `:build/pending` event"
+      (is (not (s/valid? ::sut/event
+                         {:type :build/pending
+                          :time (t/now)
+                          :sid (h/gen-build-sid)}))
+          "requires build")
+      (is (s/valid? ::sut/event
+                    {:type :build/pending
+                     :time (t/now)
+                     :sid (h/gen-build-sid)
+                     :build build})))
+
+    (testing "validates `:build/queued` event"
+      (is (not (s/valid? ::sut/event
+                         {:type :build/queued
+                          :time (t/now)
+                          :sid (h/gen-build-sid)}))
+          "requires build")
+      (is (s/valid? ::sut/event
+                    {:type :build/queued
+                     :time (t/now)
+                     :sid (h/gen-build-sid)
+                     :build build})))
+
+    (testing "validates `:build/initializing` event"
+      (is (not (s/valid? ::sut/event
+                         {:type :build/initializing
+                          :time (t/now)
+                          :sid (h/gen-build-sid)}))
+          "requires build")
+      (is (s/valid? ::sut/event
+                    {:type :build/initializing
+                     :time (t/now)
+                     :sid (h/gen-build-sid)
+                     :build build}))))
 
   (testing "validates `:build/start` event"
     (is (not (s/valid? ::sut/event

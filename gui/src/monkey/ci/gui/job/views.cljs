@@ -1,5 +1,6 @@
 (ns monkey.ci.gui.job.views
   (:require [clojure.string :as cs]
+            [medley.core :as mc]
             [monkey.ci.gui.artifact.events]
             [monkey.ci.gui.artifact.subs]
             [monkey.ci.gui.components :as co]
@@ -36,7 +37,7 @@
               (vec (interleave [:li ":"] kv))))
        (into [:ul])))
 
-(defn job-details
+(defn job-summary
   ([job]
    (when-let [{:keys [start-time end-time labels] deps :dependencies} job]
      [:div.d-flex.gap-4.align-items-center.mb-3
@@ -61,7 +62,51 @@
             ;; TODO Truncate, but allow user to expand
             [:div.col-10 msg]]))]]))
   ([]
-   (job-details @(rf/subscribe [:job/current]))))
+   (job-summary @(rf/subscribe [:job/current]))))
+
+(defn- port-mapping [{:keys [address ports]}]
+  [:<>
+   [:div.row
+    [:div.col-2 "Agent address:"]
+    [:div.col [:div.font-monospace address]]]
+   [:div.row
+    [:div.col-2 "Port forwards:"]
+    [:div.col (->> ports
+                   (map (fn [[f t]]
+                          [:span (str f " -> " t) [:br]]))
+                   (into [:div.font-monospace]))]]])
+
+(defn job-details [job]
+  (letfn [(row [k v]
+            (when v
+              [:div.row.mt-1
+               [:div.col-2 k]
+               [:div.col-10.overflow-y-scroll v]]))]
+    [:div
+     [row "Type:" [:b.text-capitalize (:type job)]]
+     [row "Image:" (:container/image job) ]
+     (when-let [s (:script job)]
+       [row "Script:" [:code (str s)]])
+     (when-let [e (:expose job)]
+       [row "Exposed ports:" [:div.font-monospace (cs/join ", " e)]])
+     (when-let [a (:agent job)]
+       [port-mapping a])
+     [row
+      [:span
+       "Raw definition:"
+       [:span.ms-1
+        {:title "The definition of the job as processed by MonkeyCI.  Environment variables have been cleared for security purposes."}
+        [co/icon :question-circle]]]
+      [:code (str (-> job
+                      (dissoc :result)
+                      (mc/update-existing :container/env
+                                          (partial mc/map-vals (constantly "...")))))]]
+     (when-let [r (:result job)]
+       [row "Raw result:" [:code (str r)]])]))
+
+(defn details-tab [job]
+  {:header "Details"
+   :contents [job-details job]})
 
 (defn- path->file [p]
   (some-> p
@@ -101,10 +146,17 @@
           (into [:<>])))])
 
 (defn- job-logs [job]
-  (rf/dispatch [:job/load-log-files job])
-  (let [script-logs (rf/subscribe [:job/script-with-logs])]
-    ;; Display combined logs for all script lines in the job
-    [co/log-viewer (map-indexed script-line @script-logs)]))
+  ;;(rf/dispatch [:job/load-log-files job])
+  (let [script-logs (rf/subscribe [:job/script-with-implied-logs])]
+    [:<>
+     [:div.form-check
+      [:input#wrap-logs.form-check-input
+       {:type :checkbox
+        :on-change (u/form-evt-handler [:job/wrap-logs-changed] u/evt->checked)
+        :checked @(rf/subscribe [::s/wrap-logs?])}]
+      [:label.form-check-label {:for :wrap-logs} "Wrap long lines"]]
+     ;; Display combined logs for all script lines in the job
+     [co/log-viewer (map-indexed script-line @script-logs)]]))
 
 (def has-logs? (comp  #{:running :success :failure :error :canceled} :status))
 
@@ -190,14 +242,16 @@
    (let [u? (rf/subscribe [::s/unblocking?])]
      (unblock-btn job @u?))))
 
-(defn details-tabs
+(defn overview-tabs
   "Renders tabs to display the job details.  These tabs include logs and test results."
   [{:keys [status] :as job}]
-  (let [[f :as tabs] (->> [(output-tab job)
-                           (error-trace job)
-                           (test-results job)
-                           (log-tab job)
-                           (artifacts-tab job)]
+  (let [all-tabs (juxt output-tab
+                       error-trace
+                       test-results
+                       log-tab
+                       details-tab
+                       artifacts-tab)
+        [f :as tabs] (->> (all-tabs job)
                           (remove nil?))]
     (cond
       (= :pending status)
@@ -220,11 +274,11 @@
       (conj [tabs/tabs e/details-tabs-id]
             (replace {f (assoc f :current? true)} tabs)))))
 
-(defn- load-details-tabs
+(defn- load-overview-tabs
   "Loads any additional job details and renders the tabs to display them."
   []
   (when-let [job @(rf/subscribe [:job/current])]
-    [details-tabs job]))
+    [overview-tabs job]))
 
 (defn- return-link []
   (let [route (rf/subscribe [:route/current])]
@@ -245,9 +299,9 @@
          [co/page-title [co/icon-text :cpu "Job: " @job-id]]
          [:div.card
           [:div.card-body
-           [job-details]
+           [job-summary]
            [co/alerts [:job/alerts]]
-           [load-details-tabs]]]
+           [load-overview-tabs]]]
          [return-link]]]
        ;; Put modals as high as possible on the dom tree to avoid interference
        [tr/test-details-modal]])))

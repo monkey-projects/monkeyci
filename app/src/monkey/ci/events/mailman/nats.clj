@@ -71,6 +71,7 @@
                          (-> {:handler router
                               :subject s}
                              (merge (select-keys opts [:queue :stream :consumer]))))]
+      (log/debug "Adding NATS router with options" opts)
       ;; If we're using jetstream consumers, only register listener once and ignore
       ;; the subjects because they are configured on jetstream level.
       (if ((every-pred :stream :consumer) opts)

@@ -38,39 +38,39 @@
       ;; Return context unchanged
       ctx)))
 
-(defn- apply-extensions [{:keys [job] :as rt} registered rk mm]
+(defn- apply-extensions [{:keys [job] :as ctx} registered rk mm]
   (->> (keys job)
        (reduce (fn [r k]
                  (let [b (or (get-in registered [k rk])
                              (find-mm k mm))]
                    (cond->> r
                      b (run-safe b))))
-               rt)))
+               ctx)))
 
 (defn apply-extensions-before
-  ([rt registered]
-   (apply-extensions rt registered :before before-job))
-  ([rt]
-   (apply-extensions-before rt @registered-extensions)))
+  ([ctx registered]
+   (apply-extensions ctx registered :before before-job))
+  ([ctx]
+   (apply-extensions-before ctx @registered-extensions)))
 
 (defn apply-extensions-after
-  ([rt registered]
-   (apply-extensions rt registered :after after-job))
-  ([rt]
-   (apply-extensions-after rt @registered-extensions)))
+  ([ctx registered]
+   (apply-extensions ctx registered :after after-job))
+  ([ctx]
+   (apply-extensions-after ctx @registered-extensions)))
 
 ;;; Utility functions
 
 (defn get-config
   "Retrieves configuration for the extension from the job"
-  [rt k]
-  (get-in rt [:job k]))
+  [ctx k]
+  (get-in ctx [:job k]))
 
 (defn set-value
   "Sets the extension value in the job.  This value will be stored with the job, so it
    must be serializable to `edn`."
-  [rt k v]
-  (assoc-in rt [:job :result k] v))
+  [ctx k v]
+  (assoc-in ctx [:job :result k] v))
 
 ;;; Interceptors
 
@@ -80,6 +80,8 @@
    added to that context."
   {:name ::before
    :enter (fn [ctx]
+            ;; TODO Allow for before extensions to cancel job execution, as a form of conditions.
+            ;; This would make it possible for extensions to prevent containers from running.
             (emi/update-job-ctx ctx apply-extensions-before))})
 
 (def after-interceptor

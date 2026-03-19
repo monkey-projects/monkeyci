@@ -1,10 +1,12 @@
-(ns monkey.ci.spec.events
+(ns monkey.ci.events.spec
   "Spec definitions for events.  All events sent (and received) should match `::event`."
   (:require [clojure.set :as set]
             [clojure.spec.alpha :as s]
             [monkey.ci.spec
-             [build]
-             [common :as c]]))
+             [build :as build]
+             [common :as c]
+             [script :as ss]]
+            [monkey.ci.spec.job.common :as jc]))
 
 (def build-event-types
   #{:build/triggered :build/queued :build/pending :build/initializing
@@ -18,8 +20,8 @@
     :job/executed :job/blocked :job/unblocked})
 
 (def container-event-types
-  #{:container/pending :container/initializing :container/start :container/end
-    :container/job-queued})
+  #{:container/pending :container/initializing :container/start :container/script-end
+    :container/end :container/job-queued})
 
 (def sidecar-event-types
   #{:sidecar/start :sidecar/end})
@@ -33,6 +35,13 @@
 (def k8s-event-types
   #{:k8s/build-scheduled :k8s/job-scheduled})
 
+(def email-event-types
+  #{:email/registration-created
+    :email/registration-deleted
+    :email/confirmation-created
+    :email/confirmation-expired
+    :email/confirmed})
+
 (def event-types
   (set/union build-event-types
              script-event-types
@@ -41,71 +50,87 @@
              sidecar-event-types
              command-event-types
              oci-event-types
-             k8s-event-types))
+             k8s-event-types
+             email-event-types))
 
 (s/def ::type event-types)
 (s/def ::message string?)
-(s/def ::time int?)
+(s/def ::time c/ts?)
+;; Event source (e.g. api, script, build-agent,...)
 (s/def ::src keyword?)
+(s/def ::done? boolean?)
 
 (s/def ::event-base (s/keys :req-un [::type ::time]
                             :opt-un [::message ::src]))
 
-(s/def ::build map?) ; TODO Specify
-(s/def ::credit-multiplier int?)
-(s/def ::job-id c/id?)
-(s/def ::result map?)
+(s/def ::job-id ::jc/id)
 
-(s/def ::build-event
-  (->> (s/keys :req-un [:build/sid])
+;; Job as passed in events
+(s/def ::job
+  (s/keys :req-un [::jc/id ::jc/type]
+          :opt-un [::jc/caches ::jc/save-artifacts ::jc/restore-artifacts ::jc/dependencies
+                   ::jc/blocked]))
+
+(s/def ::jobs (s/coll-of ::job))
+
+(s/def ::build-ref-event
+  (->> (s/keys :req-un [::build/sid])
        (s/merge ::event-base)))
+
+(s/def ::build-holding-event
+  (->> (s/keys :req-un [::build/build])
+       (s/merge ::build-ref-event)))
 
 (s/def ::job-event
   (->> (s/keys :req-un [::job-id])
-       (s/merge ::build-event)))
+       (s/merge ::build-ref-event)))
 
 (s/def ::runner-details map?)
 
 (defmulti event-type :type)
 
+(defmethod event-type :build/triggered [_]
+  ::build-holding-event)
+
 (defmethod event-type :build/pending [_]
-  (->> (s/keys :req-un [::build])
-       (s/merge ::build-event)))
+  ::build-holding-event)
+
+(defmethod event-type :build/queued [_]
+  ::build-holding-event)
 
 (defmethod event-type :build/initializing [_]
-  (->> (s/keys :req-un [::build]
-               :opt-un [::runner-details])
-       (s/merge ::build-event)))
+  (->> (s/keys :opt-un [::runner-details])
+       (s/merge ::build-holding-event)))
 
 (defmethod event-type :build/start [_]
-  (->> (s/keys :req-un [::credit-multiplier])
-       (s/merge ::build-event)))
+  (->> (s/keys :req-un [::jc/credit-multiplier])
+       (s/merge ::build-ref-event)))
 
 (defmethod event-type :build/end [_]
-  (->> (s/keys :req-un [:build/status])
-       (s/merge ::build-event)))
+  (->> (s/keys :req-un [::build/status])
+       (s/merge ::build-ref-event)))
 
 (defmethod event-type :build/canceled [_]
-  ::build-event)
+  ::build-ref-event)
 
 (defmethod event-type :build/updated [_]
-  (->> (s/keys :req-un [::build])
-       (s/merge ::build-event)))
+  ::build-holding-event)
 
 (defmethod event-type :script/initializing [_]
-  (->> (s/keys :req-un [:script/script-dir])
-       (s/merge ::build-event)))
+  (->> (s/keys :req-un [::ss/script-dir])
+       (s/merge ::build-ref-event)))
 
 (defmethod event-type :script/start [_]
-  (->> (s/keys :req-un [:script/jobs])
-       (s/merge ::build-event)))
+  (->> (s/keys :req-un [::jobs])
+       (s/merge ::build-ref-event)))
 
 (defmethod event-type :script/end [_]
-  (->> (s/keys :req-un [:script/status])
-       (s/merge ::build-event)))
+  (->> (s/keys :req-un [::ss/status])
+       (s/merge ::build-ref-event)))
 
 (defmethod event-type :job/initializing [_]
-  (->> (s/keys :req-un [::credit-multiplier])
+  (->> (s/keys :req-un [::jc/credit-multiplier]
+               :opt-un [::jc/agent])
        (s/merge ::job-event)))
 
 (defmethod event-type :job/pending [_]
@@ -126,8 +151,8 @@
   ::job-event)
 
 (s/def ::job-status-event
-  (->> (s/keys :req-un [:job/status]
-               :opt-un [::result])
+  (->> (s/keys :req-un [::jc/status]
+               :opt-un [::jc/result])
        (s/merge ::job-event)))
 
 (defmethod event-type :job/executed [_]
@@ -144,5 +169,36 @@
 
 (defmethod event-type :sidecar/end [_]
   ::job-status-event)
+
+(defmethod event-type :container/pending [_]
+  ::job-event)
+
+(defmethod event-type :container/start [_]
+  ::job-event)
+
+(defmethod event-type :container/end [_]
+  ::job-status-event)
+
+(defmethod event-type :container/script-end [_]
+  (s/merge ::job-event
+           (s/keys :req-un [::done? ::jc/result])))
+
+(s/def ::id ::c/cuid)
+(s/def ::code string?)
+
+(defmethod event-type :email/registration-created [_]
+  (s/keys :req-un [::c/email ::id]))
+
+(defmethod event-type :email/registration-deleted [_]
+  (s/keys :req-un [::c/email ::id]))
+
+(defmethod event-type :email/confirmation-created [_]
+  (s/keys :req-un [::c/email ::id ::code]))
+
+(defmethod event-type :email/confirmation-expired [_]
+  (s/keys :req-un [::c/email ::id]))
+
+(defmethod event-type :email/confirmed [_]
+  (s/keys :req-un [::c/email ::id]))
 
 (s/def ::event (s/multi-spec event-type :type))

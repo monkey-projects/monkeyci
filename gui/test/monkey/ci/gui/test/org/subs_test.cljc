@@ -208,6 +208,12 @@
 (deftest org-credits
   (h/verify-sub [:org/credits] #(lo/set-value % db/credits ::test-creds) ::test-creds nil))
 
+(deftest org-build-stats
+  (h/verify-sub [:org/build-stats] #(lo/set-value % db/build-stats ::test-stats) ::test-stats nil))
+
+(deftest org-job-stats
+  (h/verify-sub [:org/job-stats] #(lo/set-value % db/job-stats ::test-stats) ::test-stats nil))
+
 (deftest credit-stats
   (h/verify-sub [:org/credit-stats]
                 (fn [db]

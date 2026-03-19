@@ -3,14 +3,16 @@
   (:require [buddy.core.codecs :as bcc]
             [clojure.tools.logging :as log]
             [com.stuartsierra.component :as co]
-            [manifold.bus :as mb]
+            [manifold
+             [bus :as mb]
+             [deferred :as md]]
             [monkey.ci
              [blob :as blob]
-             [build :as b]
              [invoicing :as inv]
              [oci :as oci]
              [protocols :as p]
              [reporting :as rep]
+             [sid :as sid]
              [storage :as s]
              [vault :as v]]
             [monkey.ci.events.mailman :as em]
@@ -18,12 +20,14 @@
              [db :as emd]
              [interceptors :as emi]
              [jms :as emj]]
-            [monkey.ci.mailing.scw :as mailing-scw]
+            [monkey.ci.logging.log-ingest :as li]
+            [monkey.ci.mailing
+             [events :as mailing-evt]
+             [scw :as mailing-scw]]
             [monkey.ci.metrics
              [core :as m]
              [events :as me]
              [otlp :as mo]]
-            [monkey.ci.reporting.print]
             [monkey.ci.runners.oci :as ro]
             [monkey.ci.runtime.common :as rc]
             [monkey.ci.storage.sql :as sql]
@@ -206,8 +210,12 @@
   (make-queue-options (:mailman conf)))
 
 (defn new-app-routes [conf]
-  (letfn [(make-routes [{:keys [storage update-bus]}]
-            (emd/make-routes storage update-bus))]
+  (letfn [(make-routes [{:keys [storage update-bus mailer]}]
+            (em/merge-routes (emd/make-routes storage update-bus)
+                             (mailing-evt/make-routes (-> conf
+                                                          :mailing
+                                                          (select-keys [:site-url])
+                                                          (assoc :mailer mailer)))))]
     (em/map->RouteComponent {:make-routes make-routes})))
 
 (defn new-update-routes []
@@ -275,6 +283,17 @@
 (defn new-invoicing [{:keys [invoicing]}]
   {:client (inv/make-client invoicing)})
 
+(defn new-log-retriever
+  "If log ingester configuration is provided, uses it to create a log retriever fn.
+   Otherwise returns a noop."
+  [{conf :log-ingest}]
+  (if (empty? conf)
+    (constantly nil)
+    (let [client (li/make-client conf)]
+      (fn [job-sid path]
+        (log/debug "Fetching logs for" job-sid ", file" path)
+        @(li/fetch-logs client (concat (sid/parse-sid job-sid) [path]))))))
+
 (defn make-server-system
   "Creates a component system that can be used to start an application server."
   [config]
@@ -293,7 +312,7 @@
    :runtime   (co/using
                (new-server-runtime config)
                [:artifacts :metrics :storage :jwk :process-reaper :vault :mailman :update-bus
-                :crypto :mailer :invoicing])
+                :crypto :mailer :invoicing :log-retriever])
    :pool      (new-db-pool config)
    :migrator  (co/using
                (new-db-migrator config)
@@ -317,7 +336,7 @@
    :queue-options (new-queue-options config)
    :mailman-routes (co/using
                     (new-app-routes config)
-                    (-> (as-map [:mailman :storage])
+                    (-> (as-map [:mailman :storage :mailer])
                         (assoc :options :queue-options)))
    :update-routes (co/using
                    (new-update-routes)
@@ -327,7 +346,8 @@
           (new-otlp-client config)
           [:metrics])
    :mailer (new-mailer config)
-   :invoicing (new-invoicing config)))
+   :invoicing (new-invoicing config)
+   :log-retriever (new-log-retriever config)))
 
 (defn with-server-system [config f]
   (rc/with-system (make-server-system config) f))

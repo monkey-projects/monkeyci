@@ -5,7 +5,8 @@
             [io.pedestal.interceptor.chain :as pi]
             [manifold
              [bus :as mb]
-             [deferred :as md]]
+             [deferred :as md]
+             [time :as mt]]
             [medley.core :as mc]
             [monkey.ci
              [build :as b]
@@ -110,6 +111,32 @@
               (cond-> ctx
                 ;; TODO See if we can replace bp with clojure.java.process
                 cmd (set-process (bp/process cmd)))))})
+
+(def get-process-kill ::proc-kill)
+
+(defn set-process-kill [ctx p]
+  ;; Should we save it to state instead?  Would make canceling later on easier.
+  (assoc ctx ::proc-kill p))
+
+(defn schedule-process-kill
+  "When a process is stored in the context, schedules a kill in the period
+   return by the `timeout-fn`, which takes the context as arg.  Sets a deferred
+   in the context that can be used to cancel the kill."
+  [timeout-fn]
+  {:name ::schedule-proc-kill
+   :leave (fn [ctx]
+            (let [p (get-process ctx)]
+              (cond-> ctx
+                p (set-process-kill (mt/in (timeout-fn ctx) #(bp/destroy p))))))})
+
+(defn cancel-process-kill
+  "When a kill deferred is present in the context, cancels it.  Otherwise noop."
+  [ctx]
+  (let [k (get-process-kill ctx)]
+    (when k
+      (md/success! k :canceled))
+    (cond-> ctx
+      k (dissoc ctx ::proc-kill))))
 
 (def get-mailman ::mailman)
 

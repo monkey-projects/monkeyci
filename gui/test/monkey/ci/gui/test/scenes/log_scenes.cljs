@@ -14,3 +14,7 @@
 (defscene colored-log
   "Log with ansi coloring"
   [sut/log-contents ["This is \033[32mcolored\033[0;39m."]])
+
+(defscene long-line-wrap
+  "Log with very long line and wrapping enabled"
+  [sut/log-contents (repeat 30 "This is a very long line. ") {:wrap? true}])

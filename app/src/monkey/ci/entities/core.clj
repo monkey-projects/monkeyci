@@ -292,7 +292,16 @@
    :after-update  convert-webhook
    :after-select  convert-webhook-select})
 
-(defentity user)
+(def prepare-user (partial keyword->str :type))
+(def convert-user (partial copy-prop :type))
+(def convert-user-select (partial str->keyword :type))
+
+(defentity user
+  {:before-insert prepare-user
+   :after-insert  convert-user
+   :before-update prepare-user
+   :after-update  convert-user
+   :after-select  convert-user-select})
 
 (def git->edn (partial prop->edn :git))
 (def edn->git (partial edn->prop :git))
@@ -600,3 +609,17 @@
 
 (defaggregate user-setting
   {:id-col :user-id})
+
+(def prepare-email-conf
+  (partial int->time :creation-time))
+(def convert-email-conf-select
+  (partial time->int :creation-time))
+(def convert-email-conf
+  (partial copy-prop :creation-time))
+
+(defentity email-confirmation
+  {:before-insert prepare-email-conf
+   :after-insert  convert-email-conf
+   :before-update prepare-email-conf
+   :after-update  convert-email-conf
+   :after-select  convert-email-conf-select})

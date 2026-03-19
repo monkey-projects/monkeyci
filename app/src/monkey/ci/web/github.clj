@@ -97,7 +97,7 @@
    runner async and returns a 202 accepted."
   [{p :parameters :as req}]
   (log/trace "Got incoming webhook with body:" (prn-str (body req)))
-  (log/debug "Event type:" (get-in req [:headers "x-github-event"]))
+  (log/debug "Event type:" (github-event req))
   (if (should-trigger-build? req)
     (let [rt (c/req->rt req)]
       (if-let [build (create-webhook-build rt (get-in p [:path :id]) (body req))]
@@ -111,7 +111,7 @@
 
 (defn app-webhook [req]
   (log/trace "Got github app webhook event:" (pr-str (body req)))
-  (log/debug "Event type:" (get-in req [:headers "x-github-event"]))
+  (log/debug "Event type:" (github-event req))
   (if (should-trigger-build? req)
     (let [github-id (get-in (body req) [:repository :id])
           builds (->> (s/find-watched-github-repos (c/req->storage req) github-id)

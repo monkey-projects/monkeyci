@@ -11,7 +11,6 @@
              [edn :as edn]]
             [monkey.ci.events.mailman.interceptors :as emi]
             [monkey.ci.script.config :as sc]
-            [monkey.ci.spec.script :as ss]
             [monkey.ci.test
              [helpers :as h]
              [mailman :as tm]]
@@ -217,7 +216,7 @@
             (is (= "/home/monkeyci"
                    (-> deps
                        (get-in [:aliases :monkeyci/build :exec-args :config])
-                       ::ss/build
+                       ::sc/build
                        :checkout-dir))))))
 
       (testing "on exit, fires `build/end` event"
@@ -250,8 +249,8 @@
                                     :credit-multiplier 7})
                    (sut/set-token "test-token")
                    (sut/generate-script-config build))]
-      (is (spec/valid? ::ss/config conf)
-          (spec/explain-str ::ss/config conf))
+      (is (spec/valid? ::sc/config conf)
+          (spec/explain-str ::sc/config conf))
 
       (is (= [:amd] (sc/archs conf))
           "passes architectures from config")

@@ -5,15 +5,16 @@
             [manifold.stream :as ms]
             [monkey.ci.containers.oci :as c-oci]
             [monkey.ci.events.mailman :as em]
-            [monkey.ci.metrics
-             [core :as m]
-             [prometheus :as prom]]
+            [monkey.ci.metrics.core :as m]
             [monkey.ci.runners.runtime :as sut]
             [monkey.ci.spec.runner :as sr]
             [monkey.ci.test
              [config :as tc]
              [mailman :as tm]]
-            [monkey.mailman.core :as mmc]))
+            [monkey.mailman.core :as mmc]
+            [monkey.metrics
+             [prometheus :as prom]
+             [push-gw :as mmpg]]))
 
 (def runner-config
   (assoc tc/base-config
@@ -118,7 +119,7 @@
                 (co/start))
         p (:push-gw sys)
         pushed? (atom false)]
-    (with-redefs [prom/push (fn [_] (reset! pushed? true))]
+    (with-redefs [mmpg/push (fn [_] (reset! pushed? true))]
       (try
         (testing "creates push gw on start"
           (is (some? (:gw p))))

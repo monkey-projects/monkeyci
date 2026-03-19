@@ -269,7 +269,7 @@
                {:name "test org"})
           user (sut/insert-user
                 conn
-                {:type "github"
+                {:type :github
                  :type-id "1234"
                  :email "test@monkeyci.com"})]
       (testing "can insert"
@@ -538,3 +538,20 @@
         (is (= ["line 1" "line 2"]
                (-> (sut/select-org-invoicing conn (sut/by-org (:id org)))
                    :address)))))))
+
+(deftest ^:sql email-confirmations
+  (eh/with-prepared-db conn
+    (let [reg (->> (eh/gen-email-registration)
+                   (sut/insert-email-registration conn))
+          conf {:cuid (:cuid reg)
+                :email-reg-id (:id reg)
+                :code "test-code"
+                :creation-time 1000}]
+      
+      (testing "can save"
+        (is (some? (sut/insert-email-confirmation conn conf))))
+
+      (testing "can retrieve by cuid"
+        (is (= conf
+               (-> (sut/select-email-confirmation conn (sut/by-cuid (:cuid conf)))
+                   (select-keys (keys conf)))))))))

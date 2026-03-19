@@ -24,6 +24,7 @@
              [middleware :as wm]]
             [monkey.ci.web.api
              [crypto :as crypto-api]
+             [email-reg :as ereg-api]
              [org :as org-api]
              [invoice :as inv-api]
              [job :as job-api]
@@ -42,6 +43,7 @@
 (defn resolve-id-from-db
   "Tries to resolve an org cuid from its display id."
   [req org-id]
+  ;; FIXME This could theoretically cause problems if an org has another org's id as display id
   (or (st/find-org-id-by-display-id (c/req->storage req) org-id)
       org-id))
 
@@ -53,10 +55,8 @@
       (-> (cache/through-cache c org-id (partial target req))
           (get org-id)))))
 
-(def default-id-resolver (cached-id-resolver resolve-id-from-db))
-
-(def org-body-checker (auth/org-body-checker default-id-resolver))
-(def org-path-checker (auth/org-auth-checker default-id-resolver))
+(defn default-id-resolver []
+  (cached-id-resolver resolve-id-from-db))
 
 (defn health [_]
   ;; TODO Make this more meaningful
@@ -158,10 +158,14 @@
   {:query {(s/optional-key :since) s/Int
            (s/optional-key :until) s/Int}})
 
+(def stats-params
+  (assoc-in since-params
+            [:query (s/optional-key :zone-offset)] s/Str))
+
 (def webhook-routes
   ["/webhook"
    [[""
-     {:auth-chain [org-body-checker]}
+     {:auth-chain [auth/org-body-checker]}
      [["" {:post {:handler    api/create-webhook
                   :parameters {:body NewWebhook}}}]]]
     ["/health"
@@ -220,26 +224,18 @@
 
 (def repo-parameter-routes
   ["/param"
-   {:auth-chain ^:replace [org-path-checker]}
+   {:auth-chain ^:replace [auth/org-auth-checker]}
    [["" {:get {:handler param-api/get-repo-params}}]]])
 
 (def repo-ssh-keys-routes
   ["/ssh-keys"
-   {:auth-chain ^:replace [org-path-checker]}
+   {:auth-chain ^:replace [auth/org-auth-checker]}
    [["" {:get {:handler ssh-api/get-repo-ssh-keys}}]]])
 
 (def repo-webhook-routes
   ["/webhooks"
-   {:auth-chain ^:replace [org-path-checker]}
+   {:auth-chain ^:replace [auth/org-auth-checker]}
    [["" {:get {:handler repo-api/list-webhooks}}]]])
-
-(def log-routes
-  ["/logs"                              ; Deprecated, use loki instead
-   [[""
-     {:get {:handler api/list-build-logs}}]
-    ["/download"
-     {:get {:handler api/download-build-log
-            :parameters {:query {:path s/Str}}}}]]])
 
 (def artifact-routes
   ["/artifact"
@@ -258,7 +254,10 @@
      [[""
        {:get {:handler job-api/get-job}}]
       ["/unblock"
-       {:post {:handler job-api/unblock-job}}]]]]])
+       {:post {:handler job-api/unblock-job}}]
+      ["/logs"
+       {:get {:handler job-api/download-job-log
+              :parameters {:query {:file s/Str}}}}]]]]])
 
 (def build-routes
   ["/builds"                            ; TODO Replace with singular
@@ -279,7 +278,6 @@
        {:post {:handler api/retry-build}}]
       ["/cancel"
        {:post {:handler api/cancel-build}}]
-      log-routes
       artifact-routes
       job-routes]]]])
 
@@ -353,9 +351,18 @@
      {:get {:handler org-api/latest-builds}}]]])
 
 (def stats-routes
-  ["/stats" {:get {:handler org-api/stats
-                   :parameters (assoc-in since-params
-                                         [:query (s/optional-key :zone-offset)] s/Str)}}])
+  ["/stats"
+   {:parameters stats-params}
+   [[""
+     {:get {:handler org-api/stats}}]
+    ["/elapsed"
+     {:get {:handler org-api/stats-elapsed-req}}]
+    ["/credits"
+     {:get {:handler org-api/stats-credits-req}}]
+    ["/builds"
+     {:get {:handler org-api/stats-build-results}}]
+    ["/jobs"
+     {:get {:handler org-api/stats-job-results}}]]])
 
 (def credit-routes
   ["/credits" {:get {:handler org-api/credits}}])
@@ -409,7 +416,7 @@
 
 (def org-routes
   ["/org"
-   {:auth-chain [org-path-checker]}
+   {:auth-chain [auth/org-auth-checker]}
    (c/generic-routes
     {:creator org-api/create-org
      :updater org-api/update-org
@@ -547,13 +554,19 @@
    ["/unregister"
     {:conflicting true
      :post
-     {:handler api/unregister-email
+     {:handler ereg-api/unregister-email
       :parameters
       {:query schemas/EmailUnregistrationQuery}}}]
+   ["/confirm"
+    {:conflicting true
+     :post
+     {:handler ereg-api/confirm-email
+      :parameters
+      {:body schemas/EmailConfirmation}}}]
    ["" (-> (c/generic-routes
-            {:getter api/get-email-registration
-             :creator api/create-email-registration
-             :deleter api/delete-email-registration
+            {:getter ereg-api/get-email-registration
+             :creator ereg-api/create-email-registration
+             :deleter ereg-api/delete-email-registration
              :id-key :email-registration-id
              :new-schema EmailRegistration})
            (u/update-nth 1 u/update-nth 1 assoc :conflicting true))]])
@@ -582,25 +595,27 @@
   ([rt routes]
    (ring/router
     routes
-    {:data {:middleware (vec (concat [wm/stringify-body
-                                      [cors/wrap-cors
-                                       :access-control-allow-origin #".*"
-                                       :access-control-allow-methods [:get :put :post :delete]
-                                       :access-control-allow-credentials true]]
-                                     ;; TODO Transactions for sql storage
-                                     wm/default-middleware
-                                     [wm/kebab-case-query
-                                      wm/log-request
-                                      wm/post-events
-                                      :resolve-org-id
-                                      :auth-chain]))
-            :muuntaja (c/make-muuntaja)
-            :coercion reitit.coercion.schema/coercion
-            ;; Wrap the runtime in a type, so reitit doesn't change the records into maps
-            ::c/runtime (c/->RuntimeWrapper rt)}
+    {:data (-> {:middleware (vec (concat [wm/stringify-body
+                                          [cors/wrap-cors
+                                           :access-control-allow-origin #".*"
+                                           :access-control-allow-methods [:get :put :post :delete]
+                                           :access-control-allow-credentials true]]
+                                         ;; TODO Transactions for sql storage
+                                         wm/default-middleware
+                                         [wm/kebab-case-query
+                                          wm/log-request
+                                          wm/post-events
+                                          :resolve-org-id
+                                          :auth-chain]))
+                :muuntaja (c/make-muuntaja)
+                :coercion reitit.coercion.schema/coercion
+                ;; Wrap the runtime in a type, so reitit doesn't change the records into maps
+                ::c/runtime (c/->RuntimeWrapper rt)}
+               (c/set-id-resolver (default-id-resolver)))
      ;; Disabled, results in 405 errors for some reason
      ;;:compile rc/compile-request-coercers
      :reitit.middleware/registry
+     ;; Security, only enabled in non-dev mode
      (-> {:github-security
           [github/validate-security]
           :github-app-security
@@ -613,7 +628,7 @@
           [auth/sysadmin-authorization]}
          ;; TODO Move the dev-mode checks into the runtime startup code
          (as-> m (mc/map-vals (partial non-dev rt) m))
-         (assoc :resolve-org-id [wm/resolve-org-id default-id-resolver]))}))
+         (assoc :resolve-org-id [wm/resolve-org-id]))}))
   ([rt]
    (make-router rt routes)))
 

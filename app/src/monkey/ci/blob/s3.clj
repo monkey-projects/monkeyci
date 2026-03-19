@@ -5,13 +5,12 @@
             [java-time.api :as jt]
             [manifold.deferred :as md]
             [medley.core :as mc]
-            [monkey.ci.blob
-             [common :as c]
-             [minio :as minio]]
+            [monkey.ci.blob.common :as c]
             [monkey.ci.build.archive :as a]
             [monkey.ci
              [protocols :as p]
-             [utils :as u]]))
+             [utils :as u]]
+            [monkey.minio :as minio]))
 
 (defn- with-prefix [dest {:keys [prefix]}]
   (cond->> dest

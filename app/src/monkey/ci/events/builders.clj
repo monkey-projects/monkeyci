@@ -26,8 +26,8 @@
                     j
                     [:save-artifacts :restore-artifacts :caches]))]
     (-> job
-        ;; Keep everything except the action, which is a function
-        (dissoc :action)
+        ;; Keep everything except the non-serializable properties
+        (dissoc :action :init)
         ;; Force into map because records are not serializable
         (as-> m (into {} m))
         (serialize-props)
