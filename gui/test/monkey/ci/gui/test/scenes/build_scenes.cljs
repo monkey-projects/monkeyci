@@ -36,7 +36,8 @@
 
 (defscene build-status-running
   "Running build status"
-  [sut/build-status {:status :running}])
+  [sut/build-status
+   {:status :running}])
 
 (defscene build-status-success
   "Successful build status"
@@ -51,12 +52,16 @@
   [sut/build-details
    {:start-time "2024-09-24T16:52:00"
     :status :running
-    :message "Test build"
-    :git {:ref "refs/heads/main"}}])
+    :git {:ref "refs/heads/main"
+          :message "Some small changes"}}])
 
 (defscene build-details-success
   "Successful build details"
   [sut/build-details build-success])
+
+(defscene build-details-tag
+  "Build details for tag"
+  [sut/build-details (assoc-in build-success [:git :ref] "refs/tags/0.1.2")])
 
 (defscene build-overview-running
   "Running build overview"

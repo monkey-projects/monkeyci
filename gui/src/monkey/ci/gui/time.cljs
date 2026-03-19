@@ -71,10 +71,17 @@
   [ts]
   (let [h (int (/ ts 3600))
         m (int (/ (mod ts 3600) 60))
-        s (mod ts 60)]
+        s (mod ts 60)
+        pad (fn [i v]
+              (cond-> v
+                (pos? i) pad-left))]
     (->> [h m s]
-         (map pad-left)
-         (cs/join ":"))))
+         (drop-while zero?)
+         (map-indexed pad)
+         (reverse)
+         (interleave ["s" "m" "h"])
+         (reverse)
+         (apply str))))
 
 (defn format-interval
   "Formats interval in hh:mm:ss"

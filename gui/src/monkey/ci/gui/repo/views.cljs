@@ -118,7 +118,7 @@
 
 (def table-columns
   [{:label "Build"
-    :value (fn [b] [:a {:href (r/path-for :page/build (u/cust->org b))} (:idx b)])
+    :value (fn [b] [:a {:href (r/path-for :page/build (u/cust->org b))} "#" (:idx b)])
     :sorter (table/prop-sorter :idx)}
    {:label "Time"
     :value (fn [b]
@@ -130,7 +130,7 @@
     :value :source}
    {:label "Ref"
     :value (fn [b]
-             [:span.text-nowrap (trim-ref (get-in b [:git :ref]))])
+             [co/git-ref (get-in b [:git :ref])])
     :sorter (table/sorter-fn (partial sort-by (comp :ref :git)))}
    {:label "Result"
     :value (fn [b] [:div.text-center [co/build-result (:status b)]])
@@ -154,7 +154,7 @@
     ;; anything.
     [:<>
      [:div.d-flex.gap-1.align-items-start
-      [:h4.me-2.text-primary [:span.me-2 co/build-icon] "Builds"]
+      [:h4.me-2.text-primary [:span.me-2 [co/dt-icon :cod009]] "Builds"]
       [refresh-btn {:class [:me-auto]}]
       [build-actions]]
      [trigger-form repo]

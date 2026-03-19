@@ -23,6 +23,16 @@
     (is (string? (-> (sut/local-date 2024 1 23)
                      (sut/format-datetime))))))
 
+(deftest format-seconds
+  (testing "formats below 1m"
+    (is (= "32s" (sut/format-seconds 32))))
+
+  (testing "formats below 1h"
+    (is (= "2m32s" (sut/format-seconds 152))))
+
+  (testing "formats above 1h"
+    (is (= "1h05m32s" (sut/format-seconds 3932)))))
+
 (deftest parse-iso
   (testing "parses extended ISO datetime"
     (let [p (sut/parse-iso "2024-01-09T14:05:18.818834891Z")]
@@ -64,17 +74,17 @@
   (testing "formats seconds only"
     (let [s (sut/parse-iso "2024-01-23T10:00:00")
           e (sut/parse-iso "2024-01-23T10:00:10")]
-      (is (= "00:00:10" (sut/format-interval s e)))))
+      (is (= "10s" (sut/format-interval s e)))))
 
   (testing "formats minutes and seconds"
     (let [s (sut/parse-iso "2024-01-23T10:00:00")
           e (sut/parse-iso "2024-01-23T10:02:10")]
-      (is (= "00:02:10" (sut/format-interval s e)))))
+      (is (= "2m10s" (sut/format-interval s e)))))
 
     (testing "formats hours"
     (let [s (sut/parse-iso "2024-01-23T10:00:00")
           e (sut/parse-iso "2024-01-23T11:15:10")]
-      (is (= "01:15:10" (sut/format-interval s e)))))
+      (is (= "1h15m10s" (sut/format-interval s e)))))
 
   (testing "`nil` if start or end is not provided"
     (is (nil? (sut/format-interval (sut/now) nil)))

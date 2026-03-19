@@ -20,6 +20,11 @@
 (defn site-url [path]
   (tc/site-url config path))
 
+(defn dt-icon
+  "Displays duotone icon"
+  [id & [opts]]
+  [:img (merge opts {:src (str "/img/icons/" (name id) ".svg")})])
+
 (defn logo
   ([config]
    [:img.img-fluid.rounded {:src (tc/assets-url config "/img/monkeyci-black.png")

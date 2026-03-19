@@ -4,6 +4,7 @@
             [monkey.ci.gui.layout :as l]
             [monkey.ci.gui.martian :as m]
             [monkey.ci.gui.routing :as r]
+            [monkey.ci.gui.template :as templ]
             [monkey.ci.gui.utils :as u]
             [monkey.ci.gui.build.events]
             [monkey.ci.gui.build.subs]
@@ -28,27 +29,25 @@
       [:h3 (cs/capitalize (name status))]
       [:p (get status-desc status "Unknown")]]]))
 
-(defn- git-ref [{:keys [ref commit-url]}]
-  (if commit-url
-    [:a {:href commit-url :target :_blank} [:span.me-1 ref] [co/icon :box-arrow-up-right]]
-    ref))
-
 (defn build-details
   "Displays the build details by looking it up in the list of repo builds."
   [{:keys [credits] :as build}]
-  (letfn [(item [k v]
-            [:div.row
-             [:div.col-3.offset-1 [:b k]]
-             [:div.col-8 v]])]
-    [:<>
-     (item "Start time" (t/reformat (:start-time build)))
-     (item [:span {:title "Total time that has passed between build start and end"} "Elapsed"]
-           [:span {:title (t/reformat (:end-time build))} [co/build-elapsed build]])
-     (item "Git ref" [git-ref (:git build)])
+  (letfn [(item [img k v]
+            (when v
+              [:div.d-flex.gap-1
+               {:title k}
+               (when img [templ/dt-icon img]) v]))]
+    [:div.d-flex.gap-3.flex-wrap
+     (item :gen013 "Start time" (t/reformat (:start-time build)))
+     ;; TODO Tick time when build is running
+     (item :gen012 "Time elapsed"
+           (when-let [e (co/build-elapsed build)]
+             [:span {:title (t/reformat (:end-time build))} e]))
+     [co/git-ref (get-in build [:git :ref]) (get-in build [:git :commit-url])]
      (when-let [msg (or (:message build) (get-in build [:script :message]))]
-       (item "Message" msg))
+       (item :com003 "Message" msg))
      (when-let [msg (get-in build [:git :message])]
-       (item "Commit message" msg))]))
+       (item :com007 "Commit message" msg))]))
 
 (defn- credits-badge [{:keys [credits] :as b}]
   (when-not (u/running? b)
@@ -156,9 +155,12 @@
 (defn build-title []
   (let [route (rf/subscribe [:route/current])
         params (-> @route r/path-params)
-        repo (rf/subscribe [:repo/info (:repo-id params)])]
+        repo (rf/subscribe [:repo/info (:repo-id params)])
+        build (rf/subscribe [:build/current])]
     [co/page-title {:class :me-auto}
-     [:span.me-2 co/build-icon] (:name @repo) " / " (:build-id params)]))
+     [:span.me-2 [templ/dt-icon "cod009" {:style {:height "30px"}}]]
+     "Build #" (:idx @build)
+     [:span.fs-4.text-muted " - " [:a.text-muted {:href (r/path-for :page/repo params)} (:name @repo)]] ]))
 
 (defn page [route]
   (rf/dispatch [:build/init])
