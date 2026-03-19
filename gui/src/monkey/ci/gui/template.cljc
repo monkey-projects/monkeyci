@@ -20,6 +20,9 @@
 (defn site-url [path]
   (tc/site-url config path))
 
+(defn assets-url [path]
+  (tc/assets-url config path))
+
 (defn logo
   ([config]
    [:img.img-fluid.rounded {:src (tc/assets-url config "/img/monkeyci-black.png")

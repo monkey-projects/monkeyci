@@ -41,7 +41,6 @@
 
 (defn credits-chart-config [stats]
   (when-let [{:keys [consumed available]} stats]
-    ;; TODO Colors
     {:type :doughnut
      :data {:labels [(str available " available")
                      (str consumed " consumed")]

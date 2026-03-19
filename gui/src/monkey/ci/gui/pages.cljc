@@ -5,6 +5,7 @@
             [monkey.ci.gui.api-keys.views :as api-keys]
             [monkey.ci.gui.billing.views :as billing]
             [monkey.ci.gui.build.views :as build]
+            [monkey.ci.gui.dashboard.views :as dashboard]
             [monkey.ci.gui.home.views :as home]
             [monkey.ci.gui.job.views :as job]
             [monkey.ci.gui.login.views :as login]
@@ -19,6 +20,7 @@
 
 (def pages
   {:page/root home/page
+   :page/dashboard dashboard/dashboard
    :page/build build/page
    :page/login login/page
    :page/github-callback login/github-callback

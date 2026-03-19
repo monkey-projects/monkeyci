@@ -66,6 +66,7 @@
                :name :page/org-new}]
     ["/o/:org-id" {:conflicting true
                    :name :page/org}]
+    ["/o/:org-id/dashboard" :page/dashboard]
     ["/o/:org-id/add-repo" :page/add-repo]
     ["/o/:org-id/add-repo/github" :page/add-github-repo]
     ["/o/:org-id/add-repo/bitbucket" :page/add-bitbucket-repo]
