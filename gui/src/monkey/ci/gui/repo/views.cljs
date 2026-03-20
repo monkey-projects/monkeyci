@@ -117,6 +117,11 @@
       (subs ref (count prefix))
       ref)))
 
+(defn- trigger [{:keys [source]}]
+  (if (= :api source)
+    source
+    "push"))
+
 (def table-columns
   [{:label "Build"
     :value (fn [b] [:a {:href (r/path-for :page/build (u/cust->org b))} "#" (:idx b)])
@@ -128,7 +133,7 @@
     :value elapsed
     :sorter (table/sorter-fn (partial sort-by elapsed))}
    {:label "Trigger"
-    :value :source}
+    :value trigger}
    {:label "Ref"
     :value (fn [b]
              [co/git-ref (get-in b [:git :ref])])

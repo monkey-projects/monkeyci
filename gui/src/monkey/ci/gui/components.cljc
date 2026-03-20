@@ -250,7 +250,7 @@
   "Displays git ref with icon"
   [ref & [commit-url]]
   (let [ref (if-let [[img v] (parse-git-ref ref)]
-              [:span [:span.me-1 [icon img]] v]
+              [:span.text-nowrap [:span.me-1 [icon img]] v]
               ref)]
     (if commit-url
       [ext-link commit-url ref]
