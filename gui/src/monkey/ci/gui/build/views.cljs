@@ -4,6 +4,7 @@
             [monkey.ci.gui.layout :as l]
             [monkey.ci.gui.martian :as m]
             [monkey.ci.gui.routing :as r]
+            [monkey.ci.gui.tabs :as tabs]
             [monkey.ci.gui.template :as templ]
             [monkey.ci.gui.utils :as u]
             [monkey.ci.gui.build.events]
@@ -11,6 +12,7 @@
             [monkey.ci.gui.tabs :as tabs]
             [monkey.ci.gui.time :as t]
             [monkey.ci.gui.timer :as timer]
+            [monkey.ci.gui.vis :as vis]
             [re-frame.core :as rf]))
 
 (defn build-status-icon [status]
@@ -126,6 +128,13 @@
       [:p "This build does not contain any jobs."]
       :else [jobs-table @jobs])))
 
+(defn jobs-graph []
+  (let [jobs (rf/subscribe [:build/jobs])]
+    [:div {:style {:height (str (max 500 (* (count @jobs) 50)) "px")}}
+     [vis/vis-network
+      ::jobs-graph
+      (vis/jobs->network @jobs)]]))
+
 (defn- current-overview []
   (let [build (rf/subscribe [:build/current])]
     [overview @build]))
@@ -162,6 +171,15 @@
      "Build #" (:idx @build)
      [:span.fs-4.text-muted " - " [:a.text-muted {:href (r/path-for :page/repo params)} (:name @repo)]] ]))
 
+(defn jobs-tabs []
+  (let [b @(rf/subscribe [:build/current])]
+    [tabs/tabs
+     [::build (:id b)]
+     [{:header "Jobs"
+       :contents [build-jobs]}
+      {:header "Graph"
+       :contents [jobs-graph]}]]))
+
 (defn page [route]
   (rf/dispatch [:build/init])
   (let [loading? (rf/subscribe [:build/loading?])]
@@ -181,4 +199,4 @@
         [co/alerts [:build/alerts]]
         ;; TODO When loading, show placeholders
         [current-overview]
-        [build-jobs]]]]]))
+        [jobs-tabs]]]]]))
