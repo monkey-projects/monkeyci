@@ -174,7 +174,7 @@
 (defn jobs-tabs []
   (let [b @(rf/subscribe [:build/current])]
     [tabs/tabs
-     [::build (:id b)]
+     [::build (:repo-id b) (:build-id b)]
      [{:header "Jobs"
        :contents [build-jobs]}
       {:header "Graph"
