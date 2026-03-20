@@ -22,8 +22,9 @@
   {:start-time "2024-09-24T16:52:00"
    :end-time "2024-09-24T16:55:17"
    :status :success
-   :message "Test build"
-   :git {:ref "refs/heads/main"}
+   :message "Test build, for portfolio scenes"
+   :git {:ref "refs/heads/main"
+         :commit-url "https://github.com/test"}
    :credits 17})
 
 (defscene build-status-pending

@@ -233,19 +233,18 @@
 (defn page-title [& contents]
   (into [:h3.text-primary] contents))
 
-
 (defn- parse-git-ref [ref]
   (when ref
     (if-let [[_ b] (re-matches #"refs/heads/(.+)" ref)]
-      [:git-branch-icon b]
+      [:git b]
       (when-let [[_ t] (re-matches #"refs/tags/(.+)" ref)]
-        [:label-tag-icon t]))))
+        [:tag t]))))
 
 (defn git-ref
   "Displays git ref with icon"
   [ref & [commit-url]]
   (let [ref (if-let [[img v] (parse-git-ref ref)]
-              [:div.d-flex.gap-1 (templ/dt-icon img) v]
+              [:span [:span.me-1 [icon img]] v]
               ref)]
     (if commit-url
       [:a {:href commit-url :target :_blank} [:span.me-1 ref] [icon :box-arrow-up-right]]

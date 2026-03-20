@@ -36,18 +36,18 @@
             (when v
               [:div.d-flex.gap-1
                {:title k}
-               (when img [templ/dt-icon img]) v]))]
+               [:span [:span.me-1 [co/icon img]] v]]))]
     [:div.d-flex.gap-3.flex-wrap
-     (item :gen013 "Start time" (t/reformat (:start-time build)))
+     (item :clock "Start time" (t/reformat (:start-time build)))
      ;; TODO Tick time when build is running
-     (item :gen012 "Time elapsed"
+     (item :hourglass "Time elapsed"
            (when-let [e (co/build-elapsed build)]
              [:span {:title (t/reformat (:end-time build))} e]))
      [co/git-ref (get-in build [:git :ref]) (get-in build [:git :commit-url])]
      (when-let [msg (or (:message build) (get-in build [:script :message]))]
-       (item :com003 "Message" msg))
+       (item :chat-left-text "Message" msg))
      (when-let [msg (get-in build [:git :message])]
-       (item :com007 "Commit message" msg))]))
+       (item :chat-square-dots "Commit message" msg))]))
 
 (defn- credits-badge [{:keys [credits] :as b}]
   (when-not (u/running? b)
