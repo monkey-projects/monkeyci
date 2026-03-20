@@ -73,7 +73,7 @@
         m (int (/ (mod ts 3600) 60))
         s (mod ts 60)
         pad (fn [i v]
-              (cond-> v
+              (cond-> (int v)
                 (pos? i) pad-left))]
     (->> [h m s]
          (drop-while zero?)

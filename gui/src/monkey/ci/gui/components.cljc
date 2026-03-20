@@ -39,7 +39,7 @@
 (defn icon-text
   "Displays text with an icon prefix"
   [i & txt]
-  (into [:<> [:span.me-2 [icon i]]] txt))
+  (into [:span [:span.me-2 [icon i]]] txt))
 
 (def dt-icon templ/dt-icon)
 
@@ -85,6 +85,9 @@
 
 (def sort-down-icon
   [icon :caret-down-fill])
+
+(def ext-link-icon
+  [icon :box-arrow-up-right])
 
 (defn reload-btn [evt & [opts]]
   (icon-btn :arrow-clockwise "Reload" evt opts))
@@ -233,6 +236,9 @@
 (defn page-title [& contents]
   (into [:h3.text-primary] contents))
 
+(defn ext-link [url lbl & [opts]]
+  [:a (merge opts {:href url :target :_blank}) [:span.me-1 lbl] ext-link-icon])
+
 (defn- parse-git-ref [ref]
   (when ref
     (if-let [[_ b] (re-matches #"refs/heads/(.+)" ref)]
@@ -247,5 +253,5 @@
               [:span [:span.me-1 [icon img]] v]
               ref)]
     (if commit-url
-      [:a {:href commit-url :target :_blank} [:span.me-1 ref] [icon :box-arrow-up-right]]
+      [ext-link commit-url ref]
       ref)))
