@@ -245,7 +245,7 @@
   [script v]
   (conj (vec (butlast script))
         (str (last script)
-             (format " --config-merge '{:closure-defines {monkey.ci.gui.version/VERSION \"%s\"}'" v))))
+             (format " --config-merge '{:closure-defines {monkey.ci.gui.version/VERSION \"%s\"}}'" v))))
 
 (defn build-gui-release [ctx]
   (when (p/publish-gui? ctx)
