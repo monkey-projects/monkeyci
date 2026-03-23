@@ -8,6 +8,41 @@
              [runtime :as trt]]
             [monkey.ci.web.api.plan :as sut]))
 
+(deftest create-plan
+  (let [{st :storage :as rt} (trt/test-runtime)
+        org (h/gen-org)
+        old-plan {:org-id (:id org)
+                  :id (st/new-id)
+                  :type :free}]
+    (is (some? (st/save-org st org)))
+    (is (some? (st/save-org-plan st old-plan)))
+    
+    (testing "creates new org plan"
+      (let [r (-> (h/->req rt)
+                  (assoc :parameters
+                         {:path {:org-id (:id org)}
+                          :body {:type :starter
+                                 :valid-from 1000}})
+                  (sut/create-plan))]
+        (is (= 201 (:status r)))
+        (is (some? (st/find-org-plan st [(:id org) (get-in r [:body :id])])))))
+
+    (testing "ends current org plan"
+      (is (= 1000 (-> (st/find-org-plan st [(:id org) (:id old-plan)])
+                      :valid-until))))
+
+    (testing "sets plan defaults"
+      (let [r (-> (h/->req rt)
+                  (assoc :parameters
+                         {:path {:org-id (:id org)}
+                          :body {:type :starter
+                                 :valid-from 2000}})
+                  (sut/create-plan))]
+        (is (= 201 (:status r)))
+        (is (= 5000
+               (-> (st/find-org-plan st [(:id org) (get-in r [:body :id])])
+                   :credits)))))))
+
 (deftest get-current
   (let [{st :storage :as rt} (trt/test-runtime)
         org (h/gen-org)]
