@@ -1826,7 +1826,7 @@
                          :status))))
         
         (testing "`POST /cancel` cancels current org plan"
-          (is (= 200 (-> (mock/request :post (str path "/cancel"))
+          (is (= 200 (-> (h/json-request :post (str path "/cancel") {})
                          (app)
                          :status))))))))
 
