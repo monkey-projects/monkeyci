@@ -121,7 +121,7 @@
     (when (and contents (not-empty contents))
       (mapv co/->html contents))
     [[:br]])
-   (into [:pre])))
+   (into [:<>])))
 
 (defn- log-contents [lbl path]
   (let [log (rf/subscribe [:job/logs path])]
@@ -147,16 +147,17 @@
 
 (defn- job-logs [job]
   ;;(rf/dispatch [:job/load-log-files job])
-  (let [script-logs (rf/subscribe [:job/script-with-implied-logs])]
+  (let [script-logs (rf/subscribe [:job/script-with-implied-logs])
+        wrap? (rf/subscribe [::s/wrap-logs?])]
     [:<>
      [:div.form-check
       [:input#wrap-logs.form-check-input
        {:type :checkbox
         :on-change (u/form-evt-handler [:job/wrap-logs-changed] u/evt->checked)
-        :checked @(rf/subscribe [::s/wrap-logs?])}]
+        :checked @wrap?}]
       [:label.form-check-label {:for :wrap-logs} "Wrap long lines"]]
      ;; Display combined logs for all script lines in the job
-     [co/log-viewer (map-indexed script-line @script-logs)]]))
+     [co/log-viewer (map-indexed script-line @script-logs) {:wrap? @wrap?}]]))
 
 (def has-logs? (comp  #{:running :success :failure :error :canceled} :status))
 

@@ -201,8 +201,10 @@
 
 (defn log-viewer [contents & [opts]]
   (into [:div.bg-dark.text-white.font-monospace.overflow-auto.p-1
-         (cond-> {:style {:min-height "20em"}}
-           (not (:wrap? opts)) (assoc :class "text-nowrap"))]
+         (cond-> {:style {:min-height "20em"}
+                  :class (if (:wrap? opts)
+                           "text-wrap"
+                           "text-nowrap")})]
         contents))
 
 (defn log-contents [raw & [opts]]
