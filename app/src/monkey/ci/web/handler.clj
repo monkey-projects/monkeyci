@@ -417,13 +417,19 @@
 
 (def org-plan-routes
   ["/plan"
-   ["" {:post
-        {:handler plan-api/create-plan
-         :parameters {:body schemas/NewOrgPlan}}
-        :get
-        {:handler plan-api/get-current}}]
-   ["/history" {:get
-                {:handler plan-api/org-history}}]])
+   [""
+    {:post
+     {:handler plan-api/create-plan
+      :parameters {:body schemas/NewOrgPlan}}
+     :get
+     {:handler plan-api/get-current}}]
+   ["/history"
+    {:get
+     {:handler plan-api/org-history}}]
+   ["/cancel"
+    {:post
+     {:handler plan-api/cancel-plan
+      :parameters {:body {(s/optional-key :valid-until) s/Int}}}}]])
 
 (def org-routes
   ["/org"

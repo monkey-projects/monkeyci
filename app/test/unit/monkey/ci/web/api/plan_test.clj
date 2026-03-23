@@ -68,3 +68,30 @@
                   (sut/org-history))]
         (is (= 200 (:status r)))
         (is (= 2 (count (:body r))))))))
+
+(deftest cancel-plan
+  (let [{st :storage :as rt} (trt/test-runtime)
+        org (h/gen-org)
+        plan {:org-id (:id org)
+              :id (st/new-id)
+              :type :startup
+              :valid-from 1000}
+        at 2000]
+    (is (some? (st/save-org st org)))
+    (is (some? (st/save-org-plan st plan)))
+    (let [r (-> (h/->req rt)
+                (assoc :parameters
+                       {:path {:org-id (:id org)}
+                        :body {:when at}})
+                (sut/cancel-plan))]
+      (is (= 200 (:status r)))
+      
+      (testing "ends current plan at specified time"
+        (is (= at (-> (st/find-org-plan st [(:id org) (:id plan)])
+                      :valid-until))))
+      
+      (testing "returns new free plan valid from specified time"
+        (let [new-plan (st/find-org-plan st [(:id org) (get-in r [:body :id])])]
+          (is (some? new-plan))
+          (is (= :free (:type new-plan)))
+          (is (= at (:valid-from new-plan))))))))

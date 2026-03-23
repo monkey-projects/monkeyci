@@ -1825,7 +1825,10 @@
                          (app)
                          :status))))
         
-        (testing "`POST /cancel` cancels current org plan")))))
+        (testing "`POST /cancel` cancels current org plan"
+          (is (= 200 (-> (mock/request :post (str path "/cancel"))
+                         (app)
+                         :status))))))))
 
 (deftest resolve-id-from-db
   (h/with-memory-store s
