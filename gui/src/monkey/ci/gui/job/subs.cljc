@@ -39,17 +39,19 @@
          first
          convert-vals)))
 
-(defmethod convert-log-contents :log-ingest [resp]
+(defmethod convert-log-contents :log-ingest [{:keys [entries]}]
   (let [split-lines #(cs/split % "\n")]
-    (->> resp
-         :entries
-         (map :contents)
-         (reduce str)
-         (split-lines)
-         (interpose [:br]))))
+    (if (not-empty entries)
+      (->> entries
+           (map :contents)
+           (reduce str)
+           (split-lines)
+           (interpose [:br]))
+      [])))
 
 (defmethod convert-log-contents :default [resp]
-  (println "Unable to convert log contents:" (str resp)))
+  (when (not-empty resp)
+    (println "Unable to convert log contents:" (str resp))))
 
 (rf/reg-sub
  :job/logs

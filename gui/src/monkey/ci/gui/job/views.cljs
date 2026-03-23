@@ -118,8 +118,11 @@
    (concat
     [(co/->html (co/colored (str lbl ":") 95))
      [:br]]
-    (when (and contents (not-empty contents))
-      (mapv co/->html contents))
+    (if contents
+      (if (not-empty contents)
+        (mapv co/->html contents)
+        [(co/->html (co/colored "<no logs>" 90))])
+      [(co/->html (co/colored "<loading...>" 90))])
     [[:br]])
    (into [:<>])))
 
