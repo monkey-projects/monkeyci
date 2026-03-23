@@ -110,4 +110,4 @@
    (s/optional-key :max-users) s/Int})
 
 (s/defschema OrgPlan
-  (assoc OrgPlan :id Id))
+  (assoc NewOrgPlan :id Id))
