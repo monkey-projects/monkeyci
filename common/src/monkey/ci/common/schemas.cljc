@@ -1,10 +1,12 @@
 (ns monkey.ci.common.schemas
   "Prismatic schemas, used by both backend and frontend"
-  (:require [schema.core :as s]))
+  (:require [monkey.ci.common.constants :as cc]
+            [schema.core :as s]))
 
 (def not-empty-str (s/constrained s/Str not-empty))
 (def Id not-empty-str)
 (def Name not-empty-str)
+(def date-regex #"\d{4}-\d{2}-\d{2}")
 
 (defn- assoc-id [s]
   (assoc s (s/optional-key :id) Id))
@@ -53,7 +55,7 @@
 
 (s/defschema AutoCredits
   ;; ISO date format
-  {:date #"\d{4}-\d{2}-\d{2}"})
+  {:date date-regex})
 
 (def period-pattern #"^P(\d+Y)?(\d+M)?(\d+D)?$")
 
@@ -71,8 +73,8 @@
   {:receive-mailing s/Bool})
 
 (s/defschema InvoiceSearchFilter
-  {(s/optional-key :from-date) s/Str
-   (s/optional-key :until-date) s/Str
+  {(s/optional-key :from-date) date-regex
+   (s/optional-key :until-date) date-regex
    (s/optional-key :invoice-nr) s/Str})
 
 (def invoice-kind (s/enum :invoice :creditnote))
@@ -100,3 +102,12 @@
    :address [s/Str]
    :country s/Str
    (s/optional-key :vat-nr) s/Str})
+
+(s/defschema NewOrgPlan
+  {:type (apply s/enum (map name cc/plan-types))
+   (s/optional-key :valid-from) s/Int
+   (s/optional-key :valid-until) s/Int
+   (s/optional-key :max-users) s/Int})
+
+(s/defschema OrgPlan
+  (assoc OrgPlan :id Id))

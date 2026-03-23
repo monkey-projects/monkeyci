@@ -30,6 +30,7 @@
              [job :as job-api]
              [join-request :as jr-api]
              [params :as param-api]
+             [plan :as plan-api]
              [repo :as repo-api]
              [ssh-keys :as ssh-api]
              [token :as token-api]
@@ -414,6 +415,16 @@
      :id-key :token-id
      :new-schema ApiToken})])
 
+(def org-plan-routes
+  ["/plan"
+   ["" {:post
+        {:handler plan-api/create-plan
+         :parameters {:body schemas/NewOrgPlan}}
+        :get
+        {:handler plan-api/get-current}}]
+   ["/history" {:get
+                {:handler plan-api/org-history}}]])
+
 (def org-routes
   ["/org"
    {:auth-chain [auth/org-auth-checker]}
@@ -438,7 +449,8 @@
                     org-webhook-routes
                     invoice-routes
                     crypto-routes
-                    org-token-routes]})])
+                    org-token-routes
+                    org-plan-routes]})])
 
 (def github-routes
   ["/github"
