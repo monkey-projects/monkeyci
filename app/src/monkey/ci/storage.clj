@@ -1177,3 +1177,22 @@
 
 (defn find-org-invoicing [st uid]
   (p/read-obj st (org-invoicing-sid uid)))
+
+(def org-plan :org-plan)
+(defn org-plan-sid [& args]
+  (into [global (name org-plan)] args))
+
+(defn save-org-plan [st s]
+  (p/write-obj st (org-plan-sid (:org-id s) (:id s)) s))
+
+(defn find-org-plan [st sid]
+  (p/read-obj st (apply org-plan-sid sid)))
+
+(def list-org-plans
+  "Lists plans for a given org"
+  (override-or
+   [:org :list-plans]
+   (fn [st org-id]
+     (->> (p/list-obj st (org-plan-sid org-id))
+          (map (partial vector org-id))
+          (map (partial find-org-plan st))))))

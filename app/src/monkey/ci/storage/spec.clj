@@ -247,3 +247,11 @@
 (s/def ::user-setting
   (s/keys :req-un [::user-id]
           :opt-un [::receive-mailing]))
+
+(s/def :plan/type ::c/plan-type)
+(s/def ::max-users pos-int?)
+
+(s/def ::org-plan
+  (-> (s/keys :req-un [::org-id :plan/type ::valid-from ::max-users ::credits]
+              :opt-un [::valid-until])
+      (s/merge ::common)))

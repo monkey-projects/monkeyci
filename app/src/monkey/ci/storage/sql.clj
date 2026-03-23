@@ -33,6 +33,7 @@
              [mailing :as sma]
              [org :as so]
              [org-credit :as soc]
+             [org-plan :as splan]
              [org-token :as sot]
              [param :as sp]
              [repo :as sr]
@@ -226,6 +227,7 @@
 (def mailing? (partial global-sid? st/mailing))
 (def invoice? (partial global-sid? st/invoice))
 (def org-invoicing? (partial global-sid? st/org-invoicing))
+(def org-plan? (partial global-sid? st/org-plan))
 
 (defrecord SqlStorage [pool]
   p/Storage
@@ -275,7 +277,9 @@
         user-settings?
         (su/select-user-setting conn (last sid))
         org-invoicing?
-        (si/select-org-invoicing conn (last sid)))))
+        (si/select-org-invoicing conn (last sid))
+        org-plan?
+        (splan/select-org-plan conn (last sid)))))
   
   (write-obj [this sid obj]
     (let [conn (get-conn this)]
@@ -328,6 +332,8 @@
               (su/upsert-user-setting conn obj)
               org-invoicing?
               (si/upsert-org-invoicing conn obj)
+              org-plan?
+              (splan/upsert-org-plan conn obj)
               (log/warn "Unrecognized sid when writing:" sid))
         sid)))
 
@@ -436,7 +442,8 @@
     :find-id-by-display-id so/select-org-id-by-display-id
     :count so/count-orgs
     :list-tokens sot/select-org-tokens
-    :find-token sot/select-org-token-by-token}
+    :find-token sot/select-org-token-by-token
+    :list-plans splan/select-org-plans-for-org}
    :repo
    {:list-display-ids sr/select-repo-display-ids
     :find-next-build-idx sb/select-next-build-idx

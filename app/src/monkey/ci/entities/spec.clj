@@ -55,7 +55,7 @@
 
 (s/def ::repo-id id?)
 (s/def ::idx int?)
-(s/def ::credits (s/int-in 0 10000))
+(s/def ::credits (s/int-in 0 100000))
 (s/def ::message string?)
 
 (s/def ::build
@@ -245,5 +245,13 @@
 (s/def ::receive-mailing boolean?)
 
 (s/def ::user-setting
-  (-> (s/keys :req-un [::user-id]
-              :opt-un [::receive-mailing])))
+  (s/keys :req-un [::user-id]
+          :opt-un [::receive-mailing]))
+
+(s/def :plan/type ::c/plan-type)
+(s/def ::max-users pos-int?)
+
+(s/def ::org-plan
+  (-> (s/keys :req-un [::org-id :plan/type ::max-users ::valid-from ::credits]
+              :opt-un [::valid-until])
+      (s/merge ::common)))

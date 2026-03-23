@@ -79,3 +79,5 @@
                  #(sg/fixed-string token-size)))
 (s/def ::port (s/and int? pos?))
 (s/def ::email string?)
+
+(s/def ::plan-type #{:basic :startup :pro})

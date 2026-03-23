@@ -792,7 +792,18 @@
     [{:alter-table :orgs
       :alter-column [:display-id [:varchar 50]]}]
     [{:alter-table :orgs
-      :alter-column [:display-id [:varchar 30]]}])])
+      :alter-column [:display-id [:varchar 30]]}])
+
+   (entity-table-migration
+    65 :org-plans
+    [org-col
+     [:type [:varchar 30] [:not nil]]
+     [:max-users :integer [:not nil]]
+     [:credits :integer [:not nil]]
+     [:valid-from :timestamp [:not nil]]
+     [:valid-until :timestamp]
+     fk-org]
+    [(col-idx :org-plans :org-id)])])
 
 (defn prepare-migrations
   "Prepares all migrations by formatting to sql, creates a ragtime migration object from it."

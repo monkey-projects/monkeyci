@@ -140,3 +140,6 @@
 
 (defn gen-org-invoicing []
   (gen-spec ::spec/org-invoicing))
+
+(defn gen-org-plan []
+  (gen-spec ::spec/org-plan))

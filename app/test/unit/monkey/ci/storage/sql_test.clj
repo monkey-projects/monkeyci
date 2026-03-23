@@ -1123,6 +1123,30 @@
         (is (some? (st/save-org-invoicing st (assoc i :currency "EUR"))))
         (is (= "EUR" (:currency (st/find-org-invoicing st (:id org)))))))))
 
+(deftest ^:sql org-plan
+  (with-storage conn st
+    (let [org (h/gen-org)
+          plan (-> (h/gen-org-plan)
+                   (assoc :org-id (:id org)
+                          :valid-from 1000
+                          :valid-until 2000))]
+      (is (sid/sid? (st/save-org st org)))
+
+      (testing "can save"
+        (is (sid/sid? (st/save-org-plan st plan))))
+
+      (testing "can find by cuid"
+        (is (= plan (st/find-org-plan st [(:id org) (:id plan)]))))
+
+      (testing "can list for org"
+        (is (= [plan]
+               (st/list-org-plans st (:id org)))))
+
+      (testing "can update"
+        (is (sid/sid? (st/save-org-plan st (assoc plan :valid-until 3000))))
+        (is (= 3000 (-> (st/find-org-plan st [(:id org) (:id plan)])
+                        :valid-until)))))))
+
 (deftest pool-component
   (testing "creates sql connection pool using settings"
     (let [s (sut/pool-component {:type :sql

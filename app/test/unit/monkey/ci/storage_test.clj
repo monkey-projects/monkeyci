@@ -791,3 +791,21 @@
       (testing "can save and find for org"
         (is (sid/sid? (sut/save-org-invoicing st s)))
         (is (= s (sut/find-org-invoicing st (:id org))))))))
+
+(deftest org-plans
+  (h/with-memory-store st
+    (let [org (h/gen-org)
+          plan (-> (h/gen-org-plan)
+                   (assoc :org-id (:id org)))]
+      (is (sid/sid? (sut/save-org st org)))
+
+      (testing "can save"
+        (is (sid/sid? (sut/save-org-plan st plan))))
+
+      (testing "can find by cuid"
+        (is (= plan
+               (sut/find-org-plan st [(:id org) (:id plan)]))))
+
+      (testing "can list for orgs"
+        (is (= [plan]
+               (sut/list-org-plans st (:id org))))))))
