@@ -297,6 +297,10 @@
   "Alias for `api-trigger?`"
   api-trigger?)
 
+(def cli?
+  "True if the build has been triggered from the cli"
+  (comp (partial = :cli) source))
+
 (defmulti job-result
   "Retrieves the result of the job, if it has finished"
   bc/job-schema)

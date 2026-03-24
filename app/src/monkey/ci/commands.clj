@@ -130,7 +130,8 @@
   (let [wd (fs/create-temp-dir)
         conf (-> (cli->rt-conf config)
                  (lc/set-work-dir wd))
-        build (lc/get-build conf)]
+        build (-> (lc/get-build conf)
+                  (assoc :source :cli))]
     (log/info "Running local build for src at:" (b/checkout-dir build))
     (log/debug "Using working directory" (str wd))
     (lr/start-and-post conf (ec/make-event :build/pending
