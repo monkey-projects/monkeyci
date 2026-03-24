@@ -6,6 +6,7 @@
             [monkey.ci
              [cuid :as cuid]
              [protocols :as p]]
+            [monkey.ci.common.constants :as cc]
             [monkey.ci.spec.gen :as sg]))
 
 (def ts-gen (gen/choose (jt/to-millis-from-epoch (jt/offset-date-time 2020 1 1))
@@ -79,3 +80,5 @@
                  #(sg/fixed-string token-size)))
 (s/def ::port (s/and int? pos?))
 (s/def ::email string?)
+
+(s/def ::plan-type cc/plan-types)

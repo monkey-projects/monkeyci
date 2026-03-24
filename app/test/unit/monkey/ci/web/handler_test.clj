@@ -1799,6 +1799,37 @@
                            (app)
                            :status)))))))))
 
+(deftest org-plan-endpoints
+  (h/with-memory-store st
+    (let [org (h/gen-org)
+          app (make-test-app st)
+          path (format "/org/%s/plan" (:id org))]
+      (is (some? (st/save-org st org)))
+      (testing "`/org/:org-id/plan`"
+        (testing "`POST /` configures new org plan"
+          (let [r (-> (h/json-request :post path
+                                      {:type :startup})
+                      (app))]
+            (is (= 201 (:status r)))
+            (let [b (h/reply->json r)]
+              (is (map? b))
+              (is (some? (:id b)) (str b)))))
+        
+        (testing "`GET /` returns current org plan"
+          (is (= 200 (-> (mock/request :get path)
+                         (app)
+                         :status))))
+        
+        (testing "`GET /history` returns org plan history"
+          (is (= 200 (-> (mock/request :get (str path "/history"))
+                         (app)
+                         :status))))
+        
+        (testing "`POST /cancel` cancels current org plan"
+          (is (= 200 (-> (h/json-request :post (str path "/cancel") {})
+                         (app)
+                         :status))))))))
+
 (deftest resolve-id-from-db
   (h/with-memory-store s
     (let [org {:id (cuid/random-cuid)

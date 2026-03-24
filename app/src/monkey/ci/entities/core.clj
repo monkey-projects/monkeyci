@@ -623,3 +623,23 @@
    :before-update prepare-email-conf
    :after-update  convert-email-conf
    :after-select  convert-email-conf-select})
+
+(def prepare-org-plan
+  (comp (partial int->time :valid-from)
+        (partial int->time :valid-until)
+        (partial keyword->str :type)))
+(def convert-org-plan-select
+  (comp (partial time->int :valid-from)
+        (partial time->int :valid-until)
+        (partial str->keyword :type)))
+(def convert-org-plan
+  (comp (partial copy-prop :valid-from)
+        (partial copy-prop :valid-until)
+        (partial copy-prop :type)))
+
+(defentity org-plan
+  {:before-insert prepare-org-plan
+   :after-insert  convert-org-plan
+   :before-update prepare-org-plan
+   :after-update  convert-org-plan
+   :after-select  convert-org-plan-select})

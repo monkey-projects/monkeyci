@@ -555,3 +555,23 @@
         (is (= conf
                (-> (sut/select-email-confirmation conn (sut/by-cuid (:cuid conf)))
                    (select-keys (keys conf)))))))))
+
+(deftest ^:sql org-plans
+  (eh/with-prepared-db conn
+    (let [org (->> (eh/gen-org)
+                   (sut/insert-org conn))
+          sub (-> (eh/gen-credit-subscription)
+                  (assoc :org-id (:id org))
+                  (as-> cs (sut/insert-credit-subscription conn cs)))
+          plan (->> (-> (eh/gen-org-plan)
+                        (assoc :org-id (:id org)
+                               :subscription-id (:id sub)))
+                    (sut/insert-org-plan conn))]
+      (testing "can insert and retrieve"
+        (is (number? (:id plan)))
+        (is (= [plan]
+               (sut/select-org-plans conn (sut/by-cuid (:cuid plan))))))
+
+      (testing "can retrieve by org"
+        (is (= [plan]
+               (sut/select-org-plans conn (sut/by-org (:id org)))))))))
