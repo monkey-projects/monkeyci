@@ -65,15 +65,8 @@
   (when (= :free (:type plan))
     "P1Y"))
 
-(defn create-plan [req]
-  (let [st (c/req->storage req)
-        org-id (c/org-id req)
-        plan (-> (c/body req)
-                 (assoc :org-id org-id
-                        :id (st/new-id))
-                 (update :valid-from #(or % (t/now)))
-                 (validate-plan))
-        at (:valid-from plan)
+(defn- create-plan-entities [st org-id plan]
+  (let [at (:valid-from plan)
         sub {:id (st/new-id)
              :org-id org-id
              :valid-from at
@@ -84,11 +77,24 @@
     (if (st/save-credit-subscription st sub)
       (let [plan (assoc plan :subscription-id (:id sub))]
         (if (st/save-org-plan st plan)
-          (-> plan
-              (rur/response)
-              (rur/status 201))
+          plan
           (throw (ex-info "Failed to create plan" plan))))
       (throw (ex-info "Failed to create plan subscription" plan)))))
+
+(defn create-plan
+  "Creates a new plan as specified in the request body.  Cancels any previous
+   plans.  Also creates a new credit subscription and cancels the previous one."
+  [req]
+  (let [st (c/req->storage req)
+        org-id (c/org-id req)
+        plan (-> (c/body req)
+                 (assoc :org-id org-id
+                        :id (st/new-id))
+                 (update :valid-from #(or % (t/now)))
+                 (validate-plan))]
+    (-> (create-plan-entities st org-id plan)
+        (rur/response)
+        (rur/status 201))))
 
 (defn get-current [req]
   (if-let [plan (find-current-plan (c/req->storage req) (c/org-id req))]
@@ -103,21 +109,15 @@
 (defn cancel-plan
   "Cancels the current org plan at the given time (or now) by setting the `valid-until`
    time of the current plan, if any, and creating a new free plan that starts at the
-   same time."
+   same time.  This is essentially the same as creating a new free plan."
   [req]
   (let [st (c/req->storage req)
         org-id (c/org-id req)
-        plan (find-current-plan st org-id)
-        at (get-in req [:parameters :body :when] (t/now))]
-    ;; End previous plan
-    (end-current-plan st org-id at)
-    ;; Create new free plan
-    (let [free-plan {:org-id org-id
-                     :id (st/new-id)
-                     :type :free
-                     :max-users 1
-                     :valid-from at}]
-      (when-not (st/save-org-plan st free-plan)
-        ;; Throw exception to rollback trx
-        (throw (ex-info "Failed to create free plan" {:plan free-plan})))
-      (rur/response free-plan))))
+        at (get-in req [:parameters :body :when] (t/now))
+        free-plan {:org-id org-id
+                   :id (st/new-id)
+                   :type :free
+                   :max-users 1
+                   :valid-from at}]
+    (-> (create-plan-entities st org-id free-plan)
+        (rur/response))))

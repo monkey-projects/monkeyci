@@ -125,12 +125,16 @@
 (deftest cancel-plan
   (let [{st :storage :as rt} (trt/test-runtime)
         org (h/gen-org)
+        sub (-> (h/gen-credit-subs)
+                (assoc :org-id (:id org)))
         plan {:org-id (:id org)
               :id (st/new-id)
               :type :startup
-              :valid-from 1000}
+              :valid-from 1000
+              :subscription-id (:id sub)}
         at 2000]
     (is (some? (st/save-org st org)))
+    (is (some? (st/save-credit-subscription st sub)))
     (is (some? (st/save-org-plan st plan)))
     (let [r (-> (h/->req rt)
                 (assoc :parameters
@@ -142,16 +146,21 @@
       (testing "ends current plan at specified time"
         (is (= at (-> (st/find-org-plan st [(:id org) (:id plan)])
                       :valid-until))))
-      
-      (testing "returns new free plan valid from specified time"
-        (let [new-plan (st/find-org-plan st [(:id org) (get-in r [:body :id])])]
+
+      (testing "ends previous subscription"
+        (is (= at (-> (st/find-credit-subscription st [(:id org) (:id sub)])
+                      :valid-until))))
+
+      (let [new-plan (st/find-org-plan st [(:id org) (get-in r [:body :id])])]
+        (testing "returns new free plan valid from specified time"
           (is (some? new-plan))
           (is (= :free (:type new-plan)))
-          (is (= at (:valid-from new-plan)))))
+          (is (= at (:valid-from new-plan))))
 
-      (testing "creates new subscription")
-
-      (testing "ends previous subscription"))))
+        (testing "creates new subscription"
+          (is (= 2 (count (st/list-org-credit-subscriptions st (:id org)))))
+          (is (= at (-> (st/find-credit-subscription st [(:id org) (:subscription-id new-plan)])
+                        :valid-from))))))))
 
 (deftest validate-plan
   (testing "starter"
