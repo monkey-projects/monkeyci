@@ -1126,11 +1126,15 @@
 (deftest ^:sql org-plan
   (with-storage conn st
     (let [org (h/gen-org)
+          cs (-> (h/gen-credit-subs)
+                 (assoc :org-id (:id org)))
           plan (-> (h/gen-org-plan)
                    (assoc :org-id (:id org)
+                          :subscription-id (:id cs)
                           :valid-from 1000
                           :valid-until 2000))]
       (is (sid/sid? (st/save-org st org)))
+      (is (sid/sid? (st/save-credit-subscription st cs)))
 
       (testing "can save"
         (is (sid/sid? (st/save-org-plan st plan))))

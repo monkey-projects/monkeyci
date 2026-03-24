@@ -11,25 +11,43 @@
 (deftest create-plan
   (let [{st :storage :as rt} (trt/test-runtime)
         org (h/gen-org)
+        old-sub (-> (h/gen-credit-subs)
+                    (assoc :org-id (:id org) :valid-from 0)
+                    (dissoc :valid-until))
         old-plan {:org-id (:id org)
                   :id (st/new-id)
-                  :type :free}]
+                  :type :free
+                  :subscription-id (:id old-sub)}]
     (is (some? (st/save-org st org)))
+    (is (some? (st/save-credit-subscription st old-sub)))
     (is (some? (st/save-org-plan st old-plan)))
     
-    (testing "creates new org plan"
-      (let [r (-> (h/->req rt)
-                  (assoc :parameters
-                         {:path {:org-id (:id org)}
-                          :body {:type :starter
-                                 :valid-from 1000}})
-                  (sut/create-plan))]
+    (let [r (-> (h/->req rt)
+                (assoc :parameters
+                       {:path {:org-id (:id org)}
+                        :body {:type :starter
+                               :valid-from 1000}})
+                (sut/create-plan))]
+      (testing "creates new org plan"
         (is (= 201 (:status r)))
-        (is (some? (st/find-org-plan st [(:id org) (get-in r [:body :id])])))))
+        (is (some? (st/find-org-plan st [(:id org) (get-in r [:body :id])]))))
 
-    (testing "ends current org plan"
-      (is (= 1000 (-> (st/find-org-plan st [(:id org) (:id old-plan)])
-                      :valid-until))))
+      (testing "ends current org plan"
+        (is (= 1000 (-> (st/find-org-plan st [(:id org) (:id old-plan)])
+                        :valid-until))))
+
+      (let [cs (st/list-org-credit-subscriptions st (:id org))]
+        (testing "creates credit subscription"
+          (is (= 2 (count cs)))
+          (is (some? (get-in r [:body :subscription-id])))
+          (is (= 1000 (->> (get-in r [:body :subscription-id])
+                           (vector (:id org))
+                           (st/find-credit-subscription st)
+                           :valid-from))))
+
+        (testing "ends previous subscription"
+          (is (= 1000 (-> (st/find-credit-subscription st [(:id org) (:id old-sub)])
+                          :valid-until))))))
 
     (testing "sets plan defaults"
       (let [r (-> (h/->req rt)
@@ -129,4 +147,25 @@
         (let [new-plan (st/find-org-plan st [(:id org) (get-in r [:body :id])])]
           (is (some? new-plan))
           (is (= :free (:type new-plan)))
-          (is (= at (:valid-from new-plan))))))))
+          (is (= at (:valid-from new-plan)))))
+
+      (testing "creates new subscription")
+
+      (testing "ends previous subscription"))))
+
+(deftest validate-plan
+  (testing "starter"
+    (let [v (sut/validate-plan {:type :starter})]
+      (testing "sets max users"
+        (is (= 3 (:max-users v))))
+      
+      (testing "sets credits"
+        (is (= 5000 (:credits v))))))
+
+  (testing "pro"
+    (testing "sets credits"
+      (is (= 30000 (-> (sut/validate-plan {:type :pro :max-users 10})
+                       :credits))))
+
+    (testing "fails when no users"
+      (is (thrown? Exception (sut/validate-plan {:type :pro}))))))

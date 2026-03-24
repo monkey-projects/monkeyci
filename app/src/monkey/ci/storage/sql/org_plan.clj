@@ -7,20 +7,23 @@
 (defn- db->plan [p]
   (-> p
       (sc/cuid->id)
-      (assoc :org-id (:org-cuid p))
-      (dissoc :org-cuid)))
+      (assoc :org-id (:org-cuid p)
+             :subscription-id (:sub-cuid p))
+      (dissoc :org-cuid :sub-cuid)))
 
 (defn- insert-org-plan [conn plan]
   (when-let [org (ec/select-org conn (ec/by-cuid (:org-id plan)))]
-    (-> plan
-        (sc/id->cuid)
-        (assoc :org-id (:id org))
-        (as-> p (ec/insert-org-plan conn p)))))
+    (when-let [cs (ec/select-credit-subscription conn (ec/by-cuid (:subscription-id plan)))]
+      (-> plan
+          (sc/id->cuid)
+          (assoc :org-id (:id org)
+                 :subscription-id (:id cs))
+          (as-> p (ec/insert-org-plan conn p))))))
 
 (defn- update-org-plan [conn plan existing]
   (-> plan
       (dissoc :cuid)
-      (merge (select-keys existing [:org-id :id]))
+      (merge (select-keys existing [:org-id :subscription-id :id]))
       (as-> p (ec/update-org-plan conn p))))
 
 (defn upsert-org-plan [conn plan]

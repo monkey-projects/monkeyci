@@ -252,6 +252,6 @@
 (s/def ::max-users pos-int?)
 
 (s/def ::org-plan
-  (-> (s/keys :req-un [::org-id :plan/type ::max-users ::valid-from ::credits]
+  (-> (s/keys :req-un [::org-id :plan/type ::max-users ::valid-from ::credits ::subscription-id]
               :opt-un [::valid-until])
       (s/merge ::common)))

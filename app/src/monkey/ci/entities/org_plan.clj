@@ -2,9 +2,10 @@
   (:require [monkey.ci.entities.core :as ec]))
 
 (def base-query
-  {:select [:p.* [:o.cuid :org-cuid]]
+  {:select [:p.* [:o.cuid :org-cuid] [:cs.cuid :sub-cuid]]
    :from [[:org-plans :p]]
-   :join [[:orgs :o] [:= :o.id :p.org-id]]})
+   :join [[:orgs :o] [:= :o.id :p.org-id]
+          [:credit-subscriptions :cs] [:= :cs.id :p.subscription-id]]})
 
 (defn select-org-plan [conn cuid]
   (some->> (assoc base-query

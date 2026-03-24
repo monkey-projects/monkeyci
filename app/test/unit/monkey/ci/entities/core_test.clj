@@ -560,8 +560,12 @@
   (eh/with-prepared-db conn
     (let [org (->> (eh/gen-org)
                    (sut/insert-org conn))
+          sub (-> (eh/gen-credit-subscription)
+                  (assoc :org-id (:id org))
+                  (as-> cs (sut/insert-credit-subscription conn cs)))
           plan (->> (-> (eh/gen-org-plan)
-                        (assoc :org-id (:id org)))
+                        (assoc :org-id (:id org)
+                               :subscription-id (:id sub)))
                     (sut/insert-org-plan conn))]
       (testing "can insert and retrieve"
         (is (number? (:id plan)))
