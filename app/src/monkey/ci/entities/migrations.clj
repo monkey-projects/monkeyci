@@ -791,8 +791,8 @@
     (mig-id 64 :org-display-id-size)
     [{:alter-table :orgs
       :alter-column [:display-id [:varchar 50]]}]
-    [{:alter-table :orgs
-      :alter-column [:display-id [:varchar 30]]}])
+    ;; No need to rollback this
+    [])
 
    (entity-table-migration
     65 :org-plans
