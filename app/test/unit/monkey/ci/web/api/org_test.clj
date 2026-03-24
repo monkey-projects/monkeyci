@@ -107,10 +107,11 @@
         (is (= [r] (st/list-user-orgs st (:id user)))))
 
       (let [org-id (:id r)]
-        (testing "creates auto subscriptions"
+        (testing "creates plan and auto subscriptions"
           (let [s (st/list-org-credit-subscriptions st org-id)]
-            (is (= 1 (count s)))
-            (is (= "Test sub" (:description (first s))))))
+            (is (= 2 (count s)))
+            (is (= #{"Test sub" "Free plan"}
+                   (set (map :description s))))))
 
         (testing "ignores expired auto subscriptions"
           (with-redefs [sut/auto-subs (constantly
@@ -121,7 +122,7 @@
                              :body
                              :id)]
               (is (some? org-id))
-              (is (empty? (st/list-org-credit-subscriptions st org-id))))))
+              (is (= 1 (count (st/list-org-credit-subscriptions st org-id)))))))
 
         (testing "issues credits"
           (let [cc (st/list-org-credits st org-id)]

@@ -2,9 +2,9 @@
   (:require [clojure.tools.logging :as log]
             [clojure.string :as cs]
             [monkey.ci
+             [plans :as p]
              [storage :as st]
              [time :as t]]
-            [monkey.ci.common.constants :as cc]
             [monkey.ci.web.common :as c]
             [ring.util.response :as rur]))
 
@@ -40,46 +40,17 @@
     ;; In case there is no plan, cancel the free subscription(s)
     (end-free-subs st org-id at)))
 
-(defmulti validate-plan :type)
-
-(defmethod validate-plan :default [plan]
-  plan)
-
-(defmethod validate-plan :free [plan]
-  (assoc plan
-         :credits cc/free-credits
-         :max-users 1))
-
-(defmethod validate-plan :starter [plan]
-  (assoc plan
-         :credits cc/starter-credits
-         :max-users cc/starter-users))
-
-(defmethod validate-plan :pro [plan]
-  (when-not (:max-users plan)
-    (throw (ex-info "Pro plan must specify number of users" plan)))
-  (assoc plan
-         :credits cc/pro-credits))
-
-(defn- plan-valid-period [plan]
-  (when (= :free (:type plan))
-    "P1Y"))
-
 (defn- create-plan-entities [st org-id plan]
-  (let [at (:valid-from plan)
-        sub {:id (st/new-id)
-             :org-id org-id
-             :valid-from at
-             :amount (:credits plan)
-             :description (str (cs/capitalize (name (:type plan))) " plan")
-             :valid-period (plan-valid-period plan)}]
-    (end-current-plan st org-id at)
-    (if (st/save-credit-subscription st sub)
-      (let [plan (assoc plan :subscription-id (:id sub))]
-        (if (st/save-org-plan st plan)
-          plan
-          (throw (ex-info "Failed to create plan" plan))))
-      (throw (ex-info "Failed to create plan subscription" plan)))))
+  (st/with-transaction st conn
+    (let [at (:valid-from plan)
+          sub (p/plan->sub plan)]
+      (end-current-plan conn org-id at)
+      (if (st/save-credit-subscription conn sub)
+        (let [plan (assoc plan :subscription-id (:id sub))]
+          (if (st/save-org-plan conn plan)
+            plan
+            (throw (ex-info "Failed to create plan" plan))))
+        (throw (ex-info "Failed to create plan subscription" plan))))))
 
 (defn create-plan
   "Creates a new plan as specified in the request body.  Cancels any previous
@@ -91,7 +62,7 @@
                  (assoc :org-id org-id
                         :id (st/new-id))
                  (update :valid-from #(or % (t/now)))
-                 (validate-plan))]
+                 (p/validate-plan))]
     (-> (create-plan-entities st org-id plan)
         (rur/response)
         (rur/status 201))))

@@ -4,10 +4,10 @@
             [java-time.api :as jt]
             [medley.core :as mc]
             [monkey.ci
-             [config :as config]
              [cuid :as cuid]
              [storage :as st]
              [time :as t]]
+            [monkey.ci.common.constants :as cc]
             [monkey.ci.web
              [common :as c]
              [crypto :as crypto]]
@@ -44,14 +44,12 @@
                           :deleter st/delete-org})
 
 (defn auto-subs
-  "Automatically assigned subscriptions.  These can be temporary actions as well."
+  "Automatically assigned subscriptions, in addition to the plan subscription.  
+   These are usually temporary actions."
   []
   ;; TODO Make this configurable.  Initially read it from app config, later we
   ;; could introduce some kind of template entity for this.
-  [{:amount config/free-credits
-    :from (t/now)
-    :description "Basic free subscription"
-    :period "P1Y"}])
+  [])
 
 (defn create-org [req]
   (st/with-transaction (c/req->storage req) st
@@ -59,6 +57,7 @@
                      (and until (< until (t/now))))
           org-id (cuid/random-cuid)
           org (assoc (c/body req) :id org-id)
+          ;; TODO Allow specifying a plan for new orgs.  Now it's just the free plan by default.
           res (st/init-org st {:org org
                                :user-id (-> req :identity :id)
                                :credits (->> (auto-subs)

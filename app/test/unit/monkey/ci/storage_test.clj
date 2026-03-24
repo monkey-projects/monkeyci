@@ -67,16 +67,29 @@
           (is (= [(:id org)] (->> (sut/list-user-orgs st (:id user))
                                   (map :id)))))
 
-        (testing "creates credit subscriptions"
-          (let [cs (sut/list-org-credit-subscriptions st (:id org))]
-            (is (= 1 (count cs)))
-            (is (= 1000 (-> cs first :amount)))
-            (is (= "P2Y" (-> cs first :valid-period)))))
+        (let [[f :as p] (sut/list-org-plans st (:id org))]
+          (testing "creates free plan by default"
+            (is (= 1 (count p)))
+            (is (= :free (:type f)))
+            (is (some? (:subscription-id f))
+                "links plan to subscription")
+            (is (= "P1Y" (-> (sut/find-credit-subscription st [(:org-id f) (:subscription-id f)])
+                             :valid-period))))
 
-        (testing "creates starting credit"
+          (testing "creates extra credit subscriptions"
+            (let [cs (sut/list-org-credit-subscriptions st (:id org))]
+              (is (= 2 (count cs)))
+              (let [m (->> cs
+                           (filter (comp (partial not= (:subscription-id f)) :id))
+                           (first))]
+                (is (some? m))
+                (is (= 1000 (:amount m)))
+                (is (= "P2Y" (:valid-period m)))))))
+
+        (testing "creates starting credits"
           (let [c (sut/list-org-credits st (:id org))]
-            (is (= 1 (count c)))
-            (is (= 1000 (-> c first :amount)))))
+            (is (= 2 (count c)))
+            (is (every? pos? (map :amount c)))))
 
         (testing "creates crypto with dek"
           (let [c (sut/find-crypto st (:id org))]

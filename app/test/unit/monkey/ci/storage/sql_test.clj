@@ -123,17 +123,28 @@
       (testing "links org to user"
         (is (= 1 (count (st/list-user-orgs s (:id user))))))
 
-      (testing "creates credit subscription"
-        (let [cs (st/list-org-credit-subscriptions s (:id org))]
-          (is (= 1 (count cs)))
-          (is (= 1000M (-> cs first :amount)))
-          (is (string? (-> cs first :description)))
-          (is (= "P2Y" (-> cs first :valid-period)))))
+      (let [p (st/list-org-plans s (:id org))]
+        (testing "creates free plan"
+          (is (= 1 (count p)))
+          (is (= :free (-> p first :type))))
+
+        (testing "creates credit subscriptions"
+          (let [cs (st/list-org-credit-subscriptions s (:id org))
+                {[a] true [b] false} (group-by (comp (partial = (-> p first :subscription-id)) :id) cs)]
+            (is (= 2 (count cs)))
+            (testing "plan subscription"
+              (is (= 1000M (:amount a)))
+              (is (= "P1Y" (:valid-period a))))
+
+            (testing "additional subscription"
+              (is (= 1000M (:amount b)))
+              (is (string? (:description b)))
+              (is (= "P2Y" (:valid-period b)))))))
 
       (testing "creates initial credits"
         (let [c (st/list-org-credits s (:id org))]
-          (is (= 1 (count c)))
-          (is (= 1000M (-> c first :amount)))))
+          (is (= 2 (count c)))
+          (is (every? (comp (partial = 1000M) :amount) c))))
 
       (testing "creates crypto with dek"
         (is (= "test-dek" (-> (st/find-crypto s (:id org))
