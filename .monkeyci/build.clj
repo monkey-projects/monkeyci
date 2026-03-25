@@ -25,7 +25,7 @@
        [(str "cd " dir
              " && "
              (cs/join " " (concat ["clojure" "-Sdeps" "'{:mvn/local-repo \"../m2\"}'"] args)))])
-      (m/caches [(m/cache "mvn-local-repo" "m2")])))
+      (m/caches [(m/cache (str id "-mvn-repo") "m2")])))
 
 (defn- junit-artifact [dir]
   (m/artifact 
