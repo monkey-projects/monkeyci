@@ -171,7 +171,7 @@
             :exit)))))
 
 (defn ^:deprecated list-builds [rt]
-  (->> (http/get (apply format "%s/customer/%s/repo/%s/builds"
+  (->> (http/get (apply format "%s/org/%s/repo/%s/builds"
                         ((juxt :url :org-id :repo-id) (rt/account rt)))
                  {:headers {"accept" "application/edn"}})
        (deref)
@@ -215,7 +215,7 @@
     (rt/report rt {:type :watch/started
                    :url url})
     ;; TODO Trailing slashes
-    ;; TODO Customer and other filtering
+    ;; TODO Org and other filtering
     (-> (md/chain
          (http/get (str url "/events"))
          :body
