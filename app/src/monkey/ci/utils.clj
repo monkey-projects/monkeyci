@@ -242,7 +242,8 @@
   []
   (->> (enumeration-seq (java.net.NetworkInterface/getNetworkInterfaces))
        (remove (some-fn (memfn isLoopback) (memfn isVirtual)))
-       (mapcat (comp enumeration-seq (memfn getInetAddresses)))))
+       (mapcat (comp enumeration-seq (memfn getInetAddresses)))
+       (remove (memfn isLinkLocalAddress))))
 
 (defn get-ip-addr
   "Determines the ip address of this VM by selecting the first of all available addresses.
