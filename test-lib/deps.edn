@@ -22,7 +22,12 @@
    :exec-fn monkey.build/jar
    :exec-args {:lib com.monkeyci/test
                :version [[:env "MONKEYCI_VERSION"] "0.26.2-SNAPSHOT"]
-               :jar "target/monkeyci-test.jar"}}
+               :jar "target/monkeyci-test.jar"
+               :scm {:url "https://github.com/monkey-projects/monkeyci"}
+               :pom-data [[:licenses
+                           [:license
+                            [:name "GPL v3"]
+                            [:url "https://www.gnu.org/licenses/gpl-3.0.en.html#license-text"]]]]}}
 
   :install
   {:exec-fn monkey.build/jar+install}

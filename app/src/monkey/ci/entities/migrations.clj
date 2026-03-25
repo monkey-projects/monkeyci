@@ -805,14 +805,7 @@
      (fk-col :subscription-id)
      fk-org
      (fk :subscription-id :credit-subscriptions :id)]
-    [(col-idx :org-plans :org-id)])
-
-   (migration
-    (mig-id 66 :subs-plan-id)
-    [{:alter-table :credit-subscriptions
-      :add-column [:plan-id :integer]}]
-    [{:alter-table :credit-subscriptions
-      :drop-column :plan-id}])])
+    [(col-idx :org-plans :org-id)])])
 
 (defn prepare-migrations
   "Prepares all migrations by formatting to sql, creates a ragtime migration object from it."
