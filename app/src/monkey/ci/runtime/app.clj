@@ -28,6 +28,7 @@
              [core :as m]
              [events :as me]
              [otlp :as mo]]
+            [monkey.ci.reporting.print]
             [monkey.ci.runners.oci :as ro]
             [monkey.ci.runtime.common :as rc]
             [monkey.ci.storage.sql :as sql]

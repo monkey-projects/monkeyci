@@ -2,7 +2,9 @@
   (:require [clojure.spec.alpha :as spec]
             [medley.core :as mc]
             [monkey.ci
+             [plans :as p]
              [storage :as st]
+             [time :as t]
              [utils :as u]]
             [monkey.ci.entities
              [core :as ec]
@@ -59,27 +61,32 @@
                                     (assoc :display-id (u/name->display-id (:name org) existing?))
                                     (org->db)))
         org-id (:id org)]
-    (when-let [uid (some->> (:user-id opts)
-                            (ec/by-cuid)
-                            (ec/select-users conn)
-                            first
-                            :id)]
-      (ec/insert-user-orgs conn uid [org-id]))
-    (doseq [{:keys [amount from until period] :as conf} (:credits opts)]
-      (let [cse (-> conf
-                    (dissoc :from :until :period)
-                    (assoc :cuid (st/new-id)
-                           :org-id org-id
-                           :valid-from from
-                           :valid-until until
-                           :valid-period period))]
-        (when-let [cs (ec/insert-credit-subscription conn cse)]
-          (ec/insert-org-credit conn {:cuid (st/new-id)
-                                      :org-id org-id
-                                      :amount amount
-                                      :valid-from from
-                                      :type :subscription
-                                      :subscription-id (:id cs)}))))
+    (letfn [(sub-with-creds [sub]
+              (when-let [s (ec/insert-credit-subscription conn sub)]
+                (ec/insert-org-credit conn (-> (p/sub->credits s (t/now))
+                                               (sc/id->cuid)))
+                s))]
+      (when-let [uid (some->> (:user-id opts)
+                              (ec/by-cuid)
+                              (ec/select-users conn)
+                              first
+                              :id)]
+        (ec/insert-user-orgs conn uid [org-id]))
+      (let [plan (-> (p/make-org-plan org-id (:plan opts))
+                     (sc/id->cuid))
+            ps (->> (p/plan->sub plan)
+                    (sc/id->cuid)
+                    (sub-with-creds))]
+        (ec/insert-org-plan conn (assoc plan :subscription-id (:id ps))))
+      (doseq [{:keys [amount from until period] :as conf} (:credits opts)]
+        (let [cse (-> conf
+                      (dissoc :from :until :period)
+                      (assoc :cuid (st/new-id)
+                             :org-id org-id
+                             :valid-from from
+                             :valid-until until
+                             :valid-period period))]
+          (sub-with-creds cse))))
     (when-let [dek (:dek opts)]
       (ec/insert-crypto conn {:dek dek :org-id org-id}))
     (st/org-sid (:cuid org))))

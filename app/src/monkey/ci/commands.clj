@@ -130,7 +130,8 @@
   (let [wd (fs/create-temp-dir)
         conf (-> (cli->rt-conf config)
                  (lc/set-work-dir wd))
-        build (lc/get-build conf)]
+        build (-> (lc/get-build conf)
+                  (assoc :source :cli))]
     (log/info "Running local build for src at:" (b/checkout-dir build))
     (log/debug "Using working directory" (str wd))
     (lr/start-and-post conf (ec/make-event :build/pending
@@ -170,7 +171,7 @@
             :exit)))))
 
 (defn ^:deprecated list-builds [rt]
-  (->> (http/get (apply format "%s/customer/%s/repo/%s/builds"
+  (->> (http/get (apply format "%s/org/%s/repo/%s/builds"
                         ((juxt :url :org-id :repo-id) (rt/account rt)))
                  {:headers {"accept" "application/edn"}})
        (deref)
@@ -214,7 +215,7 @@
     (rt/report rt {:type :watch/started
                    :url url})
     ;; TODO Trailing slashes
-    ;; TODO Customer and other filtering
+    ;; TODO Org and other filtering
     (-> (md/chain
          (http/get (str url "/events"))
          :body

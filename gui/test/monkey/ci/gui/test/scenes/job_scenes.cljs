@@ -2,11 +2,10 @@
   (:require [portfolio.reagent-18 :refer-macros [defscene]]
             [monkey.ci.gui.job.views :as sut]))
 
-(defscene job-summary-basic
-  "Display basic job details"
+(defscene job-summary-running
+  "Display running job details"
   [sut/job-summary
    {:start-time 1726210910713
-    :end-time   1726210930713
     :message "Test message"
     :status :running}])
 

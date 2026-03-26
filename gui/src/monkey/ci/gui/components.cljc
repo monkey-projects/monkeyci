@@ -30,8 +30,8 @@
         [user-avatar @u]]
        [:p (:name @u) 
         " | "
-        [:a {:href "" :on-click (u/link-evt-handler [:login/sign-off])}
-         "sign off"]]])))
+        [:a {:href "" :on-click (u/link-evt-handler [:login/log-off])}
+         "log off"]]])))
 
 (defn icon [n]
   [:i {:class (str "bi bi-" (name n))}])
@@ -39,7 +39,9 @@
 (defn icon-text
   "Displays text with an icon prefix"
   [i & txt]
-  (into [:<> [:span.me-2 [icon i]]] txt))
+  (into [:span [:span.me-2 [icon i]]] txt))
+
+(def dt-icon templ/dt-icon)
 
 (defn spinner-text
   "Displays spinner with text, similar to `icon-text`"
@@ -83,6 +85,9 @@
 
 (def sort-down-icon
   [icon :caret-down-fill])
+
+(def ext-link-icon
+  [icon :box-arrow-up-right])
 
 (defn reload-btn [evt & [opts]]
   (icon-btn :arrow-clockwise "Reload" evt opts))
@@ -196,8 +201,10 @@
 
 (defn log-viewer [contents & [opts]]
   (into [:div.bg-dark.text-white.font-monospace.overflow-auto.p-1
-         (cond-> {:style {:min-height "20em"}}
-           (not (:wrap? opts)) (assoc :class "text-nowrap"))]
+         (cond-> {:style {:min-height "20em"}
+                  :class (if (:wrap? opts)
+                           "text-wrap"
+                           "text-nowrap")})]
         contents))
 
 (defn log-contents [raw & [opts]]
@@ -231,3 +238,22 @@
 (defn page-title [& contents]
   (into [:h3.text-primary] contents))
 
+(defn ext-link [url lbl & [opts]]
+  [:a (merge opts {:href url :target :_blank}) [:span.me-1 lbl] ext-link-icon])
+
+(defn- parse-git-ref [ref]
+  (when ref
+    (if-let [[_ b] (re-matches #"refs/heads/(.+)" ref)]
+      [:git b]
+      (when-let [[_ t] (re-matches #"refs/tags/(.+)" ref)]
+        [:tag t]))))
+
+(defn git-ref
+  "Displays git ref with icon"
+  [ref & [commit-url]]
+  (let [ref (if-let [[img v] (parse-git-ref ref)]
+              [:span.text-nowrap [:span.me-1 [icon img]] v]
+              ref)]
+    (if commit-url
+      [ext-link commit-url ref]
+      ref)))

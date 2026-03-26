@@ -97,3 +97,8 @@
         (is (not (md/realized? w)))
         (is (some? (fs/create-file p)))
         (is (= p (deref w 100 :timeout)))))))
+
+(deftest get-all-ip-addresses
+  (testing "returns non-link-local addresses"
+    (is (every? (comp false? (memfn isLinkLocalAddress))
+                (sut/get-all-ip-addresses)))))

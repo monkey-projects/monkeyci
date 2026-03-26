@@ -11,7 +11,8 @@
             [monkey.aero] ; Aero extensions
             [monkey.ci
              [edn]
-             [utils :as u]]))
+             [utils :as u]]
+            [monkey.ci.common.constants :as const]))
 
 (defn user-home []
   (System/getProperty "user.home"))
@@ -46,7 +47,7 @@
   ;; One hour
   (* 3600 1000))
 
-(def free-credits 1000) ; Maybe we should make this configurable?
+(def free-credits const/free-credits)
 
 (def default-app-config
   "Default configuration for the application, without env vars or args applied."

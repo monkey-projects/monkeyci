@@ -128,3 +128,34 @@
 
 (deftest deleting?
   (h/verify-sub [:repo/deleting?] db/mark-deleting true false))
+
+(deftest repo-stats
+  (let [s (rf/subscribe [:repo/stats])]
+    (testing "exists"
+      (is (some? s)))
+
+    (testing "empty if no builds"
+      (is (empty? @s)))
+
+    (testing "with builds"
+      (is (some? (reset! app-db (db/set-builds {} [{:build-id "build-1"
+                                                    :start-time 10000
+                                                    :end-time 30000
+                                                    :status :success}
+                                                   {:build-id "build-2"
+                                                    :start-time 50000
+                                                    :end-time 55000
+                                                    :status :error}
+                                                   {:build-id "build-3"
+                                                    :start-time 60000
+                                                    :end-time 65000
+                                                    :status :success}
+                                                   {:build-id "build-4"
+                                                    :start-time 70000
+                                                    :status :running}]))))
+      
+      (testing "provides avg build duration in milliseconds"
+        (is (= 10000 (:avg-elapsed @s))))
+
+      (testing "calculates success rate"
+        (is (= 0.666 (:success-rate @s)))))))

@@ -117,6 +117,8 @@
     (rur/response r)
     (rur/status 204)))
 
+(def build-not-found (c/not-found-response "Build not found"))
+
 (defn get-build
   "Retrieves build by id"
   [req]
@@ -126,7 +128,7 @@
                                         [(get-in req [:parameters :path :build-id])])))
                      (build->out))]
     (rur/response b)
-    (rur/not-found nil)))
+    build-not-found))
 
 (def build-sid c/build-sid)
 
@@ -143,7 +145,7 @@
       (->response (if (md/deferred? res)
                     @res       ; Deref otherwise cors middleware fails
                     res)))
-    (rur/not-found nil)))
+    build-not-found))
 
 (defn get-build-artifacts
   "Lists all artifacts produced by the given build"
@@ -214,7 +216,7 @@
     (log/debug "Triggering build for repo sid:" repo-sid)
     (if repo
       (build-triggered-response (make-build-ctx req repo))
-      (rur/not-found {:message "Repository does not exist"}))))
+      (c/not-found-response "Repository does not exist"))))
 
 (defn retry-build
   "Re-triggers existing build by id"
@@ -229,7 +231,7 @@
                       (wt/prepare-triggered-build rt repo))]
     (if build
       (build-triggered-response build)
-      (rur/not-found {:message "Build not found"}))))
+      build-not-found)))
 
 (defn cancel-build
   "Cancels running build"
@@ -237,7 +239,7 @@
   (if-let [build (st/find-build (c/req->storage req) (c/build-sid req))]
     (-> (rur/status 202)
         (r/add-event (b/build-evt :build/canceled build)))
-    (rur/not-found {:message "Build not found"})))
+    build-not-found))
 
 (defn event-stream
   "Sets up an event stream for all `build/updated` events for the org specified in the

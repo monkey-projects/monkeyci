@@ -18,7 +18,7 @@
  (fn [{:keys [db]} [_ uid]]
    (lo/on-initialize db uid {:init-events
                              [[:org/maybe-load]
-                              [:build/maybe-load]
+                              [:build/load]
                               [:tab/tab-changed details-tabs-id nil]]
                              :leave-event
                              [:job/leave uid]})))

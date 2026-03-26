@@ -56,7 +56,10 @@
                              :script-dir))))
 
       (testing "creates local data encryption key for build"
-        (is (wc/b64-dek? (:dek build)))))))
+        (is (wc/b64-dek? (:dek build))))
+
+      (testing "sets `cli` source"
+        (is (= :cli (:source build)))))))
 
 (deftest config->build
   (testing "uses workdir as checkout dir"

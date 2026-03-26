@@ -8,8 +8,10 @@
             [medley.core :as mc]
             [monkey.ci
              [cuid :as cuid]
+             [plans :as plans]
              [protocols :as p]
              [sid :as sid]
+             [time :as t]
              [utils :as u]]
             [monkey.ci.common.preds :as cp]
             [monkey.ci.storage.cached :as cached])
@@ -1007,39 +1009,6 @@
        (remove nil?)
        (set)))
 
-(def init-org
-  "Creates a new organization record, with dependent records also added.
-   This is useful to perform the update atomically (e.g. in single trx)."
-  (override-or
-   [:org :init]
-   (fn [s {:keys [org] :as opts}]
-     (let [existing? (list-org-display-ids s)
-           sid (save-org s (-> org
-                               ;; TODO Limit to max length
-                               (assoc :display-id (u/name->display-id (:name org) existing?))))
-           org-id (last sid)]
-       (when-let [uid (:user-id opts)]
-         (let [u (find-user s uid)]
-           (save-user s (update u :orgs (comp vec conj) org-id))))
-       (doseq [{:keys [amount from until period] :as conf} (:credits opts)]
-         (let [cs (-> conf
-                      (dissoc :from :until :period)
-                      (assoc :id (cuid/random-cuid)
-                             :org-id org-id
-                             :valid-from from
-                             :valid-until until
-                             :valid-period period))]
-           (when (save-credit-subscription s cs)
-             (save-org-credit s {:id (cuid/random-cuid)
-                                 :org-id org-id
-                                 :amount amount
-                                 :valid-from from
-                                 :type :subscription
-                                 :subscription-id (:id cs)}))))
-       (when-let [dek (:dek opts)]
-         (save-crypto s {:dek dek :org-id org-id}))
-       sid))))
-
 (defn- token-sid [type & parts]
   (into [global (name type)] parts))
 
@@ -1177,3 +1146,59 @@
 
 (defn find-org-invoicing [st uid]
   (p/read-obj st (org-invoicing-sid uid)))
+
+(def org-plan :org-plan)
+(defn org-plan-sid [& args]
+  (into [global (name org-plan)] args))
+
+(defn save-org-plan [st s]
+  (p/write-obj st (org-plan-sid (:org-id s) (:id s)) s))
+
+(defn find-org-plan [st sid]
+  (p/read-obj st (apply org-plan-sid sid)))
+
+(def list-org-plans
+  "Lists plans for a given org"
+  (override-or
+   [:org :list-plans]
+   (fn [st org-id]
+     (->> (p/list-obj st (org-plan-sid org-id))
+          (map (partial vector org-id))
+          (map (partial find-org-plan st))))))
+
+(defn- save-sub-with-credits [s cs]
+  (when (save-credit-subscription s cs)
+    (save-org-credit s (plans/sub->credits cs (:valid-from cs)))))
+
+(def init-org
+  "Creates a new organization record, with dependent records also added.
+   This is useful to perform the update atomically (e.g. in single trx)."
+  (override-or
+   [:org :init]
+   (fn [s {:keys [org] :as opts}]
+     (let [existing? (list-org-display-ids s)
+           sid (save-org s (-> org
+                               ;; TODO Limit to max length
+                               (assoc :display-id (u/name->display-id (:name org) existing?))))
+           org-id (last sid)]
+       (when-let [uid (:user-id opts)]
+         (let [u (find-user s uid)]
+           (save-user s (update u :orgs (comp vec conj) org-id))))
+       ;; Create plan with subscription and credits
+       (let [plan (plans/make-org-plan org-id (:plan opts))
+             ps (plans/plan->sub plan)]
+         (save-sub-with-credits s ps)
+         (save-org-plan s (assoc plan :subscription-id (:id ps))))
+       ;; Create any additional subscriptions
+       (doseq [{:keys [amount from until period] :as conf} (:credits opts)]
+         (let [cs (-> conf
+                      (dissoc :from :until :period)
+                      (assoc :id (cuid/random-cuid)
+                             :org-id org-id
+                             :valid-from from
+                             :valid-until until
+                             :valid-period period))]
+           (save-sub-with-credits s cs)))
+       (when-let [dek (:dek opts)]
+         (save-crypto s {:dek dek :org-id org-id}))
+       sid))))

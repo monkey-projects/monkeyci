@@ -15,10 +15,15 @@
  :repo/builds
  (fn [db _]
    (let [params (get-in db [:route/current :parameters :path])
-         parse-time (fn [b]
-                      (update b :start-time (comp str t/parse)))]
+         maybe-parse (fn [t]
+                       ;; Legacy data can contain strings
+                       (cond-> t
+                         (string? t)
+                         (-> t/parse t/to-epoch)))
+         ->epoch (fn [b]
+                   (update b :start-time maybe-parse))]
      (some->> (db/get-builds db)
-              (map parse-time)
+              (map ->epoch)
               (sort-by :start-time)
               (reverse)
               (map (partial merge params))))))
@@ -43,3 +48,30 @@
  :<- [:loader/loaded? db/id]
  (fn [l _]
    l))
+
+(defn- avg-elapsed [b]
+  (-> (reduce (fn [r {s :start-time e :end-time}]
+                (+ r (- e s)))
+              0
+              b)
+      (/ (count b))
+      (int)))
+
+(defn- success-rate [b]
+  (-> (->> b
+           (filter (comp (partial = :success) :status))
+           (count))
+      (/ (count b))
+      ;; Round to 0.1%
+      (* 1000)
+      (int)
+      (/ 1000)))
+
+(rf/reg-sub
+ :repo/stats
+ :<- [:repo/builds]
+ (fn [b _]
+   (let [d (filter (every-pred :start-time :end-time) b)]
+     (when-not (empty? d)
+       {:avg-elapsed (avg-elapsed d)
+        :success-rate (success-rate d)}))))

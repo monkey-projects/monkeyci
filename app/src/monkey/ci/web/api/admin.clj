@@ -4,6 +4,7 @@
             [monkey.ci
              [build :as b]
              [cuid :as cuid]
+             [plans :as p]
              [storage :as s]
              [time :as t]]
             [monkey.ci.common.preds :as cp]
@@ -62,21 +63,12 @@
                      ;; TODO Filter in the query
                      (filter (cp/prop-pred :type :subscription))
                      (group-by :subscription-id))]
-    (letfn [(calc-expiration-time [{p :valid-period} ts]
-              (when p
-                (t/plus-period ts (jt/period p))))
-            (issue-credits-for-sub [sub]
+    (letfn [(issue-credits-for-sub [sub]
               (let [sc (->> (get credits (:id sub))
                             (filter (comp (partial t/same-date? ts) :valid-from)))]
                 (when (empty? sc)
                   (log/info "Creating new org credit for sub" (:id sub) ", amount" (:amount sub))
-                  (s/save-org-credit st (-> sub
-                                            (select-keys [:org-id :amount])
-                                            (assoc :id (cuid/random-cuid)
-                                                   :type :subscription
-                                                   :subscription-id (:id sub)
-                                                   :valid-from ts
-                                                   :valid-until (calc-expiration-time sub ts)))))))]
+                  (s/save-org-credit st (p/sub->credits sub ts)))))]
       (->> org-subs
            (map issue-credits-for-sub)
            (remove nil?)

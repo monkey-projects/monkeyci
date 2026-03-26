@@ -1,5 +1,6 @@
 (ns monkey.ci.gui.org.views-stats
   (:require [monkey.ci.gui.charts :as charts]
+            [monkey.ci.gui.components :as co]
             [monkey.ci.gui.time :as time]
             [re-frame.core :as rf]))
 
@@ -182,12 +183,12 @@
     [:div.row.mb-4
      [:div.col-4
       [stats-card
-       "Build Success Overall"
+       [co/icon-text :boxes "Build Success Overall"]
        [builds-lbl]
        [builds-success-chart]]]
      [:div.col-8
       [stats-card
-       "Build Success per Day"
+       [co/icon-text :calendar2-check "Build Success per Day"]
        "Builds per day, grouped by result status."
        [builds-history-chart]]]]))
 
@@ -205,12 +206,12 @@
     [:div.row
      [:div.col-8
       [stats-card
-       "Job Success per Day"
+       [co/icon-text :box2-heart "Job Success per Day"]
        "The number of successful jobs for this period (excluding skipped jobs)."
        [jobs-history-chart]]]
      [:div.col-4
       [stats-card
-       "Job Success Overall"
+       [co/icon-text :wrench "Job Success Overall"]
        [jobs-lbl]
        [jobs-success-chart]]]]))
 
@@ -219,12 +220,12 @@
    [:div.row.my-4
     [:div.col-8
      [stats-card
-      "Times and Credits"
+      [co/icon-text :stopwatch "Times and Credits"]
       (str "Build elapsed times and consumed credits over the past " stats-period-days " days.")
       [elapsed-chart org-id]]]
     [:div.col-4
      [stats-card
-      "Available Credits"
+      [co/icon-text :credit-card "Available Credits"]
       [:p "Credit consumption for this month."]
        [credits-chart org-id]]]]
    [builds-charts org-id]
