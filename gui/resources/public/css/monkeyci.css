@@ -1,0 +1,16 @@
+svg text {
+    stroke: #008060;
+    font-weight: 300;
+    stroke-width: 0.5px;
+}
+
+svg .node rect {
+    fill: #fff;
+    stroke: #008060;
+    stroke-width: 2px;
+}
+
+svg .edgePaths path.path {
+    stroke: #008060;
+    stroke-width: 1.5px;
+}

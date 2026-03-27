@@ -7,6 +7,7 @@
 
 (defn head [config]
   (conj (cc/head config)
+        (cc/stylesheet "/css/monkeyci.css")
         (cc/script "/conf/config.js")))
 
 (defn- base-page [config]
