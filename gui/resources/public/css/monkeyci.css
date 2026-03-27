@@ -2,12 +2,14 @@ svg text {
     stroke: #008060;
     font-weight: 300;
     stroke-width: 0.5px;
+    cursor: pointer;
 }
 
 svg .node rect {
     fill: #fff;
     stroke: #008060;
     stroke-width: 2px;
+    cursor: pointer;
 }
 
 svg .edgePaths path.path {

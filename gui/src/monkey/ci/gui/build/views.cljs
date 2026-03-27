@@ -8,12 +8,11 @@
             [monkey.ci.gui.tabs :as tabs]
             [monkey.ci.gui.template :as templ]
             [monkey.ci.gui.utils :as u]
-            [monkey.ci.gui.build.events]
+            [monkey.ci.gui.build.events :as e]
             [monkey.ci.gui.build.subs]
             [monkey.ci.gui.tabs :as tabs]
             [monkey.ci.gui.time :as t]
             [monkey.ci.gui.timer :as timer]
-            [monkey.ci.gui.vis :as vis]
             [re-frame.core :as rf]))
 
 (defn build-status-icon [status]
@@ -88,10 +87,10 @@
     [elapsed-running x]
     [elapsed-final x]))
 
-(defn- job-path [job curr]
+(defn- job-path [job-id curr]
   (r/path-for :page/job (-> curr
                             (r/path-params)
-                            (assoc :job-id (:id job)))))
+                            (assoc :job-id job-id))))
 
 (defn- render-job [idx job]
   (let [r (rf/subscribe [:route/current])
@@ -103,7 +102,7 @@
                [:td [co/build-result (:status job)]]
                [:td (elapsed job)]]]
     [:<>
-     (into [:tr {:on-click #(rf/dispatch [:route/goto-path (job-path job @r)])}] cells)]))
+     (into [:tr {:on-click #(rf/dispatch [:route/goto-path (job-path (:id job) @r)])}] cells)]))
 
 (defn- jobs-table [jobs]
   [:table.table.table-hover
@@ -135,7 +134,8 @@
      {:style {:height (str (max 500 (* (count @jobs) 50)) "px")}}
      [dagre/dagre-network
       ::jobs-graph
-      (dagre/jobs->network @jobs)]]))
+      (dagre/jobs->network @jobs)
+      {:on-click (fn [job] (rf/dispatch [::e/goto-job job]))}]]))
 
 (defn- current-overview []
   (let [build (rf/subscribe [:build/current])]

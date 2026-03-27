@@ -32,7 +32,7 @@
       (as-> g (reduce add-edge
                       g (:edges data)))))
 
-(defn- render-network [el data]
+(defn- render-network [el data {:keys [on-click]}]
   (let [sel (d3/select el)
         g (new-graph data)
         inner (.append sel "g")]
@@ -41,9 +41,12 @@
     ;; Ensure a margin of 10 px
     (.attr inner "transform" "translate(10, 10)")
     (.attr sel "width" (+ (-> g (.graph) (.-width)) 20))
-    (.attr sel "height" (+ (-> g (.graph) (.-height)) 20))))
+    (.attr sel "height" (+ (-> g (.graph) (.-height)) 20))
+    (when on-click
+      (-> (.selectAll inner "g.node")
+          (.on "click" on-click)))))
 
-(defn dagre-network [id data]
+(defn dagre-network [id data opts]
   (let [co-ref (react/createRef)]
     (rc/create-class
      {:display-name "dagre-network"
@@ -52,10 +55,10 @@
         [:svg {:id id :ref co-ref}])
       :component-did-mount
       (fn [_]
-        (render-network (.-current co-ref) data))
+        (render-network (.-current co-ref) data opts))
       :component-did-update
       (fn [_ _]
-        (render-network (.-current co-ref) data))})))
+        (render-network (.-current co-ref) data opts))})))
 
 (def node-styles
   {:running "stroke: #334ac0;"
