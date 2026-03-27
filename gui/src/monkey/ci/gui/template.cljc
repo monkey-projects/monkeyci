@@ -40,7 +40,7 @@
    [:div.d-flex.border-bottom.gap-2
     [:div.mt-2 [:a {:href "/"} (logo config)]]
     [:div.flex-grow-1
-     [:h1.display-4.text-primary-dark "MonkeyCI"]
+     [:h1.display-4.text-primary-dark "Monkey" [:span.text-warning "CI"]]
      [:p.lead.text-primary "Build your code with " [:b "power and style"]]]
     [:div.d-flex.flex-column.align-items-end
      (when user-info
