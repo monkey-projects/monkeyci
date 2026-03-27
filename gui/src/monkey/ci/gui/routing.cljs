@@ -161,8 +161,7 @@
   ;; There is a bug in reitit where parameters are not filled in (no coercion)
   ;; when calling `match-by-name` so we do a second lookup using the path,
   ;; which seems to coerce correctly.
-  (->> (f/match-by-name @router r params)
-       :path
+  (->> (path-for r params)
        (f/match-by-path @router)))
 
 (rf/reg-event-fx

@@ -1,6 +1,6 @@
-(ns monkey.ci.gui.test.vis-test
+(ns monkey.ci.gui.test.dagre-test
   (:require [cljs.test :refer-macros [deftest is testing use-fixtures]]
-            [monkey.ci.gui.vis :as sut]))
+            [monkey.ci.gui.dagre :as sut]))
 
 (deftest jobs->network
   (testing "empty if no jobs"
