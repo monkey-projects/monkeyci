@@ -11,13 +11,39 @@
             [monkey.ci.gui.layout :as l]
             [monkey.ci.gui.org-settings.views :as settings]
             [monkey.ci.gui.utils :as u]
+            [monkey.ci.template.plans :as p]
             [re-frame.core :as rf]))
+
+(defn- plan-card [curr? {:keys [amount title summary features] :as plan}]
+  [:div.card
+   [:div.card-header.text-center
+    [:div.fs-3.text-dark.fw-bold (if (pos? amount) [:span (str "€" amount) [:span.fs-6 "/user/mo"]] "Free")]
+    [:h5.card-title title]
+    [:p.card-text summary]]
+   [:div.card-body.d-flex.justify-content-center.h-100.py-0
+    (->> features
+         (map (fn [f]
+                [:li.list-checked-item f]))
+         (into [:ul.list-checked.list-checked-primary]))]   
+   [:div.card-footer.text-center
+    (if curr?
+      [:p "Your current plan"]
+      [:button.btn.btn-primary
+       {:on-click (u/link-evt-handler [::e/select-plan (:type plan)])}
+       "Select Plan"])]])
 
 (defn- plans []
   [:div.card
    [:div.card-body
     [:h4.text-primary.card-title "Usage Plan"]
-    [:p "This is still in development, please check again later."]]])
+    [:p "You can modify your usage plan by selecting a new plan below."]
+    (->> p/plans
+         (map-indexed (fn [i p] (plan-card (zero? i) p)))
+         (into [:div.row.card-group]))]
+   [:div.card-footer.text-center
+    [:p.fs-6.fst-italic
+     "* Paying plans allow you to add multiple users to your organizations, up to the "
+     "number of users in your plan, or the maximum users allowed by the plan."]]])
 
 (defn- select [id lbl items sel opts]
   [:<>
