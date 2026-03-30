@@ -77,6 +77,7 @@
   [:<>
    [header]
    [:div.bg-soft-primary-light.flex-fill
+    {:style {:min-height "75vh"}}
     ;; Relative position necessary for the bg shape to work
     [:div.container.position-relative.zi-2.my-4
      [error-boundary subpanel]]]

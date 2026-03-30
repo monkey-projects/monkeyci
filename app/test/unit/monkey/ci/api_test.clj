@@ -371,3 +371,8 @@
              (-> (sut/container-job "test-job")
                  (sut/init init)
                  (sut/init)))))))
+
+(deftest cli?
+  (testing "`true` if build source is `cli`"
+    (is (false? (sut/cli? test-ctx)))
+    (is (true? (sut/cli? {:build {:source :cli}})))))

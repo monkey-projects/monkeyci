@@ -73,5 +73,4 @@
                  {:date 1731888000000, :credits 123.0}
                  {:date 1731974400000, :credits 184.0}
                  {:date 1732060800000, :credits 30.0}]}]
-    (rf/dispatch [:chart/update ::build-stats (stats/build-chart-config config)])
-    [charts/chart-component ::build-stats]))
+    [charts/chart-component ::build-stats (stats/elapsed-chart-config config)]))

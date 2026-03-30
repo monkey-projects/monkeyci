@@ -13,6 +13,7 @@
             [monkey.ci.gui.tabs :as tabs]
             [monkey.ci.gui.test-results :as tr]
             [monkey.ci.gui.time :as t]
+            [monkey.ci.gui.timer :as timer]
             [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
 
@@ -49,8 +50,13 @@
           ["Started at:" [co/date-time start-time]])
         (when end-time
           ["Ended at:" [co/date-time end-time]])
-        (when (and start-time end-time)
-          ["Duration:" [t/format-seconds (int (/ (- end-time start-time) 1000))]])
+        (when start-time
+          ["Duration:" (if end-time
+                         [t/format-seconds (int (/ (- end-time start-time) 1000))]
+                         [timer/interval-timer
+                          1000
+                          (fn [now]
+                            [:span (t/format-interval (t/parse start-time) now)])])])
         (when-not (empty? labels)
           ["Labels:" [job-labels labels]])
         (when-not (empty? deps)
@@ -118,10 +124,13 @@
    (concat
     [(co/->html (co/colored (str lbl ":") 95))
      [:br]]
-    (when (and contents (not-empty contents))
-      (mapv co/->html contents))
+    (if contents
+      (if (not-empty contents)
+        (mapv co/->html contents)
+        [(co/->html (co/colored "<no logs>" 90))])
+      [(co/->html (co/colored "<loading...>" 90))])
     [[:br]])
-   (into [:pre])))
+   (into [:<>])))
 
 (defn- log-contents [lbl path]
   (let [log (rf/subscribe [:job/logs path])]
@@ -147,16 +156,17 @@
 
 (defn- job-logs [job]
   ;;(rf/dispatch [:job/load-log-files job])
-  (let [script-logs (rf/subscribe [:job/script-with-implied-logs])]
+  (let [script-logs (rf/subscribe [:job/script-with-implied-logs])
+        wrap? (rf/subscribe [::s/wrap-logs?])]
     [:<>
      [:div.form-check
       [:input#wrap-logs.form-check-input
        {:type :checkbox
         :on-change (u/form-evt-handler [:job/wrap-logs-changed] u/evt->checked)
-        :checked @(rf/subscribe [::s/wrap-logs?])}]
+        :checked @wrap?}]
       [:label.form-check-label {:for :wrap-logs} "Wrap long lines"]]
      ;; Display combined logs for all script lines in the job
-     [co/log-viewer (map-indexed script-line @script-logs)]]))
+     [co/log-viewer (map-indexed script-line @script-logs) {:wrap? @wrap?}]]))
 
 (def has-logs? (comp  #{:running :success :failure :error :canceled} :status))
 

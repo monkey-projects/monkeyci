@@ -146,3 +146,11 @@
        (db/reset-retrying)
        (db/set-alerts
         [(a/build-retry-failed err)]))))
+
+(rf/reg-event-fx
+ ::goto-job
+ (fn [{:keys [db]} [_ job-id]]
+   {:dispatch [:route/goto :page/job (-> (r/current db)
+                                         (r/path-params)
+                                         (select-keys [:org-id :repo-id :build-id])
+                                         (assoc :job-id job-id))]}))

@@ -25,7 +25,7 @@
        [(str "cd " dir
              " && "
              (cs/join " " (concat ["clojure" "-Sdeps" "'{:mvn/local-repo \"../m2\"}'"] args)))])
-      (m/caches [(m/cache "mvn-local-repo" "m2")])))
+      (m/caches [(m/cache (str id "-mvn-repo") "m2")])))
 
 (defn- junit-artifact [dir]
   (m/artifact 
@@ -67,12 +67,6 @@
 (def uberjar-artifact
   (m/artifact "uberjar" "app/target/monkeyci-standalone.jar"))
 
-(defn- as-dir
-  "Converts artifact that points to a file, to one that points to its parent
-   directory."
-  [art]
-  (update art :path (comp str fs/parent)))
-
 (defn app-uberjar [ctx]
   (when (p/publish-app? ctx)
     (let [v (config/tag-version ctx)]
@@ -107,7 +101,7 @@
                                 (m/in-work ctx (:path uberjar-artifact))
                                 {"env" (if (p/release? ctx) "prod" "staging")}))))
         (m/depends-on ["app-uberjar"])
-        (m/restore-artifacts [(as-dir uberjar-artifact)]))))
+        (m/restore-artifacts [(m/dir-artifact uberjar-artifact)]))))
 
 (defn prepare-install-script
   "Prepares the cli install script by replacing the version.  Returns the
@@ -139,7 +133,7 @@
       :image
       {:job-id "publish-app-img"
        :container-opts
-       {:restore-artifacts [(as-dir uberjar-artifact)]
+       {:restore-artifacts [(m/dir-artifact uberjar-artifact)]
         :dependencies ["app-uberjar"]}}
       :manifest
       {:job-id "app-img-manifest"}}
@@ -251,7 +245,7 @@
   [script v]
   (conj (vec (butlast script))
         (str (last script)
-             (format " --config-merge '{:closure-defines {monkey.ci.gui.version/VERSION \"%s\"}'" v))))
+             (format " --config-merge '{:compiler-options {:closure-defines {monkey.ci.gui.version/VERSION \"%s\"}}}'" v))))
 
 (defn build-gui-release [ctx]
   (when (p/publish-gui? ctx)

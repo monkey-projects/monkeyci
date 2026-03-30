@@ -67,16 +67,29 @@
           (is (= [(:id org)] (->> (sut/list-user-orgs st (:id user))
                                   (map :id)))))
 
-        (testing "creates credit subscriptions"
-          (let [cs (sut/list-org-credit-subscriptions st (:id org))]
-            (is (= 1 (count cs)))
-            (is (= 1000 (-> cs first :amount)))
-            (is (= "P2Y" (-> cs first :valid-period)))))
+        (let [[f :as p] (sut/list-org-plans st (:id org))]
+          (testing "creates free plan by default"
+            (is (= 1 (count p)))
+            (is (= :free (:type f)))
+            (is (some? (:subscription-id f))
+                "links plan to subscription")
+            (is (= "P1Y" (-> (sut/find-credit-subscription st [(:org-id f) (:subscription-id f)])
+                             :valid-period))))
 
-        (testing "creates starting credit"
+          (testing "creates extra credit subscriptions"
+            (let [cs (sut/list-org-credit-subscriptions st (:id org))]
+              (is (= 2 (count cs)))
+              (let [m (->> cs
+                           (filter (comp (partial not= (:subscription-id f)) :id))
+                           (first))]
+                (is (some? m))
+                (is (= 1000 (:amount m)))
+                (is (= "P2Y" (:valid-period m)))))))
+
+        (testing "creates starting credits"
           (let [c (sut/list-org-credits st (:id org))]
-            (is (= 1 (count c)))
-            (is (= 1000 (-> c first :amount)))))
+            (is (= 2 (count c)))
+            (is (every? pos? (map :amount c)))))
 
         (testing "creates crypto with dek"
           (let [c (sut/find-crypto st (:id org))]
@@ -335,20 +348,28 @@
 
 (deftest jobs
   (h/with-memory-store st
-    (testing "can save and retrieve"
-      (let [[cust-id repo-id build-id :as sid] (repeatedly 3 cuid/random-cuid)
-            build (-> (h/gen-build)
-                      (assoc :org-id cust-id
-                             :repo-id repo-id
-                             :build-id build-id
-                             :script {}))
-            job {:id "test-job"}]
-        (is (sid/sid? (sut/save-build st build)))
+    (let [[org-id repo-id build-id :as sid] (repeatedly 3 cuid/random-cuid)
+          build (-> (h/gen-build)
+                    (assoc :org-id org-id
+                           :repo-id repo-id
+                           :build-id build-id
+                           :script {}))
+          job {:id "test-job"
+               :start-time 1000}]
+      (is (sid/sid? (sut/save-org st {:id org-id
+                                      :repos {repo-id {:id repo-id}}})))
+      (is (sid/sid? (sut/save-build st build)))
+      
+      (testing "can save and retrieve"
         (is (sid/sid? (sut/save-job st sid job)))
         (is (= job (sut/find-job st (concat sid [(:id job)]))))
         (is (= job (-> (sut/find-build st sid)
                        (get-in [:script :jobs (:id job)])))
-            "updates job in build")))))
+            "updates job in build"))
+
+      (testing "can list for period for org"
+        (is (= [job] (sut/list-jobs-for-period st org-id 0 2000)))
+        (is (empty? (sut/list-jobs-for-period st org-id 2000 3000)))))))
 
 (deftest save-ssh-keys
   (testing "writes ssh keys object"
@@ -783,3 +804,21 @@
       (testing "can save and find for org"
         (is (sid/sid? (sut/save-org-invoicing st s)))
         (is (= s (sut/find-org-invoicing st (:id org))))))))
+
+(deftest org-plans
+  (h/with-memory-store st
+    (let [org (h/gen-org)
+          plan (-> (h/gen-org-plan)
+                   (assoc :org-id (:id org)))]
+      (is (sid/sid? (sut/save-org st org)))
+
+      (testing "can save"
+        (is (sid/sid? (sut/save-org-plan st plan))))
+
+      (testing "can find by cuid"
+        (is (= plan
+               (sut/find-org-plan st [(:id org) (:id plan)]))))
+
+      (testing "can list for orgs"
+        (is (= [plan]
+               (sut/list-org-plans st (:id org))))))))

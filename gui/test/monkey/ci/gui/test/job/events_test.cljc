@@ -21,7 +21,7 @@
              :org/maybe-load
              (fn [db _] (assoc db ::org ::loaded)))
             (rf/reg-event-db
-             :build/maybe-load
+             :build/load
              (fn [db _] (assoc db ::build ::loaded))))]
     
     (testing "loads org if not loaded"

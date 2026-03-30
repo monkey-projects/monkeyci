@@ -449,7 +449,8 @@
         r (-> {:event {:type :job/initializing
                        :sid (sut/build->sid build)
                        :job-id (:id job)
-                       :credit-multiplier 3}}
+                       :credit-multiplier 3
+                       :agent {:address "test-agent"}}}
               (sut/set-build build)
               (sut/set-job job)
               (sut/job-init))]
@@ -462,7 +463,11 @@
              (get-in r [:build :script :jobs (:id job) :status]))))
 
     (testing "sets job credit multiplier"
-      (is (= 3 (get-in r [:build :script :jobs (:id job) :credit-multiplier]))))))
+      (is (= 3 (get-in r [:build :script :jobs (:id job) :credit-multiplier]))))
+
+    (testing "sets agent details"
+      (is (= {:address "test-agent"}
+             (get-in r [:build :script :jobs (:id job) :agent]))))))
 
 (deftest job-start
   (let [job (-> (h/gen-job)

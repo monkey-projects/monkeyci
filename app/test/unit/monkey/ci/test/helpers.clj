@@ -311,6 +311,9 @@
 (defn gen-org-invoicing []
   (gen-entity ::ss/org-invoicing))
 
+(defn gen-org-plan []
+  (gen-entity ::ss/org-plan))
+
 (defn gen-build-sid []
   (repeatedly 3 cuid/random-cuid))
 

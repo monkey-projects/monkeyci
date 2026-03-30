@@ -278,9 +278,9 @@
 
 (def job-init
   (job-update (fn [job ctx]
-                (assoc job
-                       :status :initializing
-                       :credit-multiplier (get-in ctx [:event :credit-multiplier])))))
+                (-> job
+                    (assoc :status :initializing)
+                    (merge (select-keys (:event ctx) [:credit-multiplier :agent]))))))
 
 (def job-start
   (job-update (fn [job {:keys [event]}]
@@ -299,7 +299,6 @@
 
 (def job-end
   (job-update (fn [job {:keys [event] :as ctx}]
-                (log/debug "Job ended, merging history:" (get-in ctx [:event :job-id]))
                 (-> (merge-history ctx)
                     (merge job)
                     (assoc :end-time (:time event))

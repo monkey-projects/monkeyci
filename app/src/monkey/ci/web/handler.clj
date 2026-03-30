@@ -1,9 +1,6 @@
 (ns monkey.ci.web.handler
   "Handler for the web server"
-  (:require [aleph
-             [http :as aleph]
-             [netty :as netty]]
-            [clojure.core.cache.wrapped :as cache]
+  (:require [clojure.core.cache.wrapped :as cache]
             [clojure.tools.logging :as log]
             [com.stuartsierra.component :as co]
             [manifold.deferred :as md]
@@ -33,6 +30,7 @@
              [job :as job-api]
              [join-request :as jr-api]
              [params :as param-api]
+             [plan :as plan-api]
              [repo :as repo-api]
              [ssh-keys :as ssh-api]
              [token :as token-api]
@@ -160,6 +158,10 @@
 (def since-params
   {:query {(s/optional-key :since) s/Int
            (s/optional-key :until) s/Int}})
+
+(def stats-params
+  (assoc-in since-params
+            [:query (s/optional-key :zone-offset)] s/Str))
 
 (def webhook-routes
   ["/webhook"
@@ -350,9 +352,18 @@
      {:get {:handler org-api/latest-builds}}]]])
 
 (def stats-routes
-  ["/stats" {:get {:handler org-api/stats
-                   :parameters (assoc-in since-params
-                                         [:query (s/optional-key :zone-offset)] s/Str)}}])
+  ["/stats"
+   {:parameters stats-params}
+   [[""
+     {:get {:handler org-api/stats}}]
+    ["/elapsed"
+     {:get {:handler org-api/stats-elapsed-req}}]
+    ["/credits"
+     {:get {:handler org-api/stats-credits-req}}]
+    ["/builds"
+     {:get {:handler org-api/stats-build-results}}]
+    ["/jobs"
+     {:get {:handler org-api/stats-job-results}}]]])
 
 (def credit-routes
   ["/credits" {:get {:handler org-api/credits}}])
@@ -404,6 +415,22 @@
      :id-key :token-id
      :new-schema ApiToken})])
 
+(def org-plan-routes
+  ["/plan"
+   [""
+    {:post
+     {:handler plan-api/create-plan
+      :parameters {:body schemas/NewOrgPlan}}
+     :get
+     {:handler plan-api/get-current}}]
+   ["/history"
+    {:get
+     {:handler plan-api/org-history}}]
+   ["/cancel"
+    {:post
+     {:handler plan-api/cancel-plan
+      :parameters {:body {(s/optional-key :valid-until) s/Int}}}}]])
+
 (def org-routes
   ["/org"
    {:auth-chain [auth/org-auth-checker]}
@@ -428,7 +455,8 @@
                     org-webhook-routes
                     invoice-routes
                     crypto-routes
-                    org-token-routes]})])
+                    org-token-routes
+                    org-plan-routes]})])
 
 (def github-routes
   ["/github"

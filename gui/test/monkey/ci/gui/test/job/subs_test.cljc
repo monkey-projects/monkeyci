@@ -91,7 +91,12 @@
         (is (= ["Line 1"
                 [:br]
                 "Line 2"]
-               @s))))))
+               @s))))
+
+    (testing "empty if empty entries"
+      (is (some? (reset! app-db (db/set-logs {} path {:src :log-ingest
+                                                      :entries []}))))
+      (is (empty? @s)))))
 
 (deftest job-path-alerts
   (let [path "test/path"

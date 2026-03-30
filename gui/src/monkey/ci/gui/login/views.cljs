@@ -86,7 +86,7 @@
      [:div.row.justify-content-center.align-items-lg-center
       [:div.col-md-8.col-lg-6.mb-7.mb-lg-0
        [t/logo]
-       [:h1 "Welcome to MonkeyCI"]
+       [:h1 "Welcome to " [:b [:span.text-primary "Monkey"] [:span.text-warning "CI"]]]
        [:p.lead
         "A" [:span.text-primary.mx-1 "CI/CD tool"] "designed to give you"
         [:span.text-primary.mx-1 "full power"] "when building your applications."]]

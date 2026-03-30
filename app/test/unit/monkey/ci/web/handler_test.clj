@@ -426,10 +426,31 @@
                            (app)
                            :status)))))
 
-        (testing "`GET /stats` retrieves org statistics"
-          (is (= 200 (-> (mock/request :get (str "/org/" (:id org) "/stats"))
-                         (app)
-                         :status))))
+        (testing "`/stats`"
+          (testing "`GET /` retrieves multiple org statistics"
+            (is (= 200 (-> (mock/request :get (str "/org/" (:id org) "/stats"))
+                           (app)
+                           :status))))
+
+          (testing "`GET /elapsed` retrieves build elapsed statistics"
+            (is (= 200 (-> (mock/request :get (str "/org/" (:id org) "/stats/elapsed"))
+                           (app)
+                           :status))))
+          
+          (testing "`GET /credits` retrieves credits statistics"
+            (is (= 200 (-> (mock/request :get (str "/org/" (:id org) "/stats/credits"))
+                           (app)
+                           :status))))
+
+          (testing "`GET /builds` retrieves build statistics"
+            (is (= 200 (-> (mock/request :get (str "/org/" (:id org) "/stats/builds"))
+                           (app)
+                           :status))))
+
+          (testing "`GET /jobs` retrieves job statistics"
+            (is (= 200 (-> (mock/request :get (str "/org/" (:id org) "/stats/jobs"))
+                           (app)
+                           :status)))))
 
         (testing "`/credits`"
           (testing "`GET` retrieves org credit details"
@@ -1092,7 +1113,7 @@
                   l (-> (mock/request :get (build-path sid))
                         (app))]
               (is (= 404 (:status l)))
-              (is (nil? (:body l))))))
+              (is (string? (:error (h/reply->json l)))))))
 
         (testing "`POST /retry` re-triggers build"
           (is (= 202 (-> (mock/request :post (str (build-path sid) "/retry"))
@@ -1118,7 +1139,8 @@
 
 (deftest job-endpoints
   (h/with-memory-store st
-    (let [repo (h/gen-repo)
+    (let [repo {:id (cuid/random-cuid)
+                :name "test repo"}
           org (-> (h/gen-org)
                   (assoc :repos {(:id repo) repo}))
           build (-> (h/gen-build)
@@ -1776,6 +1798,37 @@
                             (format "/org/%s/token/%s" (:id org) (-> b first :id)))
                            (app)
                            :status)))))))))
+
+(deftest org-plan-endpoints
+  (h/with-memory-store st
+    (let [org (h/gen-org)
+          app (make-test-app st)
+          path (format "/org/%s/plan" (:id org))]
+      (is (some? (st/save-org st org)))
+      (testing "`/org/:org-id/plan`"
+        (testing "`POST /` configures new org plan"
+          (let [r (-> (h/json-request :post path
+                                      {:type :startup})
+                      (app))]
+            (is (= 201 (:status r)))
+            (let [b (h/reply->json r)]
+              (is (map? b))
+              (is (some? (:id b)) (str b)))))
+        
+        (testing "`GET /` returns current org plan"
+          (is (= 200 (-> (mock/request :get path)
+                         (app)
+                         :status))))
+        
+        (testing "`GET /history` returns org plan history"
+          (is (= 200 (-> (mock/request :get (str path "/history"))
+                         (app)
+                         :status))))
+        
+        (testing "`POST /cancel` cancels current org plan"
+          (is (= 200 (-> (h/json-request :post (str path "/cancel") {})
+                         (app)
+                         :status))))))))
 
 (deftest resolve-id-from-db
   (h/with-memory-store s

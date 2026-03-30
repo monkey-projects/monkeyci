@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="24" height="24" fill="none">
+
+  <!-- ── Tag body ── -->
+  <path d="M8 18 L8 46 Q8 50 12 50 L38 50 Q42 50 44 47 L56 34 Q58 32 56 30 L44 17 Q42 14 38 14 L12 14 Q8 14 8 18 Z"
+  fill="#035A4B" opacity="0.3"/>
+
+  <!-- ── Accent inner face ── -->
+  <path d="M11 19 L11 45 Q11 47 13 47 L37 47 Q40 47 42 44.5 L53 33 Q54.5 31.5 53 30 L42 19.5 Q40 17 37 17 L13 17 Q11 17 11 19 Z"
+        fill="#035A4B" opacity="0.12"/>
+
+  <!-- ── Outline: left/top/bottom rounded edges ── -->
+  <path d="M8 18 Q8 14 12 14 L38 14 Q42 14 44 17 L56 30 Q58 32 56 34 L44 47 Q42 50 38 50 L12 50 Q8 50 8 46 Z"
+        stroke="#035A4B" stroke-width="3" stroke-linejoin="round" fill="none"/>
+
+  <!-- ── Punch-hole eyelet ── -->
+  <circle cx="19" cy="32" r="5" fill="#035A4B"/>
+  <circle cx="19" cy="32" r="2.2" fill="#035A4B"/>
+
+  <!-- ── Label text lines ── -->
+  <line x1="29" y1="25" x2="49" y2="25"
+        stroke="#035A4B" stroke-width="2.5"
+        stroke-linecap="round" opacity="0.8"/>
+  <line x1="29" y1="32" x2="51" y2="32"
+        stroke="#035A4B" stroke-width="2.5"
+        stroke-linecap="round" opacity="0.5"/>
+  <line x1="29" y1="39" x2="45" y2="39"
+        stroke="#035A4B" stroke-width="2.5"
+        stroke-linecap="round" opacity="0.3"/>
+
+</svg>

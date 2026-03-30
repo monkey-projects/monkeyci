@@ -27,7 +27,7 @@
    :output-dir "target/js/frontend/js"
    :compiler-options
    {:closure-defines
-    {monkey.ci.gui.version/VERSION "0.25.1-SNAPSHOT"}}
+    {monkey.ci.gui.version/VERSION "0.26.3-SNAPSHOT"}}
    :dev
    {:compiler-options
     {:closure-defines
