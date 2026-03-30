@@ -1,6 +1,7 @@
 (ns monkey.ci.gui.test.scenes.build-scenes
   (:require [portfolio.reagent-18 :refer-macros [defscene]]
-            [monkey.ci.gui.build.views :as sut]))
+            [monkey.ci.gui.build.views :as sut]
+            [monkey.ci.gui.time :as t]))
 
 (defscene build-status-icon
   "Large build status icon"
@@ -13,14 +14,14 @@
    [sut/build-status-icon :unknown]])
 
 (def build-running
-  {:start-time "2024-09-24T16:52:00"
+  {:start-time (str (t/now))
    :status :running
    :message "Test build"
    :git {:ref "refs/heads/main"}})
 
 (def build-success
-  {:start-time "2024-09-24T16:52:00"
-   :end-time "2024-09-24T16:55:17"
+  {:start-time (str (.minus (t/now) (clj->js {:minutes 5})))
+   :end-time (str (t/now))
    :status :success
    :message "Test build, for portfolio scenes"
    :git {:ref "refs/heads/main"
@@ -51,7 +52,7 @@
 (defscene build-details-running
   "Running build details"
   [sut/build-details
-   {:start-time "2024-09-24T16:52:00"
+   {:start-time (str (t/now))
     :status :running
     :git {:ref "refs/heads/main"
           :message "Some small changes"}}])

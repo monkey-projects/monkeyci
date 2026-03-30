@@ -41,10 +41,14 @@
                [:span [:span.me-1 [co/icon img]] v]]))]
     [:div.d-flex.gap-3.flex-wrap
      (item :clock "Start time" (t/reformat (:start-time build)))
-     ;; TODO Tick time when build is running
      (item :hourglass "Time elapsed"
-           (when-let [e (co/build-elapsed build)]
-             [:span {:title (t/reformat (:end-time build))} e]))
+           (if-let [e (co/build-elapsed build)]
+             [:span {:title (t/reformat (:end-time build))} e]
+             (when-let [s (:start-time build)]
+               [timer/interval-timer
+                1000
+                (fn [now]
+                  [:span (t/format-interval (t/parse (:start-time build)) now)])])))
      [co/git-ref (get-in build [:git :ref]) (get-in build [:git :commit-url])]
      (when-let [msg (or (:message build) (get-in build [:script :message]))]
        (item :chat-left-text "Message" msg))

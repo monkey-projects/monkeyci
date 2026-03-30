@@ -11,10 +11,9 @@
             [monkey.ci.gui.routing :as r]
             [monkey.ci.gui.table :as table]
             [monkey.ci.gui.time :as t]
+            [monkey.ci.gui.timer :as timer]
             [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
-
-(def elapsed co/build-elapsed)
 
 (defn- trigger-build-btn []
   (let [show? (rf/subscribe [:repo/show-trigger-form?])]
@@ -130,8 +129,13 @@
     :value (fn [b]
              [:span.text-nowrap (t/reformat (:start-time b))])}
    {:label "Elapsed"
-    :value elapsed
-    :sorter (table/sorter-fn (partial sort-by elapsed))}
+    :value (fn [b]
+             (if-let [e (co/build-elapsed b)]
+               e
+               (when-let [s (:start-time b)]
+                 [timer/interval-timer 1000 (fn [now]
+                                              (t/format-interval (t/parse s) now))])))
+    :sorter (table/sorter-fn (partial sort-by co/build-elapsed))}
    {:label "Trigger"
     :value trigger}
    {:label "Ref"
