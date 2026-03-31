@@ -3,6 +3,7 @@
             [monkey.ci.gui.dashboard.icons :as i]
             [monkey.ci.gui.dashboard.main.events :as e]
             [monkey.ci.gui.dashboard.main.subs :as s]
+            [monkey.ci.gui.time :as t]
             [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
 
@@ -28,7 +29,7 @@
    [:div.flex.gap-6.flex-1.items-center
     [:span.color-dim {:style {:font-size "10px"}}
      "▸"]
-    [:input.cmd-input {:placeholder "Search pipelines, runs, artifacts…"}]]
+    [:input.cmd-input {:placeholder "Search repos, builds, artifacts…"}]]
 
    [:div.flex.items-center.gap-3.ms-auto
     [running-indicator]
@@ -212,6 +213,10 @@
 (defn cancel-btn []
   [:button.run-btn.build-action-btn "Cancel"])
 
+(defn- format-elapsed [e]
+  (when e
+    (t/format-seconds (/ e 1000))))
+
 (defn build-row [{:keys [repo git-ref build-idx trigger-type elapsed status] :as b}]
   [:div.pipeline-row
    [:div
@@ -221,7 +226,7 @@
      (str "⎇ " git-ref " · #" build-idx)]]
    [:div.text-sm.color-dim (name trigger-type)]
    [:div.text-sm.color-info
-    (or elapsed "-")
+    (or (format-elapsed elapsed) "-")
     (when (= :running status)
       [:span.blink "_"])]
    [:div [build-progress (build->progress-stages b)]]
@@ -323,9 +328,11 @@
      [job-throughput]]]])
 
 (defn dashboard []
-  [:div.flex.flex-1.overflow-hidden
-   [sidebar]
-   [main]])
+  (rf/dispatch [::e/recent-builds])
+  (fn []
+    [:div.flex.flex-1.overflow-hidden
+     [sidebar]
+     [main]]))
 
 (defn main-page []
   [:<>

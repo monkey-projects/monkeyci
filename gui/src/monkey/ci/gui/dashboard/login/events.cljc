@@ -31,16 +31,17 @@
    (when-let [e (get-in provider-configs [provider :config-load])]
      {:dispatch [e]})))
 
+(defn oauth-login [{:keys [db]} [_ provider]]
+  (let [c (get provider-configs provider)
+        callback-url (str (r/origin) (r/path-for :page/oauth-callback {:provider (name provider)}))]
+    (println "Callback url:" callback-url)
+    (println "Redirecting to:" (:oauth-url c))
+    {::redirect (str (:oauth-url c) "?" (ldb/build-auth-params (db/get-client-id db provider)
+                                                               callback-url
+                                                               (:extra-params c)))}))
 (rf/reg-event-fx
  ::oauth-login
- (fn [{:keys [db]} [_ provider]]
-   (let [c (get provider-configs provider)
-         callback-url (str (r/origin) (r/path-for :page/oauth-callback {:provider (name provider)}))]
-     (println "Callback url:" callback-url)
-     (println "Redirecting to:" (:oauth-url c))
-     {:redirect (str (:oauth-url c) "?" (ldb/build-auth-params (db/get-client-id db provider)
-                                                               callback-url
-                                                               (:extra-params c)))})))
+ oauth-login)
 
 ;; Called by the backend redirect after successful OAuth
 (rf/reg-event-fx
@@ -54,6 +55,6 @@
 ;; out of event handlers and therefore easily testable.
 
 (rf/reg-fx
-  :redirect
+  ::redirect
   (fn [url]
     (set! (.-href (.-location js/window)) url)))

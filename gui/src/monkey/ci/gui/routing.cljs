@@ -96,10 +96,13 @@
   [s]
   (js/encodeURIComponent s))
 
+(defn set-url! [u]
+  (.pushState js/history (clj->js {}) nil u))
+
 (defn set-path!
   "Sets the current browser path without reloading the page"
   [p]
-  (.pushState js/history (clj->js {}) nil (str (origin) p)))
+  (set-url! (str (origin) p)))
 
 (rf/reg-fx
  :route/goto

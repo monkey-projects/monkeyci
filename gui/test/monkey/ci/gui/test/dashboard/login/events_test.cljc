@@ -14,6 +14,8 @@
 (use-fixtures :once f/dashboard-router)
 (use-fixtures :each f/reset-db)
 
+(rf/clear-subscription-cache!)
+
 (deftest load-config
   (testing "fetches config according to provider"
     (rf-test/run-test-sync
@@ -26,14 +28,12 @@
        (is (= :get-github-config (-> @e first (nth 2))))))))
 
 (deftest oauth-login
-  (let [e (h/catch-fx :redirect)]
-    (rf/dispatch-sync [::sut/oauth-login :github])
-
+  (let [r (sut/oauth-login {:db {}} [::sut/oauth-login :github])]
     (testing "redirects to auth url for provider"
-      (is (= 1 (count @e)))
-      (is (re-matches #"^https://github.com/.*$" (first @e))))
+      (is (some? (::sut/redirect r)))
+      (is (re-matches #"^https://github.com/.*$" (-> r ::sut/redirect))))
 
     (testing "includes callback url"
-      (let [[_ m] (re-matches #"^.*redirect_uri=(.+)$" (first @e))]
+      (let [[_ m] (re-matches #"^.*redirect_uri=(.+)$" (::sut/redirect r))]
         (is (some? m))
         (is (cs/ends-with? m (r/uri-encode "/oauth2/github/callback")))))))
