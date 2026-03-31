@@ -4,7 +4,6 @@
             [ajax.core :refer [json-request-format
                                json-response-format]]
             [monkey.ci.gui.dashboard.login.db :as db]
-            [monkey.ci.gui.dashboard.login.http :as http]
             [monkey.ci.gui.local-storage :as l]
             ;; Reusing the original login events for this
             [monkey.ci.gui.login.db :as ldb]
@@ -18,7 +17,19 @@
   {:github
    {:oauth-url "https://github.com/login/oauth/authorize"
     :config-load :login/load-github-config
-    :extra-params {"response_type" "code"}}})
+    :extra-params {"response_type" "code"}
+    :success-evt :login/github-code-received}})
+
+(rf/reg-event-fx
+ ::login-and-redirect
+ (fn [{:keys [db]} _]
+   (let [cr (r/current db)
+         next-route (:path cr)]
+     {:local-storage [levt/storage-redir-id
+                      ;; Ignore public routes to avoid redirecting to the callback pages
+                      (when-not (r/public? cr)
+                        {:redirect-to next-route})]
+      :dispatch [:route/goto :page/login]})))
 
 (rf/reg-event-fx
  ::load-config
@@ -40,44 +51,8 @@
 ;; Called by the backend redirect after successful OAuth
 (rf/reg-event-fx
   ::oauth-callback-success
-  (fn [{:keys [db]} [_ code]]
-    {:dispatch [:login/github-code-received code]}
-    #_{:db (assoc db :token token :user user)
-       :fx [[:local-storage [token-id token]]
-            [:navigate-to (str "/" workspace "/overview")]]}))
-
-;; ── Refresh token ──────────────────────────────────────────────
-;;
-;; Call this on app boot if a token exists in localStorage —
-;; the server returns a fresh short-lived access token.
-
-(rf/reg-event-fx
- :refresh-token
- (fn [{:keys [db]} [_ stored-token]]
-   {:db         (assoc db :loading? true)
-    :http-xhrio {:method          :post
-                 :uri             (http/endpoint "/auth/token/refresh")
-                 :headers         (http/with-auth
-                                    http/default-headers
-                                    stored-token)
-                 :format          (json-request-format)
-                 :response-format (json-response-format {:keywords? true})
-                 :on-success      [:token-refreshed]
-                 :on-failure      [:token-expired]
-                 :timeout         5000}}))
-
-(rf/reg-event-fx
-  :token-refreshed
-  (fn [{:keys [db]} [_ {:keys [token]}]]
-    {:db (assoc db :loading? false :token token)
-     :fx [[:local-storage [token-id token]]]}))
-
-(rf/reg-event-fx
-  :token-expired
-  (fn [{:keys [db]} _]
-    {:db (assoc db :loading? false :token nil)
-     :fx [[:local-storage/remove token-id]
-          [:navigate-to "/login"]]}))
+  (fn [{:keys [db]} [_ provider code]]
+    {:dispatch [(get-in provider-configs [(keyword provider) :success-evt]) code]}))
 
 ;; ── Custom effects ─────────────────────────────────────────────
 ;;
@@ -88,9 +63,3 @@
   :redirect
   (fn [url]
     (set! (.-href (.-location js/window)) url)))
-
-(rf/reg-fx
-  :navigate-to
-  (fn [path]
-    (.pushState (.-history js/window) nil "" path)
-    (rf/dispatch [:route-changed path])))   ;; wire up to your router

@@ -122,8 +122,9 @@
    [footer]])
 
 (defn github-callback-page [route]
-  (let [code (get-in route [:parameters :query :code])]
-    (rf/dispatch [::e/oauth-callback-success code])
+  (let [code (get-in route [:parameters :query :code])
+        provider (get-in route [:parameters :path :provider])]
+    (rf/dispatch [::e/oauth-callback-success provider code])
     [:div.page-wrap
      [header]
      [:div.login-main.flex-1

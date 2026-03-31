@@ -1,6 +1,7 @@
 (ns monkey.ci.gui.dashboard.core
   "Dashboard entry point"
   (:require [monkey.ci.gui.core :as c]
+            [monkey.ci.gui.dashboard.login.events :as levt]
             [monkey.ci.gui.dashboard.login.views :as lv]
             [monkey.ci.gui.dashboard.main.events :as e]
             [monkey.ci.gui.dashboard.main.views :as mv]
@@ -38,7 +39,7 @@
       (if @r
         (render-page @r)
         (root-page))
-      (rf/dispatch [:route/goto :page/login]))))
+      (rf/dispatch [::levt/login-and-redirect]))))
 
 (defn ^:dev/after-load reload []
   (c/reload [render-route]))
