@@ -6,6 +6,7 @@
             [monkey.ci.gui.dashboard.main.events :as e]
             [monkey.ci.gui.dashboard.main.views :as mv]
             [monkey.ci.gui.dashboard.routing :as dr]
+            [monkey.ci.gui.login.subs]
             [monkey.ci.gui.logging :as log]
             [monkey.ci.gui.martian :as m]
             [monkey.ci.gui.routing :as r]
@@ -33,9 +34,8 @@
 
 (defn render-route []
   (let [r (rf/subscribe [:route/current])
-        ;;u (rf/subscribe [:login/user])
-        ]
-    (if (or (r/public? @r) #_@u)
+        u (rf/subscribe [:login/user])]
+    (if (or (r/public? @r) @u)
       (if @r
         (render-page @r)
         (root-page))

@@ -1,17 +1,11 @@
 (ns monkey.ci.gui.dashboard.login.events
   (:require [re-frame.core :as rf]
-            [day8.re-frame.http-fx]
-            [ajax.core :refer [json-request-format
-                               json-response-format]]
             [monkey.ci.gui.dashboard.login.db :as db]
             [monkey.ci.gui.local-storage :as l]
             ;; Reusing the original login events for this
             [monkey.ci.gui.login.db :as ldb]
             [monkey.ci.gui.login.events :as levt]
-            [monkey.ci.gui.routing :as r]
-            [clojure.string :as str]))
-
-(def token-id "mci_token")
+            [monkey.ci.gui.routing :as r]))
 
 (def provider-configs
   {:github
