@@ -1,5 +1,7 @@
 (ns monkey.ci.gui.dashboard.main.subs
-  (:require [monkey.ci.gui.dashboard.main.db :as db]
+  (:require [medley.core :as mc]
+            [monkey.ci.gui.dashboard.main.db :as db]
+            [monkey.ci.gui.org.subs]
             [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
 
@@ -52,8 +54,8 @@
     :error 1
     0))
 
-(defn- ->active-build [b]
-  {:repo (:repo-id b)
+(defn- ->active-build [repos b]
+  {:repo (get-in repos [(:repo-id b) :name])
    :status (keyword (:status b))
    :build-idx (:idx b)
    :trigger-type (parse-trigger (:source b))
@@ -64,8 +66,13 @@
 (rf/reg-sub
  ::active-builds
  :<- [::recent-builds]
- (fn [rb _]
-   (map ->active-build rb)))
+ :<- [:org/info]
+ (fn [[rb org] _]
+   (let [repos (->> org
+                    :repos
+                    (group-by :id)
+                    (mc/map-vals first))]
+     (map (partial ->active-build repos) rb))))
 
 (rf/reg-sub
  ::n-running-builds

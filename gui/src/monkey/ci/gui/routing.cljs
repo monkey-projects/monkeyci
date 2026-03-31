@@ -89,7 +89,8 @@
 (defn origin
   "Retrieves the origin of the current location"
   []
-  (.-origin js/location))
+  (when (exists? js/location)
+    (.-origin js/location)))
 
 (defn uri-encode
   "URI-encodes the given string so it can be passed as a query parameter"

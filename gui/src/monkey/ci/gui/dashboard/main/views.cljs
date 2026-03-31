@@ -3,6 +3,8 @@
             [monkey.ci.gui.dashboard.icons :as i]
             [monkey.ci.gui.dashboard.main.events :as e]
             [monkey.ci.gui.dashboard.main.subs :as s]
+            [monkey.ci.gui.org.events]
+            [monkey.ci.gui.routing :as r]
             [monkey.ci.gui.time :as t]
             [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
@@ -334,7 +336,9 @@
      [sidebar]
      [main]]))
 
-(defn main-page []
-  [:<>
-   [header]
-   [dashboard]])
+(defn main-page [route]
+  (rf/dispatch [:org/load (-> route r/path-params :org-id)])
+  (fn [_]
+    [:<>
+     [header]
+     [dashboard]]))
