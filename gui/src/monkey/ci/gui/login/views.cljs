@@ -3,6 +3,7 @@
             [monkey.ci.gui.components :as c]
             [monkey.ci.gui.forms :as f]
             [monkey.ci.gui.layout :as l]
+            [monkey.ci.gui.login.db :as db]
             [monkey.ci.gui.login.events]
             [monkey.ci.gui.login.subs]
             [monkey.ci.gui.routing :as r]
@@ -21,10 +22,7 @@
   (fn []
     (let [callback-url (when path (str (r/origin) (r/path-for path)))
           client-id (rf/subscribe sub)
-          params (-> {"client_id" @client-id}
-                     (mc/assoc-some "redirect_uri" callback-url)
-                     (as-> p (merge extra-params p))
-                     (r/url-encode-params))]
+          params (db/build-auth-params @client-id callback-url extra-params)]
       [login-btn
        label
        (str url "?" params)
@@ -34,7 +32,7 @@
 (defn- github-btn []
   (oidc-login-btn {:label "Github"
                    :url "https://github.com/login/oauth/authorize"
-                   :path :page/github-callback-old
+                   :path :page/github-callback
                    :sub [:login/github-client-id]
                    :loader [:login/load-github-config]
                    :logo "/img/github-mark.svg"}))

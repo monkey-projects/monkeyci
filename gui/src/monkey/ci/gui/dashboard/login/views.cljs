@@ -12,16 +12,18 @@
 (defn logo [opts]
   [:img (merge opts {:src (t/img-url "monkeyci-black.png")})])
 
-(defn oauth-button [{:keys [provider label icon]}]
-  (let [oauth-loading @(rf/subscribe [::s/oauth-loading])
-        loading?      (= oauth-loading provider)]
-    [:button.btn-oauth
-     {:disabled loading?
-      :on-click #(rf/dispatch [::e/oauth-login provider])}
-     icon
-     (if loading?
-       (str "Connecting to " (name provider) "…")
-       label)]))
+(defn oauth-button [{:keys [provider]}]
+  (rf/dispatch [::e/load-config provider])
+  (fn [{:keys [provider label icon]}]
+    (let [oauth-loading @(rf/subscribe [::s/oauth-loading])
+          loading?      (= oauth-loading provider)]
+      [:button.btn-oauth
+       {:disabled loading?
+        :on-click #(rf/dispatch [::e/oauth-login provider])}
+       icon
+       (if loading?
+         (str "Connecting to " (name provider) "…")
+         label)])))
 
 (defn error-banner []
   (let [banner @(rf/subscribe [::s/error-banner])]
@@ -71,8 +73,8 @@
    ;; Footer links
    [:div.text-center {:style {:margin-top "28px" :padding-top "20px"
                               :border-top "1px solid var(--border)"}}
-    [:span.color-dim {:style {:font-size "11px"}} "No account yet? "]
-    [:a.link {:href "#" :style {:font-size "11px"}} "Create one free →"]]])
+    [:span.color-dim {:style {:font-size "11px"}}
+     "If you don't have an account yet, one can be created for free."]]])
 
 ;; ── Full page ──────────────────────────────────────────────────
 
@@ -100,7 +102,7 @@
     [footer-link "Terms of Use" "/terms-of-use"]
     [footer-link "Privacy Policy" "/privacy-policy"]]])
 
-(defn login-form []
+#_(defn login-form []
   [:div.login-card.fade-up
    {:style {:animation-delay "0.05s"}}
    [:div.text-center.mb-5
@@ -118,3 +120,13 @@
    [:div.login-main.flex-1
     [login-card]]
    [footer]])
+
+(defn github-callback-page [route]
+  (let [code (get-in route [:parameters :query :code])]
+    (rf/dispatch [::e/oauth-callback-success code])
+    [:div.page-wrap
+     [header]
+     [:div.login-main.flex-1
+      [:div.login-card
+       [:p "Authentication succeeded, logging in to MonkeyCI..."]]]
+     [footer]]))

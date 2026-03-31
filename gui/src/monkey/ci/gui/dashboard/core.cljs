@@ -10,10 +10,11 @@
             [monkey.ci.gui.routing :as r]
             [re-frame.core :as rf]))
 
-(defn not-implemented []
+(defn not-implemented [route]
   [:<>
    [:h3 "Not Implemented"]
-   [:p "Oops!  Looks like this page has not been implemented yet."]])
+   [:p "Oops!  Looks like this page has not been implemented yet."]
+   [:p (:path route)]])
 
 (defn root-page []
   [:h1 "Default Root Page"])
@@ -21,6 +22,7 @@
 (def pages
   {:page/root root-page
    :page/login lv/login-page
+   :page/oauth-callback lv/github-callback-page
    :page/org-dashboard mv/main-page})
 
 (defn render-page [route]

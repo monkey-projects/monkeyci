@@ -4,10 +4,16 @@
 
 (def routes
   "Dashboard nav routes"
-  [["/" :page/root]
-   ["/login" {:name :page/login
-              :public? true}]
-   ["/d/:org-id" :page/org-dashboard]])
+  [["/"
+    :page/root]
+   ["/login"
+    {:name :page/login
+     :public? true}]
+   ["/d/:org-id"
+    :page/org-dashboard]
+   ["/oauth2/:provider/callback"
+    {:name :page/oauth-callback
+     :public? true}]])
 
 (def router (r/make-router routes))
 

@@ -8,8 +8,7 @@
 
 (def default-headers
   {"Content-Type"  "application/json"
-   "Accept"        "application/json"
-   "X-Client-Ver"  "3.4.1"})
+   "Accept"        "application/json"})
 
 (defn with-auth [headers token]
   (assoc headers "Authorization" (str "Bearer " token)))
