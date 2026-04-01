@@ -15,5 +15,6 @@ module.exports = {
     safelist: [
 	'delay-1', 'delay-2', 'delay-3', 'delay-4',
 	'metric-success', 'metric-neutral', 'metric-danger',
+	'stage-success', 'stage-running', 'stage-danger', 'stage-none',
     ]
 }

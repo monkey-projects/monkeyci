@@ -45,7 +45,10 @@
   (c/reload [render-route]))
 
 (defn init []
+  (println "Initializing dashboard app")
   (dr/start!)
+  (println "Routing initialized")
   (rf/dispatch-sync [::e/initialize-db])
   (m/init)
+  (println "Reloading components")
   (reload))
