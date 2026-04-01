@@ -12,9 +12,10 @@
             [re-frame.core :as rf]
             [re-frame.db :refer [app-db]]))
 
-(rf/clear-subscription-cache!)
-
+(use-fixtures :once f/main-router)
 (use-fixtures :each f/reset-db)
+
+(rf/clear-subscription-cache!)
 
 (defn- build-sid []
   (repeatedly 3 (comp str random-uuid)))

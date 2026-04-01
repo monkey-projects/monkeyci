@@ -15,6 +15,7 @@
 
 (rf/clear-subscription-cache!)
 
+(use-fixtures :once f/main-router)
 (use-fixtures :each f/reset-db)
 
 (defn- test-repo-path!

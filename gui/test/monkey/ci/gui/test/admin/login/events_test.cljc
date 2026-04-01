@@ -11,6 +11,7 @@
             [re-frame.core :as rf]
             [re-frame.db :refer [app-db]]))
 
+(use-fixtures :once f/admin-router)
 (use-fixtures :each f/reset-db)
 
 (deftest login-submit
@@ -50,7 +51,7 @@
 
      (testing "redirects to root page"
        (is (= 1 (count @c)))
-       (is (nil? (first @c)))))))
+       (is (= "/" (first @c)))))))
 
 (deftest login-submit--failed
   (testing "sets error alert"

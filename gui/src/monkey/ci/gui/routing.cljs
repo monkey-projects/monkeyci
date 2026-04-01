@@ -1,5 +1,9 @@
 (ns monkey.ci.gui.routing
-  (:require [monkey.ci.gui.logging :as log]
+  "Routing functionality, used to load the appropriate page according to browser path.
+   The central part is the router, which is kept in state and referred to by various
+   functions and event handlers."
+  (:require [clojure.string :as cs]
+            [monkey.ci.gui.logging :as log]
             [re-frame.core :as rf]
             [reitit.frontend :as f]
             [reitit.frontend.easy :as rfe]))
@@ -52,86 +56,32 @@
                         (dissoc on-page-leave))}
          (not-empty handlers) (assoc :dispatch-n handlers))))))
 
-(defonce main-router
-  ;; Instead of pointing to the views directly, we refer to a keyword, which
-  ;; is linked in another namespace (pages) to the actual view.  This allows
-  ;; us to refer to the routing namespace from views, e.g. to resolve paths
-  ;; by route names.
-  (f/router
-   [["/" :page/root]
-    ["/login" :page/login]
-    ["/o/join" {:conflicting true
-                :name :page/org-join}]
-    ["/o/new" {:conflicting true
-               :name :page/org-new}]
-    ["/o/:org-id" {:conflicting true
-                   :name :page/org}]
-    ["/o/:org-id/add-repo" :page/add-repo]
-    ["/o/:org-id/add-repo/github" :page/add-github-repo]
-    ["/o/:org-id/add-repo/bitbucket" :page/add-bitbucket-repo]
-    ["/o/:org-id/settings" :page/org-settings]
-    ["/o/:org-id/params" :page/org-params]
-    ["/o/:org-id/ssh-keys" :page/org-ssh-keys]
-    ["/o/:org-id/api-keys" :page/org-api-keys]
-    ["/o/:org-id/billing" :page/billing]
-    ["/o/:org-id/r/:repo-id" :page/repo]
-    ["/o/:org-id/r/:repo-id/edit" :page/repo-edit]
-    ["/o/:org-id/r/:repo-id/settings" :page/repo-settings]
-    ["/o/:org-id/r/:repo-id/webhooks" :page/webhooks]
-    ["/o/:org-id/r/:repo-id/b/:build-id" :page/build]
-    ["/o/:org-id/r/:repo-id/b/:build-id/j/:job-id" :page/job]
-    ["/u/:user-id" :page/user]
-    ["/email/confirm" :page/confirm-email]
-    ["/email/unsubscribe" :page/unsubscribe-email]
-    ;; TODO Moved to oauth2 endpoint, remove these
-    ["/github/callback" :page/github-callback-old]
-    ["/bitbucket/callback" :page/bitbucket-callback-old]
-    ["/oauth2/codeberg/callback" :page/codeberg-callback]
-    ["/oauth2/github/callback" :page/github-callback]
-    ["/oauth2/bitbucket/callback" :page/bitbucket-callback]]))
+(def make-router f/router)
 
-(defonce admin-router
-  (f/router
-   [["/" :admin/root]
-    ["/login" :admin/login]
-    ["/credits" :admin/credits]
-    ["/credits/:org-id" :admin/org-credits]
-    ["/builds/clean" :admin/clean-builds]
-    ["/forget" :admin/forget-users]
-    ["/invoicing" :admin/invoicing]
-    ["/invoicing/:org-id" :admin/org-invoices]
-    ["/invoicing/:org-id/new" :admin/invoice-new]
-    ["/mailings" :admin/mailings]
-    ["/mailings/new" :admin/new-mailing]
-    ["/mailings/edit/:mailing-id" :admin/mailing-edit]]))
-
-(defonce router (atom main-router))
-
-(def public?
-  "Route names that are publicly accessible"
-  #{:page/login
-    :page/github-callback :page/github-callback-old
-    :page/bitbucket-callback :page/bitbucket-callback-old
-    :page/codeberg-callback
-    :page/unsubscribe-email :page/confirm-email})
+(defonce router (atom nil))
 
 (defn on-route-change [match _]
   (log/debug "Route changed:" match)
   (rf/dispatch [:route/changed match]))
 
-(defn- start-router []
-  (rfe/start! @router on-route-change {:use-fragment false}))
+(defn start-router [r]
+  (reset! router r)
+  (rfe/start! r on-route-change {:use-fragment false}))
 
-(defn start! []
-  (reset! router main-router)
-  (start-router))
+(def public?
+  "Checks if given route is publicly accessible"
+  (comp true? :public? :data))
 
-(defn start-admin! []
-  (reset! router admin-router)
-  (start-router))
+(defn match-by-name [r params]
+  ;; There is a bug in reitit where parameters are not filled in (no coercion)
+  ;; when calling `match-by-name` so we do a second lookup using the path,
+  ;; which seems to coerce correctly.
+  (->> (f/match-by-name @router r params)
+       :path
+       (f/match-by-path @router)))
 
 (defn path-for [id & [params]]
-  (some-> (f/match-by-name @router id params)
+  (some-> (match-by-name id params)
           :path)
   ;; Only works after start!
   #_(rfe/href id params))
@@ -139,30 +89,27 @@
 (defn origin
   "Retrieves the origin of the current location"
   []
-  (.-origin js/location))
+  (when (exists? js/location)
+    (.-origin js/location)))
 
 (defn uri-encode
   "URI-encodes the given string so it can be passed as a query parameter"
   [s]
   (js/encodeURIComponent s))
 
+(defn set-url! [u]
+  (.pushState js/history (clj->js {}) nil u))
+
 (defn set-path!
   "Sets the current browser path without reloading the page"
   [p]
-  (.pushState js/history (clj->js {}) nil (str (origin) p)))
+  (set-url! (str (origin) p)))
 
 (rf/reg-fx
  :route/goto
  ;; Changes browser path
  (fn [p]
    (set-path! p)))
-
-(defn- match-by-name [r params]
-  ;; There is a bug in reitit where parameters are not filled in (no coercion)
-  ;; when calling `match-by-name` so we do a second lookup using the path,
-  ;; which seems to coerce correctly.
-  (->> (path-for r params)
-       (f/match-by-path @router)))
 
 (rf/reg-event-fx
  :route/goto
@@ -183,3 +130,9 @@
  (fn [db [_ evt]]
    (update db on-page-leave (comp vec conj) evt)))
 
+(defn url-encode-params
+  "Encodes given parameter map so it can be added as query string to a url"
+  [params]
+  (->> params
+       (map #(str (name (first %)) "=" (uri-encode (second %))))
+       (cs/join "&")))

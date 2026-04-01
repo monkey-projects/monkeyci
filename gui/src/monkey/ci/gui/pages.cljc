@@ -57,10 +57,9 @@
 
 (defn render []
   (let [r (rf/subscribe [:route/current])
-        t (rf/subscribe [:login/token])
-        rn (r/route-name @r)]
+        t (rf/subscribe [:login/token])]
     (when @r
       ;; If no token found, redirect to login
-      (if (or @t (r/public? rn))
+      (if (or @t (r/public? @r))
         [render-page @r]
         (rf/dispatch [:login/login-and-redirect])))))

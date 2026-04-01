@@ -20,6 +20,12 @@
 (defn site-url [path]
   (tc/site-url config path))
 
+(defn assets-url [path]
+  (tc/assets-url config path))
+
+(defn img-url [path]
+  (assets-url (str "/img/" path)))
+
 (defn dt-icon
   "Displays duotone icon"
   [id & [opts]]

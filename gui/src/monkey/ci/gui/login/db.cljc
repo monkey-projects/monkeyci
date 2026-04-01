@@ -1,4 +1,6 @@
-(ns monkey.ci.gui.login.db)
+(ns monkey.ci.gui.login.db
+  (:require [medley.core :as mc]
+            [monkey.ci.gui.routing :as r]))
 
 (def storage-redir-id "login-redir")
 (def storage-token-id "login-tokens")
@@ -92,3 +94,9 @@
 
 (defn set-codeberg-user [db u]
   (assoc db codeberg-user u))
+
+(defn build-auth-params [client-id callback-url extra-params]
+  (-> {"client_id" client-id}
+      (mc/assoc-some "redirect_uri" callback-url)
+      (as-> p (merge extra-params p))
+      (r/url-encode-params)))

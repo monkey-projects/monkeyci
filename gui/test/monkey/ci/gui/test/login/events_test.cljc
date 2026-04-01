@@ -10,8 +10,8 @@
             [re-frame.core :as rf]
             [re-frame.db :refer [app-db]]))
 
-(use-fixtures :each
-  f/reset-db)
+(use-fixtures :once f/main-router)
+(use-fixtures :each f/reset-db)
 
 (deftest login-and-redirect
   (h/catch-fx :route/goto)
@@ -25,8 +25,7 @@
   (testing "does not set if route is public"
     (let [c (h/catch-fx :local-storage)]
       (rf-test/run-test-sync
-       (is (some? (reset! app-db {r/current {:path "/github/callback"
-                                             :data {:name :page/github-callback}}})))
+       (is (some? (reset! app-db {r/current (r/match-by-name :github/callback {})})))
        (rf/dispatch [:login/login-and-redirect])
        (is (nil? (-> @c first second :redirect-to))))))
 
