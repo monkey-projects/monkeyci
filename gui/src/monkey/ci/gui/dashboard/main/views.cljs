@@ -181,7 +181,7 @@
         "status"
         ""]
        (map (partial vector :span))
-       (into [:div.pipeline-row.header])))
+       (into [:div.build-row.header])))
 
 (defn build-progress [parts]
   (->> parts
@@ -220,7 +220,7 @@
     (t/format-seconds (/ e 1000))))
 
 (defn build-row [{:keys [repo git-ref build-idx trigger-type elapsed status] :as b}]
-  [:div.pipeline-row
+  [:div.build-row
    [:div
     [:div.font-medium.text-base.mb-1.color-text
      repo]
@@ -275,18 +275,21 @@
              (condp = lvl
                :ok "✓ "
                :warn "⚠ "
-               :running "▶ "
+               :active "▶ "
                "")
              msg
-             (when (= :running lvl)
+             (when (= :active lvl)
                [:span.blink "█"])])]
     (->> entries
          (map log-entry)
          (into [:div.overflow-y-auto.scrollbar-hide.px-3.py-4
                 {:class "max-h-[240px]"}]))))
 
-(defn live-log [{:keys [repo-id build-idx]}]
-  (let [entries [["09:14:02" :info "Pulling docker image node:20-alpine"]
+(defn live-log []
+  ;; TODO Make dynamic
+  (let [repo-id "monkeyci"
+        build-idx 1409
+        entries [["09:14:02" :info "Pulling docker image node:20-alpine"]
                  ["09:14:05" :ok "Image cached, skipping pull"]
                  ["09:14:05" :notify "Starting unit-tests job..."]
                  ["09:14:06" :ok "Caches restored"]
@@ -294,7 +297,7 @@
                  ["09:14:29" :info "Running unit tests (app)"]
                  ["09:15:35" :ok "215/215 tests passed"]
                  ["09:15:46" :ok "Artifacts saved"]
-                 ["09:15:47" :running "Starting publish job..."]]]
+                 ["09:15:47" :active "Starting publish job..."]]]
     [:div.live-log.flex-1.dashboard-card
      [:div.header
       [:div.title "Live Log"]
@@ -320,13 +323,13 @@
             (into [:div.flex.justify-between.mt-2]))])))
 
 (defn main []
-  [:div.flex.flex-1.overflow-y-auto.flex-col.grid-bg
+  [:div.flex.flex-1.flex-col.grid-bg.overflow-y-auto
    [dashboard-header]
    [dashboard-metrics]
-   [:div.grid.gap-4.px-6.flex-1.pb-5 {:class "grid-cols-[1fr_320px]"}
+   [:div.grid.gap-4.px-6.pb-5 {:class "grid-cols-[1fr_320px]"}
     [active-builds-table]
     [:div.flex.flex-col.gap-3
-     [live-log {:repo-id "monkeyci" :build-idx 1409}]
+     [live-log]
      [job-throughput]]]])
 
 (defn dashboard []

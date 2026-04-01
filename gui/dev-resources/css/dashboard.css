@@ -97,7 +97,7 @@
 	background: var(--surface);
     }
 
-    .pipeline-row {
+    .build-row {
       display: grid;
       grid-template-columns: 2fr 1fr 1fr 1fr 80px 90px;
       align-items: center;
@@ -107,9 +107,9 @@
       cursor: pointer;
       transition: background 0.12s;
     }
-    .pipeline-row:hover { background: var(--accent-light); }
+    .build-row:hover { background: var(--accent-light); }
 
-    .pipeline-row.header {
+    .build-row.header {
 	font-size: 9.5px;
 	letter-spacing: 0.14em;
 	color: var(--text-dim);

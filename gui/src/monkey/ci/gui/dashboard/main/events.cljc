@@ -20,10 +20,9 @@
  (lo/loader-evt-handler
   db/recent-builds
   (fn [_ {:keys [db]} _]
-    (println "Current route:" (r/current db))
     [:secure-request
      :get-recent-builds
-     {:org-id (r/org-id db)}
+     {:org-id (r/org-id db) :n 10}
      [::recent-builds--success]
      [::recent-builds--failure]])))
 
