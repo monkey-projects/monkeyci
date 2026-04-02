@@ -3,7 +3,8 @@
  :dev-http {8080 ["target/js/frontend" "dev-resources/sites/public" "resources/public"]
             8081 ["target/js/frontend" "dev-resources/sites/admin" "resources/public"]
             ;; Dashboard, uses tailwind css
-            8082 ["target/js/dashboard" "dev-resources/sites/dashboard" "resources/public"]
+            8082 ["target/js/dashboard" "dev-resources/sites/dashboard" "resources/public"
+                  "resources/dashboard"]
             ;; Testing
             8002 ["target/js/test-shadow"]
             ;; Portfolio scenes

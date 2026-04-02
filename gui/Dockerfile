@@ -14,6 +14,6 @@ ADD target/admin/ /var/www/html/admin/
 ADD target/error-404.html /var/www/html/
 
 # Dashboard v2: experimental
-ADD dev-resources/sites/dashboard/index.html /var/www/html/dashboard/
+ADD resources/dashboard/index.html /var/www/html/dashboard/
 ADD target/js/dashboard/js/*.js /var/www/html/dashboard/js/
 ADD target/js/dashboard/css/main.css /var/www/html/dashboard/css/
