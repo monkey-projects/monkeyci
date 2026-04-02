@@ -214,14 +214,14 @@
   "Creates a release in github"
   (gh/release-job {:dependencies ["publish-app"]}))
 
-(defn- shadow-release [id build]
+(defn- shadow-release [id & builds]
   (-> (m/container-job id)
       (m/image "docker.io/monkeyci/clojure-node:1.12.3")
       (m/work-dir "gui")
       (m/script
        ["npm install"
         (str "clojure -Sdeps '{:mvn/local-repo \".m2\"}' -M:test -m shadow.cljs.devtools.cli release "
-             build)])
+             (cs/join " " builds))])
       (m/caches [(m/cache "mvn-gui-repo" ".m2")
                  (m/cache "node-modules" "node_modules")])))
 
@@ -250,7 +250,7 @@
 (defn build-gui-release [ctx]
   (when (p/publish-gui? ctx)
     (cond->
-        (-> (shadow-release "release-gui" :frontend)
+        (-> (shadow-release "release-gui" :frontend :dashboard)
             (m/depends-on ["test-gui"])
             ;; Also generate index pages for app and admin sites
             (update :script (partial concat [(gen-idx ctx :main)
