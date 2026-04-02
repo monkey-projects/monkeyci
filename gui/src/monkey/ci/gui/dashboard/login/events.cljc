@@ -34,8 +34,6 @@
 (defn oauth-login [{:keys [db]} [_ provider]]
   (let [c (get provider-configs provider)
         callback-url (str (r/origin) (r/path-for :page/oauth-callback {:provider (name provider)}))]
-    (println "Callback url:" callback-url)
-    (println "Redirecting to:" (:oauth-url c))
     {::redirect (str (:oauth-url c) "?" (ldb/build-auth-params (db/get-client-id db provider)
                                                                callback-url
                                                                (:extra-params c)))}))

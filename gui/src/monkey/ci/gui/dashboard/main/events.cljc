@@ -16,6 +16,13 @@
                                     :status :success}))))
 
 (rf/reg-event-fx
+ ::initialize
+ (fn [{:keys [db]} _]
+   (lo/on-initialize db ::dashboard
+                     {:init-events [[:org/load (r/org-id db)]]
+                      :event-handler-event [::handle-event]})))
+
+(rf/reg-event-fx
  ::recent-builds
  (lo/loader-evt-handler
   db/recent-builds
@@ -35,3 +42,9 @@
  ::recent-builds--failure
  (fn [db [_ err]]
    (lo/on-failure db db/recent-builds "Failed to load recent builds" err)))
+
+(rf/reg-event-db
+ ::handle-event
+ (fn [db [_ evt]]
+   ;; TODO
+   (println "Dashboard event:" evt)))
