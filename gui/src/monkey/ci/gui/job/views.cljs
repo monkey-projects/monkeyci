@@ -296,9 +296,6 @@
      [:a {:href (r/path-for :page/build (r/path-params @route))}
       [:span.me-1 [co/icon :chevron-left]] "Back to build"]]))
 
-(def route->id (comp (juxt :org-id :repo-id :build-id :job-id)
-                     r/path-params))
-
 (defn page [route]
   (let [uid (e/route->id route)]
     (rf/dispatch [:job/init uid])

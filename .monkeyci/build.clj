@@ -20,7 +20,7 @@
   [id dir & args]
   (-> (m/container-job id)
       ;; Alpine based images don't exist for arm, so use debian
-      (m/image "docker.io/clojure:temurin-21-tools-deps-bookworm-slim")
+      (m/image config/clj-image)
       (m/script
        [(str "cd " dir
              " && "
@@ -216,10 +216,9 @@
 
 (defn- npm-job [id script]
   (-> (m/container-job id)
-      (m/image "docker.io/monkeyci/clojure-node:1.12.3")
+      (m/image config/node-image)
       (m/work-dir "gui")
-      (m/script
-       (into ["npm install"] script))
+      (m/script (into ["npm install"] script))
       (m/caches (m/cache "node-modules" "node_modules"))))
 
 (defn- shadow-release [id & builds]
