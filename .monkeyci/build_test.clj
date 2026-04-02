@@ -54,53 +54,39 @@
   (testing "`nil` if no release"
     (is (nil? (sut/build-gui-release mt/test-ctx))))
 
-  (testing "generates index page for release"
-    (let [ctx (-> mt/test-ctx
-                  (mt/with-git-ref "refs/tags/0.1.0"))]
-      (is (= "clojure -X:gen-main"
-             (-> (sut/build-gui-release ctx)
-                 :script
-                 first)))))
-
-  (testing "generates index page for staging"
-    (let [ctx (-> mt/test-ctx
-                  (mt/with-git-ref "refs/heads/main")
-                  (mt/with-changes (mt/modified ["gui/deps.edn"])))]
-      (is (= "clojure -X:staging:gen-main"
-             (-> (sut/build-gui-release ctx)
-                 :script
-                 first)))))
-
-  (testing "generates admin page for release"
-    (let [ctx (-> mt/test-ctx
-                  (mt/with-git-ref "refs/tags/0.1.0"))]
-      (is (= "clojure -X:gen-admin"
-             (-> (sut/build-gui-release ctx)
-                 :script
-                 second)))))
-
-  (testing "generates 404 error page for release"
-    (let [ctx (-> mt/test-ctx
-                  (mt/with-git-ref "refs/tags/0.1.0"))]
-      (is (= "clojure -X:gen-404"
-             (-> (sut/build-gui-release ctx)
-                 :script
-                 (nth 2))))))
+  (testing "for staging"
+    (testing "generates index page for staging"
+      (let [ctx (-> mt/test-ctx
+                    (mt/with-git-ref "refs/heads/main")
+                    (mt/with-changes (mt/modified ["gui/deps.edn"])))
+            script (-> (sut/build-gui-release ctx)
+                       (m/script))]
+        (is (contains? (set script)
+                       "clojure -X:staging:gen-main")))))
 
   (testing "on release"
-    (let [cmd (-> mt/test-ctx
-                  (mt/with-git-ref "refs/tags/0.1.0")
-                  (sut/build-gui-release)
-                  :script
-                  last)]
-      (is (cs/starts-with? cmd "clojure"))
+    (let [script (-> mt/test-ctx
+                     (mt/with-git-ref "refs/tags/0.1.0")
+                     (sut/build-gui-release)
+                     (m/script))]
+      (testing "generates index page"
+        (is (contains? (set script) "clojure -X:gen-main")))
+
+      (testing "generates admin page"
+        (is (contains? (set script) "clojure -X:gen-admin")))
+
+      (testing "generates 404 error page for release"
+        (is (contains? (set script) "clojure -X:gen-404")))
+
+      (testing "generates dashboard css"
+        (is (contains? (set script) "npm run postcss:release")))
 
       (testing "builds frontend and dashboard"
-        (is (cs/includes? cmd "release :frontend :dashboard")))
+        (is (cs/includes? (second script) "release :frontend :dashboard")))
       
       (testing "overrides version from tag"
         (is (cs/ends-with?
-             cmd
+             (second script)
              "--config-merge '{:compiler-options {:closure-defines {monkey.ci.gui.version/VERSION \"0.1.0\"}}}'"))))))
 
 (deftest publish
