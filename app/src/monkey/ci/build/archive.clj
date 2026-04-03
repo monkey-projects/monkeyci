@@ -6,8 +6,7 @@
             [clompress.compression :as cc]
             [monkey.ci.build.core :as bc]
             [monkey.ci.utils :as u])
-  (:import [java.io BufferedInputStream PipedInputStream PipedOutputStream]
-           [java.nio.file.attribute PosixFilePermission]
+  (:import [java.nio.file.attribute PosixFilePermission]
            [org.apache.commons.compress.archivers ArchiveStreamFactory]))
 
 (def stream-factory (ArchiveStreamFactory.))
@@ -53,6 +52,10 @@
     (cond
       (.isDirectory e)
       (u/mkdirs! f)
+
+      (.isSymbolicLink e)
+      (let [p (u/mkdirs! (.getParentFile f))]
+        (fs/create-sym-link f (.getLinkName e)))
       
       (.isFile e)
       (let [p (u/mkdirs! (.getParentFile f))]
@@ -71,19 +74,7 @@
   "Decompresses a source file.  Returns an input stream that will contain the
    decompressed archive."
   [src]
-  (let [os (PipedOutputStream.)
-        is (BufferedInputStream. (PipedInputStream. os))]
-    ;; Decompress to the output stream
-    (doto (Thread. (fn []
-                     (log/debug "Decompressing source:" src)
-                     (try 
-                       (cc/decompress src os compression-type)
-                       (catch Exception ex
-                         (log/error "Unable to decompress archive" ex))
-                       (finally
-                         (.close os)))))
-      (.start))
-    is))
+  (cc/with-decompression src compression-type))
 
 (defn- extract-loop [ai pred f]
   (loop [e (next-entry ai)

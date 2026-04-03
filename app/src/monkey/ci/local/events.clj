@@ -211,7 +211,8 @@
                                (emi/add-mailman mailman)
                                (add-api (conf/get-api conf))
                                (add-log-dir (conf/get-log-dir conf))
-                               (add-child-opts (conf/get-child-opts conf))]
+                               (add-child-opts (conf/get-child-opts conf))
+                               (add-build-opts conf)]
                         (get-in conf [:build :git]) (conj checkout-src)
                         true (conj (save-workspace (conf/get-workspace conf))))}
        {:handler make-build-init-evt}]]

@@ -57,7 +57,24 @@
                   (sut/extract is ex-dir))]
           (is (= ["testfile"]
                  (:entries r)))
-          (is (fs/executable? (fs/path ex-dir "testfile"))))))))
+          (is (fs/executable? (fs/path ex-dir "testfile")))))))
+
+  #_(testing "restores symlinks correctly"
+    (h/with-tmp-dir dir
+      (let [subdir (io/file dir "sub")
+            ex-dir (io/file dir "extract")
+            arch (io/file dir "archive.tgz")
+            p (fs/path subdir "testfile")
+            l (fs/path subdir "testlink")]
+        (is (.mkdirs subdir))
+        (spit (fs/file p) "referenced file")
+        (is (some? (fs/create-sym-link l p)))
+        (is (some? (blob/make-archive subdir arch)))
+        (let [r (with-open [is (io/input-stream arch)]
+                  (sut/extract is ex-dir))]
+          (is (= #{"testfile" "testlink"}
+                 (set (:entries r))))
+          (is (fs/sym-link? (fs/path ex-dir "testlink"))))))))
 
 (deftest extract+read
   (testing "extracts single file from archive into memory"

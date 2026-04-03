@@ -134,16 +134,20 @@
 (defn render-state
   "Converts state into printable lines, possibly using ansi control codes."
   [{:keys [build jobs i]}]
-  (cond-> (logo)
-    (nil? build) (concat ["Initializing build..."])
-    build (concat (render-build build))
-    (and build (nil? jobs)) (concat ["Initializing build script..."])
-    jobs (concat (render-jobs i jobs))
-    (= :success (:status build)) (concat ["" (success-msg "Build completed successfully!") ""])
-    (= :error (:status build)) (concat ["" (failure-msg "Build failed.") ""]
-                                       (failed-jobs-messages jobs)
-                                       [(str "Check the logs in " (:local-dir build))
-                                        ""])))
+  (->> (cond-> (logo)
+         (nil? build) (concat ["Initializing build..."])
+         build (concat (render-build build))
+         (and build (nil? jobs)) (concat ["Initializing build script..."])
+         jobs (concat (render-jobs i jobs))
+         (= :success (:status build)) (concat ["" (success-msg "Build completed successfully!") ""])
+         (= :error (:status build)) (concat ["" (failure-msg "Build failed.") ""]
+                                            [(:message build)
+                                             (:script-msg build)]
+                                            (failed-jobs-messages jobs)
+                                            (when-let [ld (not-empty (:local-dir build))]
+                                              [(str "Check the logs in " ld)
+                                               ""])))
+       (remove nil?)))
 
 (defrecord PeriodicalRenderer [state renderer interval]
   co/Lifecycle
