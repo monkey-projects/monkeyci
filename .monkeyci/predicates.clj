@@ -46,7 +46,6 @@
 (def publish-app? (some-fn (every-pred app-changed? should-publish?)
                            release?))
 (def publish-gui? (some-fn (every-pred gui-changed? should-publish?)
-                           release?
-                           m/cli?))
+                           release?))
 (def publish-test-lib? (some-fn (every-pred test-lib-changed? should-publish?) release?))
 (def publish-common? (some-fn (every-pred common-changed? should-publish?) release?))

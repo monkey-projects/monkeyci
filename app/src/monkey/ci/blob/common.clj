@@ -7,8 +7,8 @@
             [monkey.ci.build.archive :as a]
             [monkey.ci.utils :as u]))
 
-(def compression-type "gz")
-(def archive-type "tar")
+(def compression-type a/compression-type)
+(def archive-type a/archive-type)
 
 (defn- drop-prefix-resolver
   "The default entry name resolver includes the full path to the file.  
@@ -26,13 +26,6 @@
   (fn [p]
     (swap! entries conj p)
     p))
-
-(defn- set-mode
-  "Sets the TAR entry file mode using the posix file permissions"
-  [entry]
-  (.setMode entry (-> (.getFile entry)
-                      (fs/posix-file-permissions)
-                      (a/posix->mode))))
 
 (defn make-archive
   "Archives the `src` directory or file into `dest`, which should be something
@@ -55,8 +48,7 @@
        {:output-stream os
         :compression compression-type
         :archive-type archive-type
-        :entry-name-resolver (comp gatherer (partial drop-prefix-resolver prefix))
-        :before-add set-mode}
+        :entry-name-resolver (comp gatherer (partial drop-prefix-resolver prefix))}
        (u/abs-path src)))
     ;; Return some info, since clompress returns `nil`
     {:src src

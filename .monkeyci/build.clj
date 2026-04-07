@@ -259,7 +259,8 @@
             (update :script concat [(gen-idx ctx :main)
                                     (gen-idx ctx :admin)
                                     (gen-idx ctx :404)
-                                    "npm run postcss:release"])
+                                    ;; Disabled until archives support symlinks
+                                    #_"npm run postcss:release"])
             (assoc :save-artifacts [gui-release-artifact]))
         (p/release? ctx) (update :script override-gui-version (config/tag-version ctx)))))
 
