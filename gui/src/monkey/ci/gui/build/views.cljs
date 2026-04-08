@@ -96,17 +96,16 @@
                             (r/path-params)
                             (assoc :job-id job-id))))
 
-(defn- render-job [idx job]
+(defn- render-job [idx {:keys [id] :as job}]
   (let [r (rf/subscribe [:route/current])
         cells [[:td [:b (inc idx)]]
-               [:td [:a {:href (job-path job @r)}
-                     (:id job)]]
+               [:td [:a {:href (job-path id @r)} id]]
                [:td (->> (get-in job [:dependencies])
                          (cs/join ", "))]
                [:td [co/build-result (:status job)]]
                [:td (elapsed job)]]]
     [:<>
-     (into [:tr {:on-click #(rf/dispatch [:route/goto-path (job-path (:id job) @r)])}] cells)]))
+     (into [:tr {:on-click #(rf/dispatch [:route/goto-path (job-path id @r)])}] cells)]))
 
 (defn- jobs-table [jobs]
   [:table.table.table-hover
