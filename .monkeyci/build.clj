@@ -238,9 +238,6 @@
                  :junit {:artifact-id art-id
                          :path junit})))))
 
-(defn- gen-idx [ctx type]
-  (format "clojure -X%s:gen-%s" (if (p/release? ctx) "" ":staging") (name type)))
-
 (defn- override-gui-version
   "Overrides the shadow build version with the specified one in the script.  This assumes
    the command to modify is the last one."
@@ -256,11 +253,8 @@
         (-> (shadow-release "release-gui" :frontend :dashboard)
             (m/depends-on ["test-gui"])
             ;; Also generate index pages for app and admin sites
-            (update :script concat [(gen-idx ctx :main)
-                                    (gen-idx ctx :admin)
-                                    (gen-idx ctx :404)
-                                    ;; Disabled until archives support symlinks
-                                    #_"npm run postcss:release"])
+            (update :script concat [(format "clojure -X%s:gen-pages" (if (p/release? ctx) "" ":staging"))
+                                    "npm run postcss:release"])
             (assoc :save-artifacts [gui-release-artifact]))
         (p/release? ctx) (update :script override-gui-version (config/tag-version ctx)))))
 

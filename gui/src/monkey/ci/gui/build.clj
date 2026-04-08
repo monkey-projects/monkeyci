@@ -56,3 +56,10 @@
   "Generates the generic 404 not found page, to be used by nginx"
   [conf]
   (gen-page (cc/not-found-page conf) conf))
+
+(defn gen-all 
+  "Generates index, admin and 404 pages in one go"
+  [conf]
+  (gen-main (merge conf (:main conf)))
+  (gen-admin (merge conf (:admin conf)))
+  (gen-404 (merge conf (:error-404 conf))))

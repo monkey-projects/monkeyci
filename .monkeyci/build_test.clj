@@ -55,28 +55,22 @@
     (is (nil? (sut/build-gui-release mt/test-ctx))))
 
   (testing "for staging"
-    (testing "generates index page for staging"
+    (testing "generates pages for staging"
       (let [ctx (-> mt/test-ctx
                     (mt/with-git-ref "refs/heads/main")
                     (mt/with-changes (mt/modified ["gui/deps.edn"])))
             script (-> (sut/build-gui-release ctx)
                        (m/script))]
         (is (contains? (set script)
-                       "clojure -X:staging:gen-main")))))
+                       "clojure -X:staging:gen-pages")))))
 
   (testing "on release"
     (let [script (-> mt/test-ctx
                      (mt/with-git-ref "refs/tags/0.1.0")
                      (sut/build-gui-release)
                      (m/script))]
-      (testing "generates index page"
-        (is (contains? (set script) "clojure -X:gen-main")))
-
-      (testing "generates admin page"
-        (is (contains? (set script) "clojure -X:gen-admin")))
-
-      (testing "generates 404 error page for release"
-        (is (contains? (set script) "clojure -X:gen-404")))
+      (testing "generates al pages"
+        (is (contains? (set script) "clojure -X:gen-pages")))
 
       (testing "generates dashboard css"
         (is (contains? (set script) "npm run postcss:release")))
