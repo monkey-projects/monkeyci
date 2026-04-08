@@ -60,6 +60,11 @@
   ([ctx]
    (get-job-from-state ctx (get-in ctx [:event :job-id]))))
 
+(defn- get-job-from-ctx
+  "Retrieves job from job ctx"
+  [ctx]
+  (-> ctx emi/get-job-ctx :job))
+
 (defn set-initial-job-ctx [ctx job-ctx]
   (emi/update-state ctx assoc ::initial-job-ctx job-ctx))
 
@@ -192,7 +197,8 @@
                       (md/catch (partial post-job-error job (:mailman job-ctx) (:event ctx)))))))]
       {:name ::execute-action
        :enter (fn [ctx]
-                (let [job (get-job-from-state ctx)]
+                ;; Use the job from the context, so extensions can modify it
+                (let [job (get-job-from-ctx ctx)]
                   (cond-> ctx
                     (bc/action-job? job)
                     ;; Execute the jobs with the job context
@@ -296,7 +302,7 @@
             (-> (j/job-queued-evt job (build-sid ctx))
                 (assoc :type t
                        :dek dek)))]
-    (let [job (get-job-from-state ctx)
+    (let [job (get-job-from-ctx ctx)
           dek (:dek (get-build ctx))]
       ;; Action jobs do not result in an event, instead they are executed immediately.
       (when (bc/container-job? job)

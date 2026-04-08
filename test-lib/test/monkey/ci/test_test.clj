@@ -41,3 +41,21 @@
 
   (testing "`true` if success"
     (is (true? (sut/success? api/success)))))
+
+(deftest execute-job
+  (testing "executes action job, returns result"
+    (let [r (sut/execute-job
+             (api/action-job "test-job" (constantly (assoc api/success ::test ::result)))
+                sut/test-ctx)]
+      (is (sut/success? r))
+      (is (= ::result
+             (::test r)))))
+
+  (testing "simulates container job"
+    (let [job (-> (api/container-job "test-container")
+                  (api/image "test-img")
+                  (api/script ["test" "script"]))
+          r (sut/execute-job job sut/test-ctx)]
+      (is (sut/success? r))
+      (is (= job (:job r))
+          "adds job to result"))))

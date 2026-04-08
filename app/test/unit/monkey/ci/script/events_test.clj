@@ -130,17 +130,17 @@
 
 (deftest execute-action
   (let [broker (tm/test-component)
-        job-ctx  {:mailman broker}
+        job-ctx {:mailman broker}
         {:keys [enter] :as i} sut/execute-action]
     (is (keyword? (:name i)))
     
-    (testing "executes each job in the result in a new thread"
+    (testing "executes job from the context in a new thread"
       (let [jobs (jobs->map [(bc/action-job "job-1" (constantly ::first))
                              (bc/action-job "job-2" (constantly ::second))])
             r (-> {:event
                    {:job-id "job-1"}}
                   (sut/set-jobs jobs)
-                  (emi/set-job-ctx job-ctx)
+                  (emi/set-job-ctx (assoc job-ctx :job (get jobs "job-1")))
                   (enter))
             a (sut/get-running-actions r)]
         (is (= 1 (count a)))
@@ -161,7 +161,7 @@
         (let [job (bc/action-job "failing-sync" nil)
               r (-> {:event {:job-id (:id job)}}
                     (sut/set-jobs (jobs->map [job]))
-                    (emi/set-job-ctx job-ctx)
+                    (emi/set-job-ctx (assoc job-ctx :job job))
                     (enter))]
           (is (= 1 (count (sut/get-running-actions r))))
           (is (not= :timeout (h/wait-until #(contains? (->> (tm/get-posted broker) (map :type) set)
@@ -181,7 +181,7 @@
                      (throw (ex-info "Test error" {}))))
               r (-> {:event {:job-id (:id job)}}
                     (sut/set-jobs (jobs->map [job]))
-                    (emi/set-job-ctx job-ctx)
+                    (emi/set-job-ctx (assoc job-ctx :job job))
                     (enter))]
           (is (= 1 (count (sut/get-running-actions r))))
           (is (not= :timeout (h/wait-until #(contains? (->> (tm/get-posted broker) (map :type) set)
@@ -474,14 +474,15 @@
                      (sut/script-end)))))))
 
 (deftest job-queued
-  (let [jobs (jobs->map
-              [(bc/action-job "action-job" (constantly nil))
-               (bc/container-job "container-job" {})])]
+  (let [aj (bc/action-job "action-job" (constantly nil))
+        cj (bc/container-job "container-job" {})
+        jobs (jobs->map
+              [aj cj])]
     (testing "for action job, returns `nil`"
       (is (empty?
            (-> {:event
                 {:job-id "action-job"}}
-               (sut/set-jobs jobs)
+               (emi/set-job-ctx {:job aj})
                (sut/job-queued)))))
 
     (testing "for container job"
@@ -489,7 +490,7 @@
         (is (= [:container/job-queued]
                (-> {:event
                     {:job-id "container-job"}}
-                   (sut/set-jobs jobs)
+                   (emi/set-job-ctx {:job cj})
                    (sut/job-queued)
                    (as-> x (map :type x))))))
 
@@ -497,7 +498,7 @@
         (is (= "encrypted-dek"
                (-> {:event
                     {:job-id "container-job"}}
-                   (sut/set-jobs jobs)
+                   (emi/set-job-ctx {:job cj})
                    (sut/set-build (assoc (h/gen-build) :dek "encrypted-dek"))
                    (sut/job-queued)
                    (first)
@@ -508,11 +509,11 @@
           (let [job-id "dynamic-container"
                 r (-> {:event
                        {:job-id job-id}}
-                      (sut/set-jobs
-                       (jobs->map [(bc/container-job
-                                    job-id
-                                    {:init (constantly {:image "test-img"
-                                                        :script ["test-script"]})})]))
+                      (emi/set-job-ctx
+                       {:job (bc/container-job
+                              job-id
+                              {:init (constantly {:image "test-img"
+                                                  :script ["test-script"]})})})
                       (sut/job-queued)
                       (first))]
             (is (some? r))
@@ -525,10 +526,10 @@
           (let [job-id "dynamic-container"
                 r (-> {:event
                        {:job-id job-id}}
-                      (sut/set-jobs
-                       (jobs->map [(bc/container-job
-                                    job-id
-                                    {:init (constantly nil)})]))
+                      (emi/set-job-ctx
+                       {:job (bc/container-job
+                              job-id
+                              {:init (constantly nil)})})
                       (sut/job-queued)
                       (first))]
             (is (some? r))
@@ -549,13 +550,13 @@
                         :job-id job-id}}
                       (sut/set-initial-job-ctx init-ctx)
                       (sut/set-build build)
-                      (sut/set-jobs
-                       (jobs->map [(bc/container-job
-                                    job-id
-                                    {:init (constantly {:image "test-img"
-                                                        :script ["test-script"]
-                                                        :container/env {"second_var" "second val"}})
-                                     :container/env {"first_var" "first val"}})]))
+                      (emi/set-job-ctx
+                       {:job (bc/container-job
+                              job-id
+                              {:init (constantly {:image "test-img"
+                                                  :script ["test-script"]
+                                                  :container/env {"second_var" "second val"}})
+                               :container/env {"first_var" "first val"}})})
                       (sut/job-queued)
                       (first))
                 env (get-in r [:job :container/env])]

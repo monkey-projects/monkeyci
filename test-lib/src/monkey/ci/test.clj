@@ -100,9 +100,14 @@
   (assoc-in ctx [:build :build-id] id))
 
 (defn execute-job
-  "Executes given job with specified context. Look out for side effects!"
+  "For an action job, executes given job with specified context. Look out for side effects!
+   For container jobs, simulates the execution and returns a structure similar to the real
+   thing."
   [job ctx]
-  @(j/execute! job ctx))
+  (if (a/action-job? job)
+    @(j/execute! job ctx)
+    ;; Fake container job
+    (assoc a/success :job job)))
 
 (defn with-tmp-dir*
   "Creates a temp dir, then invokes `f` on it"
