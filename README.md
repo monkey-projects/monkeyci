@@ -1,7 +1,31 @@
 # README #
 
-Monkey CI is intended to be a highly customizable and powerful continuous integration
-tool.  The key features are:
+```clojure
+(ns build
+  (:require [monkey.ci.api :as m]))
+  
+(def clj-img "docker.io/clojure:tools-deps")
+  
+(def unit-test
+  "A container job that runs your clojure unit tests"
+  (-> (m/container-job "unit-test")
+      (m/image clj-img)
+	  (m/script ["clojure -X:test"])))
+	  
+(defn deploy [ctx]
+  "Deploy the lib, only when triggered by tag push"
+  (when (some? (m/tag ctx))
+    (-> (m/container-job "deploy")
+        (m/image clj-img)
+        (m/script ["clojure -X:deploy"])
+        (m/depends-on "unit-test"))))
+		
+;; Define these jobs
+[unit-test deploy]
+```
+
+[MonkeyCI](https://monkeyci.com) is intended to be a highly customizable and powerful 
+continuous integration tool.  The key features are:
 - Modular and maintainable design.
 - Highly testable (written using TDD), both for the codebase and for the build scripts.
 - Powerful if necessary, but user friendly for the less-technical.

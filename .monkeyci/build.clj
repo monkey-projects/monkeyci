@@ -20,7 +20,7 @@
   [id dir & args]
   (-> (m/container-job id)
       ;; Alpine based images don't exist for arm, so use debian
-      (m/image "docker.io/clojure:temurin-21-tools-deps-bookworm-slim")
+      (m/image config/clj-image)
       (m/script
        [(str "cd " dir
              " && "
@@ -214,16 +214,18 @@
   "Creates a release in github"
   (gh/release-job {:dependencies ["publish-app"]}))
 
-(defn- shadow-release [id build]
+(defn- npm-job [id script]
   (-> (m/container-job id)
-      (m/image "docker.io/monkeyci/clojure-node:1.12.3")
+      (m/image config/node-image)
       (m/work-dir "gui")
-      (m/script
-       ["npm install"
-        (str "clojure -Sdeps '{:mvn/local-repo \".m2\"}' -M:test -m shadow.cljs.devtools.cli release "
-             build)])
-      (m/caches [(m/cache "mvn-gui-repo" ".m2")
-                 (m/cache "node-modules" "node_modules")])))
+      (m/script (into ["npm install"] script))
+      (m/caches (m/cache "node-modules" "node_modules"))))
+
+(defn- shadow-release [id & builds]
+  (-> (npm-job id
+               [(str "clojure -Sdeps '{:mvn/local-repo \".m2\"}' -M:test -m shadow.cljs.devtools.cli release "
+                     (cs/join " " builds))])
+      (m/caches (m/cache "mvn-gui-repo" ".m2"))))
 
 (defn test-gui [ctx]
   (when (p/build-gui? ctx)
@@ -236,26 +238,23 @@
                  :junit {:artifact-id art-id
                          :path junit})))))
 
-(defn- gen-idx [ctx type]
-  (format "clojure -X%s:gen-%s" (if (p/release? ctx) "" ":staging") (name type)))
-
 (defn- override-gui-version
   "Overrides the shadow build version with the specified one in the script.  This assumes
    the command to modify is the last one."
   [script v]
-  (conj (vec (butlast script))
-        (str (last script)
-             (format " --config-merge '{:closure-defines {monkey.ci.gui.version/VERSION \"%s\"}}'" v))))
+  (concat [(first script)
+           (str (second script)
+                (format " --config-merge '{:compiler-options {:closure-defines {monkey.ci.gui.version/VERSION \"%s\"}}}'" v))]
+          (drop 2 script)))
 
 (defn build-gui-release [ctx]
   (when (p/publish-gui? ctx)
     (cond->
-        (-> (shadow-release "release-gui" :frontend)
+        (-> (shadow-release "release-gui" :frontend :dashboard)
             (m/depends-on ["test-gui"])
             ;; Also generate index pages for app and admin sites
-            (update :script (partial concat [(gen-idx ctx :main)
-                                             (gen-idx ctx :admin)
-                                             (gen-idx ctx :404)]))
+            (update :script concat [(format "clojure -X%s:gen-pages" (if (p/release? ctx) "" ":staging"))
+                                    "npm run postcss:release"])
             (assoc :save-artifacts [gui-release-artifact]))
         (p/release? ctx) (update :script override-gui-version (config/tag-version ctx)))))
 

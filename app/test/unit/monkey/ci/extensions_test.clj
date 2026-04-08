@@ -114,3 +114,20 @@
                      (emi/get-job-ctx)
                      :job
                      :result))))))))
+
+(deftest update-job
+  (testing "applies arg fn to job in ctx"
+    (let [job {:id ::test-job}
+          ctx {:job job}
+          r (sut/update-job ctx assoc ::key ::value)]
+      (is (= {:id ::test-job
+              ::key ::value}
+             (:job r))))))
+
+(deftest set-value
+  (testing "updates job result"
+    (is (= {:id ::test-job
+            :result {::test ::value}}
+           (-> {:job {:id ::test-job}}
+               (sut/set-value ::test ::value)
+               :job)))))

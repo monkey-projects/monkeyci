@@ -13,6 +13,7 @@
             [monkey.ci.gui.tabs :as tabs]
             [monkey.ci.gui.test-results :as tr]
             [monkey.ci.gui.time :as t]
+            [monkey.ci.gui.timer :as timer]
             [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
 
@@ -49,8 +50,13 @@
           ["Started at:" [co/date-time start-time]])
         (when end-time
           ["Ended at:" [co/date-time end-time]])
-        (when (and start-time end-time)
-          ["Duration:" [t/format-seconds (int (/ (- end-time start-time) 1000))]])
+        (when start-time
+          ["Duration:" (if end-time
+                         [t/format-seconds (int (/ (- end-time start-time) 1000))]
+                         [timer/interval-timer
+                          1000
+                          (fn [now]
+                            [:span (t/format-interval (t/parse start-time) now)])])])
         (when-not (empty? labels)
           ["Labels:" [job-labels labels]])
         (when-not (empty? deps)
@@ -289,9 +295,6 @@
     [:div.mt-2
      [:a {:href (r/path-for :page/build (r/path-params @route))}
       [:span.me-1 [co/icon :chevron-left]] "Back to build"]]))
-
-(def route->id (comp (juxt :org-id :repo-id :build-id :job-id)
-                     r/path-params))
 
 (defn page [route]
   (let [uid (e/route->id route)]

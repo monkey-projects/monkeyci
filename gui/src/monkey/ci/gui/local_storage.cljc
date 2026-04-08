@@ -14,6 +14,13 @@
               (.setItem js/localStorage (str id) (pr-str value)))
       :clj nil)))
 
+(rf/reg-fx
+ :local-storage/remove
+ (fn [id]
+   #?(:cljs (when (local-storage-enabled?)
+              (.reoveItem js/localStorage (str id)))
+      :clj nil)))
+
 (rf/reg-cofx
  :local-storage
  (fn [cofx id]

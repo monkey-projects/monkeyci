@@ -9,7 +9,7 @@
             [re-frame.core :as rf]
             [re-frame.db :refer [app-db]]))
 
-(use-fixtures :once f/restore-rf)
+(use-fixtures :once f/restore-rf f/main-router)
 
 (deftest init
   (testing "initializes default martian in db"

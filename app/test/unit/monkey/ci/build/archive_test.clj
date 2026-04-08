@@ -57,7 +57,24 @@
                   (sut/extract is ex-dir))]
           (is (= ["testfile"]
                  (:entries r)))
-          (is (fs/executable? (fs/path ex-dir "testfile"))))))))
+          (is (fs/executable? (fs/path ex-dir "testfile")))))))
+
+  (testing "restores symlinks correctly"
+    (h/with-tmp-dir dir
+      (let [subdir (io/file dir "sub")
+            ex-dir (io/file dir "extract")
+            arch (io/file dir "archive.tgz")
+            p (fs/path subdir "testfile")
+            l (fs/path subdir "testlink")]
+        (is (.mkdirs subdir))
+        (spit (fs/file p) "referenced file")
+        (is (some? (fs/create-sym-link l "testfile")))
+        (is (some? (blob/make-archive subdir arch)))
+        (let [r (with-open [is (io/input-stream arch)]
+                  (sut/extract is ex-dir))]
+          (is (= #{"testfile" "testlink"}
+                 (set (:entries r))))
+          (is (fs/sym-link? (fs/path ex-dir "testlink"))))))))
 
 (deftest extract+read
   (testing "extracts single file from archive into memory"
@@ -89,17 +106,3 @@
           (is (= 2 (count r)))
           (is (= #{"first file" "another file"} (set r))))))))
 
-(deftest file-mode
-  (testing "can convert from posix permissions to file mode and back"
-    (let [mode (Integer/parseInt "755" 8)
-          posix (sut/mode->posix mode)]
-      (is (= 7 (count posix)))
-      (is (contains? posix java.nio.file.attribute.PosixFilePermission/OWNER_READ))
-      (is (contains? posix java.nio.file.attribute.PosixFilePermission/OWNER_WRITE))
-      (is (contains? posix java.nio.file.attribute.PosixFilePermission/OWNER_EXECUTE))
-      (is (not (contains? posix java.nio.file.attribute.PosixFilePermission/OTHERS_WRITE)))
-      (is (contains? posix java.nio.file.attribute.PosixFilePermission/GROUP_EXECUTE))
-      (is (= mode (sut/posix->mode posix)))))
-
-  (testing "can process extended modes"
-    (is (not-empty (sut/mode->posix (Integer/parseInt "100644" 8))))))

@@ -2,7 +2,7 @@
         day8.re-frame/http-fx {:mvn/version "0.2.4"}
         com.github.oliyh/martian-re-frame {:mvn/version "0.2.1"}
         com.monkeyci/common {:local/root "../common"}
-        com.monkeyci/site-template {:mvn/version "0.14.0"}
+        com.monkeyci/site-template {:mvn/version "0.15.3"}
         medley/medley {:mvn/version "1.4.0"}
         metosin/reitit-frontend {:mvn/version "0.9.2"}
         org.clojure/core.async {:mvn/version "1.8.741"}
@@ -44,6 +44,13 @@
   {:extra-deps {hiccup/hiccup {:mvn/version "2.0.0"}}
    :exec-fn monkey.ci.gui.build/gen-404
    :exec-args {:output "target/error-404.html"}}
+
+  :gen-pages
+  {:extra-deps {hiccup/hiccup {:mvn/version "2.0.0"}}
+   :exec-fn monkey.ci.gui.build/gen-all
+   :exec-args {:main {:output "target/index.html"}
+               :admin {:output "target/admin/index.html"}
+               :error-404 {:output "target/error-404.html"}}}
 
   ;; clj -X:gen-main:staging or -X:gen-admin:staging
   :staging

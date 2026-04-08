@@ -11,6 +11,7 @@
             [monkey.ci.gui.admin.invoicing.views :as inv]
             [monkey.ci.gui.admin.login.views :as login]
             [monkey.ci.gui.admin.mailing.views :as mailing]
+            [monkey.ci.gui.admin.routing :as ar]
             [re-frame.core :as rf]))
 
 (defn action-card [icon title desc link url]
@@ -96,12 +97,10 @@
   (let [p (get pages (r/route-name route) not-implemented)]
     [p route]))
 
-(def public? #{:admin/login})
-
 (defn render-admin []
   (let [r (rf/subscribe [:route/current])
         u (rf/subscribe [:login/user])]
-    (if (or (public? (r/route-name @r)) @u)
+    (if (or (r/public? @r) @u)
       (if @r
         (render-page @r)
         (admin-root))
@@ -111,6 +110,6 @@
   (c/reload [render-admin]))
 
 (defn init []
-  (r/start-admin!)
+  (ar/start!)
   (m/init)
   (reload))

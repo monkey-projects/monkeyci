@@ -684,7 +684,7 @@
     t (assoc :authorization (str "Bearer " t))))
 
 (defn- add-token [db opts]
-  (set-token opts (get db :auth/token)))
+  (set-token opts (ldb/token db)))
 
 (rf/reg-event-fx
  ::error-handler

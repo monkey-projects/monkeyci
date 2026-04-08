@@ -1,8 +1,9 @@
 (ns monkey.ci.gui.login.views
-  (:require [clojure.string :as cs]
+  (:require [medley.core :as mc]
             [monkey.ci.gui.components :as c]
             [monkey.ci.gui.forms :as f]
             [monkey.ci.gui.layout :as l]
+            [monkey.ci.gui.login.db :as db]
             [monkey.ci.gui.login.events]
             [monkey.ci.gui.login.subs]
             [monkey.ci.gui.routing :as r]
@@ -19,13 +20,9 @@
 (defn- oidc-login-btn [{:keys [label url path sub logo loader extra-params]}]
   (rf/dispatch loader)
   (fn []
-    (let [callback-url (str (r/origin) (r/path-for path))
+    (let [callback-url (when path (str (r/origin) (r/path-for path)))
           client-id (rf/subscribe sub)
-          params (->> {"client_id" @client-id
-                       "redirect_uri" (r/uri-encode callback-url)}
-                      (merge extra-params)
-                      (map #(str (first %) "=" (second %)))
-                      (cs/join "&"))]
+          params (db/build-auth-params @client-id callback-url extra-params)]
       [login-btn
        label
        (str url "?" params)
@@ -35,7 +32,7 @@
 (defn- github-btn []
   (oidc-login-btn {:label "Github"
                    :url "https://github.com/login/oauth/authorize"
-                   :path :page/github-callback-old
+                   :path :page/github-callback
                    :sub [:login/github-client-id]
                    :loader [:login/load-github-config]
                    :logo "/img/github-mark.svg"}))
@@ -51,6 +48,17 @@
                    :extra-params {"response_type" "code"}}))
 
 (defn- bitbucket-btn []
+  (oidc-login-btn {:label "Bitbucket"
+                   :url "https://bitbucket.com/site/oauth2/authorize"
+                   ;; Unfortunately, bitbucket does not allow to specify callback url, so it's the one
+                   ;; that is configured in the app.
+                   :sub [:login/bitbucket-client-id]
+                   :loader [:login/load-bitbucket-config]
+                   :logo "/img/mark-gradient-blue-bitbucket.svg"
+                   ;; TODO Also add state param to protect against CSRF attacks
+                   :extra-params {"response_type" "code"}}))
+
+#_(defn- bitbucket-btn []
   (rf/dispatch [:login/load-bitbucket-config])
   (fn []
     (let [bitbucket-client-id (rf/subscribe [:login/bitbucket-client-id])]
@@ -76,7 +84,7 @@
      [:div.row.justify-content-center.align-items-lg-center
       [:div.col-md-8.col-lg-6.mb-7.mb-lg-0
        [t/logo]
-       [:h1 "Welcome to MonkeyCI"]
+       [:h1 "Welcome to " [:b [:span.text-primary "Monkey"] [:span.text-warning "CI"]]]
        [:p.lead
         "A" [:span.text-primary.mx-1 "CI/CD tool"] "designed to give you"
         [:span.text-primary.mx-1 "full power"] "when building your applications."]]

@@ -1,11 +1,12 @@
 (ns monkey.ci.gui.test.scenes.job-scenes
   (:require [portfolio.reagent-18 :refer-macros [defscene]]
-            [monkey.ci.gui.job.views :as sut]))
+            [monkey.ci.gui.job.views :as sut]
+            [monkey.ci.gui.time :as t]))
 
 (defscene job-summary-running
   "Display running job details"
   [sut/job-summary
-   {:start-time 1726210910713
+   {:start-time (str (t/now))
     :message "Test message"
     :status :running}])
 

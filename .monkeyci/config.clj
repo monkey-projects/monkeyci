@@ -3,6 +3,9 @@
   (:require [monkey.ci.api :as m]
             [predicates :as p]))
 
+(def clj-image "docker.io/clojure:temurin-21-tools-deps-bookworm-slim")
+(def node-image "docker.io/monkeyci/clojure-node:1.12.3")
+
 (defn tag-version
   "Extracts the version from the tag"
   [ctx]

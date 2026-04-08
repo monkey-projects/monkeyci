@@ -66,11 +66,17 @@
   [ctx k]
   (get-in ctx [:job k]))
 
+(defn update-job
+  "Applies `f` with args to the job in the given job context.  This is useful for before
+   interceptors to modify the job that will be executed."
+  [ctx f & args]
+  (apply update ctx :job f args))
+
 (defn set-value
   "Sets the extension value in the job.  This value will be stored with the job, so it
    must be serializable to `edn`."
   [ctx k v]
-  (assoc-in ctx [:job :result k] v))
+  (update-job ctx assoc-in [:result k] v))
 
 ;;; Interceptors
 
@@ -80,8 +86,6 @@
    added to that context."
   {:name ::before
    :enter (fn [ctx]
-            ;; TODO Allow for before extensions to cancel job execution, as a form of conditions.
-            ;; This would make it possible for extensions to prevent containers from running.
             (emi/update-job-ctx ctx apply-extensions-before))})
 
 (def after-interceptor

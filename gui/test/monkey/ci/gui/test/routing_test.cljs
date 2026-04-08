@@ -7,6 +7,7 @@
             [re-frame.core :as rf]
             [re-frame.db :refer [app-db]]))
 
+(use-fixtures :once f/main-router)
 (use-fixtures :each f/reset-db)
 
 (deftest on-route-change
@@ -78,7 +79,7 @@
                                      :repo-id "repo"})))))
 
 (deftest route-goto
-  ;; Failsave
+  ;; Failsafe
   (h/catch-fx :route/goto)
   
   (testing "sets browser path using fx"
@@ -90,3 +91,13 @@
     (rf-test/run-test-sync
      (rf/dispatch [:route/goto :page/root])
      (is (= :page/root (get-in (:route/current @app-db) [:data :name]))))))
+
+(deftest url-encode-params
+  (testing "converts params to string"
+    (is (= "key=value&other-key=other-value"
+           (sut/url-encode-params {:key "value"
+                                   :other-key "other-value"}))))
+
+  (testing "url encodes values"
+    (is (= "key=test%20value"
+           (sut/url-encode-params {:key "test value"})))))

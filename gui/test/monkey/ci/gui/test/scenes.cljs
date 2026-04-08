@@ -6,4 +6,5 @@
   (ui/start!
    {:config
     {:css-paths ["https://assets.staging.monkeyci.com/css/theme.min.css"
-                 "https://assets.staging.monkeyci.com/css/vendor.min.css"]}}))
+                 "https://assets.staging.monkeyci.com/css/vendor.min.css"
+                 "/css/dagre.css"]}}))
