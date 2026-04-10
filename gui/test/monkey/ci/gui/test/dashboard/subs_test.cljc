@@ -48,6 +48,43 @@
                                                     {:repo-id "test-repo"}])
                              (odb/set-org {:repos [{:id "test-repo"
                                                     :name "test repo"}]})))))
-      (is (= [{:repo "test repo"
+      (is (= [{:repo {:repo-id "test-repo"
+                      :repo-name "test repo"}
                :builds 2}]
              @a)))))
+
+(deftest successful-builds
+  (let [s (rf/subscribe [::sut/successful-builds])]
+    (testing "exists"
+      (is (some? s)))
+
+    (testing "zero when no builds"
+      (is (= 0 @s)))
+
+    (testing "calculates success ratio of finished builds"
+      (is (some? (reset! app-db
+                         (db/set-recent-builds {}
+                                               [{:status :success}
+                                                {:status :error}
+                                                {:status :running}]))))
+      (is (= 0.5 @s)))))
+
+(deftest avg-duration
+  (let [d (rf/subscribe [::sut/avg-duration])]
+    (testing "exists"
+      (is (some? d)))
+
+    (testing "zero when no builds"
+      (is (= 0 @d)))
+
+    (testing "calculates average elapsed time of finished builds"
+      (is (some? (reset! app-db
+                         (db/set-recent-builds {}
+                                               [{:status :success
+                                                 :start-time 1000
+                                                 :end-time 2000}
+                                                {:status :error
+                                                 :start-time 3000
+                                                 :end-time 5000}
+                                                {:status :running}]))))
+      (is (= 1500 @d)))))

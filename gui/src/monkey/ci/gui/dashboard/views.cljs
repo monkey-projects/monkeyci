@@ -21,12 +21,12 @@
 (defn repo-panel []
   (let [r (rf/subscribe [::s/active-repos])]
     [:<>
-     [:h5 "Active Repos"]
+     [:h5.mb-3 "Active Repos"]
      (->> @r
-          (sort-by :repo)
+          (sort-by (comp :repo-name :repo))
           (map (fn [r]
                  [:div.text-nowrap.text-truncate
-                  [:span.me-1 (:repo r)]
+                  [:span.me-1 [:a {:href (r/path-for :page/repo (:repo r))} (get-in r [:repo :repo-name])]]
                   [:span.badge.bg-soft-primary.text-primary (:builds r)]]))
           (into [:div.d-flex.flex-column.gap-1]))]))
 
@@ -34,17 +34,25 @@
   [:div.card.flex-fill.bg-soft-primary-light.text-primary
    [:div.card-body contents]])
 
+(defn- successful-builds-stats []
+  (let [s (rf/subscribe [::s/successful-builds])]
+    [stats-card
+     [:div.text-primary
+      [:h4 (str (int (* 100 @s)) "%")]
+      [:p "successful builds"]
+      [co/progress-bar @s]]]))
+
+(defn- avg-duration-stats []
+  (let [a (rf/subscribe [::s/avg-duration])]
+    [stats-card
+     [:div.text-primary
+      [:h4 (time/format-seconds (/ @a 1000))]
+      [:p "average duration"]]]))
+
 (defn- stats-row []
   [:div.d-flex.gap-4
-   [stats-card
-    [:div.text-primary
-     [:h4 "95%"]
-     [:p "successful builds"]
-     [co/progress-bar 0.95]]]
-   [stats-card
-    [:div.text-primary
-     [:h4 "3m15s"]
-     [:p "average duration"]]]
+   [successful-builds-stats]
+   [avg-duration-stats]
    [stats-card
     [:div.text-primary
      [:h4 "84%"]
@@ -89,7 +97,7 @@
     [:div.d-flex.flex-column.gap-3
      [:h3 "Dashboard"]
      [stats-row]
-     [:div.container-xxl
+     [:div.container-xxl.mx-2
       (->> @r
            (map build-row)
            (into [:<>

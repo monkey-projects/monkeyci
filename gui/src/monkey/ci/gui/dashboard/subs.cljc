@@ -1,5 +1,6 @@
 (ns monkey.ci.gui.dashboard.subs
   (:require [medley.core :as mc]
+            [monkey.ci.common.builds :as cb]
             [monkey.ci.gui.dashboard.db :as db]
             [monkey.ci.gui.loader :as lo]
             [monkey.ci.gui.org.subs]
@@ -28,5 +29,26 @@
    (->> r
         (group-by :repo-id)
         (map (fn [[_ b]]
-               {:repo (:repo-name (first b))
+               {:repo (first b)
                 :builds (count b)})))))
+
+(rf/reg-sub
+ ::successful-builds
+ :<- [::recent-builds]
+ (fn [b _]
+   (if (empty? b)
+     0
+     (let [f (filter cb/finished? b)]
+       (/ (count (filter cb/success? f))
+          (count f))))))
+
+(rf/reg-sub
+ ::avg-duration
+ :<- [::recent-builds]
+ (fn [b _]
+   (if (empty? b)
+     0
+     (let [f (filter cb/finished? b)]
+       (/ (->> (map u/build-elapsed f)
+               (reduce + 0))
+          (count f))))))
