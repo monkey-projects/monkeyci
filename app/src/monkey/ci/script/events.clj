@@ -326,6 +326,7 @@
     ;; Safeguard: treat `nil` states as success, otherwise the job is re-queued
     (when (nil? status)
       (log/warn "Got job/executed event without status, treating it as a success"))
+    ;; TODO Read status from the context, to allow extensions to manipulate it
     [(j/job-end-evt job-id sid (assoc (-> job-ctx :job :result) :status (or status :success)))]))
 
 (defn- script-status

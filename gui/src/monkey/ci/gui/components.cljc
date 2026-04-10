@@ -257,3 +257,9 @@
     (if commit-url
       [ext-link commit-url ref]
       ref)))
+
+(defn progress-bar
+  "Displays a progress bar at given percentage (0-1)"
+  [perc]
+  [:div.progress
+   [:div.progress-bar {:style {:width (str (* 100 perc) "%")}}]])

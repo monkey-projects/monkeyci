@@ -67,7 +67,7 @@
       (= 1 (count s)) (str "0"))))
 
 (defn format-seconds
-  "Formats the given number of seconds in a human readable string `HH:MM:SS`"
+  "Formats the given number of seconds in a human readable string `HHhMMmSSs`"
   [ts]
   (let [h (int (/ ts 3600))
         m (int (/ (mod ts 3600) 60))

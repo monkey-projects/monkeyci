@@ -11,7 +11,8 @@
   (fn [_ _ [_ org-id]]
     [:secure-request
      :get-recent-builds
-     {:org-id org-id}
+     {:org-id org-id
+      :n 10}
      [::load-recent-builds--success]
      [::load-recent-builds--failure]])))
 

@@ -73,7 +73,6 @@
 (defn default
   "Layout for default application pages"
   [subpanel]
-  #_(rf/dispatch [:core/init-user])
   [:<>
    [header]
    [:div.bg-soft-primary-light.flex-fill

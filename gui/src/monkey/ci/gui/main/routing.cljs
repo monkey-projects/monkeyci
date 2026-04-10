@@ -30,6 +30,7 @@
     ["/o/:org-id/r/:repo-id/webhooks" :page/webhooks]
     ["/o/:org-id/r/:repo-id/b/:build-id" :page/build]
     ["/o/:org-id/r/:repo-id/b/:build-id/j/:job-id" :page/job]
+    ["/d/:org-id" :page/dashboard]
     ["/u/:user-id" :page/user]
     ["/email/confirm" {:name :page/confirm-email
                        :public? true}]

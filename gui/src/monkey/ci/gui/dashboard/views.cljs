@@ -1,8 +1,12 @@
 (ns monkey.ci.gui.dashboard.views
-  (:require [monkey.ci.gui.dashboard.events :as e]
+  (:require [monkey.ci.gui.components :as co]
+            [monkey.ci.gui.dashboard.events :as e]
             [monkey.ci.gui.dashboard.subs :as s]
             [monkey.ci.gui.routing :as r]
+            [monkey.ci.gui.org.events]
             [monkey.ci.gui.template :as t]
+            [monkey.ci.gui.time :as time]
+            [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
 
 (defn navbar []
@@ -11,28 +15,101 @@
     [:div.navbar-nav-wrap
      [:div.navbar-brand-wrapper
       [:img {:src (t/assets-url "/img/monkeyci-white.png") :style {:height "50px"}}]
-      [:span.navbar-brand.text-light.fs-4.fw-bold "MonkeyCI"]
-      [:span.ms-4.text-warning.fs-6 "Build your code in style"]]]]])
+      [:span.navbar-brand.text-light.fs-4.fw-bold "Monkey" [:span.text-warning "CI"]]
+      [:span.ms-4.text-light.fs-6 "Build your code in style"]]]]])
 
 (defn repo-panel []
-  [:h5 "Active Repos"])
+  (let [r (rf/subscribe [::s/active-repos])]
+    [:<>
+     [:h5 "Active Repos"]
+     (->> @r
+          (sort-by :repo)
+          (map (fn [r]
+                 [:div.text-nowrap.text-truncate
+                  [:span.me-1 (:repo r)]
+                  [:span.badge.bg-soft-primary.text-primary (:builds r)]]))
+          (into [:div.d-flex.flex-column.gap-1]))]))
+
+(defn- stats-card [contents]
+  [:div.card.flex-fill.bg-soft-primary-light.text-primary
+   [:div.card-body contents]])
+
+(defn- stats-row []
+  [:div.d-flex.gap-4
+   [stats-card
+    [:div.text-primary
+     [:h4 "95%"]
+     [:p "successful builds"]
+     [co/progress-bar 0.95]]]
+   [stats-card
+    [:div.text-primary
+     [:h4 "3m15s"]
+     [:p "average duration"]]]
+   [stats-card
+    [:div.text-primary
+     [:h4 "84%"]
+     [:p "avg. test coverage"]
+     [co/progress-bar 0.84]]]
+   [stats-card
+    [:div.text-primary
+     [:h4 "15"]
+     [:p "failed jobs last 24h"]]]])
+
+(defn- build-row [build]
+  [:div.row.border-bottom.py-1.align-items-baseline
+   [:div.col-4
+    [:a {:href (r/path-for :page/build build)} "#" (:idx build)]
+    [:div.small.text-nowrap.text-truncate (:repo-name build)]]
+   [:div.col-2
+    (time/reformat (:start-time build))]
+   [:div.col-1
+    (some-> (u/build-elapsed build)
+            (/ 1000)
+            (time/format-seconds))]
+   [:div.col-3
+    ;; TODO Calculate progress
+    [co/progress-bar 1]]
+   [:div.col-1
+    [co/build-result (:status build)]]
+   [:div.col-1
+    ;; TODO Action buttons
+    ]])
+
+(defn- build-title-row []
+  [:div.row.border-bottom.my-2.pb-1.fw-bold.border-2.border-dark
+   [:div.col-4 "build / repo"]
+   [:div.col-2 "start time"]
+   [:div.col-1 "elapsed"]
+   [:div.col-3 "progress"]
+   [:div.col-1 "status"]
+   [:div.col-1 "actions"]])
 
 (defn main-panel []
   (let [r (rf/subscribe [::s/recent-builds])]
-    [:<>
+    [:div.d-flex.flex-column.gap-3
      [:h3 "Dashboard"]
-     [:p "There are " (count @r) " builds"]]))
+     [stats-row]
+     [:div.container-xxl
+      (->> @r
+           (map build-row)
+           (into [:<>
+                  [build-title-row]]))]]))
 
 (defn log-panel []
   [:p "Activity log"])
 
 (defn dashboard [route]
-  (rf/dispatch [::e/load-recent-builds (-> route r/path-params :org-id)])
-  (fn [route]
-    [:<>
-     [navbar]
-     [:div.m-2.d-flex.flex-row.gap-3
-      [repo-panel]
-      [:div.flex-grow-1
-       [main-panel]]
-      [log-panel]]]))
+  (let [org-id (-> route r/path-params :org-id)]
+    (rf/dispatch [::e/load-recent-builds org-id])
+    (rf/dispatch [:org/load org-id])
+    (fn [route]
+      [:div.vh-100
+       [navbar]
+       [:div.m-2.gap-3.container-fluid
+        [:div.row.h-100
+         [:div.col-1.border-end
+          [repo-panel]]
+         [:div.col
+          [main-panel]]
+         [:div.col-2.border-start
+          [log-panel]]]]])))
