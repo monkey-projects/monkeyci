@@ -20,7 +20,7 @@
 
 (defn repo-panel []
   (let [r (rf/subscribe [::s/active-repos])]
-    [:<>
+    [:div.d-flex.flex-column.mt-2
      [:h5.mb-3 "Active Repos"]
      (->> @r
           (sort-by (comp :repo-name :repo))
@@ -92,10 +92,12 @@
    [:div.col-1 "status"]
    [:div.col-1 "actions"]])
 
-(defn main-panel []
+(defn main-panel [org-id]
   (let [r (rf/subscribe [::s/recent-builds])]
-    [:div.d-flex.flex-column.gap-3
-     [:h3 "Dashboard"]
+    [:div.d-flex.flex-column.gap-3.mt-2
+     [:div.d-flex
+      [:h3.flex-1 "Dashboard"]
+      [:div.ms-auto [co/reload-btn-sm [::e/load-recent-builds org-id]]]]
      [stats-row]
      [:div.container-xxl.mx-2
       (->> @r
@@ -104,7 +106,7 @@
                   [build-title-row]]))]]))
 
 (defn log-panel []
-  [:p "Activity log"])
+  [:h5.mt-3 "Activity log"])
 
 (defn dashboard [route]
   (let [org-id (-> route r/path-params :org-id)]
@@ -113,11 +115,14 @@
     (fn [route]
       [:div.vh-100
        [navbar]
-       [:div.m-2.gap-3.container-fluid
+       [:div.gap-3.container-fluid
         [:div.row.h-100
-         [:div.col-1.border-end
-          [repo-panel]]
+         [:div.col-2.border-end
+          [:div.d-flex.flex-column.gap-3
+           [repo-panel]
+           [:div.border-top
+            [log-panel]]]]
          [:div.col
-          [main-panel]]
-         [:div.col-2.border-start
+          [main-panel org-id]]
+         #_[:div.col-2.border-start
           [log-panel]]]]])))
