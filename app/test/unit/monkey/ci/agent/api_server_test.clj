@@ -4,10 +4,10 @@
             [monkey.ci.agent.api-server :as sut]
             [monkey.ci.test
              [api-server :as tas]
-             [helpers :as h]]))
+             [storage :as ts]]))
 
 (deftest api-server
-  (let [test-build (h/gen-build)
+  (let [test-build (ts/gen-build)
         token (str (random-uuid))
         builds (atom {token test-build})
         test-config (-> (tas/test-config)

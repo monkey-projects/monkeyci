@@ -1,16 +1,18 @@
 (ns monkey.ci.web.api.mailing-test
-  (:require [clojure.test :refer [deftest testing is]]
+  (:require [clojure.test :refer [deftest is testing]]
             [monkey.ci.storage :as st]
-            [monkey.ci.web.api.mailing :as sut]
             [monkey.ci.test
              [helpers :as h]
-             [runtime :as trt]]))
+             [runtime :as trt]
+             [storage :as ts]
+             [web :as tw]]
+            [monkey.ci.web.api.mailing :as sut]))
 
 (deftest create-mailing
   (let [{st :storage :as rt} (trt/test-runtime)]
     (testing "assigns creation time"
       (let [r (-> rt
-                  (h/->req)
+                  (tw/->req)
                   (assoc-in [:parameters :body] {:subject "test mailing"})
                   (sut/create-mailing))]
         (is (= 201 (:status r)))
@@ -22,14 +24,14 @@
 
 (deftest list-sent-mailings
   (testing "lists sent mailings for mailing"
-    (let [m (h/gen-mailing)
-          s (-> (h/gen-sent-mailing)
+    (let [m (ts/gen-mailing)
+          s (-> (ts/gen-sent-mailing)
                 (assoc :mailing-id (:id m)))
           {st :storage :as rt} (trt/test-runtime)]
       (is (some? (st/save-mailing st m)))
       (is (some? (st/save-sent-mailing st s)))
       (let [r (-> rt
-                  (h/->req)
+                  (tw/->req)
                   (assoc-in [:parameters :path :mailing-id] (:id m))
                   (sut/list-sent-mailings))]
         (is (= 200 (:status r)))
@@ -37,12 +39,12 @@
 
 (deftest create-sent-mailing
   (let [{st :storage :as rt} (trt/test-runtime)
-        m (-> (h/gen-mailing)
+        m (-> (ts/gen-mailing)
               (assoc :subject "Test subject"
                      :text-body "Hi {{EMAIL}}"))]
     (is (some? (st/save-mailing st m)))
     (let [r (-> rt
-                (h/->req)
+                (tw/->req)
                 (assoc :parameters {:path
                                     {:mailing-id (:id m)}
                                     :body
@@ -84,7 +86,7 @@
                    (b "test-dest")))))))))
 
 (deftest list-destinations
-  (h/with-memory-store st
+  (ts/with-memory-store st
     (is (some? (st/save-email-registration st {:id (st/new-id)
                                                :email "test-reg@monkeyci.com"})))
     (is (some? (st/save-user st {:type :test

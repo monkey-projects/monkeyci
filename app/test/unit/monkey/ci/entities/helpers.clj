@@ -5,7 +5,7 @@
             [config.core :as cc]
             [monkey.ci.entities.migrations :as m]
             [monkey.ci.entities.spec :as spec]
-            [monkey.ci.test.helpers :as h]
+            [monkey.ci.test.vault :as v]
             [next.jdbc.connection :as conn])
   (:import (com.zaxxer.hikari HikariDataSource)))
 
@@ -44,7 +44,7 @@
   (with-test-db* f h2-config))
 
 (defn add-vault [conn]
-  (assoc conn :vault (h/dummy-vault)))
+  (assoc conn :vault (v/dummy-vault)))
 
 (defn with-prepared-db* [f]
   (with-test-db*

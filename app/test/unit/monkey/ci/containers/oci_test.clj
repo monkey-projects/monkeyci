@@ -8,6 +8,7 @@
             [medley.core :as mc]
             [monkey.ci
              [cuid :as cuid]
+             [edn :as edn]
              [oci :as oci]
              [utils :as u]]
             [monkey.ci.common.preds :as cp]
@@ -20,7 +21,8 @@
              [spec :as ss]]
             [monkey.ci.test
              [helpers :as h]
-             [runtime :as trt]]))
+             [runtime :as trt]
+             [string :as ts]]))
 
 (defn- find-volume-entry [vol n]
   (->> vol :configs (filter (comp (partial = n) :file-name)) first))
@@ -31,7 +33,7 @@
   (let [b (-> (java.util.Base64/getDecoder)
               (.decode s))]
     (with-open [r (io/reader (java.io.ByteArrayInputStream. b))]
-      (u/parse-edn r))))
+      (edn/edn-> r))))
 
 (defn random-build-sid []
   (repeatedly 3 cuid/random-cuid))
@@ -252,22 +254,22 @@
         (is (= "java" (first cmd))))
 
       (testing "passes config file as arg"
-        (is (h/contains-subseq? cmd
+        (is (ts/contains-subseq? cmd
                                 ["-c" "/home/monkeyci/config/config.edn"])))
       
       (testing "starts sidecar"
-        (is (h/contains-subseq? cmd ["sidecar"])))
+        (is (ts/contains-subseq? cmd ["sidecar"])))
 
       (testing "passes events-file as arg"
-        (is (h/contains-subseq? cmd
+        (is (ts/contains-subseq? cmd
                                 ["--events-file" cc/event-file])))
 
       (testing "passes start-file as arg"
-        (is (h/contains-subseq? cmd
+        (is (ts/contains-subseq? cmd
                                 ["--start-file" cc/start-file])))
 
       (testing "passes abort-file as arg"
-        (is (h/contains-subseq? cmd
+        (is (ts/contains-subseq? cmd
                                 ["--abort-file" cc/abort-file])))
 
       (testing "config volume"

@@ -14,7 +14,7 @@
              [build :as b]
              [errors :as err]]
             [monkey.ci.events.http :as eh]
-            [monkey.ci.web.crypto :as crypto]))
+            [monkey.ci.vault.common :as vc]))
 
 (defn as-edn [req]
   (-> req
@@ -79,8 +79,8 @@
     (when (not-empty p)
       (let [dek (-> (decrypt-key (ctx->api-client ctx) (:dek build))
                     (bcc/b64->bytes))
-            iv (crypto/cuid->iv (:org-id build))]
-        (mc/map-vals (partial crypto/decrypt dek iv) p)))))
+            iv (vc/cuid->iv (:org-id build))]
+        (mc/map-vals (partial vc/decrypt dek iv) p)))))
 
 (defn- fetch-with-extra-params [ctx]
     ;; Augment the fetched params with any additional parameters

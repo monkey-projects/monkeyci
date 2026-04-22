@@ -9,8 +9,10 @@
              [storage :as st]]
             [monkey.ci.test
              [aleph-test :as af]
-             [helpers :as h]
-             [runtime :as trt]]
+             [json :as tj]
+             [runtime :as trt]
+             [storage :as ts]
+             [web :as tw]]
             [monkey.ci.web
              [auth :as auth]
              [github :as sut]
@@ -24,7 +26,7 @@
         _ (st/save-org-credit st {:org-id cid
                                   :amount 1000})
         req (-> rt
-                (h/->req)
+                (tw/->req)
                 (assoc :headers {"x-github-event" "push"}
                        :parameters {:path {:id "test-hook"}
                                     :body
@@ -46,7 +48,7 @@
 
   (testing "ignores non-push events"
     (let [req (-> (trt/test-runtime)
-                  (h/->req)
+                  (tw/->req)
                   (assoc :headers {"x-github-event" "ping"}
                          :parameters {:body 
                                       {:key "value"}}))
@@ -58,7 +60,7 @@
     (let [{st :storage :as rt} (trt/test-runtime)
           _ (st/save-webhook st {:id "test-hook"})
           req (-> rt
-                  (h/->req)
+                  (tw/->req)
                   (assoc :headers {"x-github-event" "push"}
                          :parameters {:path {:id "test-hook"}
                                       :body
@@ -78,7 +80,7 @@
           _ (st/save-org-credit s {:org-id cid
                                    :amount 1000})
           req (-> rt
-                  (h/->req)
+                  (tw/->req)
                   (assoc :headers {"x-github-event" "push"}
                          :parameters {:body
                                       {:repository {:id gid}}}))
@@ -99,7 +101,7 @@
                                        :id "test-repo"
                                        :github-id gid})
           req (-> rt
-                  (h/->req)
+                  (tw/->req)
                   (assoc :headers {"x-github-event" "other"}
                          :parameters {:body
                                       {:repository {:id gid}}}))
@@ -111,7 +113,7 @@
 
   (testing "ignores push events for non-watched repos"
     (let [req (-> (trt/test-runtime)
-                  (h/->req)
+                  (tw/->req)
                   (assoc :headers {"x-github-event" "push"}
                          :parameters {:body
                                       {:repository {:id "unwatched"}}}))
@@ -125,7 +127,7 @@
 
 (deftest create-build
   (testing "file changes"
-    (h/with-memory-store s
+    (ts/with-memory-store s
       (let [b (sut/create-build (-> (trt/test-runtime)
                                     (trt/set-storage s)
                                     (trt/set-encrypter (constantly "encrypted")))
@@ -148,7 +150,7 @@
           (is (= "http://commit-url" (get-in b [:git :commit-url]))))))))
 
 (deftest create-webhook-build
-  (h/with-memory-store s
+  (ts/with-memory-store s
     (let [wh (test-webhook)
           rt (-> (trt/test-runtime)
                  (trt/set-storage s)
@@ -180,7 +182,7 @@
           (is (number? (:start-time r)))))
       
       (testing "`nil` if no configured webhook found"
-        (h/with-memory-store s
+        (ts/with-memory-store s
           (is (nil? (sut/create-webhook-build rt
                                               "test-webhook"
                                               {})))))
@@ -274,12 +276,12 @@
    (af/with-fake-http [{:url "https://github.com/login/oauth/access_token"
                         :request-method :post}
                        {:status 200
-                        :body (h/to-json {:access-token "test-token"})
+                        :body (tj/to-json {:access-token "test-token"})
                         :headers {"Content-Type" "application/json"}}
                        {:url "https://api.github.com/user"
                         :request-method :get}
                        {:status 200
-                        :body (h/to-json u)
+                        :body (tj/to-json u)
                         :headers {"Content-Type" "application/json"}}]
      (f u)))
   ([f]
@@ -291,7 +293,7 @@
   (testing "when exchange fails at github, returns body and 400 status code"
     (af/with-fake-http ["https://github.com/login/oauth/access_token"
                         {:status 401
-                         :body (h/to-json {:message "invalid access code"})
+                         :body (tj/to-json {:message "invalid access code"})
                          :headers {"Content-Type" "application/json"}}]
       (is (= 400 (-> {:parameters
                       {:query
@@ -305,7 +307,7 @@
         (let [kp (auth/generate-keypair)
               req (-> (trt/test-runtime)
                       (assoc :jwk {:priv (.getPrivate kp)})
-                      (h/->req)
+                      (tw/->req)
                       (assoc :parameters
                              {:query
                               {:code "test-code"}}))
@@ -326,7 +328,7 @@
                                   :type-id (:id u)
                                   :orgs ["test-org"]})
               req (-> rt
-                      (h/->req)
+                      (tw/->req)
                       (assoc :parameters
                              {:query
                               {:code "test-code"}}))]
@@ -341,7 +343,7 @@
       (fn [u]
         (let [{st :storage :as rt} (trt/test-runtime)
               req (-> rt
-                      (h/->req)
+                      (tw/->req)
                       (assoc :parameters
                              {:query
                               {:code "test-code"}}))]
@@ -359,7 +361,7 @@
         (let [{st :storage :as rt} (trt/test-runtime)
               pubkey (auth/rt->pub-key rt)
               req (-> rt
-                      (h/->req)
+                      (tw/->req)
                       (assoc :parameters
                              {:query
                               {:code "test-code"}}))
@@ -381,7 +383,7 @@
       (fn [u]
         (let [{st :storage :as rt} (trt/test-runtime)
               req (-> rt
-                      (h/->req)
+                      (tw/->req)
                       (assoc :parameters
                              {:query
                               {:code "test-code"}}))
@@ -401,8 +403,8 @@
               :org-id org-id
               :github-id 1234245}
         r (-> rt
-              (h/->req)
-              (h/with-body repo)
+              (tw/->req)
+              (tw/with-body repo)
               (sut/watch-repo))]
 
     (is (= 200 (:status r)))
@@ -421,7 +423,7 @@
 (deftest unwatch-repo
   (testing "404 when repo not found"
     (is (= 404 (-> (trt/test-runtime)
-                   (h/->req)
+                   (tw/->req)
                    (assoc :parameters {:path {:org-id "test-org"
                                               :repo-id "test-repo"}})
                    (sut/unwatch-repo)
@@ -432,7 +434,7 @@
           [org-id repo-id github-id :as sid] (repeatedly 3 st/new-id)
           _ (st/watch-github-repo st (zipmap [:org-id :id :github-id] sid))
           req (-> rt
-                  (h/->req)
+                  (tw/->req)
                   (assoc :parameters {:path {:org-id org-id
                                              :repo-id repo-id}}))
           resp (sut/unwatch-repo req)]

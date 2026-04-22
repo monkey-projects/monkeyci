@@ -4,7 +4,8 @@
             [monkey.ci.build :as b]
             [monkey.ci.build.core :as bc]
             [monkey.ci.script.core :as sut]
-            [monkey.ci.test.helpers :as h]))
+            [monkey.ci.test.helpers :as h]
+            [monkey.ci.test.json :as tj]))
 
 (defn dummy-job
   ([r]
@@ -61,8 +62,8 @@
       (let [sd (fs/file (fs/create-dir (fs/path dir "json")))
             build (b/set-script-dir {} sd)]
         (is (nil? (spit (fs/file (fs/path sd "build.json"))
-                        (h/to-json [{:id "json-job"
-                                     :image "test-img"}]))))
+                        (tj/to-json [{:id "json-job"
+                                      :image "test-img"}]))))
         (let [loaded (sut/load-jobs build {})]
           (is (= 1 (count loaded)))
           (is (= "json-job" (-> loaded first bc/job-id))))))

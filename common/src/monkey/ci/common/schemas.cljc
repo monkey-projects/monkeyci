@@ -15,6 +15,10 @@
   {:name Name
    :value not-empty-str})
 
+(s/defschema ParameterValue
+  {:name s/Str
+   :value s/Str})
+
 (s/defschema NewRepo
   {:org-id Id
    :name s/Str

@@ -22,7 +22,8 @@
              [aleph-test :as at]
              [config :as tc]
              [helpers :as h]
-             [mailman :as tm]]
+             [mailman :as tm]
+             [vault :as tv]]
             [monkey.ci.web
              [crypto :as wc]
              [http :as wh]]))

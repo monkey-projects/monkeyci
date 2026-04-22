@@ -2,21 +2,22 @@
   (:require [clojure.test :refer [deftest is testing]]
             [monkey.ci.storage :as st]
             [monkey.ci.test
-             [helpers :as h]
-             [runtime :as trt]]
+             [runtime :as trt]
+             [storage :as ts]
+             [web :as tw]]
             [monkey.ci.web.api.ssh-keys :as sut]))
 
 (deftest get-org-ssh-keys
   (testing "decrypts private key using vault"
     (let [{st :storage :as rt} (-> (trt/test-runtime)
                                    (trt/set-decrypter (constantly "decrypted")))
-          org (h/gen-org)
+          org (ts/gen-org)
           org-id (:id org)
           _ (st/save-org st org)
-          ssh-key (h/gen-ssh-key)
+          ssh-key (ts/gen-ssh-key)
           _ (st/save-ssh-keys st org-id [ssh-key])
           res (-> rt
-                  (h/->req)
+                  (tw/->req)
                   (assoc-in [:parameters :path :org-id] org-id)
                   (sut/get-org-ssh-keys))]
       (is (= 200 (:status res)))
@@ -29,16 +30,16 @@
   (testing "decrypts private key using vault"
     (let [{st :storage :as rt} (-> (trt/test-runtime)
                                    (trt/set-decrypter (constantly "decrypted")))
-          repo (h/gen-repo)
-          org (-> (h/gen-org)
+          repo (ts/gen-repo)
+          org (-> (ts/gen-org)
                   (assoc :repos {(:id repo) repo}))
           org-id (:id org)
           _ (st/save-org st org)
-          ssh-key (-> (h/gen-ssh-key)
+          ssh-key (-> (ts/gen-ssh-key)
                       (dissoc :label-filters))
           _ (st/save-ssh-keys st org-id [ssh-key])
           res (-> rt
-                  (h/->req)
+                  (tw/->req)
                   (assoc-in [:parameters :path] {:org-id org-id
                                                  :repo-id (:id repo)})
                   (sut/get-repo-ssh-keys))]
@@ -52,11 +53,11 @@
     (let [{st :storage :as rt} (-> (trt/test-runtime)
                                    (trt/set-encrypter (fn [_ _ cuid]
                                                         (str "encrypted with " cuid))))
-          org (h/gen-org)
+          org (ts/gen-org)
           org-id (:id org)
           _ (st/save-org st org)
           res (-> rt
-                  (h/->req)
+                  (tw/->req)
                   (assoc
                    :parameters
                    {:path

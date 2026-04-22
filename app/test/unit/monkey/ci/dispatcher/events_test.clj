@@ -8,14 +8,14 @@
              [build :as b]
              [cuid :as cuid]
              [storage :as st]]
-            [monkey.ci.test.helpers :as h]
+            [monkey.ci.test.storage :as ts]
             [monkey.mailman.core :as mmc]))
 
 (defn- gen-build []
   (zipmap st/build-sid-keys (repeatedly cuid/random-cuid)))
 
 (deftest make-routes
-  (h/with-memory-store st
+  (ts/with-memory-store st
     (let [evts [:container/job-queued :build/queued :job/end :build/end]
           r (sut/make-routes (atom {}) st)]
       (doseq [e evts]
@@ -195,7 +195,7 @@
                 "oci runner should have additional resources"))
 
           (testing "dispatches next task in queue"
-            (let [build (h/gen-build)
+            (let [build (ts/gen-build)
                   task (sut/build->task build)
                   sid (repeatedly 3 cuid/random-cuid)
                   job-id (cuid/random-cuid)]
@@ -372,7 +372,7 @@
                     (sut/get-state-assignment ::test-id)))))))
 
 (deftest delete-queued
-  (h/with-memory-store st
+  (ts/with-memory-store st
     (let [{:keys [leave] :as i} sut/delete-queued]
       (is (keyword? (:name i)))
 

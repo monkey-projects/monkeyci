@@ -16,6 +16,7 @@
              [promtail :as pt]]
             [monkey.ci.events.builders :as eb]
             [monkey.ci.events.mailman.interceptors :as emi]
+            [monkey.ci.sidecar.config :as sc]
             [monkey.oci.container-instance.core :as ci]))
 
 ;; TODO Get this information from the OCI shapes endpoint
@@ -60,10 +61,35 @@
                                  "MONKEYCI_ABORT_FILE" c/abort-file
                                  "MONKEYCI_EVENT_FILE" c/event-file})))))
 
+(def sidecar-cmd
+  "Sidecar command list"
+  (mcc/make-cmd
+   "-c" (str c/config-dir "/" c/config-file)
+   "internal"
+   "sidecar"
+   ;; TODO Move this to config file
+   "--events-file" c/event-file
+   "--start-file" c/start-file
+   "--abort-file" c/abort-file))
+
+(defn make-sidecar-config
+  "Creates a configuration map using the runtime, that can then be passed on to the
+   sidecar container."
+  [{:keys [sid job] :as conf}]
+  (-> {}
+      (sc/set-sid sid)
+      (sc/set-job (-> job
+                      (select-keys [:id :save-artifacts :restore-artifacts :caches :dependencies])
+                      (assoc :work-dir (c/job-work-dir job))))
+      (sc/set-events-file c/event-file)
+      (sc/set-start-file c/start-file)
+      (sc/set-abort-file c/abort-file)
+      (sc/set-api (:api conf))))
+
 (defn- sidecar-container [{[c] :containers}]
   (assoc c
          :display-name c/sidecar-container-name
-         :command c/sidecar-cmd
+         :command sidecar-cmd
          ;; Run as root, because otherwise we can't write to the shared volumes
          :security-context {:security-context-type "LINUX"
                             :run-as-user 0}))
@@ -139,7 +165,7 @@
                    (into [(job-script-entry)]))}))
 
 (defn- rt->edn [conf]
-  (edn/->edn (c/make-sidecar-config conf)))
+  (edn/->edn (make-sidecar-config conf)))
 
 (defn- config-vol-config
   "Configuration files for the sidecar (e.g. logging)"

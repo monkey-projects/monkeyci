@@ -12,7 +12,8 @@
             [monkey.ci.protocols :as p]
             [monkey.ci.test
              [helpers :as h]
-             [mailman :as tm]]))
+             [mailman :as tm]
+             [storage :as ts]]))
 
 (deftest start-and-post
   (h/with-tmp-dir dir
@@ -20,7 +21,7 @@
           evt {:type :test}
           r (-> {:mailman broker}
                 (lc/set-work-dir dir)
-                (lc/set-build (h/gen-build))
+                (lc/set-build (ts/gen-build))
                 (lc/set-quiet true)
                 (sut/start-and-post evt))]
       (testing "returns deferred"

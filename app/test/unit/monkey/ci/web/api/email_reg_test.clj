@@ -4,8 +4,9 @@
             [monkey.ci.events.spec :as es]
             [monkey.ci.storage :as st]
             [monkey.ci.test
-             [helpers :as h]
-             [runtime :as trt]]
+             [runtime :as trt]
+             [storage :as ts]
+             [web :as tw]]
             [monkey.ci.web.api.email-reg :as sut]
             [monkey.ci.web.response :as wr]))
 
@@ -20,8 +21,8 @@
   (let [{st :storage :as rt} (trt/test-runtime)
         email "duplicate@monkeyci.com"
         req (-> rt
-                (h/->req)
-                (h/with-body {:email email}))
+                (tw/->req)
+                (tw/with-body {:email email}))
         r (sut/create-email-registration req)]
     (testing "sets creation time"
       (is (= 201 (:status r)))
@@ -43,9 +44,9 @@
 (deftest unregister-email
   (let [{st :storage :as rt} (trt/test-runtime)]
     (testing "with `id` deletes email registration by id"
-      (let [reg (h/gen-email-registration)]
+      (let [reg (ts/gen-email-registration)]
         (is (some? (st/save-email-registration st reg)))
-        (is (= 200 (-> (h/->req rt)
+        (is (= 200 (-> (tw/->req rt)
                        (assoc-in [:parameters :query :id] (:id reg))
                        (sut/unregister-email)
                        :status)))
@@ -53,10 +54,10 @@
     
     (testing "with `email` deletes email registration by email"
       (let [email "test@monkeyci.com"
-            reg (-> (h/gen-email-registration)
+            reg (-> (ts/gen-email-registration)
                     (assoc :email email))]
         (is (some? (st/save-email-registration st reg)))
-        (is (= 200 (-> (h/->req rt)
+        (is (= 200 (-> (tw/->req rt)
                        (assoc-in [:parameters :query :email] email)
                        (sut/unregister-email)
                        :status)))
@@ -64,10 +65,10 @@
     
     (testing "with `email` of user, updates user settings"
       (let [email "testuser@monkeyci.com"
-            u (-> (h/gen-user)
+            u (-> (ts/gen-user)
                   (assoc :email email))]
         (is (some? (st/save-user st u)))
-        (is (= 200 (-> (h/->req rt)
+        (is (= 200 (-> (tw/->req rt)
                        (assoc-in [:parameters :query :email] email)
                        (sut/unregister-email)
                        :status)))
@@ -75,9 +76,9 @@
                         :receive-mailing)))))
     
     (testing "with `user-id`, updates user settings"
-      (let [u (h/gen-user)]
+      (let [u (ts/gen-user)]
         (is (some? (st/save-user st u)))
-        (is (= 200 (-> (h/->req rt)
+        (is (= 200 (-> (tw/->req rt)
                        (assoc-in [:parameters :query :user-id] (:id u))
                        (sut/unregister-email)
                        :status)))
@@ -86,28 +87,28 @@
 
     (testing "returns status `204` when no matches found"
       (is (= 204
-             (-> (h/->req rt)
+             (-> (tw/->req rt)
                  (assoc-in [:parameters :query :id] "nonexisting")
                  (sut/unregister-email)
                  :status))))
 
     (testing "returns status `204` when query params"
       (is (= 204
-             (-> (h/->req rt)
+             (-> (tw/->req rt)
                  (sut/unregister-email)
                  :status))))))
 
 (deftest confirm-email
   (let [{st :storage :as rt} (trt/test-runtime)
-        reg (-> (h/gen-email-registration)
+        reg (-> (ts/gen-email-registration)
                 (assoc :confirmed false))
-        c (-> (h/gen-email-confirmation)
+        c (-> (ts/gen-email-confirmation)
               (assoc :email-reg-id (:id reg)))]
     (is (some? (st/save-email-registration st reg)))
     (is (some? (st/save-email-confirmation st c)))
     
     (testing "400 if invalid code"
-      (is (= 400 (-> (h/->req rt)
+      (is (= 400 (-> (tw/->req rt)
                      (assoc :parameters
                             {:body
                              {:id (:id reg)
@@ -118,7 +119,7 @@
     (testing "400 if confirmation expired")
 
     (testing "when valid code"
-      (let [r (-> (h/->req rt)
+      (let [r (-> (tw/->req rt)
                   (assoc :parameters
                          {:body
                           {:id (:id reg)
@@ -137,7 +138,7 @@
                          :confirmed))))))
 
     (testing "204 if already confirmed"
-      (is (= 204 (-> (h/->req rt)
+      (is (= 204 (-> (tw/->req rt)
                      (assoc :parameters
                             {:body
                              {:id (:id reg)
@@ -146,7 +147,7 @@
                      :status))))
 
     (testing "404 if no email registration found"
-      (is (= 404 (-> (h/->req rt)
+      (is (= 404 (-> (tw/->req rt)
                      (assoc :parameters
                             {:body
                              {:id "invalid"

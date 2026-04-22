@@ -2,15 +2,16 @@
   (:require [clojure.test :refer [deftest is testing]]
             [monkey.ci.storage :as st]
             [monkey.ci.test
-             [helpers :as h]
-             [runtime :as trt]]
+             [runtime :as trt]
+             [storage :as ts]
+             [web :as tw]]
             [monkey.ci.web.api.params :as sut]))
 
 (deftest get-org-params
   (testing "empty vector if no params"
     (is (= [] (-> (trt/test-runtime)
-                  (h/->req)
-                  (h/with-path-params {:org-id (st/new-id)})
+                  (tw/->req)
+                  (tw/with-path-params {:org-id (st/new-id)})
                   (sut/get-org-params)
                   :body))))
 
@@ -25,8 +26,8 @@
           _ (st/save-params st org-id params)]
       (is (= "decrypted"
              (-> rt
-                 (h/->req)
-                 (h/with-path-params {:org-id org-id})
+                 (tw/->req)
+                 (tw/with-path-params {:org-id org-id})
                  (sut/get-org-params)
                  :body
                  first
@@ -47,8 +48,8 @@
 
     (testing "empty list if no params"
       (is (= [] (-> rt
-                    (h/->req)
-                    (h/with-path-params {:org-id org-id
+                    (tw/->req)
+                    (tw/with-path-params {:org-id org-id
                                          :repo-id repo-id})
                     (sut/get-repo-params)
                     :body))))
@@ -62,8 +63,8 @@
 
         (is (= [{:name "test-param" :value "test-value"}]
                (-> rt
-                   (h/->req)
-                   (h/with-path-params {:org-id org-id
+                   (tw/->req)
+                   (tw/with-path-params {:org-id org-id
                                         :repo-id repo-id})
                    (sut/get-repo-params)
                    :body)))))
@@ -95,15 +96,15 @@
         (is (= [{:name "param-1" :value "value-1"}
                 {:name "param-2" :value "value-2"}]
                (-> rt
-                   (h/->req)
-                   (h/with-path-params {:org-id org-id
+                   (tw/->req)
+                   (tw/with-path-params {:org-id org-id
                                         :repo-id repo-id})
                    (sut/get-repo-params)
                    :body)))))
 
     (testing "decrypts parameters"
-      (let [repo (h/gen-repo)
-            org (-> (h/gen-org)
+      (let [repo (ts/gen-repo)
+            org (-> (ts/gen-org)
                     (assoc :repos {(:id repo) repo}))
             org-id (:id org)
             param {:parameters
@@ -115,8 +116,8 @@
                     (trt/set-decrypter (fn [_ _ cuid]
                                          (when (= cuid params-id)
                                            "decrypted")))
-                    (h/->req)
-                    (h/with-path-params {:org-id org-id
+                    (tw/->req)
+                    (tw/with-path-params {:org-id org-id
                                          :repo-id (:id repo)})
                     (sut/get-repo-params))]
         (is (= [{:name "test-param"
@@ -126,8 +127,8 @@
     (testing "returns `404 not found` if repo does not exist"
       (is (= 404
              (-> rt
-                 (h/->req)
-                 (h/with-path-params {:org-id org-id
+                 (tw/->req)
+                 (tw/with-path-params {:org-id org-id
                                       :repo-id "other-repo"})
                  (sut/get-repo-params)
                  :status))))))
@@ -143,7 +144,7 @@
                     :value "test-val"}]}
           _ (st/save-params st org-id [params])
           req (-> rt
-                  (h/->req)
+                  (tw/->req)
                   (assoc :parameters
                          {:path
                           {:org-id org-id
@@ -162,7 +163,7 @@
                                                       (str "encrypted with " cuid))))
         
         req (-> rt
-                (h/->req)
+                (tw/->req)
                 (assoc :parameters
                        {:path
                         {:org-id org-id}
@@ -197,7 +198,7 @@
                                                         (when (= id cuid)
                                                           (str "encrypted with " cuid)))))
           req (-> rt
-                  (h/->req)
+                  (tw/->req)
                   (assoc :parameters
                          {:path
                           {:org-id org-id}
@@ -233,7 +234,7 @@
                                                         (when (some? cuid)
                                                           (str "encrypted with " cuid)))))
           req (-> rt
-                  (h/->req)
+                  (tw/->req)
                   (assoc :parameters
                          {:path
                           {:org-id org-id}

@@ -8,8 +8,10 @@
              [vault :as v]]
             [monkey.ci.test
              [aleph-test :as at]
-             [helpers :as h]
-             [runtime :as trt]]
+             [json :as tj]
+             [runtime :as trt]
+             [storage :as ts]
+             [web :as tw]]
             [monkey.ci.web
              [auth :as auth]
              [bitbucket :as sut]
@@ -29,16 +31,16 @@
     (let [user-id (str (random-uuid))]
       (at/with-fake-http ["https://bitbucket.org/site/oauth2/access_token"
                           {:status 200
-                           :body (h/to-json {:access-token "test-token"})
+                           :body (tj/to-json {:access-token "test-token"})
                            :headers {"Content-Type" "application/json"}}
                           "https://api.bitbucket.org/2.0/user"
                           {:status 200
-                           :body (h/to-json {:uuid user-id})
+                           :body (tj/to-json {:uuid user-id})
                            :headers {"Content-Type" "application/json"}}]
         (let [kp (auth/generate-keypair)
               req (-> (trt/test-runtime)
                       (assoc :jwk {:priv (.getPrivate kp)})
-                      (h/->req)
+                      (tw/->req)
                       (assoc :parameters
                              {:query
                               {:code "test-code"}}))
@@ -58,19 +60,19 @@
                           (fn [req]
                             (if (not= "old-refresh-token" (get-in req [:form-params :refresh_token]))
                               {:status 400
-                               :body (h/to-json {:message "Expected refresh token"})
+                               :body (tj/to-json {:message "Expected refresh token"})
                                :headers {"Content-Type" "application/json"}}
                               {:status 200
-                               :body (h/to-json {:access-token "test-token"})
+                               :body (tj/to-json {:access-token "test-token"})
                                :headers {"Content-Type" "application/json"}}))
                           "https://api.bitbucket.org/2.0/user"
                           {:status 200
-                           :body (h/to-json {:uuid user-id})
+                           :body (tj/to-json {:uuid user-id})
                            :headers {"Content-Type" "application/json"}}]
         (let [kp (auth/generate-keypair)
               req (-> (trt/test-runtime)
                       (assoc :jwk {:priv (.getPrivate kp)})
-                      (h/->req)
+                      (tw/->req)
                       (assoc :parameters
                              {:body
                               {:refresh-token "old-refresh-token"}}))
@@ -84,8 +86,8 @@
             (is (= (str "bitbucket/" user-id) (:sub u)))))))))
 
 (deftest watch-repo
-  (h/with-memory-store st
-    (let [org (h/gen-org)
+  (ts/with-memory-store st
+    (let [org (ts/gen-org)
           ws "test-workspace"
           slug "test-bb-repo"
           bb-uuid (str (random-uuid))
@@ -96,17 +98,17 @@
                           (fn [req]
                             (if (some? (get-in req [:headers "Authorization"]))
                               (do
-                                (swap! bb-requests conj (h/parse-json (:body req)))
+                                (swap! bb-requests conj (tj/parse-json (:body req)))
                                 {:status 201
                                  :headers {"Content-Type" "application/json"}
-                                 :body (h/to-json {:uuid bb-uuid})})
+                                 :body (tj/to-json {:uuid bb-uuid})})
                               {:status 401}))]
         (is (some? (st/save-org st org)))
         (let [r (-> {:storage st
                      :config
                      {:api
                       {:ext-url "http://api.monkeyci.test"}}}
-                    (h/->req)
+                    (tw/->req)
                     (assoc :uri "/org/test-org"
                            :scheme :http
                            :headers {"host" "localhost"}
@@ -153,7 +155,7 @@
 
     (testing "404 if org not found"
       (is (= 404 (-> {:storage st}
-                     (h/->req)
+                     (tw/->req)
                      (assoc-in [:parameters :path :org-id] "invalid-org")
                      (assoc :scheme :http
                             :headers {"host" "localhost"}
@@ -162,12 +164,12 @@
                      :status))))))
 
 (deftest unwatch-repo
-  (h/with-memory-store st
+  (ts/with-memory-store st
     (let [ws "test-workspace"
           repo-slug "test-repo"
           wh-uuid (str (random-uuid))
-          repo (h/gen-repo)
-          org (-> (h/gen-org)
+          repo (ts/gen-repo)
+          org (-> (ts/gen-org)
                   (assoc :repos {(:id repo) repo}))
           wh {:org-id (:id org)
               :repo-id (:id repo)
@@ -191,7 +193,7 @@
                             {:status 204
                              :headers {"Content-Type" "application/json"}})]
         (is (= 200 (-> {:storage st}
-                       (h/->req)
+                       (tw/->req)
                        (assoc :parameters
                               {:path
                                {:org-id (:id org)
@@ -207,7 +209,7 @@
 
       (testing "404 when repo not found"
         (is (= 404 (-> {:storage st}
-                       (h/->req)
+                       (tw/->req)
                        (sut/unwatch-repo)
                        :status)))))))
 
@@ -220,9 +222,9 @@
         vault (v/make-fixed-key-vault {})
         rt (-> rt
                (trt/set-vault vault))
-        repo (-> (h/gen-repo)
+        repo (-> (ts/gen-repo)
                  (assoc :url "http://test-url"))
-        org (-> (h/gen-org)
+        org (-> (ts/gen-org)
                 (assoc :repos {(:id repo) repo}))
         _ (st/save-org s org)
         wh {:id (cuid/random-cuid)
@@ -232,7 +234,7 @@
         _ (st/save-org-credit s {:org-id (:id org)
                                  :amount 1000})
         req (-> rt
-                (h/->req)
+                (tw/->req)
                 (assoc :headers {"x-event-key" "repo:push"}
                        :parameters
                        {:path
@@ -289,7 +291,7 @@
     
     (testing "404 if webhook does not exist"
       (is (= 404 (-> rt
-                     (h/->req)
+                     (tw/->req)
                      (assoc :headers {"x-event-key" "repo:push"}
                             :parameters
                             {:path
@@ -299,7 +301,7 @@
 
     (testing "ignoring non-push events"
       (is (= 200 (-> rt
-                     (h/->req)
+                     (tw/->req)
                      (assoc :headers {"x-event-key" "some:other"})
                      (sut/webhook)
                      :status))))))

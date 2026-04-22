@@ -4,14 +4,15 @@
              [storage :as st]
              [time :as t]]
             [monkey.ci.test
-             [helpers :as h]
-             [runtime :as trt]]
+             [storage :as ts]
+             [runtime :as trt]
+             [web :as tw]]
             [monkey.ci.web.api.plan :as sut]))
 
 (deftest create-plan
   (let [{st :storage :as rt} (trt/test-runtime)
-        org (h/gen-org)
-        old-sub (-> (h/gen-credit-subs)
+        org (ts/gen-org)
+        old-sub (-> (ts/gen-credit-subs)
                     (assoc :org-id (:id org) :valid-from 0)
                     (dissoc :valid-until))
         old-plan {:org-id (:id org)
@@ -22,7 +23,7 @@
     (is (some? (st/save-credit-subscription st old-sub)))
     (is (some? (st/save-org-plan st old-plan)))
     
-    (let [r (-> (h/->req rt)
+    (let [r (-> (tw/->req rt)
                 (assoc :parameters
                        {:path {:org-id (:id org)}
                         :body {:type :starter
@@ -50,7 +51,7 @@
                           :valid-until))))))
 
     (testing "sets plan defaults"
-      (let [r (-> (h/->req rt)
+      (let [r (-> (tw/->req rt)
                   (assoc :parameters
                          {:path {:org-id (:id org)}
                           :body {:type :starter
@@ -63,12 +64,12 @@
 
 (deftest get-current
   (let [{st :storage :as rt} (trt/test-runtime)
-        org (h/gen-org)]
+        org (ts/gen-org)]
     (is (some? (st/save-org st org)))
     
     (testing "`204 no content` if no plans"
       (is (= 204
-             (-> (h/->req rt)
+             (-> (tw/->req rt)
                  (assoc-in [:parameters :path :org-id] (:id org))
                  (sut/get-current)
                  :status))))
@@ -83,7 +84,7 @@
       
       (testing "`204 no content` if no current plan"
         (is (= 204
-               (-> (h/->req rt)
+               (-> (tw/->req rt)
                    (assoc-in [:parameters :path :org-id] (:id org))
                    (sut/get-current)
                    :status))))
@@ -96,7 +97,7 @@
                      :valid-from (- (t/now) (t/hours->millis 4))}]
           (is (some? (st/save-org-plan st valid)))
           
-          (let [r (-> (h/->req rt)
+          (let [r (-> (tw/->req rt)
                       (assoc-in [:parameters :path :org-id] (:id org))
                       (sut/get-current))]
             (is (= 200 (:status r)))
@@ -105,7 +106,7 @@
 (deftest org-history
   (testing "returns all plans for org"
     (let [{st :storage :as rt} (trt/test-runtime)
-          org (h/gen-org)]
+          org (ts/gen-org)]
       (is (some? (st/save-org st org)))
       (is (some? (st/save-org-plan st {:org-id (:id org)
                                        :id (st/new-id)
@@ -116,7 +117,7 @@
                                        :type :startup
                                        :valid-from 200})))
     
-      (let [r (-> (h/->req rt)
+      (let [r (-> (tw/->req rt)
                   (assoc-in [:parameters :path :org-id] (:id org))
                   (sut/org-history))]
         (is (= 200 (:status r)))
@@ -124,8 +125,8 @@
 
 (deftest cancel-plan
   (let [{st :storage :as rt} (trt/test-runtime)
-        org (h/gen-org)
-        sub (-> (h/gen-credit-subs)
+        org (ts/gen-org)
+        sub (-> (ts/gen-credit-subs)
                 (assoc :org-id (:id org)))
         plan {:org-id (:id org)
               :id (st/new-id)
@@ -136,7 +137,7 @@
     (is (some? (st/save-org st org)))
     (is (some? (st/save-credit-subscription st sub)))
     (is (some? (st/save-org-plan st plan)))
-    (let [r (-> (h/->req rt)
+    (let [r (-> (tw/->req rt)
                 (assoc :parameters
                        {:path {:org-id (:id org)}
                         :body {:when at}})

@@ -6,19 +6,22 @@
              [stream :as ms]]
             [monkey.ci
              [cuid :as cuid]
+             [edn :as edn]
              [storage :as st]
              [utils :as u]]
             [monkey.ci.events.spec :as es]
             [monkey.ci.test
              [helpers :as h]
-             [runtime :as trt]]
+             [runtime :as trt]
+             [storage :as ts]
+             [web :as tw]]
             [monkey.ci.web
              [api :as sut]
              [response :as r]]))
 
 (defn- parse-edn [s]
   (with-open [r (java.io.StringReader. s)]
-    (u/parse-edn r)))
+    (edn/edn-> r)))
 
 (defn- parse-event [evt]
   (let [prefix "data: "]
@@ -29,8 +32,8 @@
 (deftest create-webhook
   (let [{st :storage :as rt} (trt/test-runtime)
         r (-> rt
-              (h/->req)
-              (h/with-body {:org-id "test-org"})
+              (tw/->req)
+              (tw/with-body {:org-id "test-org"})
               (sut/create-webhook))]
     (is (= 201 (:status r)))
 
@@ -47,8 +50,8 @@
               :secret-key "very secret key"}
           _ (st/save-webhook st wh)
           r (-> rt
-                (h/->req)
-                (h/with-path-param :webhook-id (:id wh))
+                (tw/->req)
+                (tw/with-path-param :webhook-id (:id wh))
                 (sut/get-webhook))]
       (is (= 200 (:status r)))
       (is (nil? (get-in r [:body :secret-key]))))))
@@ -67,8 +70,8 @@
           _ (create-build 200)
           _ (create-build 100)
           r (-> rt
-                (h/->req)
-                (h/with-path-params md)
+                (tw/->req)
+                (tw/with-path-params md)
                 (sut/get-latest-build))]
       (is (= "build-200" (-> r :body :build-id))))))
 
@@ -83,8 +86,8 @@
           sid (st/ext-build-sid build)
           _ (st/save-build st build)
           r (-> rt
-                (h/->req)
-                (h/with-path-params build)
+                (tw/->req)
+                (tw/with-path-params build)
                 (sut/get-build))]
       (is (= 200 (:status r)))
       (is (= build (:body r))))))
@@ -171,13 +174,13 @@
 
 (deftest event-stream
   (testing "returns stream reply"
-    (is (ms/source? (-> (sut/event-stream (h/->req {:update-bus (mb/event-bus)}))
+    (is (ms/source? (-> (sut/event-stream (tw/->req {:update-bus (mb/event-bus)}))
                         :body))))
 
   (testing "sends ping on open"
     (let [sent (atom [])
           bus (mb/event-bus)
-          f (sut/event-stream (h/->req {:update-bus bus}))
+          f (sut/event-stream (tw/->req {:update-bus bus}))
           _ (ms/consume (partial swap! sent conj) (:body f))
           evt {:type :build/updated}]
       (is (true? (publish bus evt)))
@@ -193,7 +196,7 @@
     (let [sent (atom [])
           cid "test-org"
           bus (mb/event-bus)
-          f (-> (h/->req {:update-bus bus})
+          f (-> (tw/->req {:update-bus bus})
                 (assoc-in [:parameters :path :org-id] cid)
                 (sut/event-stream))
           _ (ms/consume (fn [evt]
@@ -211,7 +214,7 @@
                               1000)))))
 
   (testing "sets `x-accel-buffering` header for nginx proxying"
-    (let [r (-> (h/->req {:update-bus (mb/event-bus)})
+    (let [r (-> (tw/->req {:update-bus (mb/event-bus)})
                 (sut/event-stream))]
       (is (= "no" (get-in r [:headers "x-accel-buffering"]))))))
 
@@ -219,7 +222,7 @@
   (testing "adds ref to build from branch query param"
     (is (= "refs/heads/test-branch"
            (-> (trt/test-runtime)
-               (h/->req)
+               (tw/->req)
                (assoc-in [:parameters :query :branch] "test-branch")
                (sut/make-build-ctx {})
                :git
@@ -228,7 +231,7 @@
   (testing "adds ref to build from tag query param"
     (is (= "refs/tags/test-tag"
            (-> (trt/test-runtime)
-               (h/->req)
+               (tw/->req)
                (assoc-in [:parameters :query :tag] "test-tag")
                (sut/make-build-ctx {})
                :git
@@ -237,7 +240,7 @@
   (testing "adds tag to build"
     (is (= "test-tag"
            (-> (trt/test-runtime)
-               (h/->req)
+               (tw/->req)
                (assoc-in [:parameters :query :tag] "test-tag")
                (sut/make-build-ctx {})
                :git
@@ -256,7 +259,7 @@
                                     :repos {rid repo}})))
       (is (st/sid? (st/save-ssh-keys st cid [ssh-key])))
       (is (= ["public-key"]
-             (-> (h/->req rt)
+             (-> (tw/->req rt)
                  (assoc-in [:parameters :path] {:org-id cid
                                                 :repo-id rid})
                  (sut/make-build-ctx repo)
@@ -267,7 +270,7 @@
   (testing "adds main branch from repo"
     (is (= "test-branch"
            (-> (trt/test-runtime)
-               (h/->req)
+               (tw/->req)
                (sut/make-build-ctx {:main-branch "test-branch"})
                :git
                :main-branch))))
@@ -275,7 +278,7 @@
   (testing "when no branch or tag specified, uses default branch"
     (is (= "refs/heads/main"
            (-> (trt/test-runtime)
-               (h/->req)
+               (tw/->req)
                (sut/make-build-ctx {:main-branch "main"})
                :git
                :ref))))
@@ -283,14 +286,14 @@
   (testing "marks `:api` source"
     (is (= :api
            (-> (trt/test-runtime)
-               (h/->req)
+               (tw/->req)
                (sut/make-build-ctx {:main-branch "main"})
                :source))))
 
   (testing "params"
     (testing "are added from body and encrypted"
       (let [p (-> (trt/test-runtime)
-                  (h/->req)
+                  (tw/->req)
                   (assoc-in [:parameters :body :params] {"key" "value"})
                   (assoc-in [:parameters :path :org-id] (cuid/random-cuid))
                   (sut/make-build-ctx {})
@@ -300,7 +303,7 @@
 
     (testing "converts keywords to strings"
       (let [p (-> (trt/test-runtime)
-                  (h/->req)
+                  (tw/->req)
                   (assoc-in [:parameters :body :params] {:key "value"})
                   (assoc-in [:parameters :path :org-id] (cuid/random-cuid))
                   (sut/make-build-ctx {})
@@ -308,12 +311,12 @@
         (is (= ["key"] (keys p)))))))
 
 (deftest trigger-build
-  (h/with-memory-store st
+  (ts/with-memory-store st
     (letfn [(with-repo [f]
               (let [org-id (st/new-id)
-                    repo (-> (h/gen-repo)
+                    repo (-> (ts/gen-repo)
                              (assoc :org-id org-id))
-                    org (-> (h/gen-org)
+                    org (-> (ts/gen-org)
                             (assoc :id org-id
                                    :repos {(:id repo) repo}))]
                 (st/save-org st org)
@@ -327,7 +330,7 @@
 
             (make-req [params]
               (-> (make-rt)
-                  (h/->req)
+                  (tw/->req)
                   (assoc :parameters params)))
             
             (verify-response [p f]
@@ -335,7 +338,7 @@
                 (fn [org repo]
                   (let [rt (make-rt)
                         res (-> rt
-                                (h/->req)
+                                (tw/->req)
                                 (assoc :parameters p)
                                 (assoc-in [:parameters :path] {:org-id (:id org)
                                                                :repo-id (:id repo)})
@@ -474,9 +477,9 @@
                        :status)))))))
 
 (deftest retry-build
-  (h/with-memory-store st
-    (let [repo (h/gen-repo)
-          build (-> (h/gen-build)
+  (ts/with-memory-store st
+    (let [repo (ts/gen-repo)
+          build (-> (ts/gen-build)
                     (assoc :start-time 100
                            :end-time 200
                            :org-id (:org-id repo)
@@ -488,7 +491,7 @@
                          (trt/set-storage st)
                          (trt/set-encrypter (constantly "encrypted"))
                          (trt/set-decrypter (constantly "decrypted"))
-                         (h/->req)
+                         (tw/->req)
                          (assoc :parameters params)))]
       (is (some? (st/save-build st build)))
       (is (some? (st/save-repo st repo)))
@@ -528,11 +531,11 @@
                        :status)))))))
 
 (deftest cancel-build
-  (h/with-memory-store st
-    (let [build (h/gen-build)
+  (ts/with-memory-store st
+    (let [build (ts/gen-build)
           make-req (fn [& [params]]
                      (-> {:storage st}
-                         (h/->req)
+                         (tw/->req)
                          (assoc :parameters
                                 (merge {:path (select-keys build st/build-sid-keys)}
                                        params))))

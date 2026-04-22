@@ -106,10 +106,6 @@
              :repo-slug s/Str
              :token s/Str)))
 
-(s/defschema ParameterValue
-  {:name s/Str
-   :value s/Str})
-
 (s/defschema LabelFilterConjunction
   {:label s/Str
    :value s/Str})
@@ -120,7 +116,7 @@
 (s/defschema Parameters
   {(s/optional-key :id) Id
    (s/optional-key :org-id) Id
-   :parameters [ParameterValue]
+   :parameters [schemas/ParameterValue]
    (s/optional-key :description) s/Str
    :label-filters [LabelFilter]})
 

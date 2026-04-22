@@ -2,8 +2,9 @@
   (:require [clojure.test :refer [deftest testing is]]
             [monkey.ci.storage :as st]
             [monkey.ci.test
-             [helpers :as h]
-             [runtime :as trt]]
+             [runtime :as trt]
+             [storage :as ts]
+             [web :as tw]]
             [monkey.ci.web.api.repo :as sut]))
 
 (deftest create-repo
@@ -13,8 +14,8 @@
     
     (testing "generates id from repo name"
       (let [r (-> rt
-                  (h/->req)
-                  (h/with-body repo)
+                  (tw/->req)
+                  (tw/with-body repo)
                   (sut/create-repo)
                   :body)]
         (is (= "test-repo" (:id r)))))
@@ -23,8 +24,8 @@
       (let [new-repo {:name "Test repo"
                       :org-id (:org-id repo)}
             r (-> rt
-                  (h/->req)
-                  (h/with-body new-repo)
+                  (tw/->req)
+                  (tw/with-body new-repo)
                   (sut/create-repo)
                   :body)]
         (is (= "test-repo-2" (:id r)))))))
@@ -40,10 +41,10 @@
     
     (testing "updates repo in storage"
       (let [r (-> rt
-                  (h/->req)
+                  (tw/->req)
                   (assoc-in [:parameters :path] {:org-id (:org-id repo)
                                                  :repo-id (:id repo)})
-                  (h/with-body (assoc repo :name "updated repo"))
+                  (tw/with-body (assoc repo :name "updated repo"))
                   (sut/update-repo)
                   :body)]
         (is (not-empty r))
@@ -53,10 +54,10 @@
 
     (testing "clears github id when `nil`"
       (let [r (-> rt
-                  (h/->req)
+                  (tw/->req)
                   (assoc-in [:parameters :path] {:org-id (:org-id repo)
                                                  :repo-id (:id repo)})
-                  (h/with-body (assoc repo :github-id nil))
+                  (tw/with-body (assoc repo :github-id nil))
                   (sut/update-repo)
                   :body)]
         (is (nil? (:github-id r)))
@@ -64,12 +65,12 @@
                       :github-id)))))))
 
 (deftest list-webhooks
-  (h/with-memory-store st
+  (ts/with-memory-store st
     (testing "lists all webhooks for repo"
-      (let [org (h/gen-org)
-            repo (-> (h/gen-repo)
+      (let [org (ts/gen-org)
+            repo (-> (ts/gen-repo)
                      (assoc :org-id (:id org)))
-            wh (-> (h/gen-webhook)
+            wh (-> (ts/gen-webhook)
                    (assoc :org-id (:id org)
                           :repo-id (:repo-id repo)))
             rt (-> (trt/test-runtime)
@@ -78,7 +79,7 @@
         (is (some? (st/save-repo st repo)))
         (is (some? (st/save-webhook st wh)))
         (let [r (-> rt
-                    (h/->req)
+                    (tw/->req)
                     (assoc :parameters
                            {:path
                             {:org-id (:id org)

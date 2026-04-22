@@ -7,15 +7,16 @@
              [storage :as st]
              [time :as t]]
             [monkey.ci.test
-             [helpers :as h]
              [mailman :as tm]
-             [runtime :as trt]]
+             [runtime :as trt]
+             [storage :as ts]
+             [web :as tw]]
             [monkey.ci.web.api.admin :as sut]
             [monkey.ci.web.auth :as auth]))
 
 (deftest login
   (let [{st :storage :as rt} (trt/test-runtime)
-        u (-> (h/gen-user)
+        u (-> (ts/gen-user)
               (assoc :type "sysadmin"))
         s {:user-id (:id u)
            :password (auth/hash-pw "test-pass")}]
@@ -24,7 +25,7 @@
     
     (testing "returns token for valid credentials"
       (let [r (-> rt
-                  (h/->req)
+                  (tw/->req)
                   (assoc-in [:parameters :body]
                             {:username (:type-id u)
                              :password "test-pass"})
@@ -35,14 +36,14 @@
 
     (testing "403 if user does not exist"
       (is (= 403 (-> rt
-                     (h/->req)
+                     (tw/->req)
                      (assoc-in [:parameters :body :username] "nonexisting")
                      (sut/login)
                      :status))))
 
     (testing "403 if invalid password"
       (is (= 403 (-> rt
-                     (h/->req)
+                     (tw/->req)
                      (assoc-in [:parameters :body]
                                {:username (:type-id u)
                                 :password "wrong-pass"})
@@ -51,28 +52,28 @@
 
 (deftest list-org-credits
   (let [{st :storage :as rt} (trt/test-runtime)
-        org (h/gen-org)
-        cred (-> (h/gen-org-credit)
+        org (ts/gen-org)
+        cred (-> (ts/gen-org-credit)
                  (assoc :org-id (:id org)))]
     (is (sid/sid? (st/save-org st org)))
     (is (sid/sid? (st/save-org-credit st cred)))
     
     (testing "returns list of issued credits for org"
       (let [resp (-> rt
-                     (h/->req)
+                     (tw/->req)
                      (assoc-in [:parameters :path :org-id] (:id org))
                      (sut/list-org-credits))]
         (is (= 200 (:status resp)))
         (is (not-empty (:body resp)))))))
 
 (deftest issue-credits
-  (h/with-memory-store st
-    (let [org (h/gen-org)]
+  (ts/with-memory-store st
+    (let [org (ts/gen-org)]
       (testing "creates new org credits in db"
-        (let [user (h/gen-user)
+        (let [user (ts/gen-user)
               resp (-> {:storage st}
-                       (h/->req)
-                       (h/with-identity user)
+                       (tw/->req)
+                       (tw/with-identity user)
                        (assoc :parameters
                               {:path
                                {:org-id (:id org)}
@@ -84,7 +85,7 @@
           (is (= (:id user) (get-in resp [:body :user-id]))))))))
 
 (deftest issue-auto-credits
-  (h/with-memory-store st
+  (ts/with-memory-store st
     (letfn [(ts->date [ts]
               (-> (jt/instant ts)
                   (jt/local-date (jt/zone-id "UTC"))))
@@ -93,15 +94,15 @@
                   (jt/format)))
             (issue-at [at]
               (-> {:storage st}
-                  (h/->req)
+                  (tw/->req)
                   (assoc-in [:parameters :body :date] at)
                   (sut/issue-auto-credits)))]
       (let [now   (jt/to-millis-from-epoch (jt/zoned-date-time 2025 3 10 10 0 0 0 "UTC"))
             today (ts->date-str now)
             from  (- now 1000)
             until (+ now (t/hours->millis (* 24 40)))
-            org  (h/gen-org)
-            sub   (-> (h/gen-credit-subs)
+            org  (ts/gen-org)
+            sub   (-> (ts/gen-credit-subs)
                       (assoc :org-id (:id org)
                              :amount 200M
                              :valid-from from
@@ -143,7 +144,7 @@
                              :credits))))
 
         (testing "when month has fewer days, also creates credits for missing days"
-          (let [org (h/gen-org)
+          (let [org (ts/gen-org)
                 date (-> (jt/offset-date-time 2024 1 30)
                          (jt/with-offset 0) ; force UTC
                          (jt/to-millis-from-epoch))
@@ -159,7 +160,7 @@
                                 :credits)))))
 
         (testing "does not process when month has max days"
-          (let [org (h/gen-org)
+          (let [org (ts/gen-org)
                 date (-> (jt/offset-date-time 2025 3 31)
                          (jt/with-offset 0) ; force UTC
                          (jt/to-millis-from-epoch))
@@ -179,7 +180,7 @@
                                       :type :user
                                       :amount 1000M
                                       :valid-from (+ now 2000)}))
-          (is (st/save-credit-subscription st (-> (h/gen-credit-subs)
+          (is (st/save-credit-subscription st (-> (ts/gen-credit-subs)
                                                   (assoc :org-id (:id org)
                                                          :amount 300M
                                                          :valid-from from
@@ -203,7 +204,7 @@
                                            (swap! inv inc)
                                            [])))]
       (is (= 200 (-> rt
-                     (h/->req)
+                     (tw/->req)
                      (sut/cancel-dangling-builds)
                      :status)))
       (is (= 1 @inv))))
@@ -214,7 +215,7 @@
                  (trt/set-process-reaper
                   (constantly [(zipmap [:org-id :repo-id :build-id] sid)])))
           resp (-> rt
-                   (h/->req)
+                   (tw/->req)
                    (sut/cancel-dangling-builds))]
       (is (= 200 (:status resp)))
       (let [[f :as recv] (tm/get-posted (:mailman rt))]
@@ -226,14 +227,14 @@
 (deftest cancel-credit-subscription
   (testing "deletes when `valid-from` time is in the future"
     (let [{st :storage :as rt} (trt/test-runtime)
-          org (h/gen-org)
+          org (ts/gen-org)
           cs {:id (cuid/random-cuid)
               :org-id (:id org)
               :valid-from (+ (t/now) 1000)
               :amount 1000}]
       (is (sid/sid? (st/save-org st org)))
       (is (sid/sid? (st/save-credit-subscription st cs)))
-      (is (= 204 (-> (h/->req rt)
+      (is (= 204 (-> (tw/->req rt)
                      (assoc :parameters
                             {:path
                              {:org-id (:id org)

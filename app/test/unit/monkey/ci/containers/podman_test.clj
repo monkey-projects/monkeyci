@@ -15,8 +15,10 @@
             [monkey.ci.containers.podman :as sut]
             [monkey.ci.events.mailman.interceptors :as emi]
             [monkey.ci.test
-             [helpers :as h :refer [contains-subseq?]]
-             [mailman :as tm]]
+             [helpers :as h]
+             [mailman :as tm]
+             [storage :as ts]
+             [string :refer [contains-subseq?]]]
             [monkey.ci.vault.common :as vc]
             [monkey.mailman.core :as mmc]))
 
@@ -330,7 +332,7 @@
     (is (keyword? (:name i)))
 
     (testing "adds event job to state"
-      (let [job (h/gen-job)]
+      (let [job (ts/gen-job)]
         (is (= job (-> {:event
                         {:job job}}
                        (enter)
@@ -349,7 +351,7 @@
                     ::pi/queue))))
 
     (testing "continues if job in state"
-      (let [job (h/gen-job)]
+      (let [job (ts/gen-job)]
         (is (some? (-> {:event {:job-id (:id job)}}
                        (sut/set-job job)
                        (pi/enqueue [(i/interceptor {:name ::test-interceptor
@@ -498,7 +500,7 @@
     (let [{:keys [leave] :as i} sut/watch-events
           events-file (fs/path dir "script" sut/events-file)
           mm (tm/test-component)
-          job (h/gen-job)
+          job (ts/gen-job)
           sid (repeatedly 3 cuid/random-cuid)]
       (is (some? (fs/create-dirs (fs/parent events-file))))
       (is (keyword? (:name i)))

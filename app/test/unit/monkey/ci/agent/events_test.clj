@@ -13,7 +13,8 @@
             [monkey.ci.script.config :as sc]
             [monkey.ci.test
              [helpers :as h]
-             [mailman :as tm]]
+             [mailman :as tm]
+             [storage :as ts]]
             [monkey.mailman
              [core :as mmc]
              [mem :as mem]
@@ -30,7 +31,7 @@
                        t)))))
 
   (h/with-tmp-dir dir
-    (let [build (h/gen-build)
+    (let [build (ts/gen-build)
           procs (atom [])
           builds (atom {})
           fake-proc {:name (:name emi/start-process)
@@ -137,7 +138,7 @@
 
 (deftest prepare-build-cmd
   (h/with-tmp-dir dir
-    (let [build (-> (h/gen-build)
+    (let [build (-> (ts/gen-build)
                     (dissoc :script))
           broker (tm/test-component)
           cmd (-> {:event
@@ -241,7 +242,7 @@
 
 (deftest generate-script-config
   (testing "builds script config"
-    (let [build (-> (h/gen-build)
+    (let [build (-> (ts/gen-build)
                     (assoc :dek "test-dek"))
           conf (-> {:event {:build build}}
                    (sut/set-config {:api-server {:port 1234}

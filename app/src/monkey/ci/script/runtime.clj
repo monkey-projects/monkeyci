@@ -4,13 +4,14 @@
             [com.stuartsierra.component :as co]
             [manifold.deferred :as md]
             [monkey.ci
-             [artifacts :as art]
              [build :as b]
-             [cache :as cache]
              [config :as config]
              [errors :as err]
              [spec :as spec]]
-            [monkey.ci.build.api :as api]
+            [monkey.ci.build
+             [api :as api]
+             [artifacts :as art]
+             [cache :as cache]]
             [monkey.ci.events
              [builders :as eb]
              [mailman :as em]]

@@ -3,7 +3,7 @@
             [monkey.ci.invoicing :as sut]
             [monkey.ci.test
              [aleph-test :as at]
-             [helpers :as h]]))
+             [json :as tj]]))
 
 (deftest list-customers
   (let [client (sut/make-client {:url "http://test-invoice"})]
@@ -46,7 +46,7 @@
     (let [client (sut/make-client {:url "http://test"})]
       (at/with-fake-http ["http://test/customer"
                           {:status 200
-                           :body (h/to-json [{:id 1 :name "customer 1"}
+                           :body (tj/to-json [{:id 1 :name "customer 1"}
                                              {:id 2 :name "customer 2"}])
                            :headers
                            {"Content-Type" "application/json"}}]

@@ -7,7 +7,7 @@
              [core :as ec]
              [helpers :as eh]
              [migrations :as sut]]
-            [monkey.ci.test.helpers :as h]
+            [monkey.ci.test.vault :as vh]
             [monkey.ci.vault :as v]
             [monkey.ci.web.crypto :as crypto]
             [ragtime
@@ -81,7 +81,7 @@
 ;;   (with-migrations-up-to (comp (partial re-matches #"^.*-encrypt-params$")
 ;;                                rp/id)
 ;;       conn mig
-;;       (let [vault (h/dummy-vault (constantly "encrypted")
+;;       (let [vault (vh/dummy-vault (constantly "encrypted")
 ;;                                  (constantly "decrypted"))
 ;;             conn (assoc conn :vault vault)
 ;;             cust (eh/gen-customer)
@@ -114,7 +114,7 @@
 ;; (deftest ^:sql encrypt-ssh-keys
 ;;   (eh/with-prepared-db conn
 ;;     (let [mig (sut/encrypt-ssh-keys 1)
-;;           vault (h/dummy-vault (constantly "encrypted")
+;;           vault (vh/dummy-vault (constantly "encrypted")
 ;;                                (constantly "decrypted"))
 ;;           conn (assoc conn :vault vault)
 ;;           cust (eh/gen-customer)
@@ -205,7 +205,7 @@
                                :decrypter (fn [p org-id id]
                                             (when (= "dek-encrypted" p)
                                               "dek-decrypted"))}
-                      :vault (h/dummy-vault (fn [obj]
+                      :vault (vh/dummy-vault (fn [obj]
                                               (when (= "dek-decrypted" obj)
                                                 "vault-encrypted"))
                                             (fn [enc]
@@ -252,7 +252,7 @@
                                :decrypter (fn [p org-id id]
                                             (when (= "dek-encrypted" p)
                                               "dek-decrypted"))}
-                      :vault (h/dummy-vault (fn [obj]
+                      :vault (vh/dummy-vault (fn [obj]
                                               (when (= "dek-decrypted" obj)
                                                 "vault-encrypted"))
                                             (fn [enc]

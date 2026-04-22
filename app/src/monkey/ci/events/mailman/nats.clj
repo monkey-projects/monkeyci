@@ -4,6 +4,7 @@
             [clojure.tools.logging :as log]
             [com.stuartsierra.component :as co]
             [medley.core :as mc]
+            [monkey.ci.events.mailman :as em]
             [monkey.ci.events.mailman.jms :as jms]
             [monkey.ci
              [edn :as edn]
@@ -83,3 +84,6 @@
              (map make-handler)
              (map (partial mmc/add-listener broker))
              (doall))))))
+
+(defmethod em/make-component :nats [config]
+  (map->NatsComponent {:config (merge default-broker-opts config)}))

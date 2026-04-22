@@ -13,15 +13,15 @@
              [db :as sut]
              [interceptors :as emi]]
             [monkey.ci.storage.spec :as ss]
-            [monkey.ci.test.helpers :as h]))
+            [monkey.ci.test.storage :as ts]))
 
 (defn- validate-spec [spec obj]
   (is (spec/valid? spec obj)
       (spec/explain-str spec obj)))
 
 (deftest org-credits
-  (h/with-memory-store s
-    (let [org (h/gen-org)]
+  (ts/with-memory-store s
+    (let [org (ts/gen-org)]
       (is (some? (st/save-org s org)))
       (is (some? (st/save-org-credit s {:org-id (:id org)
                                         :amount 100})))
@@ -38,15 +38,15 @@
                      (sut/get-credits)))))))))
 
 (deftest assign-build-idx
-  (h/with-memory-store s
+  (ts/with-memory-store s
     (let [{:keys [enter] :as i} sut/assign-build-idx
-          build (h/gen-build)
+          build (ts/gen-build)
           get-sid (apply juxt st/build-sid-keys)]
       (is (keyword? (:name i)))
       
       (testing "`enter` assigns build index, unique to the repo"
-        (let [repo (h/gen-repo)
-              org (-> (h/gen-org)
+        (let [repo (ts/gen-repo)
+              org (-> (ts/gen-org)
                       (assoc :repos {(:id repo) repo}))
               build {:org-id (:id org)
                      :repo-id (:id repo)}]
@@ -62,9 +62,9 @@
                    (:sid r)))))))))
 
 (deftest save-build
-  (h/with-memory-store s
+  (ts/with-memory-store s
     (let [{:keys [leave] :as i} sut/save-build
-          build (-> (h/gen-build)
+          build (-> (ts/gen-build)
                     (assoc :script nil))
           get-sid (apply juxt st/build-sid-keys)]
       (is (keyword? (:name i)))
@@ -93,10 +93,10 @@
                            vals))))))))
 
 (deftest load-build
-  (h/with-memory-store s
+  (ts/with-memory-store s
     (let [sid-keys [:org-id :repo-id :build-id]
           sid (repeatedly 3 cuid/random-cuid)
-          build (-> (h/gen-build)
+          build (-> (ts/gen-build)
                     (merge (zipmap sid-keys sid)))
           {:keys [enter] :as i} sut/load-build]
       (is (some? (st/save-build s build)))
@@ -109,10 +109,10 @@
                          (sut/get-build))))))))
 
 (deftest with-build
-  (h/with-memory-store s
+  (ts/with-memory-store s
     (let [sid-keys [:org-id :repo-id :build-id]
           sid (repeatedly 3 cuid/random-cuid)
-          build (-> (h/gen-build)
+          build (-> (ts/gen-build)
                     (merge (zipmap sid-keys sid))
                     (update :script assoc :jobs {}))
           {:keys [enter leave] :as i} sut/with-build]
@@ -135,7 +135,7 @@
             (is (= upd (st/find-build s (sut/build->sid build))))))))))
 
 (deftest create-jobs
-  (h/with-memory-store s
+  (ts/with-memory-store s
     (let [{:keys [enter] :as i} sut/create-jobs]
       (is (keyword? (:name i)))
 
@@ -155,9 +155,9 @@
           (is (= job (st/find-job s (conj sid (:id job))))))))))
 
 (deftest load-job
-  (h/with-memory-store s
-    (let [job (h/gen-job)
-          build (-> (h/gen-build)
+  (ts/with-memory-store s
+    (let [job (ts/gen-job)
+          build (-> (ts/gen-build)
                     (assoc-in [:script :jobs] {(:id job) job}))
           sid (sut/build->sid build)
           {:keys [enter] :as i} sut/load-job]
@@ -172,9 +172,9 @@
                        (sut/get-job))))))))
 
 (deftest save-job
-  (h/with-memory-store s
-    (let [job (h/gen-job)
-          build (-> (h/gen-build)
+  (ts/with-memory-store s
+    (let [job (ts/gen-job)
+          build (-> (ts/gen-build)
                     (assoc-in [:script :jobs] {}))
           sid (sut/build->sid build)
           {:keys [leave] :as i} sut/save-job
@@ -196,13 +196,13 @@
           (is (= 1 (count (st/list-job-events s (conj (b/sid build) (:id job)))))))))))
 
 (deftest save-event
-  (h/with-memory-store s
+  (ts/with-memory-store s
     (let [{:keys [enter] :as i} sut/save-event]
       (is (keyword? (:name i)))
       
       (testing "`enter` saves the event to storage"
-        (let [job (h/gen-job)
-              build (h/gen-build)
+        (let [job (ts/gen-job)
+              build (ts/gen-build)
               sid (sut/build->sid build)
               evt {:type :container/pending
                    :job-id (:id job)
@@ -218,9 +218,9 @@
                    (map :event m)))))))))
 
 (deftest load-job-events
-  (h/with-memory-store s
-    (let [job (h/gen-job)
-          build (-> (h/gen-build)
+  (ts/with-memory-store s
+    (let [job (ts/gen-job)
+          build (-> (ts/gen-build)
                     (dissoc :sid)
                     (assoc-in [:script :jobs] {(:id job) job}))
           sid (sut/build->sid build)
@@ -247,9 +247,9 @@
   (let [{:keys [leave] :as i} sut/save-credit-consumption]
     (is (keyword? (:name i)))
 
-    (h/with-memory-store s
+    (ts/with-memory-store s
       (testing "inserts credit consumption in storage"
-        (let [build (-> (h/gen-build)
+        (let [build (-> (ts/gen-build)
                         (assoc :credits 100))
               ctx (-> {:result {:build build}}
                       (emi/set-db s))]
@@ -260,7 +260,7 @@
           (is (= 1 (count (st/list-org-credit-consumptions s (:org-id build)))))))
 
       (testing "when no credits, does not inserts credit consumption"
-        (let [build (-> (h/gen-build)
+        (let [build (-> (ts/gen-build)
                         (assoc :credits 100))
               ctx (-> {:result {:build build}}
                       (emi/set-db s))]
@@ -268,14 +268,14 @@
           (is (empty? (st/list-org-credit-consumptions s (:org-id build)))))))))
 
 (deftest save-runner-details
-  (h/with-memory-store s
+  (ts/with-memory-store s
     (let [{:keys [enter] :as i} sut/save-runner-details]
       (is (keyword? (:name i)))
 
       (testing "`enter` saves runner details from event"
         (let [details {:runner :test
                        :prop "Arbitrary property"}
-              build (h/gen-build)
+              build (ts/gen-build)
               sid (st/build-sid build)]
           (is (some? (st/save-build s build)))
           (is (some? (-> {:event
@@ -287,7 +287,7 @@
                  (st/find-runner-details s sid))))))))
 
 (deftest check-credits
-  (let [build (h/gen-build)
+  (let [build (ts/gen-build)
         ctx {:event {:type :build/triggered
                      :build build}}]
     
@@ -305,7 +305,7 @@
 
 (deftest queue-build
   (testing "returns `build/queued` event"
-    (let [build (h/gen-build)]
+    (let [build (ts/gen-build)]
       (is (= :build/queued (-> {:event {:type :build/pending
                                         :sid (sut/build->sid build)
                                         :build build}}
@@ -313,8 +313,8 @@
                                :type))))))
 
 (deftest build-initializing
-  (h/with-memory-store s
-    (let [build (h/gen-build)
+  (ts/with-memory-store s
+    (let [build (ts/gen-build)
           r (-> {:event {:type :build/initializing
                          :sid (sut/build->sid build)
                          :build {}}}
@@ -328,7 +328,7 @@
         (is (= :initializing (get-in r [:build :status])))))))
 
 (deftest build-start
-  (let [build (h/gen-build)
+  (let [build (ts/gen-build)
         r (-> {:event {:type :build/start
                        :sid (sut/build->sid build)
                        :time 100
@@ -349,7 +349,7 @@
       (is (= 100 (get-in r [:build :start-time]))))))
 
 (deftest build-end
-  (let [build (h/gen-build)
+  (let [build (ts/gen-build)
         r (-> {:event {:type :build/end
                        :sid (sut/build->sid build)
                        :time 100
@@ -370,7 +370,7 @@
       (is (= 100 (get-in r [:build :end-time]))))))
 
 (deftest build-canceled
-  (let [build (h/gen-build)
+  (let [build (ts/gen-build)
         r (-> {:event {:type :build/canceled
                        :sid (sut/build->sid build)
                        :time 100}}
@@ -390,7 +390,7 @@
       (is (= 100 (get-in r [:build :end-time]))))))
 
 (deftest script-init
-  (let [build (-> (h/gen-build)
+  (let [build (-> (ts/gen-build)
                   (dissoc :script))
         r (-> {:event {:type :script/initializing
                        :sid (sut/build->sid build)
@@ -405,7 +405,7 @@
       (is (= "test/dir" (get-in r [:build :script :script-dir]))))))
 
 (deftest script-start
-  (let [build (-> (h/gen-build)
+  (let [build (-> (ts/gen-build)
                   (update :script dissoc :jobs))
         r (-> {:event {:type :script/start
                        :sid (sut/build->sid build)
@@ -421,7 +421,7 @@
              (get-in r [:build :script :jobs]))))))
 
 (deftest script-end
-  (let [build (-> (h/gen-build)
+  (let [build (-> (ts/gen-build)
                   (update :script dissoc :jobs))
         r (-> {:event {:type :script/end
                        :sid (sut/build->sid build)
@@ -442,9 +442,9 @@
              (get-in r [:build :message]))))))
 
 (deftest job-init
-  (let [job (-> (h/gen-job)
+  (let [job (-> (ts/gen-job)
                 (assoc :status :pending))
-        build (-> (h/gen-build)
+        build (-> (ts/gen-build)
                   (assoc-in [:script :jobs] {(:id job) job}))
         r (-> {:event {:type :job/initializing
                        :sid (sut/build->sid build)
@@ -470,9 +470,9 @@
              (get-in r [:build :script :jobs (:id job) :agent]))))))
 
 (deftest job-start
-  (let [job (-> (h/gen-job)
+  (let [job (-> (ts/gen-job)
                 (assoc :status :initializing))
-        build (-> (h/gen-build)
+        build (-> (ts/gen-build)
                   (assoc-in [:script :jobs] {(:id job) job}))
         r (-> {:event {:type :job/start
                        :sid (sut/build->sid build)
@@ -497,10 +497,10 @@
         (is (= 3 (:credit-multiplier res)))))))
 
 (deftest job-end
-  (let [job (-> (h/gen-job)
+  (let [job (-> (ts/gen-job)
                 (assoc :status :running)
                 (dissoc :credit-multiplier))
-        build (-> (h/gen-build)
+        build (-> (ts/gen-build)
                   (assoc-in [:script :jobs] {(:id job) job}))
         r (-> {:event {:type :job/end
                        :sid (sut/build->sid build)
@@ -534,9 +534,9 @@
         (is (= 2 (:credit-multiplier res)))))))
 
 (deftest job-skipped
-  (let [job (-> (h/gen-job)
+  (let [job (-> (ts/gen-job)
                 (assoc :status :running))
-        build (-> (h/gen-build)
+        build (-> (ts/gen-build)
                   (assoc-in [:script :jobs] {(:id job) job}))
         r (-> {:event {:type :job/skipped
                        :sid (sut/build->sid build)
@@ -553,9 +553,9 @@
         (is (= :skipped (:status res)))))))
 
 (deftest job-blocked
-  (let [job (-> (h/gen-job)
+  (let [job (-> (ts/gen-job)
                 (assoc :status :running))
-        build (-> (h/gen-build)
+        build (-> (ts/gen-build)
                   (assoc-in [:script :jobs] {(:id job) job}))
         r (-> {:event {:type :job/blocked
                        :sid (sut/build->sid build)
@@ -572,9 +572,9 @@
         (is (= :blocked (:status res)))))))
 
 (deftest job-unblocked
-  (let [job (-> (h/gen-job)
+  (let [job (-> (ts/gen-job)
                 (assoc :status :running))
-        build (-> (h/gen-build)
+        build (-> (ts/gen-build)
                   (assoc-in [:script :jobs] {(:id job) job}))
         r (-> {:event {:type :job/unblocked
                        :sid (sut/build->sid build)
@@ -625,8 +625,8 @@
     
     (testing "`build/triggered`"
       (testing "with available credits"
-        (let [org (h/gen-org)
-              repo (-> (h/gen-repo)
+        (let [org (ts/gen-org)
+              repo (-> (ts/gen-repo)
                        (assoc :org-id (:id org)))
               creds {:id (cuid/random-cuid)
                      :org-id (:id org)
@@ -639,7 +639,7 @@
           (is (some? (st/save-repo st repo)))
 
           (let [res (-> {:type :build/triggered
-                         :build (-> (h/gen-build)
+                         :build (-> (ts/gen-build)
                                     (assoc :org-id (:id org)
                                            :repo-id (:id repo))
                                     ;; At this point, builds don't have an index
@@ -661,8 +661,8 @@
                 (is (number? (:idx b)) "build has an index assigned"))))))
 
       (testing "when no credits"
-        (let [org (h/gen-org)
-              build (-> (h/gen-build)
+        (let [org (ts/gen-org)
+              build (-> (ts/gen-build)
                         (assoc :org-id (:id org))
                         (dissoc :build-id))]
           (is (some? (st/save-org st org)))
@@ -687,10 +687,10 @@
                  :end-time 2000
                  :status :success
                  :credit-multiplier 1}
-            repo (h/gen-repo)
-            org (-> (h/gen-org)
+            repo (ts/gen-repo)
+            org (-> (ts/gen-org)
                     (assoc :repos {(:id repo) repo}))
-            build (-> (h/gen-build)
+            build (-> (ts/gen-build)
                       (assoc :org-id (:id org)
                              :repo-id (:id repo)
                              :credit-multiplier 1

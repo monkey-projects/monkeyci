@@ -21,13 +21,12 @@
              [spec :as spec]
              [utils :as u]]
             [monkey.ci.build.api :as ba]
-            [monkey.ci.events
-             [http :as eh]
-             [mailman :as em]]
+            [monkey.ci.common.schemas :as cs]
+            [monkey.ci.events.mailman :as em]
             [monkey.ci.spec.api-server :as aspec]
             [monkey.ci.web
              [common :as c]
-             [handler :as h]
+             [events :as we]
              [middleware :as wm]]
             [reitit.coercion.schema]
             [reitit.ring :as ring]
@@ -134,7 +133,7 @@
 (defn dispatch-events [req]
   (let [sid (build/sid (req->build req))]
     (log/info "Dispatching event stream to client for build" sid)
-    (eh/stream->sse (req->event-stream req)
+    (we/stream->sse (req->event-stream req)
                     (comp (partial = sid) :sid))))
 
 (defn- stream-response [s & [nil-code]]
@@ -225,7 +224,7 @@
 (def params-routes
   ["/params"
    {:get get-params
-    :responses {200 {:body [h/ParameterValue]}}
+    :responses {200 {:body [cs/ParameterValue]}}
     :produces edn}])
 
 (def events-routes

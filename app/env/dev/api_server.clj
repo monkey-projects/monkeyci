@@ -4,13 +4,13 @@
             [com.stuartsierra.component :as csc]
             [manifold.deferred :as md]
             [monkey.ci
-             [cache :as cache]
              [protocols :as p]
              [storage :as st]]
             [monkey.ci.blob.disk :as blob]
             [monkey.ci.build
              [api-server :as bas]
-             [api :as ba]]
+             [api :as ba]
+             [cache :as cache]]
             [monkey.ci.events.core :as ec]
             [monkey.ci.runners.runtime :as rr]))
 

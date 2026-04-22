@@ -20,7 +20,7 @@
             [monkey.ci.web.crypto :as crypto]
             [monkey.ci.test
              [config :as tc]
-             [helpers :as h]]))
+             [storage :as ts]]))
 
 (def server-config
   (assoc tc/base-config
@@ -165,7 +165,7 @@
           (is (fn? decrypter)))))))
 
 (deftest crypto
-  (h/with-memory-store st
+  (ts/with-memory-store st
     (let [k {:enc "encrypted-dek"
              :key (bcc/bytes->b64 (v/generate-key))}]
       (defmethod sut/dek-utils ::test [_]

@@ -13,7 +13,9 @@
              [aleph-test :as at]
              [api-server :as tas]
              [helpers :as h]
-             [runtime :as trt]]
+             [runtime :as trt]
+             [storage :as ts]
+             [web :as tw]]
             [ring.mock.request :as mock]))
 
 (def test-config (tas/test-config))
@@ -77,7 +79,7 @@
 (defn- ->req
   "Creates a request object from given build context"
   [ctx]
-  (h/->match-data {sut/context ctx}))
+  (tw/->match-data {sut/context ctx}))
 
 (defrecord FakeParams [params]
   p/BuildParams
@@ -85,8 +87,8 @@
     (md/success-deferred params)))
 
 (deftest get-params
-  (let [repo (h/gen-repo)
-        org (-> (h/gen-org)
+  (let [repo (ts/gen-repo)
+        org (-> (ts/gen-org)
                 (assoc :repos {(:id repo) repo}))
         param-values [{:name "test-param"
                        :value "test value"}]
@@ -101,8 +103,8 @@
                (:body (sut/get-params req))))))))
 
 (deftest get-params-from-api
-  (let [repo (h/gen-repo)
-        org (-> (h/gen-org)
+  (let [repo (ts/gen-repo)
+        org (-> (ts/gen-org)
                 (assoc :repos {(:id repo) repo}))
         param-values [{:name "test-param"
                        :value "test value"}]
@@ -125,7 +127,7 @@
 
 (deftest decrypt-key-from-api
   (testing "invokes endpoint on general api"
-    (let [org (h/gen-org)]
+    (let [org (ts/gen-org)]
       (at/with-fake-http [{:url
                            (format "http://test-api/org/%s/crypto/decrypt-key" (:id org))
                            :method :post}

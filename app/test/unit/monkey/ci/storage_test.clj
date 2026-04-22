@@ -6,7 +6,7 @@
              [sid :as sid]
              [storage :as sut]
              [time :as t]]
-            [monkey.ci.test.helpers :as h]))
+            [monkey.ci.test.storage :as h]))
 
 (deftest transaction
   (testing "executes target"

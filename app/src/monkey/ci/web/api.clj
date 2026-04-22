@@ -10,10 +10,10 @@
              [runtime :as rt]
              [storage :as st]
              [time :as t]]
-            [monkey.ci.events.http :as eh]
             [monkey.ci.web
              [auth :as auth]
              [common :as c]
+             [events :as we]
              [response :as r]
              [trigger :as wt]]
             [ring.util.response :as rur]))
@@ -245,6 +245,6 @@
   "Sets up an event stream for all `build/updated` events for the org specified in the
    request path."
   [req]
-  (eh/bus-stream (c/from-rt req :update-bus)
+  (we/bus-stream (c/from-rt req :update-bus)
                  #{:build/updated}
                  (comp (partial = (org-id req)) first :sid)))

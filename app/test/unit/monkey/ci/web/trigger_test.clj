@@ -5,15 +5,15 @@
              [cuid :as cuid]
              [storage :as st]]
             [monkey.ci.test
-             [helpers :as h]
-             [runtime :as trt]]
+             [runtime :as trt]
+             [storage :as ts]]
             [monkey.ci.vault.common :as vc]
             [monkey.ci.web
              [trigger :as sut]
              [crypto :as crypto]]))
 
 (deftest prepare-triggered-build
-  (h/with-memory-store st
+  (ts/with-memory-store st
     (let [org-id (cuid/random-cuid)
           dek (atom nil)
           rt (-> (trt/test-runtime)

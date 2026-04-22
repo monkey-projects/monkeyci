@@ -10,8 +10,9 @@
              [codeberg :as sut]]
             [monkey.ci.test
              [aleph-test :as af]
-             [helpers :as h]
-             [runtime :as trt]]))
+             [json :as tj]
+             [runtime :as trt]
+             [web :as tw]]))
 
 (defn- with-codeberg-user
   "Sets up fake http communication with codeberg to return the given user"
@@ -19,12 +20,12 @@
    (af/with-fake-http [{:url "https://codeberg.org/login/oauth/access_token"
                         :request-method :post}
                        {:status 200
-                        :body (h/to-json {:access-token "test-token"})
+                        :body (tj/to-json {:access-token "test-token"})
                         :headers {"Content-Type" "application/json"}}
                        {:url "https://codeberg.org/api/v1/user"
                         :request-method :get}
                        {:status 200
-                        :body (h/to-json u)
+                        :body (tj/to-json u)
                         :headers {"Content-Type" "application/json"}}]
      (f u)))
   ([f]
@@ -36,7 +37,7 @@
   (testing "when exchange fails at codeberg, returns body and 400 status code"
     (af/with-fake-http ["https://codeberg.org/login/oauth/access_token"
                         {:status 401
-                         :body (h/to-json {:message "invalid access code"})
+                         :body (tj/to-json {:message "invalid access code"})
                          :headers {"Content-Type" "application/json"}}]
       (is (= 400 (-> {:parameters
                       {:query
@@ -50,7 +51,7 @@
         (let [kp (auth/generate-keypair)
               req (-> (trt/test-runtime)
                       (assoc :jwk {:priv (.getPrivate kp)})
-                      (h/->req)
+                      (tw/->req)
                       (assoc :parameters
                              {:query
                               {:code "test-code"}}))
@@ -71,7 +72,7 @@
                                   :type-id (:id u)
                                   :orgs ["test-org"]})
               req (-> rt
-                      (h/->req)
+                      (tw/->req)
                       (assoc :parameters
                              {:query
                               {:code "test-code"}}))]
@@ -86,7 +87,7 @@
       (fn [u]
         (let [{st :storage :as rt} (trt/test-runtime)
               req (-> rt
-                      (h/->req)
+                      (tw/->req)
                       (assoc :parameters
                              {:query
                               {:code "test-code"}}))]
@@ -104,7 +105,7 @@
         (let [{st :storage :as rt} (trt/test-runtime)
               pubkey (auth/rt->pub-key rt)
               req (-> rt
-                      (h/->req)
+                      (tw/->req)
                       (assoc :parameters
                              {:query
                               {:code "test-code"}}))
@@ -126,7 +127,7 @@
       (fn [u]
         (let [{st :storage :as rt} (trt/test-runtime)
               req (-> rt
-                      (h/->req)
+                      (tw/->req)
                       (assoc :parameters
                              {:query
                               {:code "test-code"}}))

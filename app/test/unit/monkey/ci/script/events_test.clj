@@ -23,7 +23,8 @@
             [monkey.ci.test
              [extensions :as te]
              [helpers :as h]
-             [mailman :as tm]]
+             [mailman :as tm]
+             [storage :as ts]]
             [monkey.ci.vault.common :as vc]
             [monkey.mailman.core :as mmc]))
 
@@ -104,8 +105,8 @@
 
 (deftest add-job-ctx
   (let [{:keys [enter] :as i} sut/add-job-ctx
-        job (h/gen-job)
-        other-job (h/gen-job)
+        job (ts/gen-job)
+        other-job (ts/gen-job)
         ctx (-> {:event {:job-id (:id job)}}
                 (sut/set-initial-job-ctx {::key ::value})
                 (sut/set-jobs (jobs->map [job other-job]))
@@ -402,7 +403,7 @@
   (testing "fires `script/start` event with pending jobs"
     (let [jobs (jobs->map [(bc/action-job "test-job" (constantly nil))])
           r (-> {}
-                (sut/set-build (h/gen-build))
+                (sut/set-build (ts/gen-build))
                 (sut/set-jobs jobs)
                 (sut/script-init))]
       (is (spec/valid? ::es/event r)
@@ -418,7 +419,7 @@
                                  :script ["test-cmd"]
                                  :ext-key :ext-value})
           r (-> {}
-                (sut/set-build (h/gen-build))
+                (sut/set-build (ts/gen-build))
                 (sut/set-jobs (jobs->map [job]))
                 (sut/script-init))]
       (is (spec/valid? ::es/event r)
@@ -438,7 +439,7 @@
     (testing "with pending jobs"
       (let [r (-> {:event evt}
                   (sut/set-jobs jobs)
-                  (sut/set-build (h/gen-build))
+                  (sut/set-build (ts/gen-build))
                   (sut/script-start))]
         (testing "queues jobs without dependencies"
           (is (= 1 (count r)))
@@ -499,7 +500,7 @@
                (-> {:event
                     {:job-id "container-job"}}
                    (emi/set-job-ctx {:job cj})
-                   (sut/set-build (assoc (h/gen-build) :dek "encrypted-dek"))
+                   (sut/set-build (assoc (ts/gen-build) :dek "encrypted-dek"))
                    (sut/job-queued)
                    (first)
                    :dek))))

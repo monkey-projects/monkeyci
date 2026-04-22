@@ -4,7 +4,8 @@
             [monkey.ci.storage :as s]
             [monkey.ci.test
              [helpers :as h]
-             [mailman :as tmm]]
+             [mailman :as tmm]
+             [vault :as v]]
             [monkey.ci.web.auth :as auth]))
 
 (def empty-runtime {})
@@ -70,7 +71,7 @@
       (set-jwk (auth/keypair->rt (auth/generate-keypair)))
       (set-runner (constantly (md/success-deferred 0)))
       (set-process-reaper (constantly []))
-      (set-vault (h/fake-vault))
+      (set-vault (v/fake-vault))
       (set-dek-generator (constantly nil))
       (set-decrypter (constantly nil))
       (set-encrypter (constantly nil))

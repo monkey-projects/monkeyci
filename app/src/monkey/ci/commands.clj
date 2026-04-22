@@ -177,7 +177,7 @@
        (deref)
        :body
        (bs/to-reader)
-       (u/parse-edn)
+       (edn/edn->)
        (hash-map :type :build/list :builds)
        (rt/report rt)))
 
@@ -201,7 +201,7 @@
   (let [url (rt/api-url rt)
         d (md/deferred)
         pipe-events (fn [r]
-                      (let [read-next (fn [] (u/parse-edn r {:eof ::done}))]
+                      (let [read-next (fn [] (edn/edn-> r {:eof ::done}))]
                         (loop [m (read-next)]
                           (if (= ::done m)
                             (do

@@ -18,9 +18,13 @@
             [monkey.ci.metrics.core :as m]
             [monkey.ci.test
              [aleph-test :as at]
+             [json :as tj]
              [helpers :as h]
              [mailman :as tmm]
-             [runtime :as trt]]
+             [runtime :as trt]
+             [storage :as ts]
+             [vault :as tv]
+             [web :as tw]]
             [monkey.ci.web
              [auth :as auth]
              [handler :as sut]]
@@ -36,7 +40,7 @@
       (trt/set-encrypter (fn [x _ _] x))
       (trt/set-decrypter (fn [x _ _] x))
       (merge {:config {:dev-mode true}
-              :vault (h/dummy-vault)}
+              :vault (tv/dummy-vault)}
        opts)
       (update :storage #(or % (st/make-memory-storage)))))
 
@@ -57,7 +61,7 @@
     
     (testing (format "`%s`" path)
       (testing (str "`POST` creates new " name)
-        (let [r (-> (h/json-request :post path base-entity)
+        (let [r (-> (tw/json-request :post path base-entity)
                     (app))]
           (is (= 201 (:status r)))))
 
@@ -70,7 +74,7 @@
                       (mock/header :accept "application/json")
                       (app))]
             (is (= 200 (:status r)))
-            (is (= entity (h/reply->json r)))))
+            (is (= entity (tw/reply->json r)))))
 
         (when can-update?
           (testing (str "`PUT` updates existing " name)
@@ -78,7 +82,7 @@
                   _ (creator st (assoc base-entity :id id))
                   upd (cond-> base-entity
                         updated-entity (merge updated-entity))
-                  r (-> (h/json-request :put (str path "/" id) upd)
+                  r (-> (tw/json-request :put (str path "/" id) upd)
                         (app))]
               (is (= 200 (:status r))
                   upd))))
@@ -158,7 +162,7 @@
         (is (some? (st/save-org st {:id org-id})))
         
         (testing "cannot create"
-          (is (= 403 (-> (h/json-request :post
+          (is (= 403 (-> (tw/json-request :post
                                          "/webhook"
                                          {:org-id org-id
                                           :repo-id repo-id})
@@ -180,13 +184,13 @@
     (let [[org-id repo-id] (repeatedly st/new-id)
           st (st/make-memory-storage)]
       (is (some? (st/save-org st {:id org-id :display-id "test-org"})))
-      (let [r (-> (h/json-request :post
+      (let [r (-> (tw/json-request :post
                                      "/webhook"
                                      {:org-id "test-org"
                                       :repo-id repo-id})
                      (secure-app-req {:storage st
                                       :org-id org-id}))
-            b (h/reply->json r)]
+            b (tw/reply->json r)]
         (is (= 201 (:status r)))
         (is (= [org-id repo-id]
                (-> (st/find-webhook st (:id b))
@@ -202,7 +206,7 @@
   (testing "`POST /webhook/github/:id`"
     (testing "accepts with valid security header"
       (let [github-secret "github-secret"
-            payload (h/to-json {:head-commit {:message "test"}})
+            payload (tj/to-json {:head-commit {:message "test"}})
             signature (-> (mac/hash payload {:key github-secret
                                              :alg :hmac+sha256})
                           (codecs/bytes->hex))
@@ -240,7 +244,7 @@
               (testing (format "`POST %s`" path)
                 (testing "accepts request with valid security"
                   (let [secret (str (random-uuid))
-                        payload (h/to-json {:message "test from github"})
+                        payload (tj/to-json {:message "test from github"})
                         signature (-> (mac/hash payload {:key secret
                                                          :alg :hmac+sha256})
                                       (codecs/bytes->hex))
@@ -256,7 +260,7 @@
 
                 (testing "401 on invalid security"
                   (let [secret (str (random-uuid))
-                        payload (h/to-json {:message "test from github"})
+                        payload (tj/to-json {:message "test from github"})
                         app (sut/make-app (test-rt {:config
                                                     {:github
                                                      {:webhook-secret secret}}}))]
@@ -268,7 +272,7 @@
 
                 (testing "no security check in dev mode"
                   (let [secret (str (random-uuid))
-                        payload (h/to-json {:message "test from github"})
+                        payload (tj/to-json {:message "test from github"})
                         app (sut/make-app (test-rt {}))]
                     (is (= 204 (-> (mock/request :post (str "/webhook/github" path))
                                    (mock/body payload)
@@ -283,7 +287,7 @@
   (testing "`POST /webhook/bitbucket/:id`"
     (testing "accepts with valid security header"
       (let [bitbucket-secret "bitbucket-secret"
-            payload (h/to-json {:head-commit {:message "test"}})
+            payload (tj/to-json {:head-commit {:message "test"}})
             signature (-> (mac/hash payload {:key bitbucket-secret
                                              :alg :hmac+sha256})
                           (codecs/bytes->hex))
@@ -324,7 +328,7 @@
                             :can-delete? true})
 
   (testing "`GET /org` searches for org"
-    (h/with-memory-store st
+    (ts/with-memory-store st
       (let [app (make-test-app st)]
         (is (= 200 (-> (mock/request :get "/org" {:name "test"})
                        (app)
@@ -332,10 +336,10 @@
 
   (testing "`/:id`"
     (testing "`/join-request`"
-      (h/with-memory-store st
+      (ts/with-memory-store st
         (let [app (make-test-app st)
-              org (h/gen-org)
-              user (h/gen-user)
+              org (ts/gen-org)
+              user (ts/gen-user)
               jr {:id (st/new-id)
                   :status "pending"
                   :org-id (:id org)
@@ -350,14 +354,14 @@
             (is (= [jr]
                    (-> (mock/request :get (str "/org/" (:id org) "/join-request"))
                        (app)
-                       (h/reply->json)))))
+                       (tw/reply->json)))))
 
           (testing "allows filtering by status")
           
           (testing "`POST /:request-id/approve`"
             (testing "approves join request with message"
               (is (= 200
-                     (-> (h/json-request
+                     (-> (tw/json-request
                           :post (str "/org/" (:id org) "/join-request/" (:id jr) "/approve")
                           {:message "Very well"})
                          (app)
@@ -368,7 +372,7 @@
             
             (testing "returns 404 not found for non existing request"
               (is (= 404
-                     (-> (h/json-request
+                     (-> (tw/json-request
                           :post (str "/org/" (:id org) "/join-request/" (st/new-id) "/approve")
                           {})
                          (app)
@@ -376,7 +380,7 @@
 
             (testing "returns 404 not found when org id does not match request"
               (is (= 404
-                     (-> (h/json-request
+                     (-> (tw/json-request
                           :post (str "/org/" (st/new-id) "/join-request/" (:id jr) "/approve")
                           {})
                          (app)
@@ -385,7 +389,7 @@
           (testing "`POST /:request-id/reject`"
             (testing "rejects join request with message"
               (is (= 200
-                     (-> (h/json-request
+                     (-> (tw/json-request
                           :post (str "/org/" (:id org) "/join-request/" (:id jr) "/reject")
                           {:message "No way"})
                          (app)
@@ -396,7 +400,7 @@
             
             (testing "returns 404 not found for non existing request"
               (is (= 404
-                     (-> (h/json-request
+                     (-> (tw/json-request
                           :post (str "/org/" (:id org) "/join-request/" (st/new-id) "/reject")
                           {})
                          (app)
@@ -404,14 +408,14 @@
 
             (testing "returns 404 not found when org id does not match request"
               (is (= 404
-                     (-> (h/json-request
+                     (-> (tw/json-request
                           :post (str "/org/" (st/new-id) "/join-request/" (:id jr) "/reject")
                           {})
                          (app)
                          :status))))))))
 
-    (h/with-memory-store st
-      (let [org (h/gen-org)
+    (ts/with-memory-store st
+      (let [org (ts/gen-org)
             app (make-test-app st)]
         (is (some? (st/save-org st org)))
         
@@ -459,7 +463,7 @@
                            :status)))))
 
         (testing "`/webhook/bitbucket`"
-          (let [repo (h/gen-repo)
+          (let [repo (ts/gen-repo)
                 org (assoc org :repos {(:id repo) repo})
                 wh {:id (cuid/random-cuid)
                     :org-id (:id org)
@@ -474,7 +478,7 @@
                              (app)
                              :body
                              slurp
-                             (h/parse-json)))
+                             (tj/parse-json)))
                 select-props #(select-keys % (keys bb))]
             (is (some? (st/save-org st org)))
             (is (some? (st/save-webhook st wh)))
@@ -512,12 +516,12 @@
                                {:body {:id 2
                                        :invoice-nr "INV001"}})))))
                   app (sut/make-app rt)
-                  inv (-> (h/gen-invoice)
+                  inv (-> (ts/gen-invoice)
                           (assoc :org-id (:id org))
                           (dissoc :org-id :id :invoice-nr :ext-id))
-                  r (-> (h/json-request :post base-path inv)
+                  r (-> (tw/json-request :post base-path inv)
                         (app))
-                  b (h/reply->json r)]
+                  b (tw/reply->json r)]
 
               (testing "`POST` creates new invoice"
                 (is (= 201 (:status r)) b)
@@ -538,7 +542,7 @@
             (testing "`/settings`"
               (let [base-path (str base-path "/settings")]
                 (testing "`PUT` creates or updates invoicing settings"
-                  (is (= 200 (-> (h/json-request :put base-path
+                  (is (= 200 (-> (tw/json-request :put base-path
                                                  {:vat-nr "1234"
                                                   :currency "EUR"
                                                   :address ["test address"]
@@ -547,7 +551,7 @@
                                  :status)))
                   (is (= "EUR" (-> (st/find-org-invoicing st (:id org))
                                    :currency)))
-                  (is (= 200 (-> (h/json-request :put base-path
+                  (is (= 200 (-> (tw/json-request :put base-path
                                                  {:vat-nr "1234"
                                                   :currency "USD"
                                                   :address ["test address"]
@@ -560,11 +564,11 @@
                 (testing "`GET` retrieves invoicing settings"
                   (let [r (-> (mock/request :get base-path)
                               (app))
-                        b (h/reply->json r)]
+                        b (tw/reply->json r)]
                     (is (= 200 (:status r)))
                     (is (= (:id org) (:org-id b))))))))))))
 
-  (h/with-memory-store st
+  (ts/with-memory-store st
     (let [org-id (st/new-id)]
       (is (some? (st/save-org st {:id org-id
                                   :name "test org"})))
@@ -608,7 +612,7 @@
 
     (testing "security"
       (testing "public repo"
-        (h/with-memory-store st
+        (ts/with-memory-store st
           (let [repo (assoc repo :public true :id "test-repo")
                 path (str "/org/" org-id "/repo/" (:id repo))]
             (is (some? (st/save-repo st repo)))
@@ -621,7 +625,7 @@
 
             (testing "can not be modified"
               (is (= 403
-                     (-> (h/json-request :put
+                     (-> (tw/json-request :put
                                          path
                                          (assoc repo :name "updated repo"))
                          (secure-app-req {:storage st :org-id (st/new-id)})
@@ -629,13 +633,13 @@
 
       (testing "with org grant"
         (testing "can edit repo"
-          (h/with-memory-store st
+          (ts/with-memory-store st
             (let [[org-id repo-id] (repeatedly st/new-id)
                   repo {:id repo-id
                         :org-id org-id}]
               (is (some? (st/save-org st {:id org-id})))
               (is (some? (st/save-repo st repo)))
-              (is (= 200 (-> (h/json-request
+              (is (= 200 (-> (tw/json-request
                               :put
                               (format "/org/%s/repo/%s" org-id repo-id)
                               (assoc repo :name "test repo" :url "http://test-url"))
@@ -645,7 +649,7 @@
     (testing "`/org/:id/repo`"
       (testing "`/github`"
         (testing "`/watch` starts watching repo"
-          (is (= 200 (-> (h/json-request :post
+          (is (= 200 (-> (tw/json-request :post
                                          (str "/org/" org-id "/repo/github/watch")
                                          {:github-id 12324
                                           :org-id org-id
@@ -675,7 +679,7 @@
             (is (some? (st/save-org st {:id org-id})))
             
             (testing "`/watch` starts watching bitbucket repo"
-              (is (= 201 (-> (h/json-request :post
+              (is (= 201 (-> (tw/json-request :post
                                              (str "/org/" org-id "/repo/bitbucket/watch")
                                              {:org-id org-id
                                               :name "test-repo"
@@ -698,7 +702,7 @@
                     _ (st/save-bb-webhook st {:webhook-id wh-id
                                               :bitbucket-id (str (random-uuid))})]
                 (is (= 200
-                       (-> (h/json-request :post
+                       (-> (tw/json-request :post
                                            (format "/org/%s/repo/%s/bitbucket/unwatch" org-id repo-id)
                                            {:token "test-token"})
                            (app)
@@ -707,7 +711,7 @@
     (testing "`GET /webhooks`"
       (let [st (st/make-memory-storage)
             app (make-test-app st)
-            {:keys [repo-id] :as repo} (-> (h/gen-repo)
+            {:keys [repo-id] :as repo} (-> (ts/gen-repo)
                                            (assoc :org-id org-id))]
         (is (some? (st/save-repo st repo)))
         (let [r (-> (mock/request :get (format "/org/%s/repo/%s/webhooks" org-id repo-id))
@@ -738,7 +742,7 @@
           app (make-test-app st)]
       
       (testing "`POST` creates new user"
-        (let [r (-> (h/json-request :post "/user" user)
+        (let [r (-> (tw/json-request :post "/user" user)
                     (app))]
           (is (= 201 (:status r)))
           (is (= user (-> (st/find-user-by-type st (user->sid user))
@@ -746,7 +750,7 @@
 
       (testing "`/:user-id`"
         (testing "`DELETE` deletes user"
-          (let [u (h/gen-user)]
+          (let [u (ts/gen-user)]
             (is (some? (st/save-user st u)))
             (is (= u (st/find-user st (:id u))))
             (is (= 204 (-> (mock/request :delete (str "/user/" (:id u)))
@@ -763,7 +767,7 @@
               (is (some? (st/save-user st (assoc user :orgs [(:id org)]))))
               (is (= [org] (-> (mock/request :get (str "/user/" user-id "/orgs"))
                                (app)
-                               (h/reply->json))))))
+                               (tw/reply->json))))))
 
           (testing "`GET /settings` retrieves user settings"
             (let [s {:user-id user-id
@@ -772,20 +776,20 @@
               (let [r (-> (mock/request :get (str "/user/" user-id "/settings"))
                           (app))]
                 (is (= 200 (:status r)))
-                (is (= s (h/reply->json r))))))))
+                (is (= s (tw/reply->json r))))))))
 
       (testing "`GET /:type/:id` retrieves existing user"
         (let [r (-> (mock/request :get (str "/user/github/" (:type-id user)))
                     (app))]
           (is (= 200 (:status r)))
-          (is (= (:type-id user) (some-> r (h/reply->json) :type-id)))))
+          (is (= (:type-id user) (some-> r (tw/reply->json) :type-id)))))
 
       (testing "`PUT /:type/:id` updates existing user"
-        (let [r (-> (h/json-request :put (str "/user/github/" (:type-id user))
+        (let [r (-> (tw/json-request :put (str "/user/github/" (:type-id user))
                                     (assoc user :email "updated@monkeyci.com"))
                     (app))]
           (is (= 200 (:status r)))
-          (is (= "updated@monkeyci.com" (some-> r (h/reply->json) :email)))))
+          (is (= "updated@monkeyci.com" (some-> r (tw/reply->json) :email)))))
 
       (let [user (st/find-user-by-type st (user->sid user))
             user-id (:id user)]
@@ -797,11 +801,11 @@
             (is (some? (st/save-org st org)))
             
             (testing "`POST` create new join request"
-              (let [r (-> (h/json-request :post base-path 
+              (let [r (-> (tw/json-request :post base-path 
                                           {:org-id (:id org)})
                           (app))]
                 (is (= 201 (:status r)))
-                (let [created (h/reply->json r)]
+                (let [created (tw/reply->json r)]
                   (is (some? (:id created)))
                   (is (= user-id (:user-id created)))
                   (is (= "pending" (:status created)) "marks created request as pending"))))
@@ -810,7 +814,7 @@
               (let [r (-> (mock/request :get base-path)
                           (app))]
                 (is (= 200 (:status r)))
-                (is (not-empty (h/reply->json r)))))
+                (is (not-empty (tw/reply->json r)))))
 
             (testing "`DELETE /:id` deletes join request by id"
               (let [req (-> (st/list-user-join-requests st user-id)
@@ -825,7 +829,7 @@
                             :org-id (st/new-id)
                             :user user}]
             (testing "does not allow creating new user"
-              (is (= 403 (-> (h/json-request :post "/user"
+              (is (= 403 (-> (tw/json-request :post "/user"
                                              user)
                              (secure-app-req secure-ctx)
                              :status))))
@@ -843,7 +847,7 @@
                              :status))))
 
             (testing "does not allow updating users"
-              (is (= 403 (-> (h/json-request
+              (is (= 403 (-> (tw/json-request
                               :put (format "/user/%s/%d" (:type user) (:type-id user))
                               user)
                              (secure-app-req secure-ctx)
@@ -866,10 +870,10 @@
         (fn [path]
           (some-> (mock/request :get path)
                   (app)
-                  (h/reply->json)))
+                  (tw/reply->json)))
         save-entity
         (fn [path params]
-          (-> (h/json-request :put path entity)
+          (-> (tw/json-request :put path entity)
               (app)))]
 
     (testing "/org/:org-id"
@@ -886,7 +890,7 @@
               (is (= 200 (:status r))))
             
             (testing "returns ids on newly created entities"
-              (is (every? (comp some? :id) (h/reply->json r)))))
+              (is (every? (comp some? :id) (tw/reply->json r)))))
 
           (testing (str "can partially update using `PATCH`"))
           
@@ -936,7 +940,7 @@
                  (st/save-param s (assoc p :org-id org-id)))
       :can-delete? true}))
 
-  (h/with-memory-store st
+  (ts/with-memory-store st
     (testing "can not be accessed for public repos"
       (let [[org-id repo-id] (repeatedly st/new-id)]
         (is (some? (st/save-org st {:id org-id
@@ -972,7 +976,7 @@
                    (st/save-ssh-key s (assoc p :org-id org-id)))
         :can-delete? true}))
 
-  (h/with-memory-store st
+  (ts/with-memory-store st
     (testing "can not be accessed for public repos"
       (let [[org-id repo-id] (repeatedly st/new-id)]
         (is (some? (st/save-org st {:id org-id
@@ -983,12 +987,12 @@
                        :status)))))
 
     (testing "`PUT` with empty body deletes all"
-      (let [org (h/gen-org)
-            sk (-> (h/gen-ssh-key)
+      (let [org (ts/gen-org)
+            sk (-> (ts/gen-ssh-key)
                    (assoc :org-id (:id org)))]
         (is (some? (st/save-org st org)))
         (is (some? (st/save-ssh-keys st (:id org) [sk])))
-        (is (= 200 (-> (h/json-request :put (format "/org/%s/ssh-keys" (:id org)) [])
+        (is (= 200 (-> (tw/json-request :put (format "/org/%s/ssh-keys" (:id org)) [])
                        (secure-app-req {:storage st :org-id (:id org)})
                        :status)))
         (is (empty? (st/find-ssh-keys st (:id org))))))))
@@ -1036,7 +1040,7 @@
       (fn [{:keys [path app] [_ _ build-id] :sid}]
         (let [l (-> (mock/request :get path)
                     (app))
-              b (h/reply->json l)]
+              b (tw/reply->json l)]
           (is (= 200 (:status l)))
           (is (= 1 (count b)))
           (is (some? (first b)))
@@ -1046,7 +1050,7 @@
     (testing "posts `build/triggered` event"
       (with-repo
         (fn [{:keys [app path] :as ctx}]
-          (is (= 202 (-> (h/json-request :post (str path "/trigger") {})
+          (is (= 202 (-> (tw/json-request :post (str path "/trigger") {})
                          (app)
                          :status)))
           (is (= [:build/triggered]
@@ -1058,14 +1062,14 @@
     (testing "allows query params"
       (with-repo
         (fn [{:keys [app path]}]
-          (is (= 202 (-> (h/json-request :post (str path "/trigger?branch=main") {})
+          (is (= 202 (-> (tw/json-request :post (str path "/trigger?branch=main") {})
                          (app)
                          :status))))))
 
     (testing "allows body"
       (with-repo
         (fn [{:keys [app path]}]
-          (is (= 202 (-> (h/json-request :post (str path "/trigger")
+          (is (= 202 (-> (tw/json-request :post (str path "/trigger")
                                          {:branch "main"
                                           :params {"test-key" "test-value"}})
                          (app)
@@ -1077,7 +1081,7 @@
         (testing "retrieves latest build for repo"
           (let [l (-> (mock/request :get (str path "/latest"))
                       (app))
-                b (h/reply->json l)]
+                b (tw/reply->json l)]
             (is (= 200 (:status l)))
             (is (map? b))
             (is (= build-id (:build-id b)) "should contain build id")
@@ -1101,7 +1105,7 @@
           (testing "retrieves build with given id"
             (let [l (-> (mock/request :get (build-path sid))
                         (app))
-                  b (some-> l :body slurp h/parse-json)]
+                  b (some-> l :body slurp tj/parse-json)]
               (is (not-empty l))
               (is (= 200 (:status l)))
               (is (= build-id (:build-id b)))))
@@ -1113,7 +1117,7 @@
                   l (-> (mock/request :get (build-path sid))
                         (app))]
               (is (= 404 (:status l)))
-              (is (string? (:error (h/reply->json l)))))))
+              (is (string? (:error (tw/reply->json l)))))))
 
         (testing "`POST /retry` re-triggers build"
           (is (= 202 (-> (mock/request :post (str (build-path sid) "/retry"))
@@ -1126,11 +1130,11 @@
                          :status)))))))
 
   (testing "can list if access granted to org"
-    (h/with-memory-store st
+    (ts/with-memory-store st
       (let [[org-id repo-id :as sid] (generate-build-sid)
-            org (-> (h/gen-org)
+            org (-> (ts/gen-org)
                     (assoc :id org-id :repos {}))
-            repo (assoc (h/gen-repo) :id repo-id :org-id org-id)]
+            repo (assoc (ts/gen-repo) :id repo-id :org-id org-id)]
         (is (some? (st/save-org st org)))
         (is (some? (st/save-repo st repo)))
         (is (= 200 (-> (mock/request :get (repo-path sid))
@@ -1138,12 +1142,12 @@
                        :status)))))))
 
 (deftest job-endpoints
-  (h/with-memory-store st
+  (ts/with-memory-store st
     (let [repo {:id (cuid/random-cuid)
                 :name "test repo"}
-          org (-> (h/gen-org)
+          org (-> (ts/gen-org)
                   (assoc :repos {(:id repo) repo}))
-          build (-> (h/gen-build)
+          build (-> (ts/gen-build)
                     (assoc :build-id "test-build"
                            :org-id (:id org)
                            :repo-id (:id repo)))
@@ -1162,7 +1166,7 @@
                 (is (= 200 (:status r)) (str "sid: " (b/sid build)))
                 (is (= {:id "test-job"
                         :type "container"}
-                       (h/reply->json r)))))
+                       (tw/reply->json r)))))
 
             (testing "`404` when job does not exist"
               (is (= 404 (-> (mock/request :get (str (build-path (b/sid build)) "/job/nonexisting"))
@@ -1211,7 +1215,7 @@
                                     :code "1234"}
                                    (:query-params req))
                               {:status 200
-                               :body (h/to-raw-json {:access_token "test-token"})
+                               :body (tj/to-raw-json {:access_token "test-token"})
                                :headers {"Content-Type" "application/json"}}
                               {:status 400
                                :body (str "invalid query params:" (:query-params req))
@@ -1222,7 +1226,7 @@
                             (let [auth (get-in req [:headers "Authorization"])]
                               (if (= "Bearer test-token" auth)
                                 {:status 200
-                                 :body (h/to-raw-json {:id 4567
+                                 :body (tj/to-raw-json {:id 4567
                                                        :name "test-user"
                                                        :other-key "other-value"})
                                  :headers {"Content-Type" "application/json"}}
@@ -1239,7 +1243,7 @@
           (is (= "test-token"
                  (some-> (:body r)
                          (slurp)
-                         (h/parse-json)
+                         (tj/parse-json)
                          :github-token))))))
 
     (testing "`GET /config` returns client id"
@@ -1248,13 +1252,13 @@
             r (-> (mock/request :get "/github/config")
                   (app))]
         (is (= 200 (:status r)))
-        (is (= "test-client-id" (some-> r :body slurp h/parse-json :client-id)))))
+        (is (= "test-client-id" (some-> r :body slurp tj/parse-json :client-id)))))
 
     (testing "`POST /refresh` refreshes access token"
       (at/with-fake-http ["https://github.com/login/oauth/access_token"
                           {:status 200
                            :headers {"Content-Type" "application/json"}
-                           :body (h/to-json {:access-token "new-token"
+                           :body (tj/to-json {:access-token "new-token"
                                              :refresh-token "new-refresh"})}
                           "https://api.github.com/user"
                           {:status 200
@@ -1262,13 +1266,13 @@
         (let [app (-> (test-rt {:config {:github {:client-id "test-client-id"
                                                   :client-secret "test-secret"}}})
                       (sut/make-app))
-              r (-> (h/json-request :post "/github/refresh"
+              r (-> (tw/json-request :post "/github/refresh"
                                     {:refresh-token "old-token"})
                     (app))]
           (is (= 200 (:status r)))
           (is (= "new-token"
                  (-> r
-                     (h/reply->json)
+                     (tw/reply->json)
                      :github-token))))))))
 
 (defn- matches-basic-auth? [req user pass]
@@ -1289,7 +1293,7 @@
                               {:status 400 :body (str "Invalid auth code: " (:basic-auth req))}
                               :else
                               {:status 200
-                               :body (h/to-raw-json {:access_token "test-token"})
+                               :body (tj/to-raw-json {:access_token "test-token"})
                                :headers {"Content-Type" "application/json"}}))
                           {:url "https://api.bitbucket.org/2.0/user"
                            :request-method :get}
@@ -1297,7 +1301,7 @@
                             (let [auth (get-in req [:headers "Authorization"])]
                               (if (= "Bearer test-token" auth)
                                 {:status 200
-                                 :body (h/to-raw-json {:name "test-user"
+                                 :body (tj/to-raw-json {:name "test-user"
                                                        :other-key "other-value"})
                                  :headers {"Content-Type" "application/json"}}
                                 {:status 400 :body (str "invalid auth header: " auth)})))]
@@ -1312,7 +1316,7 @@
           (is (= "test-token"
                  (some-> (:body r)
                          (slurp)
-                         (h/parse-json)
+                         (tj/parse-json)
                          :bitbucket-token))))))
 
     (testing "`POST /refresh` refreshes token from bitbucket and fetches user info"
@@ -1332,7 +1336,7 @@
                                :headers {"Content-Type" "text/plain"}}
                               :else
                               {:status 200
-                               :body (h/to-raw-json {:access_token "test-token"})
+                               :body (tj/to-raw-json {:access_token "test-token"})
                                :headers {"Content-Type" "application/json"}}))
                           {:url "https://api.bitbucket.org/2.0/user"
                            :request-method :get}
@@ -1340,7 +1344,7 @@
                             (let [auth (get-in req [:headers "Authorization"])]
                               (if (= "Bearer test-token" auth)
                                 {:status 200
-                                 :body (h/to-raw-json {:name "test-user"
+                                 :body (tj/to-raw-json {:name "test-user"
                                                        :other-key "other-value"})
                                  :headers {"Content-Type" "application/json"}}
                                 {:status 400 :body (str "invalid auth header: " auth)})))]
@@ -1349,14 +1353,14 @@
                                                      :client-secret "test-secret"}}
                                 :jwk (auth/keypair->rt (auth/generate-keypair))})
                       (sut/make-app))
-              r (-> (h/json-request :post "/bitbucket/refresh"
+              r (-> (tw/json-request :post "/bitbucket/refresh"
                                     {:refresh-token "test-token"})
                     (app))]
           (is (= 200 (:status r)))
           (is (= "test-token"
                  (some-> (:body r)
                          (slurp)
-                         (h/parse-json)
+                         (tj/parse-json)
                          :bitbucket-token))))))
 
     (testing "`GET /config` returns client id"
@@ -1365,7 +1369,7 @@
             r (-> (mock/request :get "/bitbucket/config")
                   (app))]
         (is (= 200 (:status r)))
-        (is (= "test-client-id" (some-> r :body slurp h/parse-json :client-id)))))))
+        (is (= "test-client-id" (some-> r :body slurp tj/parse-json :client-id)))))))
 
 (deftest codeberg-endpoints
   (testing "`/codeberg`"
@@ -1377,9 +1381,9 @@
                                     :client-secret "test-secret"
                                     :code "1234"
                                     :grant-type "authorization_code"}
-                                   (h/parse-json (:body req)))
+                                   (tj/parse-json (:body req)))
                               {:status 200
-                               :body (h/to-raw-json {:access_token "test-token"})
+                               :body (tj/to-raw-json {:access_token "test-token"})
                                :headers {"Content-Type" "application/json"}}
                               {:status 400
                                :body (str "invalid query params:" (:query-params req))
@@ -1390,9 +1394,9 @@
                             (let [auth (get-in req [:headers "Authorization"])]
                               (if (= "Bearer test-token" auth)
                                 {:status 200
-                                 :body (h/to-raw-json {:id 4567
-                                                       :name "test-user"
-                                                       :other-key "other-value"})
+                                 :body (tj/to-raw-json {:id 4567
+                                                        :name "test-user"
+                                                        :other-key "other-value"})
                                  :headers {"Content-Type" "application/json"}}
                                 {:status 400
                                  :body (str "invalid auth header: " auth)
@@ -1407,7 +1411,7 @@
           (is (= "test-token"
                  (some-> (:body r)
                          (slurp)
-                         (h/parse-json)
+                         (tj/parse-json)
                          :codeberg-token))))))
 
     (testing "`GET /config` returns client id"
@@ -1416,13 +1420,13 @@
             r (-> (mock/request :get "/codeberg/config")
                   (app))]
         (is (= 200 (:status r)))
-        (is (= "test-client-id" (some-> r :body slurp h/parse-json :client-id)))))
+        (is (= "test-client-id" (some-> r :body slurp tj/parse-json :client-id)))))
 
     (testing "`POST /refresh` refreshes access token"
       (at/with-fake-http ["https://codeberg.org/login/oauth/access_token"
                           {:status 200
                            :headers {"Content-Type" "application/json"}
-                           :body (h/to-json {:access-token "new-token"
+                           :body (tj/to-json {:access-token "new-token"
                                              :refresh-token "new-refresh"})}
                           "https://codeberg.org/api/v1/user"
                           {:status 200
@@ -1430,13 +1434,13 @@
         (let [app (-> (test-rt {:config {:codeberg {:client-id "test-client-id"
                                                   :client-secret "test-secret"}}})
                       (sut/make-app))
-              r (-> (h/json-request :post "/codeberg/refresh"
+              r (-> (tw/json-request :post "/codeberg/refresh"
                                     {:refresh-token "old-token"})
                     (app))]
           (is (= 200 (:status r)))
           (is (= "new-token"
                  (-> r
-                     (h/reply->json)
+                     (tw/reply->json)
                      :codeberg-token))))))))
 
 (deftest routing-middleware
@@ -1489,7 +1493,7 @@
             k (some-> r
                       :body
                       (slurp)
-                      (h/parse-json)
+                      (tj/parse-json)
                       :keys
                       (first))]
         (is (= 200 (:status r)))
@@ -1562,7 +1566,7 @@
   (testing "`/email-registration`"
     (testing "POST `/unregister`"
       (testing "returns 200 if matching user"
-        (h/with-memory-store st
+        (ts/with-memory-store st
           (let [app (make-test-app st)
                 email "existing@monkeyci.com"]
             (is (some? (st/save-email-registration st {:email email})))
@@ -1573,10 +1577,10 @@
 
     (testing "POST `/confirm`"
       (testing "returns 200 if matching user"
-        (h/with-memory-store st
+        (ts/with-memory-store st
           (let [app (make-test-app st)
                 email "user@monkeyci.com"
-                reg (-> (h/gen-email-registration)
+                reg (-> (ts/gen-email-registration)
                         (assoc :email email
                                :confirmed false))
                 conf {:id (cuid/random-cuid)
@@ -1585,7 +1589,7 @@
             (is (some? (st/save-email-registration st reg)))
             (is (some? (st/save-email-confirmation st conf)))
             (is (= 200
-                   (-> (h/json-request :post "/email-registration/confirm"
+                   (-> (tw/json-request :post "/email-registration/confirm"
                                        {:id (:id reg)
                                         :code "test-code"})
                        (app)
@@ -1595,7 +1599,7 @@
   (testing "`/admin`"
     (testing "`/credits`"
       (testing "`/:org-id`"
-        (let [org (h/gen-org)
+        (let [org (ts/gen-org)
               make-path (fn [& [path]]
                           (cond-> (str "/admin/credits/" (:id org))
                             (some? path) (str path)))]
@@ -1605,7 +1609,7 @@
                            :status))))
           
           (testing "POST `/issue` issues new credits to specific org"
-            (is (= 201 (-> (h/json-request :post
+            (is (= 201 (-> (tw/json-request :post
                                            (make-path "/issue")
                                            {:amount 100
                                             :reason "test issue"})
@@ -1613,13 +1617,13 @@
                            :status))))
 
           (testing "`/subscription`"
-            (let [reply (-> (h/json-request :post
+            (let [reply (-> (tw/json-request :post
                                             (make-path "/subscription")
                                             {:amount 100
                                              :valid-from (t/now)
                                              :valid-until (+ (t/now) 1000)})
                             (test-app))
-                  created (h/reply->json reply)]
+                  created (tw/reply->json reply)]
               (testing "`POST /` creates new credit subscription"
                 (is (= 201 (:status reply)))
                 (is (not-empty created))
@@ -1629,7 +1633,7 @@
                 (let [reply (-> (mock/request :get (make-path "/subscription"))
                                 (test-app))]
                   (is (= 200 (:status reply)))
-                  (is (= [created] (h/reply->json reply)))))
+                  (is (= [created] (tw/reply->json reply)))))
               
               (testing "`GET /:subscription-id` retrieves subscription by id"
                 (is (= 200 (-> (mock/request
@@ -1639,17 +1643,17 @@
                                :status))))
 
               (testing "`DELETE /:subscription-id` disables subscription"
-                (let [reply (-> (h/json-request
+                (let [reply (-> (tw/json-request
                                  :delete
                                  (make-path (str "/subscription/" (:id created)))
                                  {})
                                 (test-app))]
                   (is (= 200 (:status reply)))
                   (is (= (:id created)
-                         (:id (h/reply->json reply))))))))))
+                         (:id (tw/reply->json reply))))))))))
 
       (testing "POST `/issue` issues new credits to all orgs with subscriptions"
-        (is (= 200 (-> (h/json-request :post "/admin/credits/issue"
+        (is (= 200 (-> (tw/json-request :post "/admin/credits/issue"
                                        {:date "2025-01-16"})
                        (test-app)
                        :status)))))
@@ -1676,7 +1680,7 @@
                                      :type-id "test-admin"})))
         (is (some? (st/save-sysadmin st {:user-id uid
                                          :password (auth/hash-pw "test-pass")})))
-        (is (= 200 (-> (h/json-request :post "/admin/login"
+        (is (= 200 (-> (tw/json-request :post "/admin/login"
                                        {:username "test-admin"
                                         :password "test-pass"})
                        (app)
@@ -1697,7 +1701,7 @@
                        :status))))
 
       (testing "`/:mailing-id/send`"
-        (let [{:keys [id] :as m} (h/gen-mailing)
+        (let [{:keys [id] :as m} (ts/gen-mailing)
               {st :storage :as rt} (test-rt)
               app (sut/make-app rt)
               path (str "/admin/mailing/" id "/send")]
@@ -1709,27 +1713,27 @@
 
 (deftest crypto-endpoints
   (testing "`POST /:org-id/crypto/decrypt-key` decrypts encrypted key"
-    (let [org (h/gen-org)
+    (let [org (ts/gen-org)
           app (-> (test-rt)
                   (trt/set-decrypter (fn [k org-id id]
                                        (when (= org-id id (:id org))
                                          "decrypted-key")))
                   (sut/make-app))
-          r (-> (h/json-request :post (format "/org/%s/crypto/decrypt-key" (:id org))
+          r (-> (tw/json-request :post (format "/org/%s/crypto/decrypt-key" (:id org))
                                 {:enc "encrypted-key"})
                 (app))]
       (is (= 200 (:status r)))
-      (is (= "decrypted-key" (-> (h/reply->json r)
+      (is (= "decrypted-key" (-> (tw/reply->json r)
                                  :key))))))
 
 (deftest user-token-endpoints
-  (h/with-memory-store st
+  (ts/with-memory-store st
     (testing "`/user/:user-id/token`"
-      (let [user (h/gen-user)
+      (let [user (ts/gen-user)
             app (make-test-app st)]
         (is (some? (st/save-user st user)))
         (testing "`POST` creates new token"
-          (is (= 201 (-> (h/json-request :post (format "/user/%s/token" (:id user))
+          (is (= 201 (-> (tw/json-request :post (format "/user/%s/token" (:id user))
                                          {:valid-until (+ (t/now) 10000)
                                           :description "test token"})
                          (app)
@@ -1740,7 +1744,7 @@
 
         (let [r (-> (mock/request :get (format "/user/%s/token" (:id user)))
                     (app))
-              b (h/reply->json r)]
+              b (tw/reply->json r)]
           (testing "`GET` lists user tokens"
             (is (= 200 (:status r)))
             (is (= 1 (count b))))
@@ -1750,7 +1754,7 @@
                                   :get
                                   (format "/user/%s/token/%s" (:id user) (-> b first :id)))
                                  (app)
-                                 (h/reply->json)))))
+                                 (tw/reply->json)))))
 
           (testing "`DELETE /:token-id` deletes token"
             (is (= 204 (-> (mock/request
@@ -1760,17 +1764,17 @@
                            :status)))))))))
 
 (deftest org-token-endpoints
-  (h/with-memory-store st
+  (ts/with-memory-store st
     (testing "`/org/:org-id/token`"
-      (let [org (h/gen-org)
+      (let [org (ts/gen-org)
             app (make-test-app st)]
         (is (some? (st/save-org st org)))
         (testing "`POST` creates new token"
-          (let [r (-> (h/json-request :post (format "/org/%s/token" (:id org))
+          (let [r (-> (tw/json-request :post (format "/org/%s/token" (:id org))
                                       {:valid-until (+ (t/now) 10000)
                                        :description "test token"})
                       (app))
-                b (h/reply->json r)]
+                b (tw/reply->json r)]
             (is (= 201 (:status r)))
             (is (string? (:token b)) "generates token value")
             
@@ -1780,7 +1784,7 @@
 
         (let [r (-> (mock/request :get (format "/org/%s/token" (:id org)))
                     (app))
-              b (h/reply->json r)]
+              b (tw/reply->json r)]
           (testing "`GET` lists org tokens"
             (is (= 200 (:status r)))
             (is (= 1 (count b))))
@@ -1790,7 +1794,7 @@
                                   :get
                                   (format "/org/%s/token/%s" (:id org) (-> b first :id)))
                                  (app)
-                                 (h/reply->json)))))
+                                 (tw/reply->json)))))
 
           (testing "`DELETE /:token-id` deletes token"
             (is (= 204 (-> (mock/request
@@ -1800,18 +1804,18 @@
                            :status)))))))))
 
 (deftest org-plan-endpoints
-  (h/with-memory-store st
-    (let [org (h/gen-org)
+  (ts/with-memory-store st
+    (let [org (ts/gen-org)
           app (make-test-app st)
           path (format "/org/%s/plan" (:id org))]
       (is (some? (st/save-org st org)))
       (testing "`/org/:org-id/plan`"
         (testing "`POST /` configures new org plan"
-          (let [r (-> (h/json-request :post path
+          (let [r (-> (tw/json-request :post path
                                       {:type :startup})
                       (app))]
             (is (= 201 (:status r)))
-            (let [b (h/reply->json r)]
+            (let [b (tw/reply->json r)]
               (is (map? b))
               (is (some? (:id b)) (str b)))))
         
@@ -1826,12 +1830,12 @@
                          :status))))
         
         (testing "`POST /cancel` cancels current org plan"
-          (is (= 200 (-> (h/json-request :post (str path "/cancel") {})
+          (is (= 200 (-> (tw/json-request :post (str path "/cancel") {})
                          (app)
                          :status))))))))
 
 (deftest resolve-id-from-db
-  (h/with-memory-store s
+  (ts/with-memory-store s
     (let [org {:id (cuid/random-cuid)
                :display-id "test-org"}]
       (is (some? (st/save-org s org)))
@@ -1839,13 +1843,13 @@
       (testing "looks up org id in storage"
         (is (= (:id org)
                (-> {:storage s}
-                   (h/->req)
+                   (tw/->req)
                    (sut/resolve-id-from-db "test-org")))))
 
       (testing "returns original id when no match found"
         (is (= (:id org)
                (-> {:storage s}
-                   (h/->req)
+                   (tw/->req)
                    (sut/resolve-id-from-db (:id org)))))))))
 
 (deftest cached-id-resolver

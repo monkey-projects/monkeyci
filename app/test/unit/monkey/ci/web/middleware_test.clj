@@ -1,9 +1,9 @@
 (ns monkey.ci.web.middleware-test
   (:require [clojure.test :refer [deftest is testing]]
             [monkey.ci.test
-             [helpers :as h]
              [mailman :as tmm]
-             [runtime :as trt]]
+             [runtime :as trt]
+             [web :as tw]]
             [monkey.ci.web
              [common :as wc]
              [middleware :as sut]
@@ -21,7 +21,7 @@
           resp (-> (rur/response "test reply")
                    (r/add-event evt))
           rt (trt/test-runtime)
-          req (h/->req rt)
+          req (tw/->req rt)
           mw (sut/post-events (constantly resp))
           broker (trt/get-mailman rt)
           r (mw req)]
@@ -41,7 +41,7 @@
                        "resolved-id"))]
       (is (= "resolved-id"
              (-> (wc/set-id-resolver {} resolver)
-                 (h/->match-data)
+                 (tw/->match-data)
                  (assoc :parameters {:path
                                      {:org-id "original-id"}})
                  (r)))))))

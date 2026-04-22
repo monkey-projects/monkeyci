@@ -2,13 +2,14 @@
   (:require [clojure.test :refer [deftest testing is]]
             [monkey.ci.storage :as st]
             [monkey.ci.test
-             [helpers :as h]
-             [runtime :as trt]]
+             [runtime :as trt]
+             [storage :as ts]
+             [web :as tw]]
             [monkey.ci.web.api.user :as sut]))
 
 (deftest create-user
   (let [{st :storage :as rt} (trt/test-runtime)
-        r (-> (h/->req rt)
+        r (-> (tw/->req rt)
               (assoc-in [:parameters :body] {:type "github"
                                              :type-id 124
                                              :name "new user"})
@@ -28,7 +29,7 @@
       (is (st/sid? (st/save-user st {:type "github"
                                      :type-id 543
                                      :name "test user"})))
-      (is (= 200 (-> (h/->req rt)
+      (is (= 200 (-> (tw/->req rt)
                      (assoc :parameters {:path
                                          {:user-type "github"
                                           :type-id 543}
@@ -41,10 +42,10 @@
 
 (deftest update-user-settings
   (let [{st :storage :as rt} (trt/test-runtime)
-        u (h/gen-user)]
+        u (ts/gen-user)]
     (testing "creates when none exist yet"
       (is (st/sid? (st/save-user st u)))
-      (is (= 200 (-> (h/->req rt)
+      (is (= 200 (-> (tw/->req rt)
                      (assoc :parameters
                             {:path {:user-id (:id u)}
                              :body {:receive-mailing true}})
@@ -54,7 +55,7 @@
 
     (testing "updates existing"
       (is (st/sid? (st/save-user st u)))
-      (is (= 200 (-> (h/->req rt)
+      (is (= 200 (-> (tw/->req rt)
                      (assoc :parameters
                             {:path {:user-id (:id u)}
                              :body {:receive-mailing false}})
@@ -64,7 +65,7 @@
                       :receive-mailing))))
 
     (testing "returns `404 not found` when user does not exist"
-      (is (= 404 (-> (h/->req rt)
+      (is (= 404 (-> (tw/->req rt)
                      (assoc :parameters
                             {:path {:user-id "nonexisting"}
                              :body {:receive-mailing false}})
@@ -73,8 +74,8 @@
 
 (deftest get-user-settings
   (let [{st :storage :as rt} (trt/test-runtime)
-        {uid :id :as u} (h/gen-user)
-        req (-> (h/->req rt)
+        {uid :id :as u} (ts/gen-user)
+        req (-> (tw/->req rt)
                 (assoc-in [:parameters :path :user-id] uid))]
     (testing "returns `404` when user not found"
       (is (= 404 (-> req

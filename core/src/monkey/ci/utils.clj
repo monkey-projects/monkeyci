@@ -1,0 +1,263 @@
+(ns monkey.ci.utils
+  (:require [babashka.fs :as fs]
+            [buddy.core
+             [codecs :as bcc]
+             [hash :as bch]]
+            [buddy.core.keys.pem :as pem]
+            [camel-snake-kebab.core :as csk]
+            [clojure
+             [math :as math]
+             [repl :as cr]
+             [walk :as cw]]
+            [clojure.java.io :as io]
+            [clojure.tools.logging :as log]
+            [manifold
+             [deferred :as md]
+             [stream :as ms]]
+            [medley.core :as mc]
+            [monkey.ci
+             [sid :as sid]
+             [time :as t]]))
+
+(defn cwd
+  "Returns current directory"
+  []
+  (System/getProperty "user.dir"))
+
+(defn abs-path
+  "If `b` is a relative path, will combine it with `a`, otherwise
+   will just return `b`."
+  ([a b]
+   (if a
+     (if (fs/absolute? b)
+       b
+       (str (fs/path a b)))
+     b))
+  ([p]
+   (some-> p
+           (fs/canonicalize)
+           (str))))
+
+(defn abs-path-safe [a b]
+  (when (and a b)
+    (abs-path a b)))
+
+(defn combine
+  "Returns the canonical path of combining `a` and `b`"
+  [a b]
+  (-> (fs/path a b)
+      (fs/canonicalize)
+      (str)))
+
+(defn rebase-path
+  "Given two absolute paths, recalculates p so that it becomes relative to `to` instead
+   of `from`."
+  [p from to]
+  (str (if (fs/absolute? p)
+         (->> (fs/relativize from p)
+              (fs/path to))
+         (fs/path to p))))
+
+(defn mkdirs! [f]
+  (if (and f (fs/exists? f))
+    (when-not (fs/directory? f)
+      (throw (ex-info "Directory cannot be created, already exists as a file" {:dir f})))
+    (when-not (fs/create-dirs f)
+      (throw (ex-info "Unable to create directory" {:dir f}))))
+  f)
+
+(defn ensure-dir-exists!
+  "If `f` is a file, ensures that the directory containing `f` exists."
+  [f]
+  (let [p (some-> f fs/parent)]
+    (when p
+      (mkdirs! p)))
+  f)
+
+(defn add-shutdown-hook!
+  "Executes `h` when the JVM shuts down.  Returns the thread that will
+   execute the hook."
+  [h]
+  (let [t (Thread. h)]
+    (.. (Runtime/getRuntime)
+        (addShutdownHook t))
+    t))
+
+(defn tmp-dir []
+  (System/getProperty "java.io.tmpdir"))
+
+(defn tmp-file
+  "Generates a new temporary path"
+  ([prefix suffix]
+   (tmp-file (str prefix (random-uuid) suffix)))
+  ([name]
+   (-> (fs/path (tmp-dir) name)
+       (fs/absolutize)
+       (str))))
+
+(defn delete-dir
+  "Deletes directory recursively"
+  [dir]
+  (fs/delete-tree dir))
+
+(defn load-privkey
+  "Load private key from file or from string"
+  [f]
+  (letfn [(->reader [x]
+            (if (fs/exists? x)
+              (io/reader (fs/file x))
+              (java.io.StringReader. x)))]
+    (if (instance? java.security.PrivateKey f)
+      f
+      (with-open [r (->reader f)]
+        (pem/read-privkey r nil)))))
+
+(defn fn-name
+  "If x points to a fn, returns its name without namespace"
+  [x]
+  (->> (str x)
+       (cr/demunge)
+       (re-find #".*\/(.*)[\-\-|@].*")
+       (second)))
+
+(defn stack-trace
+  "Prints stack trace to a string"
+  [^Exception ex]
+  (let [sw (java.io.StringWriter.)
+        pw (java.io.PrintWriter. sw)]
+    (.printStackTrace ex pw)
+    (.flush pw)
+    (.toString sw)))
+
+(defn- prune-map [m]
+  ;; Remove nil values and empty strings
+  (mc/remove-vals (some-fn nil? (every-pred seqable? empty?) (every-pred string? empty?)) m))
+
+(defn prune-tree [t]
+  (cw/prewalk (fn [x]
+                (cond-> x
+                  (map? x) (prune-map)))
+              t))
+
+(defn ->base64 [s]
+  (.. (java.util.Base64/getEncoder)
+      (encodeToString (.getBytes s java.nio.charset.StandardCharsets/UTF_8))))
+
+(def ^:deprecated parse-sid sid/parse-sid)
+(def ^:deprecated sid->repo-sid sid/sid->repo-sid)
+
+(def ^:deprecated serialize-sid sid/serialize-sid)
+
+(defn try-slurp
+  "Reads the file if it exists, or just returns x"
+  [x]
+  (if (fs/exists? x)
+    (slurp x)
+    x))
+
+(def now t/now)
+
+(defn ->seq
+  "Converts `x` into a sequential"
+  [x]
+  (if (sequential? x) x [x]))
+
+(defn or-nil
+  "Wraps `f` so that when the argument is `nil`, it also returns `nil` and does not invoke `f`."
+  [f]
+  (fn [x]
+    (when x
+      (f x))))
+
+(defn round-up
+  "Rounds the decimal argument up to the next integer value"
+  [x]
+  (let [r (int (math/round x))]
+    (cond-> r
+      (< r x) inc)))
+
+(defn log-deferred-elapsed
+  "Given a deferred, keeps track of time elapsed and logs it"
+  [x msg]
+  (let [start (now)]
+    (md/finally x (fn []
+                    (let [elapsed (- (now) start)]
+                      (log/debugf "%s - Elapsed: %s ms, %.2f s" msg elapsed (float (/ elapsed 1000))))))))
+
+(defn file-hash
+  "Calculates md5 hash for given file"
+  [path]
+  (when (fs/exists? path)
+    (with-open [in (io/input-stream path)]
+      (-> (bch/md5 in)
+          (bcc/bytes->hex)))))
+
+(defn maybe-deref [x]
+  (cond-> x
+    (md/deferred? x) (deref)))
+
+(defn update-nth [c idx f & args]
+  (mc/replace-nth idx (apply f (nth c idx) args) c))
+
+(defn name->display-id
+  "Generates a unique display id using the given name.  It checks the `existing?`
+   fn to avoid collisions."
+  [n existing?]
+  (let [;; TODO Check what happens with special chars
+        new-id (csk/->kebab-case n)]
+    (loop [id new-id
+           idx 2]
+      ;; Try a new id until we find one that does not exist yet.
+      ;; Alternatively we could parse the ids to extract the max index (but yagni)
+      (if (existing? id)
+        (recur (str new-id "-" idx)
+               (inc idx))
+        id))))
+
+(defn wait-until
+  "Periodically invokes predicate `p`.  Returns a deferred that realizes when `p`
+   becomes truthy.  Returns the first truthy return value of `p`."
+  [p & {:keys [period] :or {period 100}}]
+  (->> (ms/periodically period p)
+       (ms/filter (every-pred some? (complement false?)))
+       (ms/take!)))
+
+(defn wait-for-file
+  "Periodically checks if given file exists.  Returns a deferred that holds
+   the path if it exists."
+  [f & opts]
+  (wait-until #(when (fs/exists? f) f) opts))
+
+(defn get-all-ip-addresses
+  "Lists all non-loopback, non-virtual site local ip addresses"
+  []
+  (->> (enumeration-seq (java.net.NetworkInterface/getNetworkInterfaces))
+       (remove (some-fn (memfn isLoopback) (memfn isVirtual)))
+       (mapcat (comp enumeration-seq (memfn getInetAddresses)))
+       (remove (memfn isLinkLocalAddress))))
+
+(defn get-ip-addr
+  "Determines the ip address of this VM by selecting the first of all available addresses.
+   This could be an ipv4 or ipv6 address."
+  []
+  (first (get-all-ip-addresses)))
+
+(defprotocol InetAddressString
+  (inetaddr->str [a] "Returns textual representation of the inet address"))
+
+(extend-protocol InetAddressString
+  java.net.Inet4Address
+  (inetaddr->str [a]
+    (.getHostName a))
+
+  java.net.Inet6Address
+  (inetaddr->str [a]
+    ;; Drop the scope id
+    (.getHostAddress (java.net.InetAddress/getByAddress nil (.getAddress a)))))
+
+(defn file-size-mb
+  "Returns file size in MB"
+  [f]
+  (if (fs/exists? f)
+    (float (/ (fs/size f) (* 1024 1024)))
+    0.0))

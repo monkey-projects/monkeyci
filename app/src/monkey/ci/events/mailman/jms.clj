@@ -3,6 +3,7 @@
    queue and topic configurations and listeners."
   (:require [com.stuartsierra.component :as co]
             [medley.core :as mc]
+            [monkey.ci.events.mailman :as em]
             [monkey.ci.protocols :as p]
             [monkey.mailman
              [core :as mmc]
@@ -101,3 +102,7 @@
            (map (partial hash-map :handler router :destination))
            (map (partial mmc/add-listener broker))
            (doall)))))
+
+(defmethod em/make-component :jms [config]
+  (map->JmsComponent {:config config}))
+

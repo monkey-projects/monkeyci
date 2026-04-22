@@ -34,8 +34,8 @@
         com.monkeyprojects/metrics {:mvn/version "0.1.0"}
         com.monkeyprojects/minio-clj {:mvn/version "0.1.0"}
         com.monkeyprojects/monkey-jms-artemis {:mvn/version "0.3.2"}
-        com.monkeyprojects/oci-container-instance {:mvn/version "0.2.5"}
-        com.monkeyprojects/oci-os {:mvn/version "0.4.1"}
+        com.monkeyci/core {:local/root "../core"}
+        com.monkeyci/oci {:local/root "../ext/oci"}
         com.monkeyprojects/oci-sign {:mvn/version "0.1.5"}
         com.monkeyprojects/oci-vault {:mvn/version "0.2.1"}
         com.mysql/mysql-connector-j {:mvn/version "9.6.0"}
@@ -85,6 +85,7 @@
   :test
   {:extra-paths [:test-paths]
    :extra-deps {com.monkeyprojects/build {:mvn/version "0.3.1"}
+                com.monkeyci/test-utils {:local/root "../ext/test-utils"}
                 com.h2database/h2 {:mvn/version "2.4.240"}
                 org.clojure/test.check {:mvn/version "1.1.3"}
                 ring/ring-mock {:mvn/version "0.6.2"}}

@@ -17,7 +17,10 @@
             [monkey.ci.events.mailman.interceptors :as emi]
             [monkey.ci.runners.oci :as sut]
             [monkey.ci.script.config :as sc]
-            [monkey.ci.test.helpers :as h]
+            [monkey.ci.test
+             [helpers :as h]
+             [storage :as ts]
+             [vault :as tv]]
             [monkey.mailman.core :as mmc]))
 
 (defn- decode-vol-config [vol fn]
@@ -222,20 +225,20 @@
         (is (some? (oci/find-volume ic "ssh-keys")))))))
 
 (deftest decrypt-ssh-keys
-  (h/with-memory-store st
+  (ts/with-memory-store st
     (let [vault (v/->FixedKeyVault (v/generate-key))
           iv (v/generate-iv)
           {:keys [enter] :as i} (sut/decrypt-ssh-keys vault)]
       (is (keyword? (:name i)))
 
-      (testing "decrypts key using customer iv"
+      (testing "decrypts key using orgomer iv"
         (let [ssh-key "decrypted-key"
-              cust (h/gen-cust)
-              build (-> (h/gen-build)
-                        (assoc :org-id (:id cust))
+              org (ts/gen-org)
+              build (-> (ts/gen-build)
+                        (assoc :org-id (:id org))
                         (assoc-in [:git :ssh-keys] [{:private-key (p/encrypt vault iv ssh-key)
                                                      :public-key "test-pub"}]))
-              _ (st/save-crypto st {:org-id (:id cust)
+              _ (st/save-crypto st {:org-id (:id org)
                                     :iv iv})
               r (-> {:event {:type :build/pending
                              :sid (st/ext-build-sid build)
@@ -266,7 +269,7 @@
     (is (keyword? (:name i)))
     
     (testing "`enter` saves ci results in db"
-      (h/with-memory-store st
+      (ts/with-memory-store st
         (let [sid (repeatedly 3 cuid/random-cuid)
               ctx (-> {:event {:sid sid}}
                       (oci/set-ci-response {:status 200
@@ -283,7 +286,7 @@
     (is (keyword? (:name i)))
     
     (testing "`enter` fetches runner details from db"
-      (h/with-memory-store st
+      (ts/with-memory-store st
         (let [sid (repeatedly 3 cuid/random-cuid)
               ocid (random-uuid)
               details {:runner :oci
@@ -311,7 +314,7 @@
                :git {:url "test-url"}}
         st (st/make-memory-storage)
         conf {:api {:private-key (h/generate-private-key)}}
-        router (-> (sut/make-routes conf st (h/fake-vault))
+        router (-> (sut/make-routes conf st (tv/fake-vault))
                    (mmc/router))]
     
     (testing "`build/queued`"

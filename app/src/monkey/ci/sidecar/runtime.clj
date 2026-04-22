@@ -2,11 +2,12 @@
   "Functions for creating a runtime for a build-aware environment for the sidecar"
   (:require [com.stuartsierra.component :as co]
             [monkey.ci
-             [artifacts :as art]
-             [cache :as cache]
              [spec :as spec]
              [workspace :as ws]]
-            [monkey.ci.build.api :as api]
+            [monkey.ci.build
+             [api :as api]
+             [artifacts :as art]
+             [cache :as cache]]
             [monkey.ci.containers.common :as cc]
             [monkey.ci.events.mailman.build-api :as eba]
             [monkey.ci.runtime.common :as rc]

@@ -15,7 +15,8 @@
             [monkey.ci.test
              [aleph-test :as ta]
              [config :as tc]
-             [helpers :as h]]))
+             [helpers :as h]
+             [storage :as ts]]))
 
 (deftest make-system
   (let [conf (assoc tc/base-config
@@ -138,7 +139,7 @@
          (fn [req]
            {:status 200
             :body {:key "decrypted-key"}})]
-      (let [build (-> (h/gen-build)
+      (let [build (-> (ts/gen-build)
                       (assoc :org-id "test-org"))
             d (sut/new-build-key-decrypter
                {:api {:url "http://test-api"}

@@ -2,20 +2,22 @@
   (:require [clojure.test :refer [deftest is testing]]
             [monkey.ci.test
              [aleph-test :as af]
-             [helpers :as h]
-             [runtime :as trt]]
+             [json :as tj]
+             [runtime :as trt]
+             [storage :as ts]
+             [web :as tw]]
             [monkey.ci.web.oauth2 :as sut]))
 
 (deftest login-handler
   (testing "returns refresh token if provided"
-    (h/with-memory-store st
+    (ts/with-memory-store st
       (let [handler (sut/login-handler
                      (constantly {:status 200
                                   :body {:access-token "test-access-token"
                                          :refresh-token "test-refresh-token"}})
                      (constantly {:id "test-user"
                                   :sid [:github "test-id"]}))
-            req (h/->req {:storage st})]
+            req (tw/->req {:storage st})]
         (is (= "test-refresh-token"
                (-> (handler req)
                    :body
@@ -28,12 +30,12 @@
                         (fn [req]
                           {:status 200
                            :headers {"Content-Type" "application/json"}
-                           :body (h/to-json {:access-token "new-token"
+                           :body (tj/to-json {:access-token "new-token"
                                              :refresh-token "new-refresh-token"})})]
       (is (= {:access-token "new-token"
               :refresh-token "new-refresh-token"}
              (-> (trt/test-runtime)
-                 (h/->req)
+                 (tw/->req)
                  (assoc-in [:parameters :body :refresh-token] "old-refresh-token")
                  (as-> r (sut/refresh-token
                           {:get-creds (constantly {:client-id "test-client-id"

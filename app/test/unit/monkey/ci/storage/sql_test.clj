@@ -14,7 +14,7 @@
              [helpers :as eh]]
             [monkey.ci.spec.gen :as sg]
             [monkey.ci.storage.sql :as sut]
-            [monkey.ci.test.helpers :as h]
+            [monkey.ci.test.storage :as ts]
             [monkey.ci.web.auth :as auth]))
 
 (defmacro with-storage [conn s & body]
@@ -24,7 +24,7 @@
 
 (deftest ^:sql orgs
   (with-storage conn s
-    (let [org (h/gen-org)]
+    (let [org (ts/gen-org)]
       (testing "can write and read"
         (is (sid/sid? (st/save-org s org)))
         (is (= 1 (count (ec/select-orgs conn [:is :id [:not nil]]))))
@@ -72,7 +72,7 @@
             (is (= [org] (st/search-orgs s {:id (:id org)})))))))
 
     (testing "can find multiple by id"
-      (let [orgs (repeatedly 3 h/gen-org)]
+      (let [orgs (repeatedly 3 ts/gen-org)]
         (doseq [c orgs]
           (st/save-org s c))
         (let [r (st/find-orgs s (->> orgs
@@ -100,7 +100,7 @@
 
 (deftest ^:sql init-org
   (with-storage conn s
-    (let [org (-> (h/gen-org)
+    (let [org (-> (ts/gen-org)
                   (assoc :name "test org"))
           user {:id (cuid/random-cuid)
                 :type :github
@@ -155,7 +155,7 @@
     (let [repo {:name "test repo"
                 :id "test-repo"}
           lbl (str "test-label-" (cuid/random-cuid))
-          org (-> (h/gen-org)
+          org (-> (ts/gen-org)
                   (assoc-in [:repos (:id repo)] repo))
           sid [(:id org) (:id repo)]]
       
@@ -229,7 +229,7 @@
 
 (deftest ^:sql watched-github-repos
   (with-storage conn s
-    (let [org (h/gen-org)
+    (let [org (ts/gen-org)
           github-id 64253
           repo {:name "github test"
                 :id "github-test"
@@ -256,8 +256,8 @@
 (deftest ^:sql ssh-keys
   (with-storage conn s
     (testing "ssh keys"
-      (let [{org-id :id :as org} (h/gen-org)
-            k (assoc (h/gen-ssh-key) :org-id org-id)]
+      (let [{org-id :id :as org} (ts/gen-org)
+            k (assoc (ts/gen-ssh-key) :org-id org-id)]
         (is (sid/sid? (st/save-org s org)))
         
         (testing "can create and retrieve"
@@ -277,7 +277,7 @@
               (is (= lf (-> matches first :label-filters))))))
 
         (testing "deletes removed keys from set"
-          (let [new-k (assoc (h/gen-ssh-key) :org-id org-id)]
+          (let [new-k (assoc (ts/gen-ssh-key) :org-id org-id)]
             (is (sid/sid? (st/save-ssh-keys s org-id [k new-k])))
             (is (= 2 (count (st/find-ssh-keys s org-id))))
             (is (sid/sid? (st/save-ssh-keys s org-id [new-k])))
@@ -293,10 +293,10 @@
 (deftest ^:sql webhooks
   (with-storage conn s
     (testing "webhooks"
-      (let [org (h/gen-org)
-            repo (-> (h/gen-repo)
+      (let [org (ts/gen-org)
+            repo (-> (ts/gen-repo)
                      (assoc :org-id (:id org)))
-            wh (-> (h/gen-webhook)
+            wh (-> (ts/gen-webhook)
                    (assoc :org-id (:id org)
                           :repo-id (:id repo)
                           :secret-key (auth/generate-secret-key)
@@ -324,8 +324,8 @@
 
 (deftest ^:sql org-params
   (with-storage conn s
-    (let [{org-id :id :as org} (h/gen-org)
-          params (assoc (h/gen-org-params) :org-id org-id)
+    (let [{org-id :id :as org} (ts/gen-org)
+          params (assoc (ts/gen-org-params) :org-id org-id)
           sid (st/params-sid org-id (:id params))]
       (is (sid/sid? (st/save-org s org)))
       
@@ -370,7 +370,7 @@
 
 (deftest ^:sql users
   (with-storage conn s
-    (let [user (-> (h/gen-user)
+    (let [user (-> (ts/gen-user)
                    (assoc :email "test@monkeyci.com")
                    (dissoc :orgs :orgomers))
           user->id (juxt :type :type-id)]
@@ -386,7 +386,7 @@
                (st/list-user-emails s))))
 
       (testing "can link to org"
-        (let [org (h/gen-org)
+        (let [org (ts/gen-org)
               user (assoc user :orgs [(:id org)])]
           (is (sid/sid? (st/save-org s org)))
           (is (sid/sid? (st/save-user s user)))
@@ -412,10 +412,10 @@
 
 (deftest ^:sql builds
   (with-storage conn s
-    (let [repo (h/gen-repo)
-          org (-> (h/gen-org)
+    (let [repo (ts/gen-repo)
+          org (-> (ts/gen-org)
                    (assoc-in [:repos (:id repo)] repo))
-          build (-> (h/gen-build)
+          build (-> (ts/gen-build)
                     (assoc :org-id (:id org)
                            :repo-id (:id repo)
                            :script {:script-dir "test-dir"}
@@ -456,7 +456,7 @@
                  (-> match :git :ssh-keys first)))))
 
       (testing "can get next idx"
-        (let [repo (-> (h/gen-repo)
+        (let [repo (-> (ts/gen-repo)
                        (assoc :org-id (:id org)))
               repo-sid [(:id org) (:id repo)]]
           (is (some? (st/save-repo s repo)))
@@ -466,16 +466,16 @@
               "increases on each invocation"))))
 
     (testing "can list builds since timestamp"
-      (let [repo (h/gen-repo)
-            org (-> (h/gen-org)
+      (let [repo (ts/gen-repo)
+            org (-> (ts/gen-org)
                     (assoc :repos {(:id repo) repo}))
-            old-build (-> (h/gen-build)
+            old-build (-> (ts/gen-build)
                           (assoc :org-id (:id org)
                                  :repo-id (:id repo)
                                  :build-id (cuid/random-cuid)
                                  :start-time 100)
                           (dissoc :script))
-            new-build (-> (h/gen-build)
+            new-build (-> (ts/gen-build)
                           (assoc :org-id (:id org)
                                  :repo-id (:id repo)
                                  :build-id (cuid/random-cuid)
@@ -490,17 +490,17 @@
           (is (= (:id repo) (:repo-id (first r)))))))
 
     (testing "can find latest by build index"
-      (let [repo (h/gen-repo)
-            org (-> (h/gen-org)
+      (let [repo (ts/gen-repo)
+            org (-> (ts/gen-org)
                     (assoc :repos {(:id repo) repo}))
-            old-build (-> (h/gen-build)
+            old-build (-> (ts/gen-build)
                           (assoc :org-id (:id org)
                                  :repo-id (:id repo)
                                  :start-time 100
                                  :idx 9
                                  :build-id "build-9")
                           (dissoc :script))
-            new-build (-> (h/gen-build)
+            new-build (-> (ts/gen-build)
                           (assoc :org-id (:id org)
                                  :repo-id (:id repo)
                                  :start-time 200
@@ -519,8 +519,8 @@
               "contains job details"))))
 
     (testing "can find all latest for org"
-      (let [repos (repeatedly 2 h/gen-repo)
-            org (-> (h/gen-org)
+      (let [repos (repeatedly 2 ts/gen-repo)
+            org (-> (ts/gen-org)
                     (assoc :repos (->> repos
                                        (map (fn [r] [(:id r) r]))
                                        (into {}))))
@@ -547,8 +547,8 @@
                       (set)))))))
 
     (testing "can find latest n for org"
-      (let [repos (repeatedly 2 h/gen-repo)
-            org (-> (h/gen-org)
+      (let [repos (repeatedly 2 ts/gen-repo)
+            org (-> (ts/gen-org)
                     (assoc :repos (->> repos
                                        (map (fn [r] [(:id r) r]))
                                        (into {}))))
@@ -582,11 +582,11 @@
 
 (deftest ^:sql jobs
   (with-storage conn s
-    (let [org (-> (h/gen-org)
+    (let [org (-> (ts/gen-org)
                    (assoc :repos {}))
-          repo (-> (h/gen-repo)
+          repo (-> (ts/gen-repo)
                    (assoc :org-id (:id org)))
-          build (-> (h/gen-build)
+          build (-> (ts/gen-build)
                     (assoc :script {}
                            :org-id (:id org)
                            :repo-id (:id repo)))
@@ -620,11 +620,11 @@
 
 (deftest ^:sql join-requests
   (with-storage conn s
-    (let [org (h/gen-org)
-          user (h/gen-user)
+    (let [org (ts/gen-org)
+          user (ts/gen-user)
           _ (st/save-org s org)
           _ (st/save-user s user)
-          jr (-> (h/gen-join-request)
+          jr (-> (ts/gen-join-request)
                  (assoc :user-id (:id user)
                         :org-id (:id org)
                         :status :pending
@@ -645,7 +645,7 @@
 
 (deftest ^:sql email-registrations
   (with-storage conn s
-    (let [er (-> (h/gen-email-registration)
+    (let [er (-> (ts/gen-email-registration)
                  (assoc :confirmed false
                         :creation-time (t/now)))]
       (testing "can create and retrieve"
@@ -676,10 +676,10 @@
 
 (deftest ^:sql email-confirmations
   (with-storage conn s
-    (let [er (-> (h/gen-email-registration)
+    (let [er (-> (ts/gen-email-registration)
                  (assoc :confirmed true
                         :creation-time (t/now)))
-          c (-> (h/gen-email-confirmation)
+          c (-> (ts/gen-email-confirmation)
                 (assoc :email-reg-id (:id er)
                        :creation-time (t/now)))]
       (is (some? (st/save-email-registration s er)))
@@ -697,9 +697,9 @@
 
 (deftest ^:sql credit-subscriptions
   (with-storage conn s
-    (let [org (h/gen-org)
+    (let [org (ts/gen-org)
           now (t/now)
-          cs (-> (h/gen-credit-subs)
+          cs (-> (ts/gen-credit-subs)
                  (assoc :org-id (:id org)
                         :valid-from (- now 1000)
                         :valid-until (+ now 1000)
@@ -729,10 +729,10 @@
 
 (deftest ^:sql org-credits
   (with-storage conn s
-    (let [repo (h/gen-repo)
-          org (-> (h/gen-org)
+    (let [repo (ts/gen-repo)
+          org (-> (ts/gen-org)
                    (assoc :repos {(:id repo) repo}))
-          cred (-> (h/gen-org-credit)
+          cred (-> (ts/gen-org-credit)
                    (assoc :org-id (:id org)
                           :amount 100M
                           :valid-from 100
@@ -745,16 +745,16 @@
         (is (= cred (st/find-org-credit s (:id cred)))))
       
       (testing "for org"
-        (let [other-org (h/gen-org)
+        (let [other-org (ts/gen-org)
               _ (st/save-org s other-org)
               sids (->> [(assoc cred :valid-from 1000 :valid-until nil)
-                         (-> (h/gen-org-credit)
+                         (-> (ts/gen-org-credit)
                              (assoc :org-id (:id org)
                                     :valid-from 2000
                                     :valid-until 3000
                                     :amount 200M)
                              (dissoc :user-id :subscription-id))
-                         (-> (h/gen-org-credit)
+                         (-> (ts/gen-org-credit)
                              (assoc :org-id (:id other-org)
                                     :valid-from 1000)
                              (dissoc :user-id :subscription-id))]
@@ -773,7 +773,7 @@
 
       (testing "available credits"
         (testing "calculates using credit consumptions"
-          (let [build (-> (h/gen-build)
+          (let [build (-> (ts/gen-build)
                           (assoc :org-id (:id org)
                                  :repo-id (:id repo)
                                  :credits 25M))
@@ -800,16 +800,16 @@
 (deftest ^:sql credit-consumptions
   (with-storage conn s
     (let [now (t/now)
-          repo (h/gen-repo)
-          org (-> (h/gen-org)
+          repo (ts/gen-repo)
+          org (-> (ts/gen-org)
                    (assoc :repos {(:id repo) repo}))
-          build (-> (h/gen-build)
+          build (-> (ts/gen-build)
                     (assoc :repo-id (:id repo)
                            :org-id (:id org)))
-          credit (-> (h/gen-org-credit)
+          credit (-> (ts/gen-org-credit)
                      (assoc :org-id (:id org))
                      (dissoc :user-id :subscription-id))
-          cc (-> (h/gen-credit-cons)
+          cc (-> (ts/gen-credit-cons)
                  (assoc :build-id (:build-id build)
                         :repo-id (:id repo)
                         :org-id (:id org)
@@ -836,8 +836,8 @@
                         :amount))))
 
       (testing "can create for user"
-        (let [user (h/gen-user)
-              cred (-> (h/gen-org-credit)
+        (let [user (ts/gen-user)
+              cred (-> (ts/gen-org-credit)
                        (assoc :type :user
                               :user-id (:id user)
                               :reason "testing"
@@ -849,10 +849,10 @@
           (is (= cred (st/find-org-credit s (:id cred))))))
 
       (testing "can create for subscription"
-        (let [cs (-> (h/gen-credit-subs)
+        (let [cs (-> (ts/gen-credit-subs)
                      (assoc :org-id (:id org)
                             :amount 1000M))
-              cred (-> (h/gen-org-credit)
+              cred (-> (ts/gen-org-credit)
                        (assoc :type :subscription
                               :subscription-id (:id cs)
                               :org-id (:id org)
@@ -864,13 +864,13 @@
 
 (deftest ^:sql bb-webhooks
   (with-storage conn st
-    (let [repo (h/gen-repo)
-          org (-> (h/gen-org)
+    (let [repo (ts/gen-repo)
+          org (-> (ts/gen-org)
                    (assoc :repos {(:id repo) repo}))
-          wh (-> (h/gen-webhook)
+          wh (-> (ts/gen-webhook)
                  (assoc :org-id (:id org)
                         :repo-id (:id repo)))
-          bb-wh (-> (h/gen-bb-webhook)
+          bb-wh (-> (ts/gen-bb-webhook)
                     (assoc :webhook-id (:id wh)))]
       (testing "can save and find"
         (is (sid/sid? (st/save-org st org)))
@@ -891,8 +891,8 @@
 
 (deftest ^:sql crypto
   (with-storage conn st
-    (let [org (h/gen-org)
-          crypto (-> (h/gen-crypto)
+    (let [org (ts/gen-org)
+          crypto (-> (ts/gen-crypto)
                      (assoc :org-id (:id org)))]
       (testing "can save and find by org id"
         (is (sid/sid? (st/save-org st org)))
@@ -908,7 +908,7 @@
 
 (deftest ^:sql sysadmin
   (with-storage conn st
-    (let [user (h/gen-user)
+    (let [user (ts/gen-user)
           sysadmin {:user-id (:id user)
                     :password "test-password"}]
       (testing "can save and find by user id"
@@ -919,8 +919,8 @@
 
 (deftest ^:sql invoices
   (with-storage conn st
-    (let [org (h/gen-org)
-          inv (-> (h/gen-invoice)
+    (let [org (ts/gen-org)
+          inv (-> (ts/gen-invoice)
                   (assoc :org-id (:id org)
                          :kind :invoice
                          :currency "EUR"
@@ -953,10 +953,10 @@
 
 (deftest ^:sql runner-details
   (with-storage conn st
-    (let [repo (h/gen-repo)
-          org (-> (h/gen-org)
+    (let [repo (ts/gen-repo)
+          org (-> (ts/gen-org)
                   (assoc :repos {(:id repo) repo}))
-          build (-> (h/gen-build)
+          build (-> (ts/gen-build)
                     (assoc :org-id (:id org)
                            :repo-id (:id repo)
                            :status :success))
@@ -978,7 +978,7 @@
 
 (deftest ^:sql queued-tasks
   (with-storage conn st
-    (let [task (h/gen-queued-task)]
+    (let [task (ts/gen-queued-task)]
       (testing "can save and list"
         (is (sid/sid? (st/save-queued-task st task)))
         (is (= [task] (st/list-queued-tasks st))))
@@ -989,17 +989,17 @@
 
 (deftest ^:sql job-events
   (with-storage conn st
-    (let [org (h/gen-org)
-          repo (-> (h/gen-repo)
+    (let [org (ts/gen-org)
+          repo (-> (ts/gen-repo)
                    (assoc :org-id (:id org)))
-          build (-> (h/gen-build)
+          build (-> (ts/gen-build)
                     (assoc :repo-id (:id repo)
                            :org-id (:id org)))
-          job (-> (h/gen-job)
+          job (-> (ts/gen-job)
                   (assoc :org-id (:id org)
                          :repo-id (:id repo)
                          :build-id (:build-id build)))
-          evt (-> (h/gen-job-evt)
+          evt (-> (ts/gen-job-evt)
                   (assoc :org-id (:id org)
                          :repo-id (:id repo)
                          :build-id (:build-id build)
@@ -1018,8 +1018,8 @@
 
 (deftest ^:sql user-tokens
   (with-storage conn st
-    (let [user (h/gen-user)
-          token (-> (h/gen-user-token)
+    (let [user (ts/gen-user)
+          token (-> (ts/gen-user-token)
                     (assoc :user-id (:id user)))]
       (is (some? (st/save-user st user)))
 
@@ -1045,8 +1045,8 @@
 
 (deftest ^:sql org-tokens
   (with-storage conn st
-    (let [org (h/gen-org)
-          token (-> (h/gen-org-token)
+    (let [org (ts/gen-org)
+          token (-> (ts/gen-org-token)
                     (assoc :org-id (:id org)))]
       (is (some? (st/save-org st org)))
 
@@ -1072,7 +1072,7 @@
 
 (deftest ^:sql mailings
   (with-storage conn st
-    (let [m (h/gen-mailing)]
+    (let [m (ts/gen-mailing)]
       (testing "can save and find"
         (is (sid/sid? (st/save-mailing st m)))
         (is (= m (st/find-mailing st (:id m)))))
@@ -1100,8 +1100,8 @@
 
 (deftest ^:sql user-settings
   (with-storage conn st
-    (let [u (h/gen-user)
-          s (-> (h/gen-user-settings)
+    (let [u (ts/gen-user)
+          s (-> (ts/gen-user-settings)
                 (assoc :user-id (:id u)
                        :receive-mailing true))]
       (is (sid/sid? (st/save-user st u)))
@@ -1117,8 +1117,8 @@
 
 (deftest ^:sql org-invoicing
   (with-storage conn st
-    (let [org (h/gen-org)
-          i (-> (h/gen-org-invoicing)
+    (let [org (ts/gen-org)
+          i (-> (ts/gen-org-invoicing)
                 (assoc :org-id (:id org)
                        :currency "USD"
                        :address ["test street"]))]
@@ -1136,10 +1136,10 @@
 
 (deftest ^:sql org-plan
   (with-storage conn st
-    (let [org (h/gen-org)
-          cs (-> (h/gen-credit-subs)
+    (let [org (ts/gen-org)
+          cs (-> (ts/gen-credit-subs)
                  (assoc :org-id (:id org)))
-          plan (-> (h/gen-org-plan)
+          plan (-> (ts/gen-org-plan)
                    (assoc :org-id (:id org)
                           :subscription-id (:id cs)
                           :valid-from 1000

@@ -6,8 +6,9 @@
              [storage :as st]
              [time :as t]]
             [monkey.ci.test
-             [helpers :as h]
-             [runtime :as trt]]
+             [runtime :as trt]
+             [storage :as ts]
+             [web :as tw]]
             [monkey.ci.web
              [auth :as sut]
              [common :as wc]]))
@@ -20,7 +21,7 @@
   (let [app :identity
         {st :storage :as rt} (trt/test-runtime)
         sec (sut/secure-ring-app app rt)
-        req (h/->req rt)]
+        req (tw/->req rt)]
 
     (testing "with user token"
       (is (st/sid? (st/save-user st {:type "github"
@@ -74,7 +75,7 @@
 
     (testing "accepts user api key"
       (let [org-id (cuid/random-cuid)
-            user (-> (h/gen-user)
+            user (-> (ts/gen-user)
                      (assoc :orgs [org-id]))
             token {:id (cuid/random-cuid)
                    :user-id (:id user)
@@ -91,7 +92,7 @@
           (is (= #{org-id} (:orgs r))))))
 
     (testing "does not accept expired user key"
-      (let [user (h/gen-user)
+      (let [user (ts/gen-user)
             token {:id (cuid/random-cuid)
                    :user-id (:id user)
                    :token (sut/generate-api-token)
@@ -105,7 +106,7 @@
                       (sec))))))
 
     (testing "accepts org api key"
-      (let [org (h/gen-org)
+      (let [org (ts/gen-org)
             token {:id (cuid/random-cuid)
                    :org-id (:id org)
                    :token (sut/generate-api-token)}]
@@ -121,7 +122,7 @@
           (is (= #{(:id org)} (:orgs r))))))
 
     (testing "does not accept expired org key"
-      (let [org (h/gen-org)
+      (let [org (ts/gen-org)
             token {:id (cuid/random-cuid)
                    :org-id (:id org)
                    :token (sut/generate-api-token)
@@ -167,7 +168,7 @@
 
     (testing "unauthorized when authenticated but chain denies"
       (let [r (-> {:auth-chain [(constantly {:permission :denied})]}
-                  (h/->match-data)
+                  (tw/->match-data)
                   (assoc :identity {:id ::test-user})
                   (w))]
         (is (= 403 (:status r)))
@@ -175,7 +176,7 @@
 
     (testing "unauthenticated when chain denies and no authentication found"
       (let [r (-> {:auth-chain [(constantly {:permission :denied})]}
-                  (h/->match-data)
+                  (tw/->match-data)
                   (w))]
         (is (= 401 (:status r)))
         (is (string? (get-in r [:body :error])))))
@@ -183,19 +184,19 @@
     (testing "allows when chain allows"
       (is (= ::handled
              (-> {:auth-chain [(constantly nil)]}
-                 (h/->match-data)
+                 (tw/->match-data)
                  (w)))))))
 
 (deftest public-repo-checker
-  (h/with-memory-store st
-    (let [org (h/gen-org)
-          priv-repo (-> (h/gen-repo)
+  (ts/with-memory-store st
+    (let [org (ts/gen-org)
+          priv-repo (-> (ts/gen-repo)
                         (assoc :org-id (:id org)))
-          pub-repo (-> (h/gen-repo)
+          pub-repo (-> (ts/gen-repo)
                        (assoc :org-id (:id org)
                               :public true))
           req (-> {:storage st}
-                  (h/->req)
+                  (tw/->req)
                   (assoc-in [:parameters :path :org-id] (:id org)))]
       (is (some? (st/save-org st org)))
       (is (some? (st/save-repo st priv-repo)))
@@ -248,7 +249,7 @@
              :display-id "test-display-id"}
         checker (fn [req]
                   (-> (wc/set-id-resolver {} (constantly org-id))
-                      (h/->match-data)
+                      (tw/->match-data)
                       (merge req)
                       (as-> r (sut/org-auth-checker [] r))))]
     (testing "allows"

@@ -3,16 +3,17 @@
             [manifold.deferred :as md]
             [monkey.ci.storage :as st]
             [monkey.ci.test
-             [helpers :as h]
-             [runtime :as trt]]
+             [runtime :as trt]
+             [storage :as ts]
+             [web :as tw]]
             [monkey.ci.web.api.invoice :as sut]))
 
 (deftest get-invoice
   (testing "retrieves single invoice by id"
     (let [{st :storage :as rt} (trt/test-runtime)
-          inv (h/gen-invoice)]
+          inv (ts/gen-invoice)]
       (is (some? (st/save-invoice st inv)))
-      (is (= inv (-> (h/->req rt)
+      (is (= inv (-> (tw/->req rt)
                      (assoc-in [:parameters :path] {:org-id (:org-id inv)
                                                     :invoice-id (:id inv)})
                      (sut/get-invoice)
@@ -20,12 +21,12 @@
 
 (deftest search-invoices
   (let [{st :storage :as rt} (trt/test-runtime)
-        org (h/gen-org)
+        org (ts/gen-org)
         [a b c :as inv] (->> [{:kind :invoice
                                :currency "EUR"
                                :net-amount 100M
                                :vat-perc 21M}]
-                             (map (partial merge (h/gen-invoice)))
+                             (map (partial merge (ts/gen-invoice)))
                              (map #(assoc % :org-id (:id org)))
                              (remove nil?))]
     (is (some? (st/save-org st org)))
@@ -34,7 +35,7 @@
                     (doall))))
     
     (testing "when no filter given, returns all org invoices"
-      (is (= inv (-> (h/->req rt)
+      (is (= inv (-> (tw/->req rt)
                      (assoc-in [:parameters :path :org-id] (:id org))
                      (sut/search-invoices)
                      :body))))
@@ -58,12 +59,12 @@
                         (md/error-deferred (ex-info "Invalid request" req))))
         {st :storage :as rt} (-> (trt/test-runtime)
                                  (trt/set-invoicing-client fake-client))
-        org (-> (h/gen-org)
+        org (-> (ts/gen-org)
                 (assoc :name "test org"))
         _ (st/save-org st org)
         _ (st/save-org-invoicing st {:org-id (:id org)
                                      :ext-id "1"})
-        res (-> (h/->req rt)
+        res (-> (tw/->req rt)
                 (assoc-in [:parameters :path :org-id] (:id org))
                 (assoc-in [:parameters :body] {:amount 10M})
                 (sut/create-invoice))]
@@ -95,10 +96,10 @@
                                       (md/success-deferred {:body {:id 567 :name "Updated customer"}})
                                       :else
                                       (md/error-deferred (ex-info "Unexpected request" req))))))
-        org (h/gen-org)]
+        org (ts/gen-org)]
     (is (some? (st/save-org st org)))
     
-    (let [req (-> (h/->req rt)
+    (let [req (-> (tw/->req rt)
                   (assoc :parameters {:path {:org-id (:id org)}
                                       :body {:vat-nr "TEST1234"
                                              :currency "EUR"}}))
