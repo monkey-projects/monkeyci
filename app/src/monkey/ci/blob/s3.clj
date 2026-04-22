@@ -5,6 +5,7 @@
             [java-time.api :as jt]
             [manifold.deferred :as md]
             [medley.core :as mc]
+            [monkey.ci.blob :as blob]
             [monkey.ci.blob.common :as c]
             [monkey.ci.build.archive :as a]
             [monkey.ci
@@ -89,3 +90,7 @@
                (assoc :src src
                       :result res)
                (mc/update-existing :last-modified jt/instant))))))))
+
+(defmethod blob/make-blob-store :s3 [conf k]
+  (let [s3-config (get conf k)]
+    (->S3BlobStore (make-client s3-config) s3-config)))

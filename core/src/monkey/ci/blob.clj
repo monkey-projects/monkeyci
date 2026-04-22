@@ -32,7 +32,3 @@
 ;;         client (-> (os/make-client oci-conf)
 ;;                    (oci/add-inv-interceptor :blob))]
 ;;     (bo/->OciBlobStore client oci-conf )))
-
-;; (defmethod make-blob-store :s3 [conf k]
-;;   (let [s3-config (get conf k)]
-;;     (bs3/->S3BlobStore (bs3/make-client s3-config) s3-config)))
