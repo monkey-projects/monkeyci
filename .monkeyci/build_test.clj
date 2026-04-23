@@ -22,6 +22,22 @@
                               {:git
                                {:ref "refs/tags/other"}}})))))
 
+(deftest test-core
+  (testing "creates job if core files changed"
+    (is (m/container-job?
+         (-> mt/test-ctx
+             (mt/with-changes (mt/modified ["core/deps.edn"]))
+             (sut/test-core)))))
+
+  (testing "is dependent on `test-common` if included"
+    (is (= ["test-common"]
+           (-> mt/test-ctx
+               (mt/with-changes (mt/modified ["core/deps.edn"
+                                              "common/deps.edn"]))
+               (mt/with-git-ref "refs/heads/main")
+               (sut/test-core)
+               :dependencies)))))
+
 (deftest test-app
   (testing "creates job if app files changed"
     (is (m/container-job?
@@ -34,6 +50,15 @@
            (-> mt/test-ctx
                (mt/with-changes (mt/modified ["app/deps.edn"
                                               "common/deps.edn"]))
+               (mt/with-git-ref "refs/heads/main")
+               (sut/test-app)
+               :dependencies))))
+  
+  (testing "is dependent on `test-core` if included"
+    (is (= ["test-core"]
+           (-> mt/test-ctx
+               (mt/with-changes (mt/modified ["app/deps.edn"
+                                              "core/deps.edn"]))
                (mt/with-git-ref "refs/heads/main")
                (sut/test-app)
                :dependencies)))))

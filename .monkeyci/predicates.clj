@@ -26,6 +26,9 @@
   (or (m/touched? ctx re)      
       (api-trigger? ctx)))
 
+(defn core-changed? [ctx]
+  (dir-changed? ctx #"^core/.*"))
+
 (defn app-changed? [ctx]
   (dir-changed? ctx #"^app/.*"))
 
@@ -39,6 +42,7 @@
   (dir-changed? ctx #"^common/.*"))
 
 (def build-app? (some-fn app-changed? release? m/manual?))
+(def build-core? (some-fn core-changed? release? m/manual?))
 (def build-gui? (some-fn gui-changed? release? m/manual?))
 (def build-test-lib? (some-fn test-lib-changed? release? m/manual?))
 (def build-common? (some-fn common-changed? release? m/manual?))

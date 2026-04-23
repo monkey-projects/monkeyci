@@ -45,6 +45,13 @@
                  :junit {:artifact-id (:id junit-artifact)
                          :path "junit.xml"})))))
 
+(defn test-core [ctx]
+  (some-> (run-tests ctx {:id "test-core"
+                          :dir "core"
+                          :should-test? p/build-core?})
+          (cond->
+            (p/build-common? ctx) (m/depends-on ["test-common"]))))
+
 (defn test-app [ctx]
   (some-> (run-tests ctx {:id "test-app"
                           :dir "app"
@@ -52,7 +59,8 @@
                           :should-test? p/build-app?})
           (update :save-artifacts conj (coverage-artifact "app"))
           (cond->
-            (p/build-common? ctx) (m/depends-on ["test-common"]))))
+            (p/build-common? ctx) (m/depends-on ["test-common"])
+            (p/build-core? ctx) (m/depends-on ["test-core"]))))
 
 (defn test-test-lib [ctx]
   (run-tests ctx {:id "test-test-lib"
@@ -294,6 +302,7 @@
 ;; List of jobs
 (def jobs
   [test-common
+   test-core
    test-app
    test-gui
    test-test-lib
