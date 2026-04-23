@@ -15,11 +15,13 @@
              [sid :as sid]
              [storage :as s]
              [vault :as v]]
+            [monkey.ci.blob.s3]
             [monkey.ci.events.mailman :as em]
             [monkey.ci.events.mailman
              [db :as emd]
              [interceptors :as emi]
-             [jms :as emj]]
+             [jms :as emj]
+             [nats]]
             [monkey.ci.logging.log-ingest :as li]
             [monkey.ci.mailing
              [events :as mailing-evt]
