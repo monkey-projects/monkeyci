@@ -26,9 +26,3 @@
   (bd/->DiskBlobStore (u/abs-path (:work-dir conf) (get-in conf [k :dir]))))
 
 (def extension bc/extension)
-
-;; (defmethod make-blob-store :oci [conf k]
-;;   (let [oci-conf (get conf k)
-;;         client (-> (os/make-client oci-conf)
-;;                    (oci/add-inv-interceptor :blob))]
-;;     (bo/->OciBlobStore client oci-conf )))

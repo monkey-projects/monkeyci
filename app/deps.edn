@@ -20,6 +20,8 @@
         com.github.seancorfield/honeysql {:mvn/version "2.7.1368"}
         com.github.seancorfield/next.jdbc {:mvn/version "1.3.1093"}
         com.monkeyci/common {:mvn/version "0.26.3"}
+        com.monkeyci/core {:local/root "../core"}
+        com.monkeyci/oci {:local/root "../ext/oci"}
         com.monkeyprojects/aero-ext {:mvn/version "0.3.1"}
         com.monkeyprojects/clj-scw-client {:mvn/version "0.1.4"}
         com.monkeyprojects/clompress {:mvn/version "0.2.0"}
@@ -34,10 +36,6 @@
         com.monkeyprojects/metrics {:mvn/version "0.1.0"}
         com.monkeyprojects/minio-clj {:mvn/version "0.1.0"}
         com.monkeyprojects/monkey-jms-artemis {:mvn/version "0.3.2"}
-        com.monkeyci/core {:local/root "../core"}
-        com.monkeyci/oci {:local/root "../ext/oci"}
-        com.monkeyprojects/oci-sign {:mvn/version "0.1.5"}
-        com.monkeyprojects/oci-vault {:mvn/version "0.2.1"}
         com.mysql/mysql-connector-j {:mvn/version "9.6.0"}
         com.squareup.okhttp3/okhttp-jvm {:mvn/version "5.3.2"}
         com.stuartsierra/component {:mvn/version "1.2.0"}

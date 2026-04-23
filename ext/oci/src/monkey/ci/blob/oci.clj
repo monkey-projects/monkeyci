@@ -9,6 +9,7 @@
             [manifold.deferred :as md]
             [medley.core :as mc]
             [monkey.ci
+             [blob :as blob]
              [oci :as oci]
              [protocols :as p]
              [utils :as u]]
@@ -149,3 +150,9 @@
                (mc/assoc-some
                 :last-modified (some->> (:last-modified headers)
                                         (jt/instant (jt/formatter :rfc-1123-date-time)))))))))))
+
+(defmethod blob/make-blob-store :oci [conf k]
+  (let [oci-conf (get conf k)
+        client (-> (os/make-client oci-conf)
+                   (oci/add-inv-interceptor :blob))]
+    (->OciBlobStore client oci-conf )))

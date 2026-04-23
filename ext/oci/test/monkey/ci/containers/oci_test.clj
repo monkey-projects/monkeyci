@@ -21,7 +21,7 @@
              [spec :as ss]]
             [monkey.ci.test
              [helpers :as h]
-             [runtime :as trt]
+             #_[runtime :as trt]
              [string :as ts]]))
 
 (defn- find-volume-entry [vol n]
@@ -38,8 +38,9 @@
 (defn random-build-sid []
   (repeatedly 3 cuid/random-cuid))
 
-(def default-rt (-> (trt/test-runtime)
-                    (assoc :build {:checkout-dir "/tmp"})))
+(def default-rt #_(-> (trt/test-runtime)
+                    (assoc :build {:checkout-dir "/tmp"}))
+  {:build {:checkout-dir "/tmp"}})
 
 (def default-config
   {:runtime default-rt
