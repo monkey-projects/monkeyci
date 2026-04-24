@@ -55,3 +55,4 @@ junit.xml
 tmp/
 /app/*.sh
 \#.*
+/.claude

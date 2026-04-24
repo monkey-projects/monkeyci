@@ -111,6 +111,23 @@
       (is (some? (reset! app-db (db/set-editing {} ::editing))))
       (is (= ::editing @l)))))
 
+(deftest edit-url
+  (h/verify-sub [::sut/edit-url]
+                #(db/set-editing % {:url "test-url"})
+                "test-url"
+                nil))
+
+(deftest edit-name
+  (h/verify-sub [::sut/edit-name]
+                #(db/set-editing % {:name "test-repo"})
+                "test-repo"
+                nil)
+
+  (testing "when no name, uses url name"
+    (let [n (rf/subscribe [::sut/edit-name])]
+      (is (some? (reset! app-db (db/set-editing {} {:url "https://github.org/some-org/test-repo.git"}))))
+      (is (= "test-repo" @n)))))
+
 (deftest edit-alerts
   (let [a (rf/subscribe [:repo/edit-alerts])]
     (testing "exists"

@@ -6,7 +6,7 @@
             [monkey.ci.gui.layout :as l]
             [monkey.ci.gui.modals :as m]
             [monkey.ci.gui.repo.events :as e]
-            [monkey.ci.gui.repo.subs]
+            [monkey.ci.gui.repo.subs :as s]
             [monkey.ci.gui.repo-settings.views :as settings]
             [monkey.ci.gui.routing :as r]
             [monkey.ci.gui.table :as table]
@@ -317,6 +317,26 @@
        [:span.form-text {:id :github-id-help}
         "If you have installed the Github MonkeyCI app, the native id is used for watching the repo."]])))
 
+(defn- edit-url []
+  (let [u (rf/subscribe [::s/edit-url])]
+    [f/form-input {:id :url
+                   :label "Url"
+                   :value @u
+                   :extra-opts
+                   {:on-change (u/form-evt-handler [:repo/url-changed])
+                    :max-length 300}
+                   :help-msg (str "This is used when manually triggering a build from the UI. "
+                                  "Use an ssh url for private repos.")}]))
+
+(defn- edit-name []
+  (let [n (rf/subscribe [::s/edit-name])]
+    [f/form-input {:id :name
+                   :label "Repository name"
+                   :value @n
+                   :extra-opts
+                   {:on-change (u/form-evt-handler [:repo/name-changed])
+                    :max-length 200}}]))
+
 (defn- edit-form [close-btn]
   (let [e (rf/subscribe [:repo/editing])]
     [:form
@@ -325,21 +345,9 @@
       [:div.col
        [:h5 [co/icon-text :gear "General"]]
        [:div.mb-2
-        [f/form-input {:id :url
-                       :label "Url"
-                       :value (:url @e)
-                       :extra-opts
-                       {:on-change (u/form-evt-handler [:repo/url-changed])
-                        :max-length 300}
-                       :help-msg (str "This is used when manually triggering a build from the UI. "
-                                      "Use an ssh url for private repos.")}]]
+        [edit-url]]
        [:div.mb-2
-        [f/form-input {:id :name
-                       :label "Repository name"
-                       :value (:name @e)
-                       :extra-opts
-                       {:on-change (u/form-evt-handler [:repo/name-changed])
-                        :max-length 200}}]]
+        [edit-name]]
        [:div.mb-2
         [f/form-input {:id :main-branch
                        :label "Main branch"

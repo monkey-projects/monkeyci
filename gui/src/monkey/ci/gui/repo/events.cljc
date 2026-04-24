@@ -291,15 +291,17 @@
               (db/mark-saving)
               (db/reset-edit-alerts))})))
 
-(rf/reg-event-db
+(rf/reg-event-fx
  :repo/save--success
- (fn [db [_ new? {:keys [body]}]]
-   (-> db
-       (odb/replace-repo body)
-       (db/unmark-saving)
-       (db/set-edit-alerts [(if new?
-                              a/repo-create-success
-                              a/repo-update-success)]))))
+ (fn [{:keys [db]} [_ new? {:keys [body]}]]
+   (cond-> {:db (-> db
+                    (odb/replace-repo body)
+                    (db/unmark-saving)
+                    (db/set-edit-alerts [(if new?
+                                           a/repo-create-success
+                                           a/repo-update-success)]))}
+     new? (assoc :dispatch [:route/goto :page/repo {:org-id (r/org-id db)
+                                                    :repo-id (:id body)}]))))
 
 (rf/reg-event-db
  :repo/save--failed

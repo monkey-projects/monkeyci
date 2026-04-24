@@ -537,7 +537,19 @@
     (is (= 1 (count (db/edit-alerts @app-db))))
     (is (= :success (-> (db/edit-alerts @app-db)
                         first
-                        :type)))))
+                        :type))))
+
+  (testing "redirects to repo page when creating new"
+    (let [r (h/catch-fx :route/goto)]
+      (rft/run-test-sync
+       (reset! app-db (r/set-current {} {:parameters
+                                         {:path
+                                          {:org-id "test-org"}}}))
+       (rf/dispatch [:repo/save--success true {:body {:id "test-repo"}}])
+       (is (not-empty @r))
+       (is (= (r/path-for :page/repo {:org-id "test-org"
+                                      :repo-id "test-repo"})
+              (first @r)))))))
 
 (deftest repo-save--failed
   (testing "sets error alert"

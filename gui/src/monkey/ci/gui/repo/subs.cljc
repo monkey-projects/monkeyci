@@ -1,5 +1,6 @@
 (ns monkey.ci.gui.repo.subs
-  (:require [monkey.ci.gui.org.subs]
+  (:require [clojure.string :as cs]
+            [monkey.ci.gui.org.subs]
             [monkey.ci.gui.repo.db :as db]
             [monkey.ci.gui.time :as t]
             [monkey.ci.gui.utils :as u]
@@ -36,6 +37,26 @@
 (u/db-sub :repo/editing db/editing)
 (u/db-sub :repo/saving? (comp true? db/saving?))
 (u/db-sub :repo/deleting? (comp true? db/deleting?))
+
+(rf/reg-sub
+ ::edit-url
+ :<- [:repo/editing]
+ (fn [e _]
+   (:url e)))
+
+(defn- extract-repo-name [url]
+  (letfn [(drop-ext [v]
+            (first (cs/split v #"\.")))]
+    (when url
+      (-> (cs/split url #"/")
+          (last)
+          (drop-ext)))))
+
+(rf/reg-sub
+ ::edit-name
+ :<- [:repo/editing]
+ (fn [e _]
+   (or (:name e) (extract-repo-name (:url e)))))
 
 (rf/reg-sub
  :builds/init-loading?
