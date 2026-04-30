@@ -2,9 +2,9 @@
   (:require [clojure.test :refer [deftest is testing]]
             [babashka.fs :as fs]
             [cli-matic.platform :as cp]
-            [clj-kondo.core :as lint]
             [monkey.ci.cli
              [print :as p]
+             [verify :as verify]
              [version :as v]]
             [monkey.ci.cli :as sut]))
 
@@ -22,7 +22,7 @@
   (testing "returns nil"
     (with-redefs [fs/path         (fn [& parts] (apply str parts))
                   fs/exists?      (constantly false)
-                  lint/run!       (constantly {:summary {} :findings []})
+                  verify/verify   (constantly [])
                   p/print-summary (constantly nil)]
       (is (nil? (sut/verify {:dir "/some/dir"})))))
 
@@ -30,20 +30,20 @@
     (let [linted-path (atom nil)]
       (with-redefs [fs/path         (fn [& parts] (apply str parts))
                     fs/exists?      (constantly true)
-                    lint/run!       (fn [{[p] :lint}]
-                                      (reset! linted-path p)
-                                      {:summary {} :findings []})
+                    verify/verify   (fn [dir]
+                                      (reset! linted-path dir)
+                                      [])
                     p/print-summary (constantly nil)]
         (sut/verify {:dir "/project"})
-        (is (= "/project.monkeyci" @linted-path)))))
+        (is (= "/project/.monkeyci" @linted-path)))))
 
   (testing "lints the given dir when .monkeyci subdirectory does not exist"
     (let [linted-path (atom nil)]
       (with-redefs [fs/path         (fn [& parts] (apply str parts))
                     fs/exists?      (constantly false)
-                    lint/run!       (fn [{[p] :lint}]
+                    verify/verify   (fn [p]
                                       (reset! linted-path p)
-                                      {:summary {} :findings []})
+                                      [])
                     p/print-summary (constantly nil)]
         (sut/verify {:dir "/project"})
         (is (= "/project" @linted-path)))))
@@ -52,10 +52,11 @@
     (let [received (atom nil)]
       (with-redefs [fs/path          (fn [& parts] (apply str parts))
                     fs/exists?       (constantly false)
-                    lint/run!        (constantly {:summary {}
-                                                  :findings [{:filename "foo.clj"
-                                                              :row      10
-                                                              :message  "unused var"}]})
+                    verify/verify    (constantly [{:details
+                                                   {:summary {}
+                                                    :findings [{:filename "foo.clj"
+                                                                :row      10
+                                                                :message  "unused var"}]}}])
                     p/print-summary  (constantly nil)
                     p/print-findings (fn [f] (reset! received f))]
         (sut/verify {:dir "/project"})

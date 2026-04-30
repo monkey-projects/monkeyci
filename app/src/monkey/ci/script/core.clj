@@ -11,8 +11,7 @@
              [build :as build]
              [edn :as edn]
              [jobs :as j]
-             [protocols :as p]
-             [utils :as u]]))
+             [protocols :as p]]))
 
 ;;; Script loading
 
@@ -24,9 +23,14 @@
   ;; Currently, only container jobs are supported in non-clj files
   (assoc job :type :container))
 
+(defn- ->seq
+  "Converts `x` into a sequential"
+  [x]
+  (if (sequential? x) x [x]))
+
 (defn- normalize [jobs]
   (->> jobs
-       (u/->seq)
+       (->seq)
        (map infer-type)))
 
 (defn- load-edn [path]

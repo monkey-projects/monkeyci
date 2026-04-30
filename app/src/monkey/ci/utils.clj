@@ -166,11 +166,6 @@
 
 (def now t/now)
 
-(defn ->seq
-  "Converts `x` into a sequential"
-  [x]
-  (if (sequential? x) x [x]))
-
 (defn or-nil
   "Wraps `f` so that when the argument is `nil`, it also returns `nil` and does not invoke `f`."
   [f]

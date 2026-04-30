@@ -2,12 +2,12 @@
   (:gen-class)
   (:require [babashka.fs :as fs]
             [cli-matic.core :as cli]
-            [clj-kondo.core :as lint]
             [monkey.ci.cli
              [build :as b]
              [print :as p]
              [test :as t]
              [utils :as u]
+             [verify :as verify]
              [version :as v]]))
 
 (defn print-version [_]
@@ -16,11 +16,9 @@
 (defn verify [{:keys [dir]}]
   (let [path (u/find-script-dir dir)]
     (println "Verifying directory:" path)
-    (let [r (lint/run! {:lint [path]})]
-      (p/print-summary (:summary r))
-      (when-let [f (not-empty (:findings r))]
-        (p/print-findings f)))
-    nil))
+    (let [r (verify/verify path)]
+      (doseq [{:keys [details]} r]
+        (p/print-findings (:findings details))))))
 
 (def dir-opt
   {:as "Project directory"
