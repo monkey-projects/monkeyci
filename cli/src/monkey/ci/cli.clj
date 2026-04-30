@@ -4,6 +4,7 @@
             [cli-matic.core :as cli]
             [clj-kondo.core :as lint]
             [monkey.ci.cli
+             [build :as b]
              [print :as p]
              [test :as t]
              [utils :as u]
@@ -41,16 +42,20 @@
    :subcommands
    [{:command "version"
      :description "Prints current version"
-     :runs print-version}
+     :runs #'print-version}
     {:command "verify"
      :description "Verifies the syntax of the build script files"
-     :runs verify
+     :runs #'verify
      :opts [dir-opt]}
     {:command "test"
      :description "Run unit tests in the specified directory"
-     :runs t/run-tests
+     :runs #'t/run-tests
      :opts [dir-opt
-            watch-opt]}]})
+            watch-opt]}
+    {:command "build"
+     :description "Run a local build of the MonkeyCI script in the given directory"
+     :runs #'b/build
+     :opts [dir-opt]}]})
 
 (defn -main [& args]
   (cli/run-cmd args config))

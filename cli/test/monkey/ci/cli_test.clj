@@ -1,6 +1,7 @@
 (ns monkey.ci.cli-test
   (:require [clojure.test :refer [deftest is testing]]
             [babashka.fs :as fs]
+            [cli-matic.platform :as cp]
             [clj-kondo.core :as lint]
             [monkey.ci.cli
              [print :as p]
@@ -70,3 +71,22 @@
                     p/print-findings (fn [_] (reset! called true))]
         (sut/verify {:dir "/project"})
         (is (false? @called))))))
+
+(deftest -main
+  (with-redefs [cp/exit-script identity]
+    (testing "`version` prints version"
+      (let [printed (atom nil)]
+        (with-redefs [sut/print-version (partial reset! printed)]
+          (is (zero? (sut/-main "version")))
+          (is (some? @printed)))))
+
+    (testing "`verify`"
+      (let [v (atom nil)]
+        (with-redefs [sut/verify (partial reset! v)]
+          (testing "verifies script"
+            (is (zero? (sut/-main "verify")))
+            (is (some? @v)))
+
+          (testing "accepts dir"
+            (is (zero? (sut/-main "verify" "-d" "test/dir")))
+            (is (= "test/dir" (:dir @v)))))))))

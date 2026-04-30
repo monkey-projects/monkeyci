@@ -22,7 +22,7 @@
 (def status "Get job status" :status)
 (def labels "Get job labels" :labels)
 (def save-artifacts "Gets artifacts saved by job" :save-artifacts)
-(def job-id "Gets job id" :id)
+(def job-id "Gets job id" bc/job-id)
 (def work-dir "Gets job work dir" :work-dir)
 
 (def default-job-timeout
