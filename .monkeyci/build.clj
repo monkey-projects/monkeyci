@@ -63,6 +63,11 @@
                   :dir "common"
                   :should-test? p/build-common?}))
 
+(defn test-cli [ctx]
+  (run-tests ctx {:id "test-cli"
+                  :dir "cli"
+                  :should-test? p/build-cli?}))
+
 (def uberjar-artifact
   (m/artifact "uberjar" "app/target/monkeyci-standalone.jar"))
 
@@ -296,6 +301,7 @@
    test-app
    test-gui
    test-test-lib
+   test-cli
            
    app-uberjar
    upload-uberjar

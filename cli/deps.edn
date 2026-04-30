@@ -17,7 +17,11 @@
   {:main-opts ["-m" "monkey.ci.cli"]}
 
   :test
-  ;; clj -M:test
+  ;; clj -X:test
   {:extra-paths ["test" "dev-resources"]
-   :extra-deps {lambdaisland/kaocha {:mvn/version "1.91.1392"}}
-   :main-opts ["-m" "kaocha.runner"]}}}
+   :extra-deps {com.monkeyprojects/build {:mvn/version "0.3.1"}}
+   :exec-fn monkey.test/all}
+
+  :junit
+  ;; clj -X:test:junit
+  {:exec-fn monkey.test/junit}}}

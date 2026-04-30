@@ -38,10 +38,14 @@
 (defn common-changed? [ctx]
   (dir-changed? ctx #"^common/.*"))
 
+(defn cli-changed? [ctx]
+  (dir-changed? ctx #"^cli/.*"))
+
 (def build-app? (some-fn app-changed? release? m/manual?))
 (def build-gui? (some-fn gui-changed? release? m/manual?))
 (def build-test-lib? (some-fn test-lib-changed? release? m/manual?))
 (def build-common? (some-fn common-changed? release? m/manual?))
+(def build-cli? (some-fn cli-changed? release? m/manual?))
 
 (def publish-app? (some-fn (every-pred app-changed? should-publish?)
                            release?))
