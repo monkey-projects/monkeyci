@@ -2,8 +2,20 @@
   (:require [clojure.test :refer [deftest is testing]]
             [babashka.fs :as fs]
             [clj-kondo.core :as lint]
-            [monkey.ci.cli.print :as p]
+            [monkey.ci.cli
+             [print :as p]
+             [version :as v]]
             [monkey.ci.cli :as sut]))
+
+(deftest print-version
+  (let [printed (atom [])]
+    (with-redefs [p/print-version (fn [v]
+                                    (swap! printed conj v)
+                                    nil)]
+      (testing "prints version to stdout"
+        (is (nil? (sut/print-version {})))
+        (is (= 1 (count @printed)))
+        (is (= v/version (first @printed)))))))
 
 (deftest verify-test
   (testing "returns nil"

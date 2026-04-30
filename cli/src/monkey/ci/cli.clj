@@ -6,12 +6,11 @@
             [monkey.ci.cli
              [print :as p]
              [test :as t]
-             [utils :as u]]))
-
-(def version "0.1.0")
+             [utils :as u]
+             [version :as v]]))
 
 (defn print-version [_]
-  (p/print-version version))
+  (p/print-version v/version))
 
 (defn verify [{:keys [dir]}]
   (let [path (u/find-script-dir dir)]
@@ -38,7 +37,7 @@
 (def config
   {:command "monkey-ci"
    :description "Clojure-powered CI/CD tool"
-   :version version
+   :version v/version
    :subcommands
    [{:command "version"
      :description "Prints current version"
