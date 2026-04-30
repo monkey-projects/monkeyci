@@ -1,7 +1,6 @@
 ;; Build script for Monkey-ci itself
 (ns build
-  (:require [babashka.fs :as fs]
-            [clojars :as clojars]
+  (:require [clojars :as clojars]
             [clojure.string :as cs]
             [config :as config]
             [medley.core :as mc]
