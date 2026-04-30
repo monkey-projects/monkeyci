@@ -6,7 +6,9 @@
              [api :as a]
              [build :as b]
              [jobs :as j]]
-            [monkey.ci.build.api :as ba]
+            [monkey.ci.build
+             [api :as ba]
+             [core :as bc]]
             [monkey.ci.protocols :as p]))
 
 (defn with-build-params* [params f]
@@ -27,7 +29,8 @@
     {:main-branch "main"}}
    :api
    ;; Dummy api client
-   {:client (constantly (atom {}))}
+   {:client (constantly (atom {}))
+    :jobs (constantly nil)}
    :archs [:amd]})
 
 (defn with-git-ref
@@ -97,9 +100,14 @@
   (assoc-in ctx [:build :build-id] id))
 
 (defn execute-job
-  "Executes given job with specified context. Look out for side effects!"
+  "For an action job, executes given job with specified context. Look out for side effects!
+   For container jobs, simulates the execution and returns a structure similar to the real
+   thing."
   [job ctx]
-  @(j/execute! job ctx))
+  (if (a/action-job? job)
+    @(j/execute! job ctx)
+    ;; Fake container job
+    (assoc a/success :job job)))
 
 (defn with-tmp-dir*
   "Creates a temp dir, then invokes `f` on it"
@@ -130,3 +138,19 @@
    `monkey.ci.api/main-branch`."
   [ctx b]
   (assoc-in ctx [:build :git :main-branch] b))
+
+(def action-job?
+  "Checks if the argument is an action job"
+  bc/action-job?)
+
+(def container-job?
+  "Checks if the argument is a container job"
+  bc/container-job?)
+
+(def success?
+  "Checks if the job return value is successful"
+  bc/success?)
+
+(def failure?
+  "Checks if the job return value is a failure"
+  bc/failed?)

@@ -135,3 +135,32 @@
       (is (= ::test-db (-> ((:enter i) {})
                            ::sut/db))))))
 
+(deftest schedule-process-kill
+  (let [d? (atom nil)
+        {:keys [leave] :as i} (sut/schedule-process-kill (constantly 100))]
+    (is (keyword? (:name i)))
+    
+    (with-redefs [bp/destroy (fn [proc]
+                               (reset! d? proc)
+                               proc)]
+      (testing "`leave` sets process kill"
+        (let [r (-> {}
+                    (sut/set-process ::test-proc)
+                    (leave))
+              k (sut/get-process-kill r)]
+          (is (md/deferred? k))
+          (is (some? (deref k 200 :timeout))
+              "executes kill in specified timeout")
+          (is (= ::test-proc @d?)
+              "destroys process"))))))
+
+(deftest cancel-process-kill
+  (testing "resolves process kill deferred if present"
+    (let [r (md/deferred)]
+      (is (empty? (-> {}
+                      (sut/set-process-kill r)
+                      (sut/cancel-process-kill))))
+      (is (= :canceled (deref r 100 :timeout)))))
+
+  (testing "if no kill present, does nothing"
+    (is (empty? (sut/cancel-process-kill {})))))

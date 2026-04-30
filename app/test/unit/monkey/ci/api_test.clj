@@ -71,6 +71,24 @@
       (is (= "test-img"
              (sut/image (job test-ctx)))))))
 
+(deftest expose
+  (testing "gets container job exposed ports"
+    (is (= [8080]
+           (-> (sut/container-job "test-job" {:expose [8080]})
+               (sut/expose)))))
+
+  (testing "sets container job exposed ports"
+    (is (= [8443]
+           (-> (sut/container-job "test-job")
+               (sut/expose [8443])
+               (sut/expose)))))
+
+  (testing "sets container job fn expose"
+    (let [job (-> (fn [_] (sut/container-job "test-job"))
+                  (sut/expose "test-img"))]
+      (is (= "test-img"
+             (sut/expose (job test-ctx)))))))
+
 (deftest script
   (testing "sets and gets script from container job"
     (is (= ["first" "second"]
@@ -190,14 +208,14 @@
     (testing "sets caches on job"
       (is (= [art] (-> (sut/action-job "test-job" (constantly ::ok))
                        (sut/caches art)
-                       :caches))))
+                       (sut/caches)))))
 
     (testing "adds to existing artifacts"
       (let [orig (sut/cache "original" "/tmp")]
         (is (= [orig art]
                (-> (sut/action-job "test-job" (constantly ::ok) {:caches [orig]})
                    (sut/caches art)
-                   :caches)))))
+                   (sut/caches))))))
 
     (testing "sets caches on job fn"
       (let [job (-> (constantly (sut/container-job "test-job"))
@@ -290,8 +308,71 @@
 
   (testing "`nil` on action job"))
 
+(deftest blocked
+  (testing "sets job blocked status"
+    (is (true? (-> (sut/container-job "test-job")
+                   (sut/blocked)
+                   (sut/blocked?))))))
+
+(deftest unblocked
+  (testing "unblocks blocked job"
+    (is (false? (-> (sut/container-job "test-job")
+                    (sut/blocked)
+                    (sut/unblocked)
+                    (sut/blocked?))))))
+
 (deftest checkout-dir
   (testing "returns build checkout dir"
     (is (= "/test/dir" (sut/checkout-dir
                         {:build
                          {:checkout-dir "/test/dir"}})))))
+
+(deftest job-result
+  (testing "from v1"
+    (is (= ::test-result
+           (sut/job-result {:result ::test-result}))))
+
+  (testing "from v2"
+    (is (= ::test-result
+           (sut/job-result {:schema :v2
+                            :status {:result ::test-result}})))))
+
+(deftest get-job
+  (testing "retrieves other job by id via api"
+    (is (= ::test-job
+           (->  {:api
+                 {:jobs (fn [id]
+                          (when (= "test-id") ::test-job))}}
+                (sut/get-job "test-id"))))))
+
+(deftest get-job-exposed-addr
+  (testing "`nil` if job not found"
+    (is (nil? (sut/get-job-exposed-addr {:api {:jobs (constantly nil)}} "test-job" 1000))))
+
+  (let [state {"test-job"
+               {:agent
+                {:address "test-addr"
+                 :ports {10001 8080}}}}
+        ctx {:api
+             {:jobs (fn [id]
+                      (get state id))}}]
+    (testing "returns externally accessible address for mapped port"
+      (is (= {:address "test-addr"
+              :port 10001}
+             (sut/get-job-exposed-addr ctx "test-job" 8080))))
+
+    (testing "`nil` if port not mapped"
+      (is (nil? (sut/get-job-exposed-addr ctx "test-job" 12342))))))
+
+(deftest init
+  (testing "retrieves container initializer fn"
+    (let [init (fn [ctx] (println "just testing"))]
+      (is (= init
+             (-> (sut/container-job "test-job")
+                 (sut/init init)
+                 (sut/init)))))))
+
+(deftest cli?
+  (testing "`true` if build source is `cli`"
+    (is (false? (sut/cli? test-ctx)))
+    (is (true? (sut/cli? {:build {:source :cli}})))))

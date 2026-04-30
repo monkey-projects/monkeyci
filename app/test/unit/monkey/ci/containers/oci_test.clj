@@ -15,8 +15,9 @@
              [common :as cc]
              [oci :as sut]]
             [monkey.ci.events.mailman :as em]
-            [monkey.ci.sidecar.config :as cs]
-            [monkey.ci.spec.sidecar :as ss]
+            [monkey.ci.sidecar
+             [config :as cs]
+             [spec :as ss]]
             [monkey.ci.test
              [helpers :as h]
              [runtime :as trt]]))

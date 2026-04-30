@@ -104,12 +104,11 @@
 
 ;; Account configuration
 (s/def :conf/org-id string?)
-(s/def :conf/project-id string?)
 (s/def :conf/repo-id string?)
 (s/def :conf/build-id string?)
 (s/def :conf/account
   (s/keys :req-un [:conf/org-id]
-          :opt-un [:conf/url :conf/project-id :conf/repo-id]))
+          :opt-un [:conf/url :conf/org-id :conf/repo-id]))
 
 (s/def :conf/socket string?)
 (s/def :conf/api

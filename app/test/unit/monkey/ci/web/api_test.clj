@@ -8,7 +8,7 @@
              [cuid :as cuid]
              [storage :as st]
              [utils :as u]]
-            [monkey.ci.spec.events :as se]
+            [monkey.ci.events.spec :as es]
             [monkey.ci.test
              [helpers :as h]
              [runtime :as trt]]
@@ -307,78 +307,6 @@
                   :params)]
         (is (= ["key"] (keys p)))))))
 
-(deftest create-email-registration
-  (let [{st :storage :as rt} (trt/test-runtime)
-        email "duplicate@monkeyci.com"
-        req (-> rt
-                (h/->req)
-                (h/with-body {:email email}))]
-    (testing "sets creation time"
-      (let [r (sut/create-email-registration req)]
-        (is (= 201 (:status r)))
-        (is (some? (get-in r [:body :creation-time])))))
-
-    (testing "does not create same email twice"
-      (is (= 200 (:status (sut/create-email-registration req))))
-      (is (= 1 (count (st/list-email-registrations st)))))))
-
-(deftest unregister-email
-  (let [{st :storage :as rt} (trt/test-runtime)]
-    (testing "with `id` deletes email registration by id"
-      (let [reg (h/gen-email-registration)]
-        (is (some? (st/save-email-registration st reg)))
-        (is (= 200 (-> (h/->req rt)
-                       (assoc-in [:parameters :query :id] (:id reg))
-                       (sut/unregister-email)
-                       :status)))
-        (is (nil? (st/find-email-registration st (:id reg))))))
-    
-    (testing "with `email` deletes email registration by email"
-      (let [email "test@monkeyci.com"
-            reg (-> (h/gen-email-registration)
-                    (assoc :email email))]
-        (is (some? (st/save-email-registration st reg)))
-        (is (= 200 (-> (h/->req rt)
-                       (assoc-in [:parameters :query :email] email)
-                       (sut/unregister-email)
-                       :status)))
-        (is (nil? (st/find-email-registration st (:id reg))))))
-    
-    (testing "with `email` of user, updates user settings"
-      (let [email "testuser@monkeyci.com"
-            u (-> (h/gen-user)
-                  (assoc :email email))]
-        (is (some? (st/save-user st u)))
-        (is (= 200 (-> (h/->req rt)
-                       (assoc-in [:parameters :query :email] email)
-                       (sut/unregister-email)
-                       :status)))
-        (is (false? (-> (st/find-user-settings st (:id u))
-                        :receive-mailing)))))
-    
-    (testing "with `user-id`, updates user settings"
-      (let [u (h/gen-user)]
-        (is (some? (st/save-user st u)))
-        (is (= 200 (-> (h/->req rt)
-                       (assoc-in [:parameters :query :user-id] (:id u))
-                       (sut/unregister-email)
-                       :status)))
-        (is (false? (-> (st/find-user-settings st (:id u))
-                        :receive-mailing)))))
-
-    (testing "returns status `204` when no matches found"
-      (is (= 204
-             (-> (h/->req rt)
-                 (assoc-in [:parameters :query :id] "nonexisting")
-                 (sut/unregister-email)
-                 :status))))
-
-    (testing "returns status `204` when query params"
-      (is (= 204
-             (-> (h/->req rt)
-                 (sut/unregister-email)
-                 :status))))))
-
 (deftest trigger-build
   (h/with-memory-store st
     (letfn [(with-repo [f]
@@ -617,7 +545,7 @@
               [e :as evts] (r/get-events resp)]
           (is (= 202 (:status resp)))
           (is (= [:build/canceled] (map :type evts)))
-          (is (spec/valid? ::se/event e))
+          (is (spec/valid? ::es/event e))
           (is (= (sid build) (:sid e)))))
       
       (testing "404 if build not found"

@@ -4,10 +4,10 @@
             [java-time.api :as jt]
             [medley.core :as mc]
             [monkey.ci
-             [config :as config]
              [cuid :as cuid]
              [storage :as st]
              [time :as t]]
+            [monkey.ci.common.constants :as cc]
             [monkey.ci.web
              [common :as c]
              [crypto :as crypto]]
@@ -44,22 +44,12 @@
                           :deleter st/delete-org})
 
 (defn auto-subs
-  "Automatically assigned subscriptions.  These can be temporary actions as well."
+  "Automatically assigned subscriptions, in addition to the plan subscription.  
+   These are usually temporary actions."
   []
   ;; TODO Make this configurable.  Initially read it from app config, later we
   ;; could introduce some kind of template entity for this.
-  [{:amount config/free-credits
-    :from (t/now)
-    :description "Basic free subscription"
-    :period "P1Y"}
-   ;; TODO Also add start/end date, to indicate promotion periods
-   {:amount 2000
-    :from (t/now)
-    :until (-> (jt/offset-date-time)
-               (jt/plus (jt/years 1))
-               (jt/to-millis-from-epoch))
-    :description "Year's end promotion"
-    :period "P1Y"}])
+  [])
 
 (defn create-org [req]
   (st/with-transaction (c/req->storage req) st
@@ -67,6 +57,7 @@
                      (and until (< until (t/now))))
           org-id (cuid/random-cuid)
           org (assoc (c/body req) :id org-id)
+          ;; TODO Allow specifying a plan for new orgs.  Now it's just the free plan by default.
           res (st/init-org st {:org org
                                :user-id (-> req :identity :id)
                                :credits (->> (auto-subs)
@@ -159,31 +150,68 @@
          (map day-consumed)
          (sort-by :date))))
 
+(defn- stats-period [req]
+  {:zone  (-> (get-in req [:parameters :query :zone-offset] default-tz)
+              (jt/zone-offset))
+   :since (or (query->since req)
+              (hours-ago (* 24 31)))
+   :until (or (query->until req)
+              (t/now))})
+
+(defn- req->stats-dates
+  "Extracts time zone, since/until dates from the request and returns a sequence
+   of dates for statistics generation."
+  [req]
+  (let [{:keys [zone since until]} (stats-period req)
+        dates (->> (t/date-seq (jt/offset-date-time since zone))
+                   (take-while (partial jt/after? (jt/offset-date-time until zone))))]
+    {:since since
+     :until until
+     :zone  zone
+     :dates dates}))
+
+(defn- with-builds-for-period
+  "Retrieves all builds for the org over the period specified in the query params,
+   groups them by date and applies `f` to this map."
+  [req f]
+  (let [st (c/req->storage req)
+        {:keys [since dates zone]} (req->stats-dates req)
+        builds (st/list-builds-since st (c/org-id req) since)]
+    (-> (group-by-date dates zone builds :start-time)
+        (f))))
+
+(defn- stats-elapsed [req]
+  (with-builds-for-period req elapsed-seconds))
+
+(defn- stats-credits [req]
+  (let [st (c/req->storage req)
+        {:keys [since dates zone]} (req->stats-dates req)
+        cid (c/org-id req)
+        ccos (st/list-org-credit-consumptions-since st cid since)]
+    (-> (group-by-date dates zone ccos :consumed-at)
+        (consumed-credits))))
+
+(def stats-elapsed-req
+  "Elapsed build duration statistics"
+  (comp rur/response stats-elapsed))
+
+(def stats-credits-req
+  "Consumed credits over period statistics"
+  (comp rur/response stats-credits))
+
 (defn stats
   "Retrieves org statistics, since given time and grouped by specified zone
-   offset (or UTC if none given)"
+   offset (or UTC if none given).  This combines both elapsed seconds and
+   consumed credits over period stats."
   [req]
   (try
-    (let [zone     (-> (get-in req [:parameters :query :zone-offset] default-tz)
-                       (jt/zone-offset))
-          st       (c/req->storage req)
-          since    (or (query->since req)
-                       (hours-ago (* 24 31)))
-          until    (or (query->until req)
-                       (t/now))
-          dates    (->> (t/date-seq (jt/offset-date-time since zone))
-                        (take-while (partial jt/after? (jt/offset-date-time until zone))))
-          cid      (c/org-id req)
-          builds   (st/list-builds-since st cid since)
-          ccos     (st/list-org-credit-consumptions-since st cid since)
-          elapsed  (-> (group-by-date dates zone builds :start-time)
-                       (elapsed-seconds))
-          consumed (-> (group-by-date dates zone ccos :consumed-at)
-                       (consumed-credits))]
-      (rur/response {:period      {:start (t/now)
-                                   :end   (t/now)}
+    (let [{:keys [since until zone]} (stats-period req)
+          elapsed (stats-elapsed req)
+          consumed (stats-credits req)]
+      (rur/response {:period      {:start since
+                                   :end   until}
                      :zone-offset (str zone)
-                     :stats       {:elapsed-seconds elapsed
+                     :stats       {:elapsed-seconds  elapsed
                                    :consumed-credits consumed}}))
     (catch java.time.DateTimeException ex
       ;; Most likely invalid zone offset
@@ -196,3 +224,36 @@
         org-id (c/org-id req)
         avail (st/calc-available-credits s org-id (t/now))]
     (rur/response {:available avail})))
+
+(defn- calc-stats-results [defaults [k v]]
+  (->> (group-by :status v)
+       (mc/map-vals count)
+       (merge {:date k
+               :n (count v)}
+              defaults)))
+
+(defn stats-build-results
+  "Statistics about build success and failure over period"
+  [req]
+  (let [defaults (zipmap [:success :error :canceled] (repeat 0))]
+    (with-builds-for-period
+      req
+      (fn [by-date]
+        (->> by-date
+             (map (partial calc-stats-results defaults))
+             (sort-by :date)
+             (hash-map :results)
+             (rur/response))))))
+
+(defn stats-job-results
+  "Similar to `build-result-stats` but for jobs."
+  [req]
+  (let [st (c/req->storage req)
+        {:keys [since until dates zone]} (req->stats-dates req)
+        jobs (st/list-jobs-for-period st (c/org-id req) since until)
+        defaults (zipmap [:success :failure :canceled] (repeat 0))]
+    (->> (group-by-date dates zone jobs :start-time)
+         (map (partial calc-stats-results defaults))
+         (sort-by :date)
+         (hash-map :results)
+         (rur/response))))

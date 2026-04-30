@@ -777,7 +777,35 @@
     [{:alter-table :credit-subscriptions
       :add-column [:valid-period [:varchar 20]]}]
     [{:alter-table :credit-subscriptions
-      :drop-column :valid-period}])])
+      :drop-column :valid-period}])
+
+   (entity-table-migration
+    63 :email-confirmations
+    [(fk-col :email-reg-id)
+     [:code [:varchar 100] [:not nil]]
+     [:creation-time :timestamp]
+     (fk :email-reg-id :email-registrations :id)]
+    [(col-idx :email-confirmations :email-reg-id)])
+
+   (migration
+    (mig-id 64 :org-display-id-size)
+    [{:alter-table :orgs
+      :alter-column [:display-id [:varchar 50]]}]
+    ;; No need to rollback this
+    [])
+
+   (entity-table-migration
+    65 :org-plans
+    [org-col
+     [:type [:varchar 30] [:not nil]]
+     [:max-users :integer [:not nil]]
+     [:credits :integer [:not nil]]
+     [:valid-from :timestamp [:not nil]]
+     [:valid-until :timestamp]
+     (fk-col :subscription-id)
+     fk-org
+     (fk :subscription-id :credit-subscriptions :id)]
+    [(col-idx :org-plans :org-id)])])
 
 (defn prepare-migrations
   "Prepares all migrations by formatting to sql, creates a ragtime migration object from it."

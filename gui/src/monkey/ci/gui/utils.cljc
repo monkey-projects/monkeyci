@@ -1,4 +1,5 @@
 (ns monkey.ci.gui.utils
+  "Generic utility functions"
   (:require [clojure.string :as cs]
             [goog.string :as gstring]
             [medley.core :as mc]
@@ -122,3 +123,25 @@
                     (assoc :org-id customer-id))))
 
 (def org-id (some-fn :display-id :id))
+
+(defn ->b64
+  "Converts string to base64 text"
+  [s]
+  #?(:clj (.. (java.util.Base64/getEncoder)
+              (.encodeToString (.getBytes s)))
+     ;; Preferred but not yet suppored everywhere (e.g. older node versions)
+     ;; :cljs (.. (js/TextEncoder.)
+     ;;             (encode s)
+     ;;             (toBase64))
+     :cljs (js/btoa s)))
+
+(defn b64->
+  "Converts base64 text to string"
+  [b]
+  #?(:clj (.. (java.util.Base64/getDecoder)
+              (.decode s)
+              (String.))
+     ;; Preferred but not yet suppored everywhere
+     ;; :cljs (.. (js/TextDecoder.)
+     ;;           (decode (js/Uint8Array.fromBase64 b)))
+     :cljs (js/atob b)))

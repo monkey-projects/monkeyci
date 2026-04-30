@@ -43,6 +43,10 @@
           (is (thrown? Exception
                        @(c {:path "/test" :method :get})))))
 
+      (testing "fails on http error"
+        (is (thrown? Exception
+                     @(client {:path "/not-found" :method :get}))))
+
       (testing "can post events"
         (let [broker (emba/make-broker client nil)
               event {:type ::test-event :message "test event"}

@@ -12,10 +12,15 @@
             [monkey.ci.web.crypto :as wc]
             [monkey.ci.web.api.org :as sut]))
 
+(defn- ts [& args]
+  (-> (apply jt/offset-date-time args)
+      (jt/with-offset (jt/zone-offset "Z"))
+      (jt/to-millis-from-epoch)))
+
 (deftest get-org
   (testing "returns org in body"
     (let [org {:id "test-org"
-                :name "Test org"}
+               :name "Test org"}
           {st :storage :as rt} (trt/test-runtime)
           req (-> rt
                   (h/->req)
@@ -32,7 +37,7 @@
 
   (testing "converts repo map into list"
     (let [org {:id (st/new-id)
-                :name "Org with projects"}
+               :name "Org with projects"}
           repo {:id "test-repo"
                 :name "Test repository"
                 :org-id (:id org)}
@@ -102,10 +107,11 @@
         (is (= [r] (st/list-user-orgs st (:id user)))))
 
       (let [org-id (:id r)]
-        (testing "creates auto subscriptions"
+        (testing "creates plan and auto subscriptions"
           (let [s (st/list-org-credit-subscriptions st org-id)]
-            (is (= 1 (count s)))
-            (is (= "Test sub" (:description (first s))))))
+            (is (= 2 (count s)))
+            (is (= #{"Test sub" "Free plan"}
+                   (set (map :description s))))))
 
         (testing "ignores expired auto subscriptions"
           (with-redefs [sut/auto-subs (constantly
@@ -116,7 +122,7 @@
                              :body
                              :id)]
               (is (some? org-id))
-              (is (empty? (st/list-org-credit-subscriptions st org-id))))))
+              (is (= 1 (count (st/list-org-credit-subscriptions st org-id)))))))
 
         (testing "issues credits"
           (let [cc (st/list-org-credits st org-id)]
@@ -366,10 +372,6 @@
                              :start-time start
                              :end-time end
                              :credits creds)))
-                (ts [& args]
-                  (-> (apply jt/offset-date-time args)
-                      (jt/with-offset (jt/zone-offset "Z"))
-                      (jt/to-millis-from-epoch)))
                 (insert-cc [cred build]
                   (st/save-credit-consumption st (-> (select-keys build [:build-id :repo-id :org-id])
                                                      (assoc :id (cuid/random-cuid)
@@ -440,3 +442,102 @@
                         :available))))
 
       (testing "contains last credit provision"))))
+
+(deftest stats-build-results
+  (let [{st :storage :as rt} (trt/test-runtime)
+        repo (h/gen-repo)
+        org (assoc (h/gen-org) :repos {(:id repo) repo})
+        builds [{:start-time (ts 2026 3 18 10 0 0)
+                 :status :success}
+                {:start-time (ts 2026 3 18 10 30 0)
+                 :status :error}
+                {:start-time (ts 2026 3 19 10 0 0)
+                 :status :error}]]
+    (is (some? (st/save-org st org)))
+    (is (every? some?
+                (->> builds
+                     (map-indexed (fn [idx b]
+                                    (assoc b
+                                           :org-id (:id org)
+                                           :repo-id (:id repo)
+                                           :build-id (str "build-" (inc idx))
+                                           :end-time (+ (:start-time b) 1000))))
+                     (mapv (partial st/save-build st)))))
+    
+    (testing "build results grouped by status and by date over given period for org"
+      (let [r (-> rt
+                  (h/->req)
+                  (assoc :parameters
+                         {:path
+                          {:org-id (:id org)}
+                          :query
+                          {:since (ts 2026 3 18)
+                           :until (ts 2026 3 20)}})
+                  (sut/stats-build-results))]
+        (is (= 200 (:status r)))
+        (let [b (get-in r [:body :results])]
+          (is (= 2 (count b)))
+          (let [[v1 v2] b]
+            (is (= (ts 2026 3 18) (:date v1))
+                (t/epoch->date (:date v1)))
+            (is (= 2 (:n v1)))
+            (is (= 1 (:success v1)))
+            (is (= 1 (:error v1)))
+
+            (is (= 1 (:n v2)))
+            (is (= 0 (:success v2)))
+            (is (= 1 (:error v2)))))))))
+
+(deftest stats-job-results
+  (let [{st :storage :as rt} (trt/test-runtime)
+        repo (h/gen-repo)
+        org (assoc (h/gen-org) :repos {(:id repo) repo})
+        builds [{:start-time (ts 2026 3 18 10 0 0)
+                 :script
+                 {:jobs {"first" {:job-id "first"
+                                  :start-time (ts 2026 3 18 10 0 0)
+                                  :status :success}}}}
+                {:start-time (ts 2026 3 18 10 30 0)
+                 :script
+                 {:jobs {"second" {:job-id "second"
+                                   :start-time (ts 2026 3 18 10 30 0)
+                                   :status :success}}}}
+                {:start-time (ts 2026 3 19 10 0 0)
+                 :script
+                 {:jobs {"third" {:job-id "third"
+                                  :start-time (ts 2026 3 19 10 0 0)
+                                  :status :failure}}}}]]
+    (is (some? (st/save-org st org)))
+    (is (every? some?
+                (->> builds
+                     (map-indexed (fn [idx b]
+                                    (assoc b
+                                           :org-id (:id org)
+                                           :repo-id (:id repo)
+                                           :build-id (str "build-" (inc idx))
+                                           :end-time (+ (:start-time b) 1000))))
+                     (mapv (partial st/save-build st)))))
+    
+    (testing "job results grouped by status and by date over given period for org"
+      (let [r (-> rt
+                  (h/->req)
+                  (assoc :parameters
+                         {:path
+                          {:org-id (:id org)}
+                          :query
+                          {:since (ts 2026 3 18)
+                           :until (ts 2026 3 20)}})
+                  (sut/stats-job-results))]
+        (is (= 200 (:status r)))
+        (let [b (get-in r [:body :results])]
+          (is (= 2 (count b)))
+          (let [[v1 v2] b]
+            (is (some? (:date v1))
+                (t/epoch->date (:date v1)))
+            (is (= 2 (:n v1)))
+            (is (= 2 (:success v1)))
+            (is (= 0 (:failure v1)))
+
+            (is (= 1 (:n v2)))
+            (is (= 0 (:success v2)))
+            (is (= 1 (:failure v2)))))))))

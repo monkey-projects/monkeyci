@@ -5,7 +5,7 @@
             [monkey.ci.entities
              [core :as ec]
              [ssh-key :as essh]]
-            [monkey.ci.spec.entities]
+            [monkey.ci.storage.spec :as ss]
             [monkey.ci.storage.sql.common :as sc]))
 
 (defn- ssh-key->db [k]
@@ -24,7 +24,7 @@
   (ec/update-ssh-key conn (merge existing (ssh-key->db ssh-key))))
 
 (defn- upsert-ssh-key [conn org-id ssh-key]
-  (spec/valid? :entity/ssh-key ssh-key)
+  (spec/valid? ::ss/ssh-key ssh-key)
   (if-let [existing (ec/select-ssh-key conn (ec/by-cuid (:id ssh-key)))]
     (update-ssh-key conn ssh-key existing)
     (insert-ssh-key conn ssh-key org-id)))

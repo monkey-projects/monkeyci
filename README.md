@@ -1,7 +1,31 @@
 # README #
 
-Monkey CI is intended to be a highly customizable and powerful continuous integration
-tool.  The key features are:
+```clojure
+(ns build
+  (:require [monkey.ci.api :as m]))
+  
+(def clj-img "docker.io/clojure:tools-deps")
+  
+(def unit-test
+  "A container job that runs your clojure unit tests"
+  (-> (m/container-job "unit-test")
+      (m/image clj-img)
+	  (m/script ["clojure -X:test"])))
+	  
+(defn deploy [ctx]
+  "Deploy the lib, only when triggered by tag push"
+  (when (some? (m/tag ctx))
+    (-> (m/container-job "deploy")
+        (m/image clj-img)
+        (m/script ["clojure -X:deploy"])
+        (m/depends-on "unit-test"))))
+		
+;; Define these jobs
+[unit-test deploy]
+```
+
+[MonkeyCI](https://monkeyci.com) is intended to be a highly customizable and powerful 
+continuous integration tool.  The key features are:
 - Modular and maintainable design.
 - Highly testable (written using TDD), both for the codebase and for the build scripts.
 - Powerful if necessary, but user friendly for the less-technical.
@@ -110,7 +134,8 @@ activated or not (see the [deps.edn](builder/deps.edn) file).
 #### Building ####
 
 *MonkeyCI* is self-building since quite some time, [check out the application
-site here](https://app.monkeyci.com).
+site here](https://app.monkeyci.com).  You can find the [MonkeyCI builds
+here](https://app.monkeyci.com/o/monkey-projects/r/monkeyci).
 
 ### More Details ###
 
@@ -121,7 +146,7 @@ site here](https://app.monkeyci.com).
 ### Contribution guidelines ###
 
 * All code must be written in [TDD fashion](https://en.wikipedia.org/wiki/Test-driven_development).
-* Allo code must reviewed by at least two other coworkers, assuming there are coworkers.
+* All code must reviewed by at least two other coworkers, assuming there are coworkers.
 
 ### Who do I talk to? ###
 
@@ -131,7 +156,7 @@ site here](https://app.monkeyci.com).
 
 [GPL v3](LICENSE)
 
-Copyright (c) 2023-2025 by Monkey Projects BV
+Copyright (c) 2023-2026 by Monkey Projects BV
 
 [https://www.monkey-projects.be](https://www.monkey-projects.be)
 

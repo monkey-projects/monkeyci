@@ -23,6 +23,9 @@
    :page/login login/page
    :page/github-callback login/github-callback
    :page/bitbucket-callback login/bitbucket-callback
+   :page/codeberg-callback login/codeberg-callback
+   :page/github-callback-old login/github-callback
+   :page/bitbucket-callback-old login/bitbucket-callback
    :page/org org/page
    :page/org-api-keys api-keys/org-page
    :page/org-settings org/page-edit
@@ -39,6 +42,7 @@
    :page/repo-settings repo/settings-page
    :page/job job/page
    :page/webhooks webhooks/page
+   :page/confirm-email notifications/confirm-email
    :page/unsubscribe-email notifications/unsubscribe-email
    :page/user user/overview})
 
@@ -53,10 +57,9 @@
 
 (defn render []
   (let [r (rf/subscribe [:route/current])
-        t (rf/subscribe [:login/token])
-        rn (r/route-name @r)]
+        t (rf/subscribe [:login/token])]
     (when @r
       ;; If no token found, redirect to login
-      (if (or @t (r/public? rn))
+      (if (or @t (r/public? @r))
         [render-page @r]
         (rf/dispatch [:login/login-and-redirect])))))

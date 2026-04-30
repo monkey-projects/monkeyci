@@ -12,7 +12,10 @@
             [re-frame.core :as rf]
             [re-frame.db :refer [app-db]]))
 
+(use-fixtures :once f/main-router)
 (use-fixtures :each f/reset-db)
+
+(rf/clear-subscription-cache!)
 
 (defn- build-sid []
   (repeatedly 3 (comp str random-uuid)))
@@ -310,3 +313,22 @@
 
     (testing "sets alert"
       (is (not-empty (db/get-alerts @app-db))))))
+
+(deftest goto-job
+  (let [e (h/catch-fx :route/goto)]
+    (rft/run-test-sync
+     (is (some? (reset! app-db (r/set-current {}
+                                              {:parameters
+                                               {:path
+                                                {:org-id "test-org"
+                                                 :repo-id "test-repo"
+                                                 :build-id "test-build"}}}))))
+     (is (nil? (rf/dispatch [::sut/goto-job "test-job"])))
+     
+     (testing "navigates to job path"
+       (is (= 1 (count @e)))
+       (is (= (r/path-for :page/job {:job-id "test-job"
+                                     :build-id "test-build"
+                                     :repo-id "test-repo"
+                                     :org-id "test-org"})
+              (first @e)))))))

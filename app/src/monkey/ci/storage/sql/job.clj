@@ -50,3 +50,13 @@
 (defn select-job [st job-sid]
   (some-> (ej/select-by-sid (sc/get-conn st) job-sid)
           (db->job)))
+
+(defn select-for-period [st org-id from until]
+  (letfn [(from-db [job]
+            (-> job
+                (db->job)
+                (assoc :org-id org-id
+                       :repo-id (:repo-display-id job)
+                       :build-id (:build-display-id job))))]
+    (->> (ej/select-by-org-cuid (sc/get-conn st) org-id (ej/time-between from until))
+         (map from-db))))

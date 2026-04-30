@@ -15,6 +15,7 @@
 
 (rf/clear-subscription-cache!)
 
+(use-fixtures :once f/main-router)
 (use-fixtures :each f/reset-db)
 
 (defn- test-repo-path!
@@ -460,7 +461,15 @@
          (is (db/saving? @app-db)))
 
        (testing "clears alerts"
-         (is (empty? (db/edit-alerts @app-db)))))
+         (is (empty? (db/edit-alerts @app-db))))
+
+       (testing "pass empty github id as `nil`"
+         (swap! app-db #(db/set-editing % {:name "updated repo name"
+                                           :github-id ""}))
+
+         (is (not-empty (r/path-params (r/current @app-db))))
+         (rf/dispatch [:repo/save])
+         (is (nil? (-> @c last (nth 3) :repo :github-id)))))
 
      (testing "new repo"
        (swap! app-db #(-> %
@@ -472,21 +481,22 @@
 
        (is (not-empty (r/path-params (r/current @app-db))))
 
-       (rf/dispatch [:repo/save])
+       (let [b (count @c)]
+         (rf/dispatch [:repo/save])
 
-       (testing "updates repo in backend"
-         (is (= 2 (count @c)))
-         (is (= :create-repo (-> @c last (nth 2)))))
+         (testing "updates repo in backend"
+           (is (= (inc b) (count @c)))
+           (is (= :create-repo (-> @c last (nth 2)))))
 
-       (testing "adds org id to body"
-         (let [args (-> @c first (nth 3) :repo)]
-           (is (map? args))
-           (is (= org-id (:org-id args)))))
+         (testing "adds org id to body"
+           (let [args (-> @c first (nth 3) :repo)]
+             (is (map? args))
+             (is (= org-id (:org-id args)))))
 
-       (testing "adds org id to params"
-         (let [args (-> @c first (nth 3))]
-           (is (map? args))
-           (is (= org-id (:org-id args)))))))))
+         (testing "adds org id to params"
+           (let [args (-> @c first (nth 3))]
+             (is (map? args))
+             (is (= org-id (:org-id args))))))))))
 
 (deftest repo-save--success
   (testing "updates existing repo in db"
@@ -527,7 +537,19 @@
     (is (= 1 (count (db/edit-alerts @app-db))))
     (is (= :success (-> (db/edit-alerts @app-db)
                         first
-                        :type)))))
+                        :type))))
+
+  (testing "redirects to repo page when creating new"
+    (let [r (h/catch-fx :route/goto)]
+      (rft/run-test-sync
+       (reset! app-db (r/set-current {} {:parameters
+                                         {:path
+                                          {:org-id "test-org"}}}))
+       (rf/dispatch [:repo/save--success true {:body {:id "test-repo"}}])
+       (is (not-empty @r))
+       (is (= (r/path-for :page/repo {:org-id "test-org"
+                                      :repo-id "test-repo"})
+              (first @r)))))))
 
 (deftest repo-save--failed
   (testing "sets error alert"

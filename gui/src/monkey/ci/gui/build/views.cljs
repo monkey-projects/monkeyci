@@ -1,11 +1,14 @@
 (ns monkey.ci.gui.build.views
   (:require [clojure.string :as cs]
             [monkey.ci.gui.components :as co]
+            [monkey.ci.gui.dagre :as dagre]
             [monkey.ci.gui.layout :as l]
             [monkey.ci.gui.martian :as m]
             [monkey.ci.gui.routing :as r]
+            [monkey.ci.gui.tabs :as tabs]
+            [monkey.ci.gui.template :as templ]
             [monkey.ci.gui.utils :as u]
-            [monkey.ci.gui.build.events]
+            [monkey.ci.gui.build.events :as e]
             [monkey.ci.gui.build.subs]
             [monkey.ci.gui.tabs :as tabs]
             [monkey.ci.gui.time :as t]
@@ -28,27 +31,29 @@
       [:h3 (cs/capitalize (name status))]
       [:p (get status-desc status "Unknown")]]]))
 
-(defn- git-ref [{:keys [ref commit-url]}]
-  (if commit-url
-    [:a {:href commit-url :target :_blank} [:span.me-1 ref] [co/icon :box-arrow-up-right]]
-    ref))
-
 (defn build-details
   "Displays the build details by looking it up in the list of repo builds."
   [{:keys [credits] :as build}]
-  (letfn [(item [k v]
-            [:div.row
-             [:div.col-3.offset-1 [:b k]]
-             [:div.col-8 v]])]
-    [:<>
-     (item "Start time" (t/reformat (:start-time build)))
-     (item [:span {:title "Total time that has passed between build start and end"} "Elapsed"]
-           [:span {:title (t/reformat (:end-time build))} [co/build-elapsed build]])
-     (item "Git ref" [git-ref (:git build)])
+  (letfn [(item [img k v]
+            (when v
+              [:div.d-flex.gap-1
+               {:title k}
+               [:span [:span.me-1 [co/icon img]] v]]))]
+    [:div.d-flex.gap-3.flex-wrap
+     (item :clock "Start time" (t/reformat (:start-time build)))
+     (item :hourglass "Time elapsed"
+           (if-let [e (co/build-elapsed build)]
+             [:span {:title (t/reformat (:end-time build))} e]
+             (when-let [s (:start-time build)]
+               [timer/interval-timer
+                1000
+                (fn [now]
+                  [:span (t/format-interval (t/parse (:start-time build)) now)])])))
+     [co/git-ref (get-in build [:git :ref]) (get-in build [:git :commit-url])]
      (when-let [msg (or (:message build) (get-in build [:script :message]))]
-       (item "Message" msg))
+       (item :chat-left-text "Message" msg))
      (when-let [msg (get-in build [:git :message])]
-       (item "Commit message" msg))]))
+       (item :chat-square-dots "Commit message" msg))]))
 
 (defn- credits-badge [{:keys [credits] :as b}]
   (when-not (u/running? b)
@@ -86,22 +91,21 @@
     [elapsed-running x]
     [elapsed-final x]))
 
-(defn- job-path [job curr]
+(defn- job-path [job-id curr]
   (r/path-for :page/job (-> curr
                             (r/path-params)
-                            (assoc :job-id (:id job)))))
+                            (assoc :job-id job-id))))
 
-(defn- render-job [idx job]
+(defn- render-job [idx {:keys [id] :as job}]
   (let [r (rf/subscribe [:route/current])
         cells [[:td [:b (inc idx)]]
-               [:td [:a {:href (job-path job @r)}
-                     (:id job)]]
+               [:td [:a {:href (job-path id @r)} id]]
                [:td (->> (get-in job [:dependencies])
                          (cs/join ", "))]
                [:td [co/build-result (:status job)]]
                [:td (elapsed job)]]]
     [:<>
-     (into [:tr {:on-click #(rf/dispatch [:route/goto-path (job-path job @r)])}] cells)]))
+     (into [:tr {:on-click #(rf/dispatch [:route/goto-path (job-path id @r)])}] cells)]))
 
 (defn- jobs-table [jobs]
   [:table.table.table-hover
@@ -126,6 +130,15 @@
       (empty? @jobs)
       [:p "This build does not contain any jobs."]
       :else [jobs-table @jobs])))
+
+(defn jobs-graph []
+  (let [jobs (rf/subscribe [:build/jobs])]
+    [:div.d-flex.justify-content-center.align-items-center
+     {:style {:height (str (max 500 (* (count @jobs) 50)) "px")}}
+     [dagre/dagre-network
+      ::jobs-graph
+      (dagre/jobs->network @jobs)
+      {:on-click (fn [job] (rf/dispatch [::e/goto-job job]))}]]))
 
 (defn- current-overview []
   (let [build (rf/subscribe [:build/current])]
@@ -156,9 +169,21 @@
 (defn build-title []
   (let [route (rf/subscribe [:route/current])
         params (-> @route r/path-params)
-        repo (rf/subscribe [:repo/info (:repo-id params)])]
+        repo (rf/subscribe [:repo/info (:repo-id params)])
+        build (rf/subscribe [:build/current])]
     [co/page-title {:class :me-auto}
-     [:span.me-2 co/build-icon] (:name @repo) " / " (:build-id params)]))
+     [:span.me-2 [templ/dt-icon "cod009" {:style {:height "30px"}}]]
+     "Build #" (:idx @build)
+     [:span.fs-4.text-muted " - " [:a.text-muted {:href (r/path-for :page/repo params)} (:name @repo)]] ]))
+
+(defn jobs-tabs []
+  (let [b @(rf/subscribe [:build/current])]
+    [tabs/tabs
+     [::build (:repo-id b) (:build-id b)]
+     [{:header "Jobs"
+       :contents [build-jobs]}
+      {:header "Graph"
+       :contents [jobs-graph]}]]))
 
 (defn page [route]
   (rf/dispatch [:build/init])
@@ -179,4 +204,4 @@
         [co/alerts [:build/alerts]]
         ;; TODO When loading, show placeholders
         [current-overview]
-        [build-jobs]]]]]))
+        [jobs-tabs]]]]]))

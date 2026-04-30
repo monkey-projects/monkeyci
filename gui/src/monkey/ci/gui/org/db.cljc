@@ -65,6 +65,8 @@
 
 (def stats ::stats)
 (def credits ::credits)
+(def build-stats ::build-stats)
+(def job-stats ::job-stats)
 
 (defn get-credits [db]
   (lo/get-value db credits))

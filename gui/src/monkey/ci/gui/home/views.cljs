@@ -9,7 +9,6 @@
             [monkey.ci.gui.home.subs]
             [monkey.ci.gui.template :as template]
             [monkey.ci.gui.utils :as u]
-            [monkey.ci.template.components :as tc]
             [re-frame.core :as rf]))
 
 (defn- create-org-btn []
@@ -41,7 +40,9 @@
   [:div
    (->> (map org-item org)
         (into [:div.d-flex.gap-3.mb-3]))
-   [:p "You can join any number of organizations, as long as an organization administrator approves your request."]
+   [:p
+    "You can " [template/docs-link "/articles/org-join" "join"]
+    " any number of organizations, as long as an organization administrator approves your request."]
    [join-org-btn]])
 
 ;; TODO Configure centrally somewhere
@@ -62,7 +63,7 @@
     "per month. "
     "One credit can be spent on one cpu minute, or one memory GB per minute. "
     "You can join an unlimited number of organizations.  See more details in "
-    [:a {:href (tc/docs-url template/config) :target :_blank} "the documentation."]]
+    [template/docs-link "" "the documentation."]]
    [:p
     "After you have created or joined an organization, you can start " [:b "adding repositories "]
     "and unlock the full power of " [:i "MonkeyCI!"]]])

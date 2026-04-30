@@ -5,13 +5,18 @@
             [clojure.tools.logging :as log]
             [io.pedestal.interceptor :as i]
             [io.pedestal.interceptor.chain :as pi]
-            [manifold.deferred :as md]
+            [manifold
+             [deferred :as md]
+             [stream :as ms]]
             [monkey.ci
              [cuid :as cuid]
+             [jobs :as j]
              [vault :as v]]
             [monkey.ci.containers.podman :as sut]
             [monkey.ci.events.mailman.interceptors :as emi]
-            [monkey.ci.test.helpers :as h :refer [contains-subseq?]]
+            [monkey.ci.test
+             [helpers :as h :refer [contains-subseq?]]
+             [mailman :as tm]]
             [monkey.ci.vault.common :as vc]
             [monkey.mailman.core :as mmc]))
 
@@ -138,6 +143,15 @@
             (is (contains-subseq? args ["--cpus" "2"]))
             (is (contains-subseq? args ["--memory" "4g"])))))
 
+      (testing "binds exposed ports using available range"
+        (let [args (-> base-conf
+                       (assoc :mapped-ports {8080 10000
+                                             8443 10001})
+                       (sut/build-cmd-args))]
+          (is (= "podman" (first args)) "still runs podman")
+          (is (contains-subseq? args ["-p" "10000:8080"]))
+          (is (contains-subseq? args ["-p" "10001:8443"]))))
+
       (testing "uses build and job id as container name"
         (is (contains-subseq? (sut/build-cmd-args base-conf)
                               ["--name" "test-build-test-job"])))
@@ -169,12 +183,33 @@
                (sut/set-job-dir "/test/wd")
                (sut/job-work-dir {:work-dir "job-dir"}))))))
 
+(deftest get-job-timeout
+  (testing "returns default timeout"
+    (is (= j/default-job-timeout (sut/get-job-timeout {}))))
+
+  (testing "returns configured job timeout"
+    (is (= 1000
+           (-> {:event
+                {:job-id "test-job"}}
+               (sut/set-job {:id "test-job"
+                             :timeout 1000})
+               (sut/get-job-timeout)))))
+
+  (testing "does not exceed max timeout"
+    (is (= j/max-job-timeout
+           (-> {:event
+                {:job-id "test-job"}}
+               (sut/set-job {:id "test-job"
+                             :timeout (* 2 j/max-job-timeout)})
+               (sut/get-job-timeout))))))
+
 (deftest make-routes
   (h/with-tmp-dir dir
     (let [state (atom nil)
           routes (sut/make-routes {:work-dir dir :state state})
           expected [:container/job-queued
                     :job/initializing
+                    :container/pending
                     :container/end]]
       (doseq [t expected]
         (testing (format "handles `%s`" t)
@@ -458,6 +493,102 @@
                  (enter)
                  (sut/podman-opts)))))))
 
+(deftest watch-events
+  (h/with-tmp-dir dir
+    (let [{:keys [leave] :as i} sut/watch-events
+          events-file (fs/path dir "script" sut/events-file)
+          mm (tm/test-component)
+          job (h/gen-job)
+          sid (repeatedly 3 cuid/random-cuid)]
+      (is (some? (fs/create-dirs (fs/parent events-file))))
+      (is (keyword? (:name i)))
+
+      (testing "`leave`"
+        (let [ctx (-> {:event
+                       {:type :job/initializing
+                        :job-id (:id job)
+                        :sid sid}}
+                      (sut/set-job-dir dir)
+                      (emi/set-mailman mm)
+                      (leave))]
+          (is (nil? (spit (fs/file events-file) (prn-str {:type :container/pending}))))
+
+          (let [es (sut/get-events-stream ctx)]
+            (testing "forwards events read from events file to mailman"
+              (is (ms/sink? es))
+              (is (not= :timeout (h/wait-until #(not-empty (tm/get-posted mm)) 200)))
+              (is (= [:container/pending]
+                     (map :type (tm/get-posted mm)))))
+
+            (testing "augments events with job id and build sid"
+              (let [e (first (tm/get-posted mm))]
+                (is (= sid (:sid e)))
+                (is (= (:id job) (:job-id e)))))
+
+            (testing "adds time"
+              (is (int? (-> (tm/get-posted mm) first :time))))
+
+            (is (nil? (ms/close! es)))))))))
+
+(deftest stop-watch-events
+  (let [{:keys [enter] :as i} sut/stop-watch-events]
+    (is (keyword? (:name i)))
+    
+    (testing "closes the event stream"
+      (let [s (ms/stream)]
+        (is (nil? (-> {:event
+                       {:type :container/end
+                        :job-id "test-job"
+                        :sid ["test" "build"]}}
+                      (sut/set-events-stream s)
+                      (enter)
+                      (sut/get-events-stream))))
+        (is (ms/closed? s))))))
+
+(deftest assign-ports
+  (let [{:keys [enter] :as i} (sut/assign-ports [100 200])]
+    (is (keyword? (:name i)))
+    
+    (testing "updates port mapping in context"
+      (is (= {["test" "build"]
+              {"test-job" {8000 100}}}
+             (-> {:event
+                  {:sid ["test" "build"]
+                   :job-id "test-job"}}
+                 (sut/set-job {:id "test-job"
+                               :expose [8000]})
+                 (enter)
+                 (sut/get-mapped-ports)))))
+
+    (testing "skips already mapped ports"
+      (is (= {["test" "build"]
+              {"test-job" {8000 101}}
+              ["other" "build"]
+              {"other-job" {1234 100}}}
+             (-> {:event
+                  {:sid ["test" "build"]
+                   :job-id "test-job"}}
+                 (sut/set-job {:id "test-job"
+                               :expose [8000]})
+                 (sut/set-mapped-ports {["other" "build"]
+                                        {"other-job" {1234 100}}})
+                 (enter)
+                 (sut/get-mapped-ports)))))))
+
+(deftest release-ports
+  (let [{:keys [enter] :as i} sut/release-ports]
+    (is (keyword? (:name i)))
+    
+    (testing "releases assigned ports"
+      (let [sid ["test" "build"]
+            job-id "test-job"]
+        (is (empty? (-> {:event
+                         {:sid sid
+                          :job-id job-id}}
+                        (sut/set-mapped-ports {sid {job-id {1000 2000}}})
+                        (enter)
+                        (sut/get-mapped-ports))))))))
+
 (deftest job-queued
   (testing "returns `job/initializing` event"
     (is (= [:job/initializing]
@@ -480,25 +611,57 @@
              (-> {}
                  (sut/job-queued (sut/set-job-dir {} job-dir))
                  first
-                 :local-dir))))))
+                 :local-dir)))))
+
+  (testing "adds agent details with mapped ports"
+    (let [a (-> {:event
+                 {:sid ["test" "build"]
+                  :job-id "test-job"}}
+                (sut/set-mapped-ports {["test" "build"]
+                                       {"test-job" {1000 8080}}})
+                (as-> ctx (sut/job-queued {} ctx))
+                first
+                :agent)]
+      (is (map? a))
+      (is (string? (:address a)))
+      (is (= {1000 8080} (:ports a))))))
 
 (deftest job-init
-  (testing "returns `job/start` event"
+  (testing "when no script, returns `job/start` event"
     (is (= :job/start
            (-> {:event
                 {:type :job/initializing
-                 :job-id "test-job"}}
+                 :job-id "no-script-job"}}
+               (sut/set-job {:id "no-script-job"})
                (sut/job-init)
+               first
+               :type))))
+
+  (testing "when script, does nothing"
+    (is (empty? (-> {:event
+                     {:type :job/initializing
+                      :job-id "script-job"}}
+                    (sut/set-job {:id "script-job"
+                                  :script ["ls"]})
+                    (sut/job-init))))))
+
+(deftest job-pending
+  (testing "returns `job/start` event"
+    (is (= :job/start
+           (-> {:event
+                {:type :job/pending
+                 :job-id "test-job"}}
+               (sut/job-pending)
                first
                :type)))))
 
 (deftest job-exec
   (testing "returns `job/executed` event"
     (let [r (-> {:event
-                {:type :container/end
-                 :job-id "test-job"}}
-               (sut/job-exec)
-               first)]
+                 {:type :container/end
+                  :job-id "test-job"}}
+                (sut/job-exec)
+                first)]
       (is (= :job/executed
              (:type r))))))
 
@@ -550,3 +713,16 @@
 
   (testing "returns job count"
     (is (= 3 (sut/count-jobs {:job-count 3})))))
+
+(deftest find-avail-ports
+  (testing "selects first available from range"
+    (is (= [100 101]
+           (sut/find-avail-ports 2 [100 200] #{}))))
+
+  (testing "skips used ports"
+    (is (= [100 102]
+           (sut/find-avail-ports 2 [100 200] #{101}))))
+
+  (testing "returns less than `n` when not enough available ports"
+    (is (= [100]
+           (sut/find-avail-ports 2 [100 101] #{101})))))

@@ -4,6 +4,7 @@
             [monkey.ci
              [build :as b]
              [cuid :as cuid]
+             [plans :as p]
              [storage :as s]
              [time :as t]]
             [monkey.ci.common.preds :as cp]
@@ -35,8 +36,8 @@
 (defn list-org-credits
   "Returns overview of the issued credits to a org"
   [req]
-  (let [cust-id (c/org-id req)
-        creds (s/list-org-credits (c/req->storage req) cust-id)]
+  (let [org-id (c/org-id req)
+        creds (s/list-org-credits (c/req->storage req) org-id)]
     (rur/response creds)))
 
 (defn issue-credits
@@ -56,28 +57,19 @@
 (defn issue-credits-for-subs
   "Given a org id and list of subscriptions, issues any credits for the given 
    timestamp.  Returns a list of issued org credit sids."
-  [st ts [cust-id cust-subs]]
-  (log/debug "Found" (count cust-subs) "subscriptions for org" cust-id)
-  (let [credits (->> (s/list-org-credits-since st cust-id (- ts 100))
+  [st ts [org-id org-subs]]
+  (log/debug "Found" (count org-subs) "subscriptions for org" org-id)
+  (let [credits (->> (s/list-org-credits-since st org-id (- ts 100))
                      ;; TODO Filter in the query
                      (filter (cp/prop-pred :type :subscription))
                      (group-by :subscription-id))]
-    (letfn [(calc-expiration-time [{p :valid-period} ts]
-              (when p
-                (t/plus-period ts (jt/period p))))
-            (issue-credits-for-sub [sub]
+    (letfn [(issue-credits-for-sub [sub]
               (let [sc (->> (get credits (:id sub))
                             (filter (comp (partial t/same-date? ts) :valid-from)))]
                 (when (empty? sc)
                   (log/info "Creating new org credit for sub" (:id sub) ", amount" (:amount sub))
-                  (s/save-org-credit st (-> sub
-                                            (select-keys [:org-id :amount])
-                                            (assoc :id (cuid/random-cuid)
-                                                   :type :subscription
-                                                   :subscription-id (:id sub)
-                                                   :valid-from ts
-                                                   :valid-until (calc-expiration-time sub ts)))))))]
-      (->> cust-subs
+                  (s/save-org-credit st (p/sub->credits sub ts)))))]
+      (->> org-subs
            (map issue-credits-for-sub)
            (remove nil?)
            (doall)))))

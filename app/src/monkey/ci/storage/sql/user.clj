@@ -13,14 +13,12 @@
   (-> user
       (sc/id->cuid)
       (select-keys [:cuid :type :type-id :email])
-      (mc/update-existing :type name)
       (mc/update-existing :type-id str)))
 
 (defn- db->user [user]
   (-> user
       (sc/cuid->id)
-      (select-keys [:id :type :type-id :email])
-      (mc/update-existing :type keyword)))
+      (select-keys [:id :type :type-id :email])))
 
 (defn- insert-user [conn user]
   (let [{:keys [id] :as ins} (ec/insert-user conn (user->db user))

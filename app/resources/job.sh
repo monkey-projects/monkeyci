@@ -89,9 +89,9 @@ do
     if [ $r -ne 0 ]; then
 	echo "Got error at step $v: $r"
 	# Nonzero return value means error, so don't proceed
-	post_event "{:type :container/end :done? true :result {:status :error :exit $r} :step \"$v\"}"
+	post_event "{:type :container/script-end :done? true :result {:status :error :exit $r} :step \"$v\"}"
 	exit $r
     fi
 done
-post_event "{:type :container/end :result {:status :success :exit 0} :done? true}"
+post_event "{:type :container/script-end :result {:status :success :exit 0} :done? true}"
 echo "All done."

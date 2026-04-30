@@ -1,0 +1,74 @@
+(ns monkey.ci.gui.test.scenes.build-scenes
+  (:require [portfolio.reagent-18 :refer-macros [defscene]]
+            [monkey.ci.gui.build.views :as sut]
+            [monkey.ci.gui.time :as t]))
+
+(defscene build-status-icon
+  "Large build status icon"
+  [:div.d-flex.gap-2
+   [sut/build-status-icon :success]
+   [sut/build-status-icon :error]
+   [sut/build-status-icon :running]
+   [sut/build-status-icon :pending]
+   [sut/build-status-icon :initializing]
+   [sut/build-status-icon :unknown]])
+
+(def build-running
+  {:start-time (str (t/now))
+   :status :running
+   :message "Test build"
+   :git {:ref "refs/heads/main"}})
+
+(def build-success
+  {:start-time (str (.minus (t/now) (clj->js {:minutes 5})))
+   :end-time (str (t/now))
+   :status :success
+   :message "Test build, for portfolio scenes"
+   :git {:ref "refs/heads/main"
+         :commit-url "https://github.com/test"}
+   :credits 17})
+
+(defscene build-status-pending
+  "Pending build status"
+  [sut/build-status {:status :pending}])
+
+(defscene build-status-initializing
+  "Initializing build status"
+  [sut/build-status {:status :initializing}])
+
+(defscene build-status-running
+  "Running build status"
+  [sut/build-status
+   {:status :running}])
+
+(defscene build-status-success
+  "Successful build status"
+  [sut/build-status {:status :success}])
+
+(defscene build-status-error
+  "Failed build status"
+  [sut/build-status {:status :error}])
+
+(defscene build-details-running
+  "Running build details"
+  [sut/build-details
+   {:start-time (str (t/now))
+    :status :running
+    :git {:ref "refs/heads/main"
+          :message "Some small changes"}}])
+
+(defscene build-details-success
+  "Successful build details"
+  [sut/build-details build-success])
+
+(defscene build-details-tag
+  "Build details for tag"
+  [sut/build-details (assoc-in build-success [:git :ref] "refs/tags/0.1.2")])
+
+(defscene build-overview-running
+  "Running build overview"
+  [sut/overview build-running])
+
+(defscene build-overview-success
+  "Successful build overview"
+  [sut/overview build-success])

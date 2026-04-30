@@ -45,6 +45,21 @@
   [build]
   (update build :script dissoc :jobs))
 
+(defn- transactional
+  "Wraps interceptor fn `f` in a transaction"
+  [f]
+  (fn [ctx]
+    (let [orig-db (get-db ctx)]
+      (-> orig-db
+          (st/transact
+           (fn [db]
+             (f (emi/set-db ctx db))))
+          ;; Restore original db conn
+          (emi/set-db orig-db)))))
+
+(defn- store-evt [ctx evt]
+  (st/save-job-event (get-db ctx) (st/event->storage evt)))
+
 ;;; Interceptors for side effects
 
 (def org-credits
@@ -60,18 +75,6 @@
   {:name ::load-build
    :enter (fn [ctx]
             (set-build ctx (st/find-build (get-db ctx) (get-in ctx [:event :sid]))))})
-
-(defn- transactional
-  "Wraps interceptor fn `f` in a transaction"
-  [f]
-  (fn [ctx]
-    (let [orig-db (get-db ctx)]
-      (-> orig-db
-          (st/transact
-           (fn [db]
-             (f (emi/set-db ctx db))))
-          ;; Restore original db conn
-          (emi/set-db orig-db)))))
 
 (def assign-build-idx
   "Interceptor that assigns a new index to the build"
@@ -132,16 +135,18 @@
                    job (let [j (-> ctx (em/get-result) (get-in [:build :script :jobs job-id]))]
                          (if (and j (st/save-job db sid j))
                            (do (log/debug "Updated job in db:" j)
-                               (st/save-job-event db (-> st/build-sid-keys
-                                                         (zipmap sid)
-                                                         (assoc :job-id job-id
-                                                                :event (:type evt)
-                                                                :time (:time evt)
-                                                                :details evt)))
+                               (store-evt ctx evt)
                                j)
                            (log/warn "Failed to update job in db:" j)))]
                (cond-> ctx
                  job (set-job job)))))})
+
+(def save-event
+  "Interceptor that just saves the event for future reference"
+  {:name ::save-event
+   :enter (fn [ctx]
+            (store-evt ctx (:event ctx))
+            ctx)})
 
 (def with-job
   {:name ::with-job
@@ -151,8 +156,9 @@
 (def load-job-events
   {:name ::load-job-events
    :enter (fn [ctx]
-            (println "job events:" (st/list-job-events (get-db ctx) (job-sid ctx)))
-            (set-job-events ctx (st/list-job-events (get-db ctx) (job-sid ctx))))})
+            (->> (st/list-job-events (get-db ctx) (job-sid ctx))
+                 (map :details)
+                 (set-job-events ctx )))})
 
 (def save-credit-consumption
   "Assuming the result contains a build with credits, creates a credit consumption for
@@ -275,9 +281,9 @@
 
 (def job-init
   (job-update (fn [job ctx]
-                (assoc job
-                       :status :initializing
-                       :credit-multiplier (get-in ctx [:event :credit-multiplier])))))
+                (-> job
+                    (assoc :status :initializing)
+                    (merge (select-keys (:event ctx) [:credit-multiplier :agent]))))))
 
 (def job-start
   (job-update (fn [job {:keys [event]}]
@@ -295,8 +301,6 @@
        (apply merge)))
 
 (def job-end
-  ;; TODO List job events and merge the data into one.  This to fix any missing data due to
-  ;; concurrent updates.
   (job-update (fn [job {:keys [event] :as ctx}]
                 (-> (merge-history ctx)
                     (merge job)
@@ -307,6 +311,19 @@
   (job-update (fn [job _]
                 (assoc job :status :skipped))))
 
+(def job-blocked
+  (job-update (fn [job _]
+                (assoc job :status :blocked))))
+
+(def job-unblocked
+  ;; FIXME Should not allow unblocking a job when build has finished
+  (job-update (fn [job _]
+                ;; When a job is unblocked, it is immediately scheduled for execution
+                ;; Perhaps we should change the state here to unblocked for tracing purposes?
+                (assoc job :status :queued))))
+
+(def noop-handler (constantly nil))
+
 ;;; Event routing configuration
 
 (defn make-routes [storage bus]
@@ -315,7 +332,10 @@
                    with-build]
         job-int [use-db
                  load-build
-                 with-job]]
+                 with-job]
+        only-save [{:handler noop-handler
+                    :interceptors [use-db
+                                   save-event]}]]
     [[:build/triggered
       ;; Checks if the org has credits available, and creates the build in db
       [{:handler check-credits
@@ -376,4 +396,18 @@
 
      [:job/skipped
       [{:handler job-skipped
-        :interceptors job-int}]]]))
+        :interceptors job-int}]]
+
+     [:job/blocked
+      [{:handler job-blocked
+        :interceptors job-int}]]
+
+     [:job/unblocked
+      [{:handler job-unblocked
+        :interceptors job-int}]]
+
+     [:container/pending only-save]
+     
+     [:container/start only-save]
+     
+     [:container/end only-save]]))

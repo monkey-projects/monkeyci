@@ -16,8 +16,8 @@
             [monkey.ci.runners.controller :as rc]
             [monkey.ci.sidecar
              [config :as cs]
-             [core :as sc]]
-            [monkey.ci.spec.sidecar :as ss]
+             [core :as sc]
+             [spec :as ss]]
             [monkey.ci.test
              [aleph-test :as at]
              [config :as tc]
@@ -56,7 +56,10 @@
                              :script-dir))))
 
       (testing "creates local data encryption key for build"
-        (is (wc/b64-dek? (:dek build)))))))
+        (is (wc/b64-dek? (:dek build))))
+
+      (testing "sets `cli` source"
+        (is (= :cli (:source build)))))))
 
 (deftest config->build
   (testing "uses workdir as checkout dir"

@@ -1,5 +1,6 @@
 (ns monkey.ci.gui.repo.subs
-  (:require [monkey.ci.gui.org.subs]
+  (:require [clojure.string :as cs]
+            [monkey.ci.gui.org.subs]
             [monkey.ci.gui.repo.db :as db]
             [monkey.ci.gui.time :as t]
             [monkey.ci.gui.utils :as u]
@@ -15,10 +16,15 @@
  :repo/builds
  (fn [db _]
    (let [params (get-in db [:route/current :parameters :path])
-         parse-time (fn [b]
-                      (update b :start-time (comp str t/parse)))]
+         maybe-parse (fn [t]
+                       ;; Legacy data can contain strings
+                       (cond-> t
+                         (string? t)
+                         (-> t/parse t/to-epoch)))
+         ->epoch (fn [b]
+                   (update b :start-time maybe-parse))]
      (some->> (db/get-builds db)
-              (map parse-time)
+              (map ->epoch)
               (sort-by :start-time)
               (reverse)
               (map (partial merge params))))))
@@ -33,6 +39,26 @@
 (u/db-sub :repo/deleting? (comp true? db/deleting?))
 
 (rf/reg-sub
+ ::edit-url
+ :<- [:repo/editing]
+ (fn [e _]
+   (:url e)))
+
+(defn- extract-repo-name [url]
+  (letfn [(drop-ext [v]
+            (first (cs/split v #"\.")))]
+    (when url
+      (-> (cs/split url #"/")
+          (last)
+          (drop-ext)))))
+
+(rf/reg-sub
+ ::edit-name
+ :<- [:repo/editing]
+ (fn [e _]
+   (or (:name e) (extract-repo-name (:url e)))))
+
+(rf/reg-sub
  :builds/init-loading?
  :<- [:loader/init-loading? db/id]
  (fn [l _]
@@ -43,3 +69,30 @@
  :<- [:loader/loaded? db/id]
  (fn [l _]
    l))
+
+(defn- avg-elapsed [b]
+  (-> (reduce (fn [r {s :start-time e :end-time}]
+                (+ r (- e s)))
+              0
+              b)
+      (/ (count b))
+      (int)))
+
+(defn- success-rate [b]
+  (-> (->> b
+           (filter (comp (partial = :success) :status))
+           (count))
+      (/ (count b))
+      ;; Round to 0.1%
+      (* 1000)
+      (int)
+      (/ 1000)))
+
+(rf/reg-sub
+ :repo/stats
+ :<- [:repo/builds]
+ (fn [b _]
+   (let [d (filter (every-pred :start-time :end-time) b)]
+     (when-not (empty? d)
+       {:avg-elapsed (avg-elapsed d)
+        :success-rate (success-rate d)}))))

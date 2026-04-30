@@ -1,9 +1,6 @@
 (ns monkey.ci.web.api.token
   "API handlers for user and org tokens"
-  (:require [buddy.core
-             [codecs :as bcc]
-             [hash :as bch]]
-            [monkey.ci.storage :as st]
+  (:require [monkey.ci.storage :as st]
             [monkey.ci.web
              [auth :as auth]
              [common :as c]]

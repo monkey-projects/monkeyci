@@ -3,6 +3,9 @@
             [buddy.sign.jwt :as jwt]
             [clojure.test :refer [deftest testing is]]
             [com.stuartsierra.component :as co]
+            [manifold
+             [deferred :as md]
+             [stream :as ms]]
             [monkey.ci.agent.runtime :as sut]
             [monkey.ci.build.api-server :as bas]
             [monkey.ci
@@ -86,14 +89,14 @@
           (is (= "http://test-api" (:url req))))))))
 
 (deftest ssh-keys-fetcher
-  (let [sid ["test-cust" "test-repo" "test-build"]
+  (let [sid ["test-org" "test-repo" "test-build"]
         kp (auth/generate-keypair)
         conf {:api {:url "http://test-api"}
               :jwk {:priv (.getPrivate kp)}}
         pubkey (.getPublic kp)]
     (testing "retrieves from global api for repo"
       (ta/with-fake-http
-          ["http://test-api/org/test-cust/repo/test-repo/ssh-keys"
+          ["http://test-api/org/test-org/repo/test-repo/ssh-keys"
            (fn [req]
              {:status 200
               :body (pr-str ["test-key"])})]
@@ -102,20 +105,31 @@
 
     (testing "passes valid token for build"
       (ta/with-fake-http
-          ["http://test-api/org/test-cust/repo/test-repo/ssh-keys"
+          ["http://test-api/org/test-org/repo/test-repo/ssh-keys"
            (fn [req]
-             (let [token (get-in req [:headers "authorization"])]
+             (let [token (:oauth-token req)]
                {:status 200
                 :body (pr-str [token])}))]
         (let [fetcher (sut/new-ssh-keys-fetcher conf)
               token (->> (fetcher sid)
                          (first)
-                         (re-matches #"^Bearer (.*)$")
-                         (second))]
+                         #_(re-matches #"^Bearer (.*)$")
+                         #_(second))]
           (is (string? token))
           (is (= sid (-> (jwt/unsign token pubkey {:alg :rs256})
                          :sub
-                         (sid/parse-sid)))))))))
+                         (sid/parse-sid)))))))
+
+    (testing "throws on error response"
+      (ta/with-fake-http
+          ["http://test-api/org/test-org/repo/test-repo/ssh-keys"
+           (fn [req]
+             (md/error-deferred
+              (ex-info "Test error"
+                       {:status 400
+                        :body (java.io.ByteArrayInputStream. (.getBytes "Test client error"))})))]
+        (let [fetcher (sut/new-ssh-keys-fetcher conf)]
+          (is (thrown-with-msg? Exception #"Test client error" (fetcher sid))))))))
 
 (deftest build-key-decrypter
   (testing "decrypts from global api"
@@ -178,4 +192,67 @@
       (is (some? (:state sys))))
 
     (testing "provides key decrypter"
-      (is (fn? (:key-decrypter sys))))))
+      (is (fn? (:key-decrypter sys))))
+
+    (testing "provides log ingester"
+      (is (some? (:log-ingest sys))))))
+
+(deftest agent-routes
+  (testing "includes stream and consumer for nats"
+    (let [conf {:mailman {:type :nats
+                          :stream "test-stream"
+                          :consumer "test-consumer"}}
+          r (sut/new-agent-routes conf)]
+      (is (= "test-stream"
+             (get-in r [:options :stream])))
+      (is (= "test-consumer"
+             (get-in r [:options :consumer]))))))
+
+(deftest container-routes
+  (let [conf {:mailman {:type :nats
+                        :stream "test-stream"
+                        :consumer "test-consumer"}}
+        r (sut/new-container-routes conf)]
+    (testing "includes stream and consumer for nats"
+      (is (= "test-stream"
+             (get-in r [:options :stream])))
+      (is (= "test-consumer"
+             (get-in r [:options :consumer]))))
+
+    (testing "when no log ingester configured, handles command events"
+      (let [routes ((:make-routes r) {:log-ingest {}})
+            evts (set (map first routes))]
+        (is (not (contains? evts :command/start)))
+        (is (not (contains? evts :command/end))))))
+
+  (testing "when log ingester configured, handles command events"
+    (let [c (sut/new-container-routes {:mailman {:type :noop}})
+          routes ((:make-routes c) {:log-ingest {:stream-creator (constantly ::test-stream)}})
+          evts (set (map first routes))]
+      (is (contains? evts :command/start))
+      (is (contains? evts :command/end)))))
+
+(deftest log-ingest
+  (testing "with config"
+    (let [l (sut/new-log-ingest {:log-ingest {:url "http://test-log-ingest"}})]
+      (testing "provides client fn"
+        (is (fn? (:client l))))
+
+      (testing "stream creator"
+        (let [sc (:stream-creator l)]
+          (testing "is provided"
+            (is (fn? sc)))
+
+          (testing "creates manifold sink"
+            (let [s (sc "test-file" {:sid ["test" "build"]
+                                     :job-id "test-job"})]
+              (is (ms/sink? s))
+              (is (nil? (ms/close! s)))))))))
+
+  (testing "without config"
+    (let [l (sut/new-log-ingest {})]
+      (testing "does not provide client"
+        (is (not (contains? l :client))))
+
+      (testing "does not provide stream creator"
+        (is (not (contains? l :stream-creator)))))))

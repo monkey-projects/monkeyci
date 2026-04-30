@@ -111,6 +111,23 @@
       (is (some? (reset! app-db (db/set-editing {} ::editing))))
       (is (= ::editing @l)))))
 
+(deftest edit-url
+  (h/verify-sub [::sut/edit-url]
+                #(db/set-editing % {:url "test-url"})
+                "test-url"
+                nil))
+
+(deftest edit-name
+  (h/verify-sub [::sut/edit-name]
+                #(db/set-editing % {:name "test-repo"})
+                "test-repo"
+                nil)
+
+  (testing "when no name, uses url name"
+    (let [n (rf/subscribe [::sut/edit-name])]
+      (is (some? (reset! app-db (db/set-editing {} {:url "https://github.org/some-org/test-repo.git"}))))
+      (is (= "test-repo" @n)))))
+
 (deftest edit-alerts
   (let [a (rf/subscribe [:repo/edit-alerts])]
     (testing "exists"
@@ -128,3 +145,34 @@
 
 (deftest deleting?
   (h/verify-sub [:repo/deleting?] db/mark-deleting true false))
+
+(deftest repo-stats
+  (let [s (rf/subscribe [:repo/stats])]
+    (testing "exists"
+      (is (some? s)))
+
+    (testing "empty if no builds"
+      (is (empty? @s)))
+
+    (testing "with builds"
+      (is (some? (reset! app-db (db/set-builds {} [{:build-id "build-1"
+                                                    :start-time 10000
+                                                    :end-time 30000
+                                                    :status :success}
+                                                   {:build-id "build-2"
+                                                    :start-time 50000
+                                                    :end-time 55000
+                                                    :status :error}
+                                                   {:build-id "build-3"
+                                                    :start-time 60000
+                                                    :end-time 65000
+                                                    :status :success}
+                                                   {:build-id "build-4"
+                                                    :start-time 70000
+                                                    :status :running}]))))
+      
+      (testing "provides avg build duration in milliseconds"
+        (is (= 10000 (:avg-elapsed @s))))
+
+      (testing "calculates success rate"
+        (is (= 0.666 (:success-rate @s)))))))

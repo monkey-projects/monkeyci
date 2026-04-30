@@ -8,7 +8,8 @@
                                 LineController PointElement LineElement
                                 CategoryScale LinearScale
                                 Colors Legend Tooltip
-                                Chart]]))
+                                Chart]]
+            ["react" :as react]))
 
 ;; Necessary otherwise chartjs won't be able to use these
 (.register Chart (clj->js [BarController BarElement
@@ -55,35 +56,35 @@
   ;; The main issue with the chart component is that it requires an existing
   ;; DOM object before it can render the chart.  So we can't really use the
   ;; regular system of "prepare the data and set it in the hiccup structure".
-  (letfn [(make-chart [conf]
-            ;;(log/debug "Creating new chart with config:" (str conf))
-            (Chart. (.getElementById js/document (str id)) (clj->js conf)))
-          (update-chart [chart conf]
-            ;; Replace the data in the chart, leave other values untouched
-            ;;(log/debug "Updating chart data")
-            (update-chart-data! chart conf)
-            (.update chart)
-            chart)]
-    (let [state (rc/atom nil)]
+  (let [state (rc/atom nil)
+        ;; Component ref, will be populated with the dom element
+        co-ref (react/createRef)]
+    (letfn [(make-chart [conf]
+              (if-let [el (.-current co-ref)]
+                (Chart. el (clj->js conf))
+                (log/warn "Chart element not found:" id)))
+            (update-chart [chart conf]
+              (doto chart
+                ;; Replace the data in the chart, leave other values untouched
+                (update-chart-data! conf)
+                (.update)))]
       (rc/create-class
        {:display-name "chart-component"
         :reagent-render
         (fn [id config]
-          ;;(log/debug "Rendering component with config" (str config))
           ;; Put the config in the state, we'll need it after mount
           (swap! state assoc :config config)
-          ;; Render the component, chart js will fill it up after mount
-          [:canvas {:id (str id)}])
+          ;; Render the component, chart js will fill it up after mount.
+          ;; Also populate the ref with the dom element, it's needed by chartjs.
+          [:canvas {:id (str id) :ref co-ref}])
         :component-did-update
         (fn [this argv]
           ;; Don't use argv, it contains the original values
-          ;;(log/debug "Component updated")
           ;; Update the chart configuration
           (swap! state (fn [{:keys [config] :as r}]
                          (update r :chart update-chart config))))
         :component-did-mount
         (fn [this]
-          ;;(log/debug "Component mounted")
           ;; Create the chart object using the config stored when rendering
           (swap! state (fn [{:keys [config] :as r}]
                          (assoc r :chart (make-chart config)))))}))))

@@ -10,7 +10,9 @@
              [deferred :as md]
              [stream :as ms]]
             [medley.core :as mc]
-            [monkey.ci.build :as b]
+            [monkey.ci
+             [build :as b]
+             [errors :as err]]
             [monkey.ci.events.http :as eh]
             [monkey.ci.web.crypto :as crypto]))
 
@@ -19,10 +21,6 @@
       (assoc :accept :edn
              :as :clojure)))
 
-(def api-middleware
-  (conj mw/default-middleware
-        mw/wrap-exceptions))
-
 (defn api-request
   "Sends a request to the api at configured url"
   [{:keys [url token]} req]
@@ -30,13 +28,9 @@
             (assoc req
                    :url (str url (:path req))
                    :oauth-token token
-                   :middelware api-middleware))
+                   :middelware mw/default-middleware))
           (handle-error [ex]
-            (throw (ex-info
-                    (ex-message ex)
-                    (-> (ex-data ex)
-                        ;; Read the response body in case of error
-                        (mc/update-existing :body bs/to-string)))))]
+            (throw (err/unwrap-exception ex)))]
     (-> req
         (build-request)
         (http/request)

@@ -8,6 +8,9 @@
             [clojure.java.io :as io]
             [clojure.string :as cs]
             [clojure.tools.logging :as log]
+            [manifold
+             [deferred :as md]
+             [stream :as ms]]
             [medley.core :as mc]
             [monkey.ci
              [artifacts :as art]
@@ -17,12 +20,15 @@
              [jobs :as j]
              [process :as proc]
              [protocols :as p]
+             [time :as t]
              [utils :as u]
              [vault :as v]
              [workspace :as ws]]
             [monkey.ci.build.core :as bc]
             [monkey.ci.containers.common :as cc]
-            [monkey.ci.events.mailman :as em]
+            [monkey.ci.events
+             [edn :as ee]
+             [mailman :as em]]
             [monkey.ci.events.mailman.interceptors :as emi]
             [monkey.ci.vault.common :as vc]))
 
@@ -47,6 +53,8 @@
     "XDG_CONFIG_HOME"
     "XDG_DATA_HOME"
     "XDG_RUNTIME_DIR"})
+
+(def events-file "events.edn")
 
 (defn- reserved? [var]
   (or (reserved-vars var)
@@ -115,9 +123,22 @@
 (defn podman-cmd [opts]
   (get opts :podman-cmd "podman"))
 
+(defn find-avail-ports
+  "Calculates first `n` available ports from the given range, skipping those in use."
+  [n port-range used]
+  (take n (->> (apply range port-range)
+               (remove used))))
+
+(defn- expose-ports [cmd ports]
+  (->> ports
+       (mapcat (fn [[cp hp]]
+                 ["-p" (str hp ":" cp)]))
+       (concat cmd)
+       (vec)))
+
 (defn build-cmd-args
   "Builds command line args for the podman executable"
-  [{:keys [job sid] base :work-dir sd :script-dir :as opts}]
+  [{:keys [job sid mapped-ports] base :work-dir sd :script-dir :as opts}]
   (let [cn (get-job-id sid)
         cwd "/home/monkeyci"
         ext-dir "/opt/monkeyci"
@@ -142,6 +163,7 @@
                           "-w" wd
                           ;; TODO Allow arbitrary additional command line opts
                           ]
+                   (not-empty mapped-ports) (expose-ports mapped-ports)
                    ;; Do not delete container in dev mode
                    (not (:dev-mode opts)) (conj "--rm"))
         env {"MONKEYCI_WORK_DIR" wd
@@ -149,7 +171,7 @@
              "MONKEYCI_LOG_DIR" cld
              "MONKEYCI_START_FILE" (str csd "/" start)
              "MONKEYCI_ABORT_FILE" (str csd "/abort")
-             "MONKEYCI_EVENT_FILE" (str csd "/events.edn")}]
+             "MONKEYCI_EVENT_FILE" (str csd "/" events-file)}]
     (when-let [s (:script job)]
       (script->files s sd)
       (io/copy (slurp (io/resource cc/job-script)) (fs/file (fs/path sd cc/job-script)))
@@ -199,13 +221,23 @@
 (defn set-job-dir [ctx wd]
   (emi/update-state ctx assoc ::job-dir wd))
 
+(defn get-job-timeout
+  "Returns the timeout for this job"
+  [ctx]
+  (min (or (some-> (get-job ctx) :timeout)
+           j/default-job-timeout)
+       j/max-job-timeout))
+
 (def get-work-dir
   "The directory where the container process is run"
   (comp #(fs/path % "work") get-job-dir))
 
+(defn calc-log-dir [jd]
+  (fs/path jd "logs"))
+
 (def get-log-dir
   "The directory where container output is written to"
-  (comp #(fs/path % "logs") get-job-dir))
+  (comp calc-log-dir get-job-dir))
 
 (def get-script-dir
   "The directory where script files are stored"
@@ -227,6 +259,39 @@
 
 (defn set-podman-opts [ctx opts]
   (assoc ctx podman-opts opts))
+
+(defn get-events-stream [ctx]
+  (some-> (emi/get-state ctx)
+          (get-in [:events-streams (build-sid ctx) (ctx->job-id ctx)])))
+
+(defn set-events-stream [ctx s]
+  (emi/update-state ctx assoc-in [:events-streams (build-sid ctx) (ctx->job-id ctx)] s))
+
+(defn remove-events-stream
+  "Removes event stream for the current job from state"
+  [ctx]
+  (emi/update-state ctx (fn [s]
+                          (-> s
+                              (update-in [:events-streams (build-sid ctx)] dissoc (ctx->job-id ctx))
+                              ;; Remove any empty entries if all jobs have finished
+                              (update :events-streams u/prune-tree)))))
+
+(defn set-mapped-ports [ctx p]
+  (emi/update-state ctx assoc ::mapped-ports p))
+
+(def get-mapped-ports (comp ::mapped-ports emi/get-state))
+
+(defn update-mapped-ports [ctx f & args]
+  (set-mapped-ports ctx (apply f (get-mapped-ports ctx) args)))
+
+(defn get-job-mapped-ports
+  "Retrieves mapped ports for current job"
+  [ctx]
+  (-> (get-mapped-ports ctx)
+      (get-in [(build-sid ctx) (ctx->job-id ctx)])))
+
+(defn podman-src [evt]
+  (assoc evt :src :podman))
 
 ;;; Interceptors
 
@@ -252,7 +317,7 @@
    :enter (fn [ctx]
             (let [dest (fs/create-dirs (get-work-dir ctx))
                   ws (ws/->BlobWorkspace workspace (str dest))]
-              (log/debug "Restoring workspace to" dest)
+              (log/debug "Restoring workspace for job" (ctx->job-id ctx) "to" dest)
               (assoc ctx ::workspace (-> (p/restore-workspace ws (build-sid ctx))
                                          (u/maybe-deref)))))})
 
@@ -357,19 +422,92 @@
             (set-podman-opts ctx opts))})
 
 (defn job-queued [conf ctx]
-  (let [{:keys [job-id sid]} (:event ctx)]
+  (let [{:keys [job-id sid]} (:event ctx)
+        m (get-job-mapped-ports ctx)]
     [(-> (j/job-initializing-evt job-id sid (:credit-multiplier conf))
-         (assoc :local-dir (get-job-dir ctx)))]))
+         (assoc :local-dir (get-job-dir ctx)
+                :agent (cond-> {:address (u/inetaddr->str (u/get-ip-addr))}
+                         (not-empty m) (assoc :ports m))))]))
 
 (defn job-queued-result [conf]
   {:name ::job-queued
    :leave (fn [ctx]
             (emi/set-result ctx (job-queued conf ctx)))})
 
-;;; Event handlers
+(def watch-events
+  "Interceptor that starts watching the events file that will be written to by the started process.
+   These events are posted to the configured mailman."
+  {:name ::watch-events
+   :leave (fn [ctx]
+            (let [e (fs/path (get-script-dir ctx) events-file)
+                  s (ms/stream 1)
+                  sid (build-sid ctx)
+                  job-id (ctx->job-id ctx)
+                  augment-evt (fn [evt]
+                                (-> evt
+                                    (podman-src)
+                                    (assoc :sid sid :job-id job-id :time (t/now))))]
+              ;; Post to mailman
+              (ms/consume #(em/post-events (emi/get-mailman ctx) [%]) s)
+              (-> ctx
+                  (set-events-stream s)
+                  (assoc ::events-stream-result
+                         (-> (u/wait-for-file e)
+                             (md/chain
+                              (fn [p]
+                                (let [r (io/reader (fs/file p))]
+                                  (log/debug "Starting to watch events from" (str p))
+                                  (-> (ee/read-edn r (-> (fn [evt]
+                                                           @(ms/put! s (augment-evt evt)))
+                                                         (ee/sleep-on-eof 100)
+                                                         (ee/stop-on-file-delete p)))
+                                      (md/finally #(.close r)))))))))))})
 
-(defn podman-src [evt]
-  (assoc evt :src :podman))
+(def stop-watch-events
+  "Stops watching events for a job by closing the event sink"
+  {:name ::stop-watch-events
+   :enter (fn [ctx]
+            (let [s (get-events-stream ctx)]
+              (when s
+                (ms/close! s))
+              (cond-> ctx
+                s (remove-events-stream))))})
+
+(defn assign-ports
+  "Interceptor that is responsible for assigning exposed job ports from a configured range"
+  [r]
+  (letfn [(calc-used-ports [m]
+            (->> m
+                 vals
+                 (mapcat vals)
+                 (mapcat vals)
+                 set))]
+    {:name ::assign-ports
+     :enter (fn [ctx]
+              (let [ports (:expose (get-job ctx))]
+                (update-mapped-ports
+                 ctx
+                 (fn [mapped]
+                   (->> (find-avail-ports (count ports) r (calc-used-ports mapped))
+                        (zipmap ports)
+                        (assoc-in mapped [(build-sid ctx) (ctx->job-id ctx)]))))))}))
+
+(def release-ports
+  "Releases any previously assigned ports associated with the job"
+  (letfn [(maybe-remove-build [m sid]
+            (cond-> m
+              (empty? (get m sid)) (dissoc sid)))]
+    {:name ::release-ports
+     :enter (fn [ctx]
+              (update-mapped-ports
+               ctx
+               (fn [mapped]
+                 (let [sid (build-sid ctx)]
+                   (-> mapped
+                       (update sid dissoc (ctx->job-id ctx))
+                       (maybe-remove-build sid))))))}))
+
+;;; Event handlers
 
 (def container-end-evt
   "Creates a `container/end` event, specifically for podman containers.  This is used
@@ -386,7 +524,8 @@
                 :sid (conj sid job-id)
                 :work-dir (get-work-dir ctx)
                 :log-dir (get-log-dir ctx)
-                :script-dir (get-script-dir ctx)}
+                :script-dir (get-script-dir ctx)
+                :mapped-ports (get-job-mapped-ports ctx)}
                (merge (podman-opts ctx))
                (build-cmd-args))
      :dir (job-work-dir ctx job)
@@ -405,9 +544,17 @@
                      (log/error "Failed to post job/executed event" ex)))))}))
 
 (defn job-init [ctx]
+  (let [job (get-job ctx)
+        {:keys [job-id sid]} (:event ctx)]
+    ;; If the job contains a script, we can wait for the container/pending event.  Otherwise
+    ;; we'll have to mark the job as started right here.
+    (when (empty? (:script job))
+      [(podman-src (j/job-start-evt job-id sid))])))
+
+(defn job-pending [ctx]
+  ;; Raised by the job script, when the job is waiting to start.  In this case, this is immediately,
+  ;; so we can assume the job is already running.
   (let [{:keys [job-id sid]} (:event ctx)]
-    ;; Ideally the container notifies us when it's running by means of a script,
-    ;; similar to the oci sidecar.
     [(podman-src (j/job-start-evt job-id sid))]))
 
 (defn job-exec
@@ -418,6 +565,8 @@
 (defn- make-job-ctx [conf]
   (-> (select-keys conf [:artifacts :cache])
       (assoc :checkout-dir (b/checkout-dir (:build conf)))))
+
+(def default-expose-range [20000 21000])
 
 (defn make-routes [{:keys [workspace work-dir mailman state] :as conf}]
   (let [state (emi/with-state (or state (atom {})))
@@ -436,18 +585,28 @@
                        (add-key-decrypter (:key-decrypter conf))
                        (restore-ws workspace)
                        (emi/add-mailman mailman)
+                       (assign-ports (get-in conf [:podman :expose-ports] default-expose-range))
                        (add-job-ctx job-ctx)
                        (cache/restore-interceptor emi/get-job-ctx)
                        (art/restore-interceptor emi/get-job-ctx)
                        decrypt-env
+                       (emi/schedule-process-kill get-job-timeout)
                        emi/start-process
                        (add-podman-opts (:podman conf))]}]]
 
      [:job/initializing
-      ;; TODO Start polling for events from events.edn?
+      ;; This marks the job as running, but only if there is no script configured.
       [{:handler job-init
         :interceptors [emi/handle-job-error
                        state
+                       require-job
+                       (add-job-dir wd)
+                       (emi/add-mailman mailman)
+                       watch-events]}]]
+
+     [:container/pending
+      [{:handler job-pending
+        :interceptors [state
                        require-job]}]]
 
      [:container/end
@@ -456,6 +615,7 @@
                        require-job
                        remove-job
                        dec-job-count
+                       ;; TODO Cancel process kill
                        ;; Handle any errors before decreasing job count, to make sure that's
                        ;; being executed.
                        emi/handle-job-error
@@ -463,5 +623,7 @@
                        (cleanup conf)
                        (add-job-dir wd)
                        (add-job-ctx job-ctx)
+                       stop-watch-events
+                       release-ports
                        (art/save-interceptor emi/get-job-ctx)
                        (cache/save-interceptor emi/get-job-ctx)]}]]]))

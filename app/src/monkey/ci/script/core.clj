@@ -93,9 +93,9 @@
                  jobs)))
 
 (defn resolve-jobs
-  "The build script either returns a list of pipelines, a set of jobs or a function 
-   that returns either.  This function resolves the jobs by processing the script
-   return value."
+  "The build script must return something that satisfies `JobResolvable`.  
+   This function resolves the jobs by processing the script return value
+   and assigns a generic id to the jobs that don't have one yet."
   [p rt]
   (log/debug "Resolving:" p)
   (-> (j/resolve-jobs p rt)

@@ -1,10 +1,9 @@
 (ns monkey.ci.metrics.entity-stats
   "Metrics that reflect some statistics on entities.  These are typically
    lazy and execute a count query on retrieval."
-  (:require [monkey.ci.metrics
-             [common :as c]
-             [prometheus :as p]]
-            [monkey.ci.storage :as st]))
+  (:require [monkey.ci.metrics.common :as c]
+            [monkey.ci.storage :as st]
+            [monkey.metrics.prometheus :as p]))
 
 (defn user-count-gauge
   "Creates a gauge that returns number of users in db"

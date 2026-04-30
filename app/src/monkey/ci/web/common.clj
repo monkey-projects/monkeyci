@@ -7,12 +7,15 @@
              [labels :as lbl]
              [storage :as st]
              [time :as t]
-             [utils :as u]]
+             [utils :as u]
+             [version :as v]]
             [monkey.ci.common.schemas :as schemas]
             [muuntaja.core :as mc]
             [reitit.ring :as ring]
             [ring.util.response :as rur]
             [schema.core :as s]))
+
+(def user-agent (str "MonkeyCI:" (v/version)))
 
 (def not-empty-str schemas/not-empty-str)
 (def Id not-empty-str)
@@ -67,6 +70,9 @@
   ([error-msg]
    (error-response error-msg 400)))
 
+(defn not-found-response [msg]
+  (error-response msg 404))
+
 ;; Reitit rewrites records in the data to hashmaps, so wrap it in a type
 (deftype RuntimeWrapper [runtime])
 
@@ -103,6 +109,16 @@
 (def req->mailman
   "Retrieves mailman component from request"
   #(from-rt % :mailman))
+
+(def req->id-resolver
+  "Retrieves the id resolver from route match data"
+  (comp ::id-resolver route-data))
+
+(defn set-id-resolver
+  "Sets given id resolver in the route data.  The id resolver is used to determine the actual
+   org id should a display id be provided."
+  [data r]
+  (assoc data ::id-resolver r))
 
 (defn id-getter [id-key]
   (comp id-key :path :parameters))

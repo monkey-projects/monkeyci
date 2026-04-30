@@ -1,0 +1,16 @@
+{:subject "MonkeyCI - Please confirm your email address"
+ :text-body
+ "Thank you for subscribing to the MonkeyCI mailing list.
+
+You're almost there, we just need you to confirm your email address by clicking this link:
+{{site-url}}/email/confirm?code={{code}}
+
+If you didn't sign up for your mailing list, or you changed your mind, you can always unsubscribe using this link:
+
+{{site-url}}/email/unsubscribe?email={{email}}
+
+Regards,
+The MonkeyCI Team"
+ 
+ :html-body
+ "<!DOCTYPE html><html><head><meta charset=\"utf-8\" /><meta content=\"width=device-width, initial-scale=1, shrink-to-fit=no\" name=\"viewport\" /><title>MonkeyCI</title></head><body style=\"font-family:Roboto, sans serif;margin:1em;\"><div><div><img alt=\"Logo\" src=\"https://assets.monkeyci.com/img/monkeyci-black.png\" /><div><h1>Build Code in Style with <a href=\"https://www.monkeyci.com\" onMouseOut=\"this.style.textDecorationLine=&apos;none&apos;\" onMouseOver=\"this.style.textDecorationLine=&apos;underline&apos;\" style=\"color:#008060;text-decoration:none;\" target=\"_blank\">MonkeyCI</a></h1><i>The powerful CI/CD pipeline runner.</i></div></div></div><div style=\"margin-top:2em;\"><div><h3>Confirm your Email Address</h3><p>Thank you for subscribing to the MonkeyCI mailing list.</p><p>You&apos;re almost there, we just need you to confirm your email address by clicking this link:<br /><a href=\"{{site-url}}/email/confirm?code={{code}}\" onMouseOut=\"this.style.textDecorationLine=&apos;none&apos;\" onMouseOver=\"this.style.textDecorationLine=&apos;underline&apos;\" style=\"color:#008060;text-decoration:none;\" target=\"_blank\">Confirm your Email Address</a></p><p>If you didn&apos;t sign up for your mailing list, or you changed your mind, you can always unsubscribe using this link:<br /><a href=\"{{site-url}}/email/unsubscribe?email={{email}}\" onMouseOut=\"this.style.textDecorationLine=&apos;none&apos;\" onMouseOver=\"this.style.textDecorationLine=&apos;underline&apos;\" style=\"color:#008060;text-decoration:none;\" target=\"_blank\">Unsubscribe</a></p><p>Regards,<br />The MonkeyCI Team</p></div></div><hr /><footer style=\"text-align:center;\"><p style=\"color:#8C98A4;\">You are receiving these emails as a subscriber to <b>MonkeyCI</b> mailings.<a href=\"https://app.monkeyci.com/email/unsubscribe?email={{EMAIL}}\" onMouseOut=\"this.style.textDecorationLine=&apos;none&apos;\" onMouseOver=\"this.style.textDecorationLine=&apos;underline&apos;\" style=\"color:#008060;margin-left:0.5em;text-decoration:none;\" target=\"_blank\">Unsubscribe</a></p><a href=\"https://www.monkeyci.com\" onMouseOut=\"this.style.textDecorationLine=&apos;none&apos;\" onMouseOver=\"this.style.textDecorationLine=&apos;underline&apos;\" style=\"color:#008060;text-decoration:none;\" target=\"_blank\"><img alt=\"Logo\" src=\"https://assets.monkeyci.com/img/monkeyci-black.png\" style=\"height:5em;\" /></a></footer></body></html>"}

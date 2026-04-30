@@ -5,9 +5,9 @@
 
 (defn render-alert [{:keys [type message]}]
   [:div.d-flex
-   {:class (str "alert alert-dismissable alert-" (name type))
+   {:class (str "alert alert-dismissible fade show alert-" (name type))
     :role :alert}
-   message
+   [:span message]
    [:button.btn-close.ms-auto
     {:type :button
      :data-bs-dismiss :alert
@@ -17,7 +17,6 @@
   "Renders an alerts component with given id."
   [id]
   (let [s (rf/subscribe id)]
-    ;; TODO Allow user to close notifications
     (when (not-empty @s)
       (->> @s
            (map render-alert)
@@ -232,7 +231,10 @@
   (error-msg "Failed to create new delivery"))
 
 (def unregister-email-failed
-  (error-msg "Failed unregister your email"))
+  (error-msg "Failed to unregister your email"))
+
+(def confirm-email-failed
+  (error-msg "Failed to confirm your email"))
 
 (def user-general-load-failed
   (error-msg "Failed to retrieve general settings"))
@@ -254,3 +256,18 @@
 
 (def invoice-settings-save-failed
   (error-msg "Failed to update billing settings"))
+
+(def job-fetch-logs-failed
+  (error-msg "Failed to fetch logs"))
+
+(def job-unblock-failed
+  (error-msg "Failed to continue job"))
+
+(def codeberg-login-failed
+  (error-msg "Unable to fetch Codeberg user token"))
+
+(def codeberg-load-config-failed
+  (error-msg "Unable to load Codeberg login config"))
+
+(def codeberg-load-user-failed
+  (error-msg "Unable to load Codeberg user details"))

@@ -1,47 +1,81 @@
 (ns monkey.ci.gui.login.views
-  (:require [monkey.ci.gui.components :as c]
+  (:require [medley.core :as mc]
+            [monkey.ci.gui.components :as c]
             [monkey.ci.gui.forms :as f]
             [monkey.ci.gui.layout :as l]
+            [monkey.ci.gui.login.db :as db]
             [monkey.ci.gui.login.events]
             [monkey.ci.gui.login.subs]
             [monkey.ci.gui.routing :as r]
             [monkey.ci.gui.template :as t]
             [re-frame.core :as rf]))
 
-(defn- login-btn [url contents disabled?]
+(defn- login-btn [lbl url contents disabled?]
   [:a.btn.btn-outline-dark
    (cond-> {:href url
-            :title "Redirects you to GitHub for authentication, then takes you back here."}
+            :title (str "Redirects you to " lbl " for authentication, then takes you back here.")}
      disabled? (assoc :class :disabled))
    contents])
 
-(defn- github-btn []
-  (rf/dispatch [:login/load-github-config])
+(defn- oidc-login-btn [{:keys [label url path sub logo loader extra-params]}]
+  (rf/dispatch loader)
   (fn []
-    (let [callback-url (str (r/origin) (r/path-for :page/github-callback))
-          github-client-id (rf/subscribe [:login/github-client-id])]
+    (let [callback-url (when path (str (r/origin) (r/path-for path)))
+          client-id (rf/subscribe sub)
+          params (db/build-auth-params @client-id callback-url extra-params)]
       [login-btn
-       (str "https://github.com/login/oauth/authorize?client_id=" @github-client-id
-            "&redirect_uri=" (r/uri-encode callback-url))
-       [:<> [:img.me-2 {:src "/img/github-mark.svg" :height "20px"}] "Login with GitHub"]
-       (nil? @github-client-id)])))
+       label
+       (str url "?" params)
+       [:<> [:img.me-2 {:src logo :height "20px"}] "Login with " label]
+       (nil? @client-id)])))
+
+(defn- github-btn []
+  (oidc-login-btn {:label "Github"
+                   :url "https://github.com/login/oauth/authorize"
+                   :path :page/github-callback
+                   :sub [:login/github-client-id]
+                   :loader [:login/load-github-config]
+                   :logo "/img/github-mark.svg"}))
+
+(defn- codeberg-btn []
+  (oidc-login-btn {:label "Codeberg"
+                   :url "https://codeberg.org/login/oauth/authorize"
+                   :path :page/codeberg-callback
+                   :sub [:login/codeberg-client-id]
+                   :loader [:login/load-codeberg-config]
+                   :logo "/img/codeberg.svg"
+                   ;; TODO Also add state param to protect against CSRF attacks
+                   :extra-params {"response_type" "code"}}))
 
 (defn- bitbucket-btn []
+  (oidc-login-btn {:label "Bitbucket"
+                   :url "https://bitbucket.com/site/oauth2/authorize"
+                   ;; Unfortunately, bitbucket does not allow to specify callback url, so it's the one
+                   ;; that is configured in the app.
+                   :sub [:login/bitbucket-client-id]
+                   :loader [:login/load-bitbucket-config]
+                   :logo "/img/mark-gradient-blue-bitbucket.svg"
+                   ;; TODO Also add state param to protect against CSRF attacks
+                   :extra-params {"response_type" "code"}}))
+
+#_(defn- bitbucket-btn []
   (rf/dispatch [:login/load-bitbucket-config])
   (fn []
     (let [bitbucket-client-id (rf/subscribe [:login/bitbucket-client-id])]
       ;; Unfortunately, bitbucket does not allow to specify callback url, so it's the one
       ;; that is configured in the app.
       [login-btn
+       "Bitbucket"
        (str "https://bitbucket.com/site/oauth2/authorize?client_id=" @bitbucket-client-id
             "&response_type=code")
        [:<> [:img.me-2 {:src "/img/mark-gradient-blue-bitbucket.svg" :height "20px"}] "Login with Bitbucket"]
        (nil? @bitbucket-client-id)])))
 
 (defn login-form []
-  [:div.d-flex.flex-wrap.gap-2
+  [:div.d-flex.flex-wrap.gap-2.flex-column
    [github-btn]
-   [bitbucket-btn]])
+   [bitbucket-btn]
+   [codeberg-btn]])
 
 (defn page [_]
   [:<>
@@ -50,7 +84,7 @@
      [:div.row.justify-content-center.align-items-lg-center
       [:div.col-md-8.col-lg-6.mb-7.mb-lg-0
        [t/logo]
-       [:h1 "Welcome to MonkeyCI"]
+       [:h1 "Welcome to " [:b [:span.text-primary "Monkey"] [:span.text-warning "CI"]]]
        [:p.lead
         "A" [:span.text-primary.mx-1 "CI/CD tool"] "designed to give you"
         [:span.text-primary.mx-1 "full power"] "when building your applications."]]
@@ -86,3 +120,6 @@
 
 (defn bitbucket-callback [req]
   (callback-page req [:login/bitbucket-code-received]))
+
+(defn codeberg-callback [req]
+  (callback-page req [:login/codeberg-code-received]))

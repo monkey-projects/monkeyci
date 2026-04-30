@@ -108,11 +108,11 @@
     :title "Delete token"}
    [co/icon :trash]])
 
-(defn- token-table [conf route]
+(defn- token-table [{:keys [db-id] :as conf} route]
   [t/paged-table
-   {:id [::api-keys (:db-id conf) ((:params->id conf) (r/path-params route))]
-    :items-sub (:items-sub conf)
-    :loading-sub (:loading-sub conf)
+   {:id [::api-keys db-id ((:params->id conf) (r/path-params route))]
+    :items-sub [:tokens/items db-id]
+    :loading-sub [:tokens/loading? db-id]
     :columns (-> [{:label "Description"
                    :value :description
                    :sorter (t/prop-sorter :description)}
@@ -142,9 +142,14 @@
 
 (def org-config
   {:db-id db/org-id
-   :params->id :org-id
-   :items-sub [:org-tokens/items]
-   :loading-sub [:org-tokens/loading?]})
+   :params->id :org-id})
 
 (defn org-page [route]
   (page org-config route))
+
+(def user-config
+  {:db-id db/user-id
+   :params->id :user-id})
+
+(defn user-page [route]
+  (page user-config route))

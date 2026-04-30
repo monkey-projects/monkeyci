@@ -2,8 +2,16 @@
 {:deps {:aliases [:dev :test]}
  :dev-http {8080 ["target/js/frontend" "dev-resources/sites/public" "resources/public"]
             8081 ["target/js/frontend" "dev-resources/sites/admin" "resources/public"]
-            8002 ["dev-resources/devcards" "target/js/frontend" "resources/public"]
-            8003 ["target/js/test-shadow"]}
+            ;; Dashboard, uses tailwind css
+            8082 ["target/js/dashboard" "dev-resources/sites/dashboard" "resources/public"
+                  "resources/dashboard"]
+            ;; Testing
+            8002 ["target/js/test-shadow"]
+            ;; Portfolio scenes
+            8003 ["dev-resources/portfolio" "target/js/frontend" "resources/public" "classpath:public"
+                  "target/js/portfolio"]
+            8004 ["dev-resources/portfolio-dashboard" "target/js/portfolio-dashboard" "classpath:public"
+                  "target/js/dashboard"]}
 
  :builds
  {:frontend
@@ -18,16 +26,23 @@
     {:init-fn monkey.ci.gui.admin/init
      :depends-on #{:common}}}
    :output-dir "target/js/frontend/js"
-   :devtools
-   {:preloads [re-frisk-remote.preload]}
    :compiler-options
    {:closure-defines
-    {monkey.ci.gui.version/VERSION "0.23.0-SNAPSHOT"}}
+    {monkey.ci.gui.version/VERSION "0.26.6-SNAPSHOT"}}
    :dev
    {:compiler-options
     {:closure-defines
      {"re_frame.trace.trace_enabled_QMARK_" true
       monkey.ci.gui.version/VERSION "dev"}}}}
+
+  :dashboard
+  {:target :browser
+   :output-dir "target/js/dashboard/js"
+   :asset-path "/js"
+   :modules
+   {:dashboard
+    {:entries [monkey.ci.gui.dashboard.core]
+     :init-fn monkey.ci.gui.dashboard.core/init}}}
 
   :test/browser
   {:target :browser-test
@@ -51,13 +66,14 @@
    ;; Output as junit
    :main monkey.shadow.junit.runner/run-tests}
 
-  :cards
+  :portfolio
   {:target :browser-test
-   :ns-regexp "-cards$" ;; Pick up all files that end with -cards
-   :test-dir "dev-resources/devcards"
-   :runner-ns monkey.ci.gui.test.cards
-   :compiler-options {:devcards true}
-   :js-options {:resolve {"devcards-marked"
-                          {:target :npm :require "marked"}
-                          "devcards-syntax-highlighter"
-                          {:target :npm :require "highlight.js"}}}}}}
+   :ns-regexp "-scenes$"
+   :test-dir "target/js/portfolio"
+   :runner-ns monkey.ci.gui.test.scenes}
+
+  :portfolio-dashboard
+  {:target :browser-test
+   :ns-regexp "dashboard-scenes$"
+   :test-dir "target/js/portfolio-dashboard"
+   :runner-ns monkey.ci.gui.test.scenes-v2}}}

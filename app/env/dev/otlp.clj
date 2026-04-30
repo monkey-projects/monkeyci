@@ -2,8 +2,8 @@
   (:require [config :as c]
             [monkey.ci.metrics
              [core :as mc]
-             [otlp :as mo]
-             [prometheus :as mp]]))
+             [otlp :as mo]]
+            [monkey.metrics.prometheus :as mp]))
 
 (org.slf4j.bridge.SLF4JBridgeHandler/install)
 

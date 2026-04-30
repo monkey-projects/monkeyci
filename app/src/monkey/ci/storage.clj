@@ -8,8 +8,10 @@
             [medley.core :as mc]
             [monkey.ci
              [cuid :as cuid]
+             [plans :as plans]
              [protocols :as p]
              [sid :as sid]
+             [time :as t]
              [utils :as u]]
             [monkey.ci.common.preds :as cp]
             [monkey.ci.storage.cached :as cached])
@@ -475,13 +477,13 @@
   "Retrieves all builds for org since the given timestamp"
   (override-or
    [:build :list-since]
-   (fn [s cust-id ts]
+   (fn [s org-id ts]
      (letfn [(since? [b]
                (>= (:start-time b) ts))]
-       (->> (find-org s cust-id)
+       (->> (find-org s org-id)
             :repos
             keys
-            (mapcat #(list-builds s [cust-id %]))
+            (mapcat #(list-builds s [org-id %]))
             (filter since?))))))
 
 (def save-job
@@ -499,25 +501,39 @@
      (some-> (find-build s (sid/->sid (take 3 job-sid)))
              (get-in [:script :jobs (nth job-sid 3)])))))
 
+(def list-jobs-for-period
+  "Retrieves all jobs for given org over a period of time"
+  (override-or
+   [:job :list-for-period]
+   (fn [s org-id from until]
+     (letfn [(between? [{:keys [start-time]}]
+               (<= from start-time until))]
+       (->> (find-org s org-id)
+            :repos
+            keys
+            (mapcat (comp (partial list-builds s) (partial vector org-id)))
+            (mapcat (comp vals :jobs :script))
+            (filter between?))))))
+
 (defn params-sid [org-id & [param-id]]
   ;; All parameters for a org are stored together
   (cond-> ["build-params" org-id]
     param-id (conj param-id)))
 
-(defn find-params [s cust-id]
-  (p/read-obj s (params-sid cust-id)))
+(defn find-params [s org-id]
+  (p/read-obj s (params-sid org-id)))
 
 (defn save-params
   "Saves all org parameters at once"
-  [s cust-id p]
-  (p/write-obj s (params-sid cust-id) p))
+  [s org-id p]
+  (p/write-obj s (params-sid org-id) p))
 
 (def find-param
   "Retrieves a single parameter by sid"
   (override-or
    [:param :find]
-   (fn [s [_ cust-id param-id]]
-     (->> (find-params s cust-id)
+   (fn [s [_ org-id param-id]]
+     (->> (find-params s org-id)
           (filter (cp/prop-pred :id param-id))
           (first)))))
 
@@ -724,6 +740,27 @@
    (fn [s]
      (-> (p/list-obj s (email-registration-sid))
          (count)))))
+
+(def email-confirmations :email-confirmations)
+(def email-confirmation-sid (partial global-sid email-confirmations))
+
+(defn save-email-confirmation [s reg]
+  (p/write-obj s (email-confirmation-sid (:id reg)) reg))
+
+(defn find-email-confirmation [s id]
+  (p/read-obj s (email-confirmation-sid id)))
+
+(def list-email-confirmations
+  "Retrieves all email confirmations for the registration id"
+  (override-or
+   [:email-confirmation :list]
+   (fn [s reg-id]
+     (->> (p/list-obj s (email-confirmation-sid))
+          (map (partial find-email-confirmation s))
+          (filter (comp (partial = reg-id) :email-reg-id))))))
+
+(defn delete-email-confirmation [s id]
+  (p/delete-obj s (email-confirmation-sid id)))
 
 (def org-credits :org-credits)
 (def org-credit-sid (partial global-sid org-credits))
@@ -943,6 +980,16 @@
 
 (def job-event->sid (juxt :org-id :repo-id :build-id :job-id (comp str :time)))
 
+(defn event->storage
+  "Converts the event into a format suitable for storage"
+  [{:keys [sid job-id] :as evt}]
+  (-> build-sid-keys
+      (zipmap sid)
+      (assoc :job-id job-id
+             :event (:type evt)
+             :time (:time evt)
+             :details evt)))
+
 (defn save-job-event [st evt]
   (p/write-obj st (job-event-sid (job-event->sid evt)) evt))
 
@@ -961,39 +1008,6 @@
        (map :display-id)
        (remove nil?)
        (set)))
-
-(def init-org
-  "Creates a new organization record, with dependent records also added.
-   This is useful to perform the update atomically (e.g. in single trx)."
-  (override-or
-   [:org :init]
-   (fn [s {:keys [org] :as opts}]
-     (let [existing? (list-org-display-ids s)
-           sid (save-org s (-> org
-                               ;; TODO Limit to max length
-                               (assoc :display-id (u/name->display-id (:name org) existing?))))
-           org-id (last sid)]
-       (when-let [uid (:user-id opts)]
-         (let [u (find-user s uid)]
-           (save-user s (update u :orgs (comp vec conj) org-id))))
-       (doseq [{:keys [amount from until period] :as conf} (:credits opts)]
-         (let [cs (-> conf
-                      (dissoc :from :until :period)
-                      (assoc :id (cuid/random-cuid)
-                             :org-id org-id
-                             :valid-from from
-                             :valid-until until
-                             :valid-period period))]
-           (when (save-credit-subscription s cs)
-             (save-org-credit s {:id (cuid/random-cuid)
-                                 :org-id org-id
-                                 :amount amount
-                                 :valid-from from
-                                 :type :subscription
-                                 :subscription-id (:id cs)}))))
-       (when-let [dek (:dek opts)]
-         (save-crypto s {:dek dek :org-id org-id}))
-       sid))))
 
 (defn- token-sid [type & parts]
   (into [global (name type)] parts))
@@ -1132,3 +1146,59 @@
 
 (defn find-org-invoicing [st uid]
   (p/read-obj st (org-invoicing-sid uid)))
+
+(def org-plan :org-plan)
+(defn org-plan-sid [& args]
+  (into [global (name org-plan)] args))
+
+(defn save-org-plan [st s]
+  (p/write-obj st (org-plan-sid (:org-id s) (:id s)) s))
+
+(defn find-org-plan [st sid]
+  (p/read-obj st (apply org-plan-sid sid)))
+
+(def list-org-plans
+  "Lists plans for a given org"
+  (override-or
+   [:org :list-plans]
+   (fn [st org-id]
+     (->> (p/list-obj st (org-plan-sid org-id))
+          (map (partial vector org-id))
+          (map (partial find-org-plan st))))))
+
+(defn- save-sub-with-credits [s cs]
+  (when (save-credit-subscription s cs)
+    (save-org-credit s (plans/sub->credits cs (:valid-from cs)))))
+
+(def init-org
+  "Creates a new organization record, with dependent records also added.
+   This is useful to perform the update atomically (e.g. in single trx)."
+  (override-or
+   [:org :init]
+   (fn [s {:keys [org] :as opts}]
+     (let [existing? (list-org-display-ids s)
+           sid (save-org s (-> org
+                               ;; TODO Limit to max length
+                               (assoc :display-id (u/name->display-id (:name org) existing?))))
+           org-id (last sid)]
+       (when-let [uid (:user-id opts)]
+         (let [u (find-user s uid)]
+           (save-user s (update u :orgs (comp vec conj) org-id))))
+       ;; Create plan with subscription and credits
+       (let [plan (plans/make-org-plan org-id (:plan opts))
+             ps (plans/plan->sub plan)]
+         (save-sub-with-credits s ps)
+         (save-org-plan s (assoc plan :subscription-id (:id ps))))
+       ;; Create any additional subscriptions
+       (doseq [{:keys [amount from until period] :as conf} (:credits opts)]
+         (let [cs (-> conf
+                      (dissoc :from :until :period)
+                      (assoc :id (cuid/random-cuid)
+                             :org-id org-id
+                             :valid-from from
+                             :valid-until until
+                             :valid-period period))]
+           (save-sub-with-credits s cs)))
+       (when-let [dek (:dek opts)]
+         (save-crypto s {:dek dek :org-id org-id}))
+       sid))))

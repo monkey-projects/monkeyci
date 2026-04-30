@@ -16,9 +16,11 @@
    "%s.scripts"
    [:script/initializing :script/start :script/end]
    "%s.jobs"
-   [:job/pending :job/queued :job/initializing :job/start :job/end :job/skipped :job/executed]
+   [:job/pending :job/queued :job/initializing :job/start :job/end :job/skipped :job/executed
+    :job/blocked :job/unblocked]
    "%s.jobs.containers"
-   [:container/pending :container/initializing :container/start :container/end :sidecar/start :sidecar/end]
+   [:container/pending :container/initializing :container/start :container/script-end
+    :container/end :sidecar/start :sidecar/end]
    "%s.jobs.commands"
    [:command/start :command/end]
    ;; All things that need to be run in a container go here.
@@ -31,7 +33,11 @@
    [:k8s/build-scheduled :k8s/job-scheduled]
    ;; Consolidated build events
    "%s.build.updates"
-   [:build/updated]})
+   [:build/updated]
+   ;; Emails and registrations
+   "%s.emails"
+   [:email/registration-created :email/registration-deleted
+    :email/confirmation-created :email/confirmation-expired :email/confirmed]})
 
 (defn- make-dest [prefix dest]
   (format dest prefix))

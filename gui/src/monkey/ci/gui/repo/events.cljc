@@ -263,10 +263,13 @@
 (rf/reg-event-db
  ::unwatch-github
  (fn [db _]
-   (db/update-editing db dissoc :github-id)))
+   (db/update-editing db assoc :github-id nil)))
 
 (defn- parse-github-id [repo]
-  (mc/update-existing repo :github-id u/parse-int))
+  (letfn [(parse [id]
+            (when-not (empty? id)
+              (u/parse-int id)))]
+    (mc/update-existing repo :github-id parse)))
 
 (rf/reg-event-fx
  :repo/save
@@ -288,15 +291,17 @@
               (db/mark-saving)
               (db/reset-edit-alerts))})))
 
-(rf/reg-event-db
+(rf/reg-event-fx
  :repo/save--success
- (fn [db [_ new? {:keys [body]}]]
-   (-> db
-       (odb/replace-repo body)
-       (db/unmark-saving)
-       (db/set-edit-alerts [(if new?
-                              a/repo-create-success
-                              a/repo-update-success)]))))
+ (fn [{:keys [db]} [_ new? {:keys [body]}]]
+   (cond-> {:db (-> db
+                    (odb/replace-repo body)
+                    (db/unmark-saving)
+                    (db/set-edit-alerts [(if new?
+                                           a/repo-create-success
+                                           a/repo-update-success)]))}
+     new? (assoc :dispatch [:route/goto :page/repo {:org-id (r/org-id db)
+                                                    :repo-id (:id body)}]))))
 
 (rf/reg-event-db
  :repo/save--failed

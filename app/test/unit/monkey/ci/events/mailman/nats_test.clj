@@ -4,7 +4,9 @@
              [jetstream :as js]]
             [clojure.test :refer [deftest testing is]]
             [com.stuartsierra.component :as co]
-            [monkey.ci.events.mailman :as em]
+            [monkey.ci.events
+             [mailman :as em]
+             [spec :as es]]
             [monkey.ci.events.mailman.nats :as sut]))
 
 (deftest types-to-subjects
@@ -15,36 +17,22 @@
                     (str "should map " t))))]
       (testing "returns a subject for each event type"
         (testing "build types"
-          (verify-types [:build/triggered
-                         :build/pending
-                         :build/queued
-                         :build/initializing
-                         :build/start
-                         :build/end
-                         :build/canceled
-                         :build/updated])
+          (verify-types es/build-event-types)
 
           (testing "maps `build/queued` to separate subject"
             (is (not= (f :build/queued) (f :build/end)))))
 
         (testing "script types"
-          (verify-types [:script/initializing
-                         :script/start
-                         :script/end]))
+          (verify-types es/script-event-types))
 
         (testing "job types"
-          (verify-types [:job/pending
-                         :job/queued
-                         :job/initializing
-                         :job/start
-                         :job/end
-                         :job/skipped
-                         :job/executed]))
+          (verify-types es/job-event-types))
 
         (testing "container types"
-          (verify-types [:container/pending
-                         :container/initializing
-                         :container/job-queued]))))))
+          (verify-types es/container-event-types))
+
+        (testing "email types"
+          (verify-types es/email-event-types))))))
 
 (deftest nats-component
   (with-redefs [nats/make-connection (constantly ::nats)]

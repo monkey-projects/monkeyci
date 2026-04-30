@@ -1,0 +1,112 @@
+@layer components {
+    /* Main layout */
+    .login-main {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 40px 24px;
+	gap: 0;
+    }
+
+    /* Login card */
+    .login-card {
+	background: var(--surface);
+	border: 1px solid var(--border);
+	box-shadow: 0 4px 32px rgba(26,158,63,0.07), 0 1px 4px rgba(0,0,0,0.04);
+	padding: 44px 40px 36px;
+	position: relative;
+	overflow: hidden;
+    }
+
+    /* Green top accent line */
+    .login-card::before {
+	content: '';
+	position: absolute;
+	top: 0; left: 0; right: 0;
+	height: 3px;
+	background: linear-gradient(90deg, var(--accent), var(--accent-mid));
+    }
+
+    .login-btns {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	margin-bottom: 4px;
+    }
+
+    .field-label {
+	font-size: 9.5px;
+	letter-spacing: 0.14em;
+	text-transform: uppercase;
+	color: var(--text-dim);
+	margin-bottom: 6px;
+	display: block;
+    }
+
+    .field-input {
+	background: var(--accent-light);
+	border: 1px solid var(--border);
+	color: var(--text);
+	font-family: 'IBM Plex Mono', monospace;
+	font-size: 12.5px;
+	padding: 10px 14px;
+	outline: none;
+	width: 100%;
+	border-radius: 2px;
+	transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .field-input:focus {
+	border-color: var(--accent);
+	box-shadow: 0 0 0 3px rgba(26,158,63,0.1);
+	background: #fff;
+    }
+    .field-input::placeholder { color: var(--muted); }
+
+    .btn-oauth {
+	background: var(--surface);
+	border: 1px solid var(--border);
+	color: var(--text);
+	font-family: 'IBM Plex Mono', monospace;
+	font-size: 11px;
+	font-weight: 500;
+	letter-spacing: 0.06em;
+	padding: 10px 18px;
+	cursor: pointer;
+	width: 100%;
+	border-radius: 2px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 9px;
+	transition: all 0.15s;
+    }
+    .btn-oauth:hover { border-color: var(--accent); background: var(--accent-light); }
+
+    .page-wrap {
+	position: relative;
+	z-index: 1;
+	display: flex;
+	flex-direction: column;
+	min-height: 100vh;
+    }
+
+    footer {
+	background: var(--surface);
+	border-top: 1px solid var(--border);
+	padding: 14px 28px;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	position: relative;
+	z-index: 1;
+    }
+}
+
+@layer utilities {
+    /* Animations */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .fade-up { animation: fadeUp 0.4s ease forwards; }
+}

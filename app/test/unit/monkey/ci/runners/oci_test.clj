@@ -11,11 +11,12 @@
              [protocols :as p]
              [storage :as st]
              [vault :as v]]
-            [monkey.ci.events.mailman :as em]
+            [monkey.ci.events
+             [mailman :as em]
+             [spec :as es]]
             [monkey.ci.events.mailman.interceptors :as emi]
             [monkey.ci.runners.oci :as sut]
             [monkey.ci.script.config :as sc]
-            [monkey.ci.spec.events :as se]
             [monkey.ci.test.helpers :as h]
             [monkey.mailman.core :as mmc]))
 
@@ -303,7 +304,11 @@
                :type)))))
 
 (deftest routes
-  (let [build (h/gen-build)
+  (let [build {:org-id "test-org"
+               :repo-id "test-repo"
+               :build-id "test-build"
+               :source :api
+               :git {:url "test-url"}}
         st (st/make-memory-storage)
         conf {:api {:private-key (h/generate-private-key)}}
         router (-> (sut/make-routes conf st (h/fake-vault))
@@ -324,7 +329,8 @@
                       first
                       :result
                       first)]
-          (is (spec/valid? ::se/event res))
+          (is (spec/valid? ::es/event res)
+              (spec/explain-str ::es/event res))
           (is (= :build/initializing (:type res)))))
 
       (testing "when instance creation fails, returns `build/end` event"
@@ -341,7 +347,7 @@
                       first
                       :result
                       first)]
-          (is (spec/valid? ::se/event res))
+          (is (spec/valid? ::es/event res))
           (is (= :build/end (:type res)))
           (is (= :error (-> res :build :status))))))))
 

@@ -3,119 +3,25 @@
   (:require [babashka.fs :as fs]
             [clojure.tools.logging :as log]
             [clojure.java.io :as io]
-            [clompress.compression :as cc]
+            [clompress
+             [compression :as cc]
+             [unarchivers :as cu]]
             [monkey.ci.build.core :as bc]
             [monkey.ci.utils :as u])
-  (:import [java.io BufferedInputStream PipedInputStream PipedOutputStream]
-           [java.nio.file.attribute PosixFilePermission]
+  (:import [java.nio.file.attribute PosixFilePermission]
            [org.apache.commons.compress.archivers ArchiveStreamFactory]))
 
-(def stream-factory (ArchiveStreamFactory.))
 (def compression-type "gz")
-
-(def posix-permissions (PosixFilePermission/values))
-
-(defn mode->posix
-  "Converts from file mode number (converted from octal) to a set of posix file permissions"
-  [mode]
-  (let [n (dec (count posix-permissions))]
-    (->> (seq posix-permissions)
-         (reduce (fn [s fp]
-                   (cond-> s
-                     (bit-test mode (- n (.ordinal fp)))
-                     (conj fp)))
-                 #{}))))
-
-(defn posix->mode
-  "Converts a set of posix file permissions to a mode number"
-  [posix]
-  (let [n (dec (count posix-permissions))]
-    (reduce (fn [m fp]
-              (bit-set m (- n (.ordinal fp))))
-            0
-            posix)))
-
-(defn- next-entry
-  "Gets the next entry from the stream.  Due to the nature of piped streams,
-   this may throw an exception when the write end is closed.  In that case, 
-   we return `nil`, indicating we're at EOF."
-  [ai]
-  (try
-    (.getNextEntry ai)
-    (catch java.io.IOException ex
-      (when-not (= "Write end dead" (.getMessage ex))
-        ;; Some other i/o exception, rethrow it
-        (throw ex)))))
-
-(defn- extract-entry [ai e dest]
-  (let [f (io/file dest (.getName e))]
-    (log/trace "Extracting entry from archive:" (.getName e) "into" f)
-    (cond
-      (.isDirectory e)
-      (u/mkdirs! f)
-      
-      (.isFile e)
-      (let [p (u/mkdirs! (.getParentFile f))]
-        (with-open [os (io/output-stream f)]
-          (io/copy ai os))
-        ;; Mode field contains file permissions in octal
-        (fs/set-posix-file-permissions f (mode->posix (.getMode e))))
-
-      :else
-      (log/warn "Unsupported archive entry:" e))))
-
-(defn- archive-stream [is]
-  (.createArchiveInputStream stream-factory ArchiveStreamFactory/TAR is))
+(def archive-type "tar")
 
 (defn- decompress
   "Decompresses a source file.  Returns an input stream that will contain the
    decompressed archive."
   [src]
-  (let [os (PipedOutputStream.)
-        is (BufferedInputStream. (PipedInputStream. os))]
-    ;; Decompress to the output stream
-    (doto (Thread. (fn []
-                     (log/debug "Decompressing source:" src)
-                     (try 
-                       (cc/decompress src os compression-type)
-                       (catch Exception ex
-                         (log/error "Unable to decompress archive" ex))
-                       (finally
-                         (.close os)))))
-      (.start))
-    is))
+  (cc/with-decompression src compression-type))
 
-(defn- extract-loop [ai pred f]
-  (loop [e (next-entry ai)
-         entries []]
-    (if e
-      (let [p? (pred (.getName e))]
-        (when p?
-          (f e))
-        ;; Go to next entry
-        (recur (next-entry ai)
-               (cond-> entries
-                 (and p? (not (.isDirectory e)))
-                 (conj (.getName e)))))
-      ;; Done
-      entries)))
-
-(defn- unarchive
-  "Unarchives the given (uncompressed) input stream to the given output location.
-   `dest` is supposed to be a directory where the files can be written to.  Only
-   files matching the given predicate will be unarchived.  Returns a map that
-   contains the destination directory and the names of the extracted entries."
-  [is dest pred]
-  (log/debug "Extracting archive into" dest)
-  (.mkdirs dest)
-  (with-open [ai (archive-stream is)]
-    {:entries (extract-loop ai
-                            pred
-                            (fn [e]
-                              (if (.canReadEntryData ai e)
-                                (extract-entry ai e dest)
-                                (log/warn "Unable to read entry data:" (.getName e)))))
-     :dest dest}))
+(defn archive-stream [i]
+  (cu/make-unarchiver i archive-type))
 
 (defn extract
   "Allows extracting an archive input stream (like a downloaded artifact) 
@@ -126,13 +32,15 @@
   ;; FIXME When the archive only contains one file, and it's name is the same name as
   ;; the archive file (without tgz extension), it should be extracted in the same
   ;; location, and not in a subdirectory.
-  (with-open [in (io/input-stream src)
-              ds (decompress in)]
-    (unarchive ds
-               (io/file dest)
-               (if re
-                 (bc/->pred re)
-                 (constantly true)))))
+  (with-open [in (io/input-stream src)]
+    {:entries (->> (cu/unarchive (cond-> {:input-stream src
+                                          :archive-type archive-type
+                                          :compression compression-type}
+                                   re (assoc :filter-fn (bc/->pred re)))
+                                 dest)
+                   (filter (comp #{:file :sym-link} :type))
+                   (map (comp (memfn getName) :entry)))
+     :dest dest}))
 
 (defn list-files
   "Lists files in the archive at given path"
@@ -140,7 +48,9 @@
   (with-open [is (io/input-stream arch)
               ds (decompress is)
               ai (archive-stream ds)]
-    (extract-loop ai (constantly true) (constantly nil))))
+    (->> (cu/entry-seq ai)
+         (filter (complement (memfn isDirectory)))
+         (mapv (memfn getName)))))
 
 (defn- read-entry [ai]
   (with-open [w (java.io.StringWriter.)]
@@ -158,17 +68,10 @@
     (let [p (bc/->pred pred)]
       (letfn [(matches? [e]
                 (and (.isFile e) (p (.getName e))))]
-        (loop [e (next-entry ai)
-               r []]
-          (if e
-            (let [f (when (matches? e)
-                      ;; Found match
-                      (read-entry ai))]
-              ;; Go to next entry
-              (recur (next-entry ai)
-                     (cond-> r f (conj f))))
-            ;; End of archive reached
-            r))))))
+        (->> ai
+             (cu/entry-seq)
+             (filter matches?)
+             (mapv (fn [_] (read-entry ai))))))))
 
 (defn extract+read
   "Extracts the given source archive, and returns the contents of the first
@@ -178,12 +81,10 @@
               dc (decompress in)
               ai (archive-stream dc)]
     (let [p (bc/->pred pred)]
-      (loop [e (next-entry ai)]
-        (if e
-          (if (and (.isFile e) (p (.getName e)))
-            ;; Found match
-            (read-entry ai)
-            ;; Go to next entry
-            (recur (next-entry ai)))
-          ;; Done without match
-          nil)))))
+      (letfn [(matches? [e]
+                (and (.isFile e) (p (.getName e))))]
+        (when-let [e (->> ai
+                          (cu/entry-seq)
+                          (filter matches?)
+                          (first))]
+          (read-entry ai))))))

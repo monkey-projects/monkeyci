@@ -6,29 +6,29 @@
             [monkey.ci.gui.layout :as l]
             [monkey.ci.gui.modals :as m]
             [monkey.ci.gui.repo.events :as e]
-            [monkey.ci.gui.repo.subs]
+            [monkey.ci.gui.repo.subs :as s]
             [monkey.ci.gui.repo-settings.views :as settings]
             [monkey.ci.gui.routing :as r]
             [monkey.ci.gui.table :as table]
             [monkey.ci.gui.time :as t]
+            [monkey.ci.gui.timer :as timer]
             [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
-
-(def elapsed co/build-elapsed)
 
 (defn- trigger-build-btn []
   (let [show? (rf/subscribe [:repo/show-trigger-form?])]
     [:button.btn.btn-info
      (cond-> {:type :button
-              :on-click #(rf/dispatch [:repo/show-trigger-build])}
+              :on-click #(rf/dispatch [:repo/show-trigger-build])
+              :title "Trigger a new build, with optional parameters"}
        @show? (assoc :disabled true))
-     [:span.me-2 [co/icon :play-circle]] "Trigger Build"]))
+     [co/icon-text :play-circle "Trigger"]]))
 
 (defn- repo-settings-btn []
   (let [c (rf/subscribe [:route/current])]
     [:a.btn.btn-outline-primary
      {:href (r/path-for :page/repo-settings (get-in @c [:parameters :path]))}
-     [:span.me-2 [co/icon :gear]] "Settings"]))
+     [co/icon-text :gear "Settings"]]))
 
 (defn refresh-btn [& [opts]]
   [:button.btn.btn-outline-primary.btn-icon.btn-sm
@@ -116,21 +116,31 @@
       (subs ref (count prefix))
       ref)))
 
+(defn- trigger [{:keys [source]}]
+  (if (= :api source)
+    source
+    "push"))
+
 (def table-columns
   [{:label "Build"
-    :value (fn [b] [:a {:href (r/path-for :page/build (u/cust->org b))} (:idx b)])
+    :value (fn [b] [:a {:href (r/path-for :page/build (u/cust->org b))} "#" (:idx b)])
     :sorter (table/prop-sorter :idx)}
    {:label "Time"
     :value (fn [b]
              [:span.text-nowrap (t/reformat (:start-time b))])}
    {:label "Elapsed"
-    :value elapsed
-    :sorter (table/sorter-fn (partial sort-by elapsed))}
+    :value (fn [b]
+             (if-let [e (co/build-elapsed b)]
+               e
+               (when-let [s (:start-time b)]
+                 [timer/interval-timer 1000 (fn [now]
+                                              (t/format-interval (t/parse s) now))])))
+    :sorter (table/sorter-fn (partial sort-by co/build-elapsed))}
    {:label "Trigger"
-    :value :source}
+    :value trigger}
    {:label "Ref"
     :value (fn [b]
-             [:span.text-nowrap (trim-ref (get-in b [:git :ref]))])
+             [co/git-ref (get-in b [:git :ref])])
     :sorter (table/sorter-fn (partial sort-by (comp :ref :git)))}
    {:label "Result"
     :value (fn [b] [:div.text-center [co/build-result (:status b)]])
@@ -154,7 +164,7 @@
     ;; anything.
     [:<>
      [:div.d-flex.gap-1.align-items-start
-      [:h4.me-2.text-primary [:span.me-2 co/build-icon] "Builds"]
+      [:h4.me-2.text-primary [co/icon-text :wrench "Builds"]]
       [refresh-btn {:class [:me-auto]}]
       [build-actions]]
      [trigger-form repo]
@@ -169,6 +179,17 @@
          :class [:table-hover]
          :on-row-click #(rf/dispatch [:route/goto :page/build %])}])]))
 
+(defn- repo-details [repo]
+  (let [s (rf/subscribe [:repo/stats])]
+    [:<>
+     [co/icon-text :git [co/ext-link (:url repo) (:url repo)]]
+     (when-let [avg (:avg-elapsed @s)]
+       [:span.fs-6 {:title "Average elapsed build time"}
+        [co/icon-text :hourglass (t/format-seconds (/ avg 1000))]])
+     (when-let [sr (:success-rate @s)]
+       [:span.fs-5 {:title "Success rate"}
+        [co/icon-text :graph-up (str (int (* sr 100)) "%")]])]))
+
 (defn page [route]
   (rf/dispatch [:repo/init])
   (fn [route]
@@ -176,12 +197,10 @@
           r (rf/subscribe [:repo/info repo-id])]
       [l/default
        [:<>
-        [co/page-title
-         [:span.me-2 co/repo-icon] 
-         "Repository: " (:name @r)
-         [:span.fs-6.p-1
-          [cl/clipboard-copy (u/->sid p :org-id :repo-id) "Click to save the sid to clipboard"]]]
-        [:p "Repository url: " [:a {:href (:url @r) :target :_blank} (:url @r)]]
+        [:div.d-flex.justify-content-between.align-items-baseline.mb-3.text-primary
+         [co/page-title
+          [:span.me-2 co/repo-icon] (:name @r)]
+         [repo-details @r]]
         [co/alerts [:repo/alerts]]
         [:div.card
          [:div.card-body
@@ -298,6 +317,26 @@
        [:span.form-text {:id :github-id-help}
         "If you have installed the Github MonkeyCI app, the native id is used for watching the repo."]])))
 
+(defn- edit-url []
+  (let [u (rf/subscribe [::s/edit-url])]
+    [f/form-input {:id :url
+                   :label "Url"
+                   :value @u
+                   :extra-opts
+                   {:on-change (u/form-evt-handler [:repo/url-changed])
+                    :max-length 300}
+                   :help-msg (str "This is used when manually triggering a build from the UI. "
+                                  "Use an ssh url for private repos.")}]))
+
+(defn- edit-name []
+  (let [n (rf/subscribe [::s/edit-name])]
+    [f/form-input {:id :name
+                   :label "Repository name"
+                   :value @n
+                   :extra-opts
+                   {:on-change (u/form-evt-handler [:repo/name-changed])
+                    :max-length 200}}]))
+
 (defn- edit-form [close-btn]
   (let [e (rf/subscribe [:repo/editing])]
     [:form
@@ -306,21 +345,9 @@
       [:div.col
        [:h5 [co/icon-text :gear "General"]]
        [:div.mb-2
-        [f/form-input {:id :url
-                       :label "Url"
-                       :value (:url @e)
-                       :extra-opts
-                       {:on-change (u/form-evt-handler [:repo/url-changed])
-                        :max-length 300}
-                       :help-msg (str "This is used when manually triggering a build from the UI. "
-                                      "Use an ssh url for private repos.")}]]
+        [edit-url]]
        [:div.mb-2
-        [f/form-input {:id :name
-                       :label "Repository name"
-                       :value (:name @e)
-                       :extra-opts
-                       {:on-change (u/form-evt-handler [:repo/name-changed])
-                        :max-length 200}}]]
+        [edit-name]]
        [:div.mb-2
         [f/form-input {:id :main-branch
                        :label "Main branch"

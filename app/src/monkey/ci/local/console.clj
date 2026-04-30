@@ -11,7 +11,9 @@
             [monkey.ci
              [console :as c]
              [jobs :as j]
-             [utils :as u]]
+             [utils :as u]
+             [version :as v]]
+            [monkey.ci.build.core :as bc]
             [monkey.ci.common.jobs :as cj]
             [monkey.ci.events.mailman.interceptors :as mi]
             [monkey.ci.local.common :as lc]))
@@ -60,7 +62,7 @@
    (str (c/color-256  46) "░▒█▀▄▀█░▄▀▀▄░█▀▀▄░█░▄░█▀▀░█░░█░▒█▀▀▄░▀█▀")
    (str (c/color-256 118) "░▒█▒█▒█░█░░█░█░▒█░█▀▄░█▀▀░█▄▄█░▒█░░░░▒█░")
    (str (c/color-256 190) "░▒█░░▒█░░▀▀░░▀░░▀░▀░▀░▀▀▀░▄▄▄▀░▒█▄▄▀░▄█▄")
-   (str color-white "  Build your code in style")
+   (str color-white "  Build your code in style - " (v/version))
    c/reset])
 
 (defn- duration-since [t]
@@ -88,7 +90,7 @@
 (defn- render-jobs [i jobs]
   (let [w (->> jobs
                (map (comp count j/job-id))
-               (apply max))
+               (reduce max 0))
         perc 0.5
         inv-speed 20 ; Inverse speed, the lower, the faster the animation runs
         s (if i (- (mod (float (/ i inv-speed)) (+ 1 perc)) perc) 0)]
@@ -118,18 +120,34 @@
                       #(in-yellow (str "  " %))) (name (:status job))))))
           jobs)))
 
+(defn- failed-jobs-messages [jobs]
+  (let [f (->> jobs
+               (filter bc/failed?))
+        m (->> f
+               (map (comp count j/job-id))
+               (reduce max 0))]
+    (map (fn [j]
+           (format (format "%%%ds: %%s" (inc m)) (j/job-id j)
+                   (get-in j [:result :message] "(No message)")))
+         f)))
+
 (defn render-state
   "Converts state into printable lines, possibly using ansi control codes."
   [{:keys [build jobs i]}]
-  (cond-> (logo)
-    (nil? build) (concat ["Initializing build..."])
-    build (concat (render-build build))
-    (and build (nil? jobs)) (concat ["Initializing build script..."])
-    jobs (concat (render-jobs i jobs))
-    (= :success (:status build)) (concat ["" (success-msg "Build completed successfully!") ""])
-    (= :error (:status build)) (concat ["" (failure-msg "Build failed.")
-                                        (str "Check the logs in " (:local-dir build))
-                                        ""])))
+  (->> (cond-> (logo)
+         (nil? build) (concat ["Initializing build..."])
+         build (concat (render-build build))
+         (and build (nil? jobs)) (concat ["Initializing build script..."])
+         jobs (concat (render-jobs i jobs))
+         (= :success (:status build)) (concat ["" (success-msg "Build completed successfully!") ""])
+         (= :error (:status build)) (concat ["" (failure-msg "Build failed.") ""]
+                                            [(:message build)
+                                             (:script-msg build)]
+                                            (failed-jobs-messages jobs)
+                                            (when-let [ld (not-empty (:local-dir build))]
+                                              [(str "Check the logs in " ld)
+                                               ""])))
+       (remove nil?)))
 
 (defrecord PeriodicalRenderer [state renderer interval]
   co/Lifecycle
@@ -207,9 +225,9 @@
   (with-state [s ctx]
     (update-job s (:job-id event)
                 merge
-                (select-keys event [:status :message])
-                {:end-time (:time event)
-                 :output (get-in event [:result :output])})))
+                (select-keys event [:status])
+                {:end-time (:time event)}
+                (select-keys (:result event) [:output :message]))))
 
 ;;; Interceptors
 

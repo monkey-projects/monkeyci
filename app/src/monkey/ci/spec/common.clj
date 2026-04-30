@@ -1,16 +1,18 @@
 (ns monkey.ci.spec.common
+  "Common specs, used by other spec definitions"
   (:require [clojure.spec.alpha :as s]
             [clojure.spec.gen.alpha :as gen]
             [java-time.api :as jt]
             [monkey.ci
              [cuid :as cuid]
              [protocols :as p]]
+            [monkey.ci.common.constants :as cc]
             [monkey.ci.spec.gen :as sg]))
 
 (def ts-gen (gen/choose (jt/to-millis-from-epoch (jt/offset-date-time 2020 1 1))
                         (jt/to-millis-from-epoch (jt/offset-date-time 2030 1 1))))
 
-(def id? string?)
+(def id? (s/and string? not-empty))
 (def ts? (s/with-gen int?
            (constantly ts-gen)))
 (def path? string?)
@@ -38,6 +40,15 @@
                 cuid/cuid?
                 #(gen/return (cuid/random-cuid))))
 
+(s/def ::sid (s/coll-of id?))
+
+;; Start and end time for build, script, job, etc...
+(s/def ::start-time ts?)
+(s/def ::end-time ts?)
+
+(s/def ::timed
+  (s/keys :opt-un [::start-time ::end-time]))
+
 ;; Just using string to avoid "no gen" errors
 (s/def ::url string? #_(s/with-gen url?
                          #(gen/return "http://test-url")))
@@ -58,22 +69,6 @@
 (s/def :bb/workspace string?)
 (s/def :bb/repo-slug string?)
 
-;; Invoice numbers are strings, but should only consist of digits
-(s/def :invoice/invoice-nr (s/with-gen
-                             (partial re-matches #"\d+")
-                             #(gen/return (str (int (* 100000 (rand)))))))
-(s/def :invoice/net-amount (s/and decimal? pos?))
-(s/def :invoice/vat-perc (s/and decimal? pos?))
-(s/def :invoice/currency #{"EUR" "USD" "GBP"})
-(s/def :invoice/kind #{:invoice :creditnote})
-(s/def :invoice/date date?)
-(s/def :invoice/ext-id (s/with-gen
-                         string?
-                         #(sg/fixed-string 5)))
-(s/def :invoice/address (s/coll-of string?))
-(s/def :invoice/country (s/with-gen
-                          string?
-                          #(sg/fixed-string 3)))
 
 (s/def :queued-task/creation-time ts?)
 (s/def :queued-task/task map?)
@@ -83,9 +78,7 @@
 (s/def ::token (s/with-gen
                  string?
                  #(sg/fixed-string token-size)))
+(s/def ::port (s/and int? pos?))
+(s/def ::email string?)
 
-(s/def :mailing/subject string?)
-(s/def :mailing/text-body string?)
-(s/def :mailing/html-body string?)
-(s/def :mailing/to-users boolean?)
-(s/def :mailing/to-subscribers boolean?)
+(s/def ::plan-type cc/plan-types)

@@ -6,6 +6,7 @@
              [deferred :as md]
              [executor :as me]]
             [medley.core :as mc]
+            [meta-merge.core :as mm]
             [monkey.ci
              [build :as b]
              [extensions :as ext]
@@ -54,8 +55,15 @@
 
 (defn- get-job-from-state
   "Gets current job from the jobs stored in the state"
+  ([ctx id]
+   (get (get-jobs ctx) id))
+  ([ctx]
+   (get-job-from-state ctx (get-in ctx [:event :job-id]))))
+
+(defn- get-job-from-ctx
+  "Retrieves job from job ctx"
   [ctx]
-  (get (get-jobs ctx) (get-in ctx [:event :job-id])))
+  (-> ctx emi/get-job-ctx :job))
 
 (defn set-initial-job-ctx [ctx job-ctx]
   (emi/update-state ctx assoc ::initial-job-ctx job-ctx))
@@ -81,6 +89,23 @@
 
 (def get-api-client (comp :client :api get-initial-job-ctx))
 
+(defn- get-encrypter
+  "Returns a lazy ref to an encrypter function that uses the DEK specified
+   in the build."
+  [ctx]
+  (delay ; Lazy so we don't unnecessarily decrypt the dek
+    (let [build (get-build ctx)
+          dek (-> (ba/decrypt-key (get-api-client ctx) (:dek build))
+                  (bcc/b64->bytes))
+          iv (v/cuid->iv (b/org-id build))]
+      (fn [v]
+        (vc/encrypt dek iv v)))))
+
+(defn- encrypt-env-vars
+  "Encrypts any environment vars in a container job using given encrypter"
+  [job enc]
+  (mc/update-existing job :container/env (partial mc/map-vals enc)))
+
 ;;; Event builders
 
 (defn- base-event
@@ -103,20 +128,14 @@
   (letfn [(encrypt-env [encrypter job]
             (letfn [(encrypt-val [v]
                       (@encrypter v))]
-              (mc/update-existing job :container/env (partial mc/map-vals encrypt-val))))
+              (encrypt-env-vars job encrypt-val)))
           (filter-jobs [f jobs]
             (cond->> jobs
               f (j/filter-jobs (if (fn? f) f (comp (set f) j/job-id)))))]
     {:name ::load-jobs
      :enter (fn [ctx]
-              (let [build (get-build ctx)
-                    job-ctx (select-keys (get-initial-job-ctx ctx) [:build :api :archs])
-                    encrypter (delay ; Lazy so we don't unnecessarily decrypt the dek
-                                (let [dek (-> (ba/decrypt-key (get-api-client ctx) (:dek build))
-                                              (bcc/b64->bytes))
-                                      iv (v/cuid->iv (b/org-id build))]
-                                  (fn [v]
-                                    (vc/encrypt dek iv v))))]
+              (let [job-ctx (select-keys (get-initial-job-ctx ctx) [:build :api :archs])
+                    encrypter (get-encrypter ctx)]
                 (log/debug "Loading script jobs using context" job-ctx
                            "and filter" (get-job-filter ctx))
                 (->> (s/load-jobs (get-build ctx) job-ctx)
@@ -147,6 +166,16 @@
    :leave (fn [ctx]
             (set-job-ctx ctx (emi/get-job-ctx ctx)))})
 
+(defn add-job-retriever
+  "Interceptor that augments the job context with an api function that can be used to
+   retrieve other job details."
+  [state]
+  {:name ::add-job-retriever
+   :enter (fn [ctx]
+            (emi/set-job-ctx ctx (-> (emi/get-job-ctx ctx)
+                                     (assoc-in [:api :jobs] (fn [id]
+                                                              (get-in @state [:jobs id]))))))})
+
 (def execute-action
   "Interceptor that executes the job in the input event in a new thread, provided
    it's an action job.  The job context must contain all necessary components for 
@@ -168,7 +197,8 @@
                       (md/catch (partial post-job-error job (:mailman job-ctx) (:event ctx)))))))]
       {:name ::execute-action
        :enter (fn [ctx]
-                (let [job (get-job-from-state ctx)]
+                ;; Use the job from the context, so extensions can modify it
+                (let [job (get-job-from-ctx ctx)]
                   (cond-> ctx
                     (bc/action-job? job)
                     ;; Execute the jobs with the job context
@@ -217,6 +247,12 @@
               (= (build-sid ctx) (b/sid (get-build ctx)))
               (set-build-canceled)))})
 
+(def update-job-init
+  "Updates the job info with details from the job/initializing event"
+  {:name ::update-job-init
+   :leave (fn [ctx]
+            (update-job ctx (job-id ctx) assoc :agent (get-in ctx [:event :agent])))})
+
 ;;; Handlers
 
 (defn script-init
@@ -226,6 +262,11 @@
             (assoc job :status :pending))]
     (-> (base-event (get-build ctx) :script/start)
         (assoc :jobs (map (comp mark-pending eb/job->event) (vals (get-jobs ctx)))))))
+
+(defn make-job-queued-evt [job build-sid]
+  (if (j/should-block? job)
+    (j/job-blocked-evt (j/job-id job) build-sid)
+    (j/job-queued-evt job build-sid)))
 
 (defn script-start
   "Queues all jobs that have no dependencies"
@@ -239,12 +280,20 @@
       [(-> (script-end-evt ctx :error)
            (bc/with-message "No jobs to run"))]
       (let [next-jobs (j/next-jobs (vals jobs))]
-        (map #(j/job-queued-evt % build-sid) next-jobs)))))
+        (map #(make-job-queued-evt % build-sid) next-jobs)))))
 
 (defn script-end [ctx]
   (log/debug "Script ended, realizing deferred")
   ;; Just set the event in the result, so it can be passed to the deferred
   (:event ctx))
+
+(defn- apply-init [{:keys [init] :as job} ctx]
+  (if (fn? init)
+    (some-> (init (emi/get-job-ctx ctx))
+            ;; Encrypt any additional env vars
+            (encrypt-env-vars #(@(get-encrypter ctx) %))
+            (as-> upd (mm/meta-merge job upd)))
+    job))
 
 (defn job-queued
   "Dispatches queued event for action or container job, depending on the type."
@@ -253,11 +302,21 @@
             (-> (j/job-queued-evt job (build-sid ctx))
                 (assoc :type t
                        :dek dek)))]
-    (let [job (get-job-from-state ctx)
+    (let [job (get-job-from-ctx ctx)
           dek (:dek (get-build ctx))]
       ;; Action jobs do not result in an event, instead they are executed immediately.
       (when (bc/container-job? job)
-        [(job-queued-evt :container/job-queued job dek)]))))
+        ;; If the container job has an initializer, invoke it with the context to
+        ;; configure additional props.
+        [(if-let [job (apply-init job ctx)]
+           (job-queued-evt :container/job-queued job dek)
+           ;; If the initializer returns `nil`, then the job should be skipped.
+           (j/job-skipped-evt (job-id ctx) (build-sid ctx)))]))))
+
+(defn job-unblocked
+  "Received when a blocked job becomes unblocked: schedule it immediately."
+  [ctx]
+  [(j/job-queued-evt (get-job-from-state ctx) (b/sid (get-build ctx)))])
 
 (defn job-executed
   "Runs any extensions for the job in interceptors, then ends the job."
@@ -272,16 +331,35 @@
 (defn- script-status
   "Determines script status according to the status of all jobs"
   [ctx]
-  (if (some bc/failed? (vals (get-jobs ctx))) :error :success))
+  (cond
+    (build-canceled? ctx)
+    :canceled
+    (some bc/failed? (vals (get-jobs ctx)))
+    :error
+    :else
+    :success))
 
-(defn- pending-jobs [ctx]
+(defn- filter-jobs [ctx pred]
   (->> (get-jobs ctx)
        vals
-       (filter j/pending?)))
+       (filter pred)))
+
+(defn- pending-jobs [ctx]
+  (filter-jobs ctx j/pending?))
+
+(defn- pending-or-blocked-jobs [ctx]
+  (filter-jobs ctx (some-fn j/pending? j/blocked?)))
+
+(defn- active-jobs [ctx]
+  (filter-jobs ctx j/active?))
+
+(defn- make-jobs-skipped-evts [ctx jobs]
+  (map #(j/job-skipped-evt (j/job-id %) (build-sid ctx)) jobs))
 
 (defn job-end
   "Queues jobs that have their dependencies resolved, or ends the script
-   if all jobs have been executed, or the build has been canceled."
+   if all jobs have been executed, or the build has been canceled.  Blocked
+   jobs are not queued, but marked as blocked."
   [ctx]
   ;; Enqueue jobs that have become ready to run
   (let [all-jobs (vals (get-jobs ctx))
@@ -292,10 +370,18 @@
             (and (empty? next-jobs) (empty? active-jobs)))
       ;; No more jobs eligible for execution, end the script
       (->> (pending-jobs ctx)
-           (map #(j/job-skipped-evt (j/job-id %) (build-sid ctx)))
+           (make-jobs-skipped-evts ctx)
            (into [(script-end-evt ctx (script-status ctx))]))
       ;; Otherwise, enqueue next jobs
-      (map #(j/job-queued-evt % (build-sid ctx)) next-jobs))))
+      (map #(make-job-queued-evt % (build-sid ctx)) next-jobs))))
+
+(defn build-canceled
+  "Marks all pending or blocked jobs in the script as skipped.  If no other jobs remain,
+   the script is ended."
+  [ctx]
+  (cond-> (->> (pending-or-blocked-jobs ctx)
+               (make-jobs-skipped-evts ctx))
+    (empty? (active-jobs ctx)) (into [(script-end-evt ctx :canceled)])))
 
 (defn make-job-ctx
   "Constructs job context object from the route configuration"
@@ -305,19 +391,21 @@
       (assoc :api {:client (:api-client conf)})))
 
 (defn make-routes [{:keys [result] :as conf}]
-  (let [state (emi/with-state (atom (-> conf
-                                        (select-keys [:build :filter])
-                                        (assoc ::initial-job-ctx (make-job-ctx conf)))))]
+  (let [state (or (:state conf) ; For testing
+                  (atom (-> conf
+                            (select-keys [:build :filter])
+                            (assoc ::initial-job-ctx (make-job-ctx conf)))))
+        state-int (emi/with-state state)]
     [[:script/initializing
       [{:handler script-init
         :interceptors [handle-script-error
-                       state
+                       state-int
                        load-jobs]}]]
 
      [:script/start
       [{:handler script-start
         :interceptors [handle-script-error
-                       state
+                       state-int
                        enqueue-jobs]}]]
 
      [:script/end
@@ -330,27 +418,39 @@
       ;; type and executes before-extensions.  Action jobs are executed immediately.
       [{:handler job-queued
         :interceptors [emi/handle-job-error
-                       state
+                       state-int
                        with-job-ctx
+                       (add-job-retriever state)
                        ext/before-interceptor
                        execute-action]}]]
+
+     [:job/unblocked
+      [{:handler job-unblocked
+        :interceptors [emi/handle-job-error
+                       state-int
+                       add-job-ctx]}]]
+
+     [:job/initializing
+      [{:handler (constantly nil)
+        :interceptors [state-int
+                       update-job-init]}]]
 
      [:job/executed
       ;; Handle this for both container and action jobs
       [{:handler job-executed
         :interceptors [emi/handle-job-error
-                       state
+                       state-int
                        add-job-ctx
                        add-result-to-ctx
                        ext/after-interceptor]}]]
 
      [:job/end
       [{:handler job-end
-        :interceptors [state
+        :interceptors [state-int
                        enqueue-jobs
                        set-job-result]}]]
 
      [:build/canceled
-      [{:handler (constantly nil)
-        :interceptors [state
+      [{:handler build-canceled
+        :interceptors [state-int
                        mark-canceled]}]]]))
