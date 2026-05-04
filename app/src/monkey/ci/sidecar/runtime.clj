@@ -4,10 +4,11 @@
             [monkey.ci
              [spec :as spec]
              [workspace :as ws]]
-            [monkey.ci.build.api :as api]
             [monkey.ci.containers.common :as cc]
-            [monkey.ci.events.mailman.build-api :as eba]
             [monkey.ci.runtime.common :as rc]
+            [monkey.ci.script
+             [api-client :as api]
+             [mailman :as eba]]
             [monkey.ci.sidecar
              [config :as cs]
              [spec :as ss]]))

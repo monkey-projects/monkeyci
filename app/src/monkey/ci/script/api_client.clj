@@ -1,4 +1,4 @@
-(ns monkey.ci.build.api
+(ns monkey.ci.script.api-client
   "Functions for invoking the build script API."
   (:require [aleph.http :as http]
             [aleph.http.client-middleware :as mw]
@@ -8,7 +8,6 @@
             [clojure.java.io :as io]
             [clojure.tools.logging :as log]
             [manifold
-             [bus :as bus]
              [deferred :as md]
              [stream :as ms]]
             [medley.core :as mc]
@@ -153,21 +152,6 @@
          (.close @evt-stream)
          (log/warn "Unable to close event inputstream, not delivered yet."))
        (log/debug "Stream closed"))]))
-
-(defn ^:deprecated event-bus
-  "Creates an event bus that receives all events from the build api using the
-   `/events` endpoint.  The bus can be subscribed to using `manifold.bus/subscribe`.
-   Returns both the bus and a function which, when invoked, should close the http 
-   connection."
-  [client]
-  (let [eb (bus/event-bus)
-        [src close-fn] (events-to-stream client)]
-    (ms/consume (fn [evt]
-                  (log/debug "Got event from build API:" evt)
-                  @(bus/publish! eb (:type evt) evt))
-                src)
-    {:bus eb
-     :close close-fn}))
 
 (defrecord BuildApiArtifactRepository [client base-path]
   p/ArtifactRepository

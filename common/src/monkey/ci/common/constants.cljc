@@ -10,3 +10,8 @@
 (def plan-types #{:basic :startup :pro})
 
 (def blob-extension ".tgz")
+
+(def max-script-timeout
+  "Max msecs a build script can run before we terminate it"
+  ;; One hour
+  (* 3600 1000))

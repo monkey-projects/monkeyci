@@ -5,17 +5,17 @@
             [manifold.deferred :as md]
             [monkey.ci
              [build :as b]
-             [config :as config]
              [errors :as err]
              [spec :as spec]]
-            [monkey.ci.build.api :as api]
+            [monkey.ci.common.constants :as const]
             [monkey.ci.events
              [builders :as eb]
              [mailman :as em]]
-            [monkey.ci.events.mailman.build-api :as emba]
             [monkey.ci.script
+             [api-client :as api]
              [config :as sc]
-             [events :as se]]))
+             [events :as se]
+             [mailman :as emba]]))
 
 (defn- client-url [{:keys [url port]}]
   (if port
@@ -114,7 +114,7 @@
   [{:keys [config]}]
   (try
     (-> (run-script config)
-        (deref config/max-script-timeout {:status err/error-script-timeout})
+        (deref const/max-script-timeout {:status err/error-script-timeout})
         (status->exit-code)
         (exit!))
     (catch Throwable ex

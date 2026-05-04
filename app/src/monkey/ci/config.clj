@@ -44,8 +44,7 @@
 
 (def max-script-timeout
   "Max msecs a build script can run before we terminate it"
-  ;; One hour
-  (* 3600 1000))
+  const/max-script-timeout)
 
 (def free-credits const/free-credits)
 

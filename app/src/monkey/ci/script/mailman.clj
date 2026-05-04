@@ -1,4 +1,4 @@
-(ns monkey.ci.events.mailman.build-api
+(ns monkey.ci.script.mailman
   "Mailman implementation that uses the build api for event posting and
    receiving.  This is used by the build script."
   (:require [clojure.tools.logging :as log]
@@ -6,12 +6,12 @@
             [manifold
              [deferred :as md]
              [stream :as ms]]
-            [monkey.ci.build.api :as api]
             [monkey.ci.protocols :as p]
             [monkey.mailman
              [core :as mmc]
              [manifold :as mmm]
-             [utils :as mmu]]))
+             [utils :as mmu]]
+            [monkey.ci.script.api-client :as api]))
 
 ;; The broker implementation posts directly to the build api using the HTTP
 ;; client.  Receiving however is done using manifold streams: when a listener
@@ -38,6 +38,8 @@
                        :content-type :edn
                        :throw-exceptions false})))
 
+;; Implementation of a mailman poster/receiver that uses the http api client
+;; for sending/receiving events.
 (defrecord BuildApiBroker [api-client event-stream listeners]
   mmc/EventPoster
   (post-events [this evts]
@@ -76,6 +78,7 @@
 (defn make-broker [api-client event-stream]
   (->BuildApiBroker api-client event-stream (atom {})))
 
+;; Lifecycle component that also handles new routes.  Creates an api broker internally.
 (defrecord BuildApiBrokerComponent [api-client event-stream broker]
   co/Lifecycle
   (start [this]

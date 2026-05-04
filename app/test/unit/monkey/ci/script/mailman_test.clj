@@ -1,4 +1,4 @@
-(ns monkey.ci.events.mailman.build-api-test
+(ns monkey.ci.script.mailman-test
   (:require [clojure.test :refer [deftest testing is]]
             [com.stuartsierra.component :as co]
             [manifold
@@ -6,7 +6,7 @@
              [stream :as ms]]
             [monkey.ci.edn :as edn]
             [monkey.ci.events.mailman :as em]
-            [monkey.ci.events.mailman.build-api :as sut]
+            [monkey.ci.script.mailman :as sut]
             [monkey.mailman.core :as mmc]))
 
 (deftest build-api-broker

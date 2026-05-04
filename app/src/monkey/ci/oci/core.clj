@@ -9,12 +9,12 @@
             [martian.interceptors :as mi]
             [medley.core :as mc]
             [monkey.ci
-             [build :as b]
-             [config :as config]
              [retry :as retry]
              [time :as t]
              [utils :as u]]
-            [monkey.ci.common.preds :as cp]
+            [monkey.ci.common
+             [constants :as const]
+             [preds :as cp]]
             [monkey.ci.containers.common :as cc]
             [monkey.oci.container-instance.core :as ci]
             [monkey.oci.os
@@ -216,7 +216,7 @@
 
 (defn delete-stale-instances [client cid]
   ;; Timeout is the max time a script may run, with a margin of one minute
-  (let [timeout (jt/instant (- (t/now) config/max-script-timeout 60000))]
+  (let [timeout (jt/instant (- (t/now) const/max-script-timeout 60000))]
     (letfn [(stale? [x]
               (jt/before? (jt/instant (:time-created x)) timeout))
             (build? [x]

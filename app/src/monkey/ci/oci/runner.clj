@@ -11,7 +11,6 @@
             [meta-merge.core :as mm]
             [monkey.ci
              [build :as b]
-             [containers :as co]
              [edn :as edn]
              [process :as proc]
              [protocols :as p]
@@ -19,6 +18,7 @@
              [utils :as u]
              [version :as v]]
             [monkey.ci.build.api-server :as bas]
+            [monkey.ci.containers.common :as cc]
             [monkey.ci.events.mailman.interceptors :as emi]
             [monkey.ci.runners.interceptors :as ri]
             [monkey.ci.script.config :as sc]
@@ -164,7 +164,7 @@
 (defn controller-container [config]
   (-> default-container
       (assoc :display-name "controller"
-             :command (co/make-cmd
+             :command (cc/make-internal-cmd
                        "-c" (str config-path "/" config-file)
                        "internal"
                        "controller")

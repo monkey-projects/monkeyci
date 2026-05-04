@@ -6,7 +6,6 @@
             [io.pedestal.interceptor.chain :as pi]
             [medley.core :as mc]
             [monkey.ci
-             [build :as b]
              [containers :as mcc]
              [edn :as edn]
              [jobs :as j]]

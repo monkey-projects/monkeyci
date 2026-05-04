@@ -8,13 +8,13 @@
 
   (:require [babashka.fs :as fs]
             [monkey.ci.build
-             [api :as api]
              [core :as bc]
              [shell :as bs]]
             [monkey.ci
              [build :as b]
              [containers :as co]
-             [jobs :as j]]))
+             [jobs :as j]]
+            [monkey.ci.script.api-client :as api]))
 
 (def action-job
   "Declares an action job with id, action and options"

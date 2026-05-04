@@ -4,11 +4,11 @@
             [clojure.string :as cs]
             [babashka.process :as bp]
             [monkey.ci.build
-             [api :as api]
              [core :as core]
              [shell :as sut]]
             [monkey.ci.build.helpers :as h]
-            [monkey.ci.jobs :as j]))
+            [monkey.ci.jobs :as j]
+            [monkey.ci.script.api-client :as api]))
 
 (deftest bash
   (testing "returns fn"

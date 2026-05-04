@@ -4,9 +4,7 @@
             [clojure.test :refer [deftest is testing]]
             [manifold.deferred :as md]
             [medley.core :as mc]
-            [monkey.ci.build
-             [api :as ba]
-             [core :as bc]]
+            [monkey.ci.build.core :as bc]
             [monkey.ci.events
              [mailman :as em]
              [spec :as es]]
@@ -18,6 +16,7 @@
              [jobs :as j]
              [vault :as v]]
             [monkey.ci.script
+             [api-client :as ba]
              [core :as sc]
              [events :as sut]]
             [monkey.ci.test

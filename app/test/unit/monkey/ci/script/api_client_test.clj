@@ -1,10 +1,9 @@
-(ns monkey.ci.build.api-test
+(ns monkey.ci.script.api-client-test
   (:require [babashka.fs :as fs]
             [buddy.core.codecs :as bcc]
             [clojure.java.io :as io]
             [clojure.test :refer [deftest is testing]]
             [manifold
-             [bus :as bus]
              [deferred :as md]
              [stream :as ms]]
             [monkey.ci
@@ -12,9 +11,10 @@
              [protocols :as p]]
             [monkey.ci.blob.disk :as bd]
             [monkey.ci.build
-             [api :as sut]
              [api-server :as server]]
-            [monkey.ci.events.mailman.build-api :as emba]
+            [monkey.ci.script
+             [api-client :as sut]
+             [mailman :as emba]]
             [monkey.ci.test
              [api-server :as tas]
              [helpers :as h]
@@ -138,39 +138,6 @@
             (post-event evt)
             (is (= evt (-> stream (ms/take!) (deref 1000 :timeout))))
             (is (nil? (ms/close! stream)))))))))
-
-(deftest event-bus
-  (let [input (PipedInputStream.)
-        output (PipedOutputStream. input)
-        client (fn [req]
-                 (md/success-deferred {:status 200
-                                       :body input}))
-        bus (sut/event-bus client)]
-    (with-open [w (io/writer output)
-                pw (PrintWriter. w)]
-      (letfn [(post-event [evt]
-                (.println pw (str "data: " (pr-str evt) "\n"))
-                (.flush pw))]
-        (testing "returns an event bus"
-          (is (some? (:bus bus))))
-
-        (testing "returns a close fn"
-          (is (fn? (:close bus))))
-
-        (testing "dispatches events"
-          (let [s (bus/subscribe (:bus bus) ::test-event)
-                evt {:type ::test-event :message "test event"}]
-            (is (ms/source? s))
-            (post-event evt)
-            (is (= evt (-> s (ms/take!) (deref 1000 :timeout))))
-            (is (nil? (ms/close! s)))))
-
-        (testing "dispatches events to multiple listeners"
-          (let [s (bus/subscribe (:bus bus) ::test-event)
-                evt {:type ::test-event :message "other event"}]
-            (post-event evt)
-            (is (= evt (-> s (ms/take!) (deref 1000 :timeout))))
-            (is (nil? (ms/close! s)))))))))
 
 (deftest build-api-artifact-repository
   (h/with-tmp-dir dir
