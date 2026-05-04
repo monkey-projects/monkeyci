@@ -4,20 +4,15 @@
    used for different jobs in the same build.  Artifacts can also be exposed to
    the outside world."
   (:require [babashka.fs :as fs]
-            [clojure.java.io :as io]
             [clojure.string :as cs]
             [clojure.tools.logging :as log]
             [manifold.deferred :as md]
             [medley.core :as mc]
             [monkey.ci
-             [blob :as blob]
              [build :as b]
-             [oci :as oci]
              [protocols :as p]
              [utils :as u]]
-            [monkey.ci.build
-             [api :as api]
-             [archive :as archive]]))
+            [monkey.ci.common.constants :as const]))
 
 (defn- do-with-blobs
   "Fetches blobs configurations from the job using the job key, then
@@ -31,13 +26,6 @@
         (apply md/zip))
    (partial remove nil?)))
 
-(defn- mb
-  "Returns file size in MB"
-  [f]
-  (if (fs/exists? f)
-    (float (/ (fs/size f) (* 1024 1024)))
-    0.0))
-
 (defn- save-blob
   "Saves a single blob path, using the blob configuration and artifact info."
   [{:keys [job sid checkout-dir repo]} {:keys [path id]}]
@@ -49,7 +37,7 @@
      (p/save-artifact repo sid id fullp)
      (fn [{:keys [dest entries] :as r}]
        (if (not-empty entries)
-         (log/debugf "Zipped %d entries to %s (%.2f MB)" (count entries) dest (mb dest))
+         (log/debugf "Zipped %d entries to %s (%.2f MB)" (count entries) dest (u/mb dest))
          (log/warn "No files to archive for" id "at" path))
        r))))
 
@@ -71,7 +59,7 @@
                  (mc/update-existing :dest (comp str fs/canonicalize))
                  (mc/update-existing :entries count))]
        (when r
-         (log/debugf "Unzipped %d entries from %s (%.2f MB) to %s" (count entries) src (mb src) dest))
+         (log/debugf "Unzipped %d entries from %s (%.2f MB) to %s" (count entries) src (u/mb src) dest))
        r))))
 
 (defn restore-generic [conf]
@@ -82,64 +70,17 @@
 (defrecord BlobArtifactRepository [store path-fn]
   p/ArtifactRepository
   (restore-artifact [this sid id dest]
-    (blob/restore store (path-fn sid id) dest))
+    (p/restore-blob store (path-fn sid id) dest))
 
   (save-artifact [this sid id src]
-    (blob/save store src (path-fn sid id))))
-
-(defrecord BuildApiArtifactRepository [client base-path]
-  p/ArtifactRepository
-  (restore-artifact [this _ id dest]
-    (log/debug "Restoring artifact using build API:" id "to" dest)
-    (u/log-deferred-elapsed
-     (-> (client {:method :get
-                  :path (str base-path id)
-                  :as :stream})
-         (md/chain
-          :body
-          #(archive/extract % dest))
-         (md/catch (fn [ex]
-                     (if (= 404 (:status (ex-data ex)))
-                       (log/warn "Artifact not found:" id)
-                       (throw ex)))))
-     (str "Restored artifact from build API: " id)))
-
-  (save-artifact [this _ id src]
-    (let [tmp (fs/create-temp-file)
-          ;; TODO Skip the tmp file intermediate step, it takes up disk space and is slower
-          arch (try
-                 (blob/make-archive src (fs/file tmp))
-                 (catch Exception ex
-                   (log/error "Unable to create archive from" src ex)
-                   (throw ex)))
-          stream (io/input-stream (fs/file tmp))]
-      (log/debugf "Uploading artifact/cache to api server: %s from %s (compressed size: %.2f MB)" id src (mb arch))
-      (u/log-deferred-elapsed
-       (-> (client (api/as-edn {:method :put
-                                :path (str base-path id)
-                                :body stream}))
-           (md/chain
-            :body
-            (partial merge arch))
-           (md/finally
-             ;; Clean up
-             (fn []
-               (.close stream)
-               (fs/delete tmp))))
-       (str "Saved artifact to build API: " id)))))
+    (p/save-blob store src (path-fn sid id) nil)))
 
 ;;; Artifact specific functions
 
 (defn build-sid->artifact-path
   "Returns the path to the artifact with specified id for given build sid"
   [sid id]
-  (str (cs/join "/" (concat sid [id])) blob/extension))
-
-(defn ^:deprecated artifact-archive-path
-  "Returns path for the archive in the given build"
-  [build id]
-  ;; The blob archive path is the build sid with the blob id added.
-  (build-sid->artifact-path (b/sid build) id))
+  (str (cs/join "/" (concat sid [id])) const/blob-extension))
 
 (defn rt->config
   "Creates a configuration object for artifacts from the runtime"
@@ -188,9 +129,6 @@
    (->BlobArtifactRepository store (fn [_ id] (build-sid->artifact-path sid id))))
   ([store]
    (->BlobArtifactRepository store build-sid->artifact-path)))
-
-(defn make-build-api-repository [client]
-  (->BuildApiArtifactRepository client "/artifact/"))
 
 ;;; Interceptors
 

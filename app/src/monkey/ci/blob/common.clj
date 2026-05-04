@@ -5,6 +5,7 @@
             [clojure.tools.logging :as log]
             [clompress.archivers :as ca]
             [monkey.ci.build.archive :as a]
+            [monkey.ci.common.constants :as c]
             [monkey.ci.utils :as u]))
 
 (def compression-type a/compression-type)
@@ -58,7 +59,5 @@
 (defn tmp-dir [{:keys [tmp-dir]}]
   (or tmp-dir (u/tmp-dir)))
 
-(def extension ".tgz")
-
 (defn tmp-archive [conf]
-  (io/file (tmp-dir conf) (str (random-uuid) extension)))
+  (io/file (tmp-dir conf) (str (random-uuid) c/blob-extension)))

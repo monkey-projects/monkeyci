@@ -13,6 +13,7 @@
              [protocols :as p]
              [utils :as u]
              [workspace :as ws]]
+            [monkey.ci.common.constants :as const]
             [monkey.ci.events
              [builders :as eb]
              [mailman :as em]]
@@ -89,12 +90,12 @@
 (defn- repo-cache-location
   "Returns the location to use in the repo cache for the given build."
   [build]
-  (str (cs/join "/" (take 2 (b/sid build))) blob/extension))
+  (str (cs/join "/" (take 2 (b/sid build))) const/blob-extension))
 
 (defn- restore-build-cache [{:keys [build build-cache] :as rt}]
   (log/debug "Restoring build cache for build" (b/sid build))
   ;; Restore to parent because the dir is in the archive
-  @(blob/restore build-cache (repo-cache-location build) (str (fs/parent (m2-cache-dir rt))))
+  @(p/restore-blob build-cache (repo-cache-location build) (str (fs/parent (m2-cache-dir rt))))
   rt)
 
 (defmacro app-hash
@@ -111,11 +112,11 @@
     (if (not= (app-hash) (:app-hash md))
       (try
         (log/debug "Saving build cache for build" (b/sid build))
-        @(blob/save build-cache
-                    (m2-cache-dir rt)
-                    loc
-                    ;; TODO Include hash of the build deps.edn as well
-                    {:app-hash (app-hash)})
+        @(p/save-blob build-cache
+                      (m2-cache-dir rt)
+                      loc
+                      ;; TODO Include hash of the build deps.edn as well
+                      {:app-hash (app-hash)})
         (catch Throwable ex
           (log/error "Failed to save build cache" ex)))
       (log/debug "Not saving build cache, hash is unchanged"))

@@ -4,9 +4,7 @@
             [com.stuartsierra.component :as co]
             [manifold.deferred :as md]
             [monkey.ci
-             [artifacts :as art]
              [build :as b]
-             [cache :as cache]
              [config :as config]
              [errors :as err]
              [spec :as spec]]
@@ -30,10 +28,10 @@
     (api/make-client (client-url ac) token)))
 
 (defn- new-artifacts []
-  (art/make-build-api-repository nil))
+  (api/make-artifact-repository nil))
 
 (defn- new-cache []
-  (cache/make-build-api-repository nil))
+  (api/make-cache-repository nil))
 
 (defrecord EventStream [client]
   co/Lifecycle

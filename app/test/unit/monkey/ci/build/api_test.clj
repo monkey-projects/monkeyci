@@ -1,12 +1,16 @@
 (ns monkey.ci.build.api-test
-  (:require [buddy.core.codecs :as bcc]
+  (:require [babashka.fs :as fs]
+            [buddy.core.codecs :as bcc]
             [clojure.java.io :as io]
             [clojure.test :refer [deftest is testing]]
             [manifold
              [bus :as bus]
              [deferred :as md]
              [stream :as ms]]
-            [monkey.ci.cuid :as cuid]
+            [monkey.ci
+             [cuid :as cuid]
+             [protocols :as p]]
+            [monkey.ci.blob.disk :as bd]
             [monkey.ci.build
              [api :as sut]
              [api-server :as server]]
@@ -167,4 +171,33 @@
             (post-event evt)
             (is (= evt (-> s (ms/take!) (deref 1000 :timeout))))
             (is (nil? (ms/close! s)))))))))
+
+(deftest build-api-artifact-repository
+  (h/with-tmp-dir dir
+    (let [store-dir (fs/path dir "store")
+          _ (fs/create-dir store-dir)
+          store (bd/->DiskBlobStore (str store-dir))
+          sid (repeatedly 3 (comp str random-uuid))
+          build {:sid sid}
+          server (-> (tas/test-config)
+                     (assoc :artifacts store
+                            :build build)
+                     (server/start-server))
+          client (sut/make-client (format "http://localhost:%d" (:port server)) (:token server))
+          art-id (str (random-uuid))
+          in-dir (fs/path dir "input")
+          out-dir (fs/path dir "output")
+          _ (fs/create-dir in-dir)
+          _ (spit (fs/file (fs/path in-dir "test.txt")) "This is a test file")
+          repo (sut/make-artifact-repository client)]
+      (with-open [s (:server server)]
+        (testing "uploads artifact using api"
+          (is (= art-id (:artifact-id @(p/save-artifact repo sid art-id (str in-dir))))))
+        
+        (testing "downloads artifact using api"
+          (is (some? @(p/restore-artifact repo sid art-id (str out-dir))))
+          (is (fs/exists? (fs/path out-dir "test.txt"))))
+
+        (testing "does nothing if artifact does not exist"
+          (is (nil? @(p/restore-artifact repo sid "nonexisting" (str out-dir)))))))))
 

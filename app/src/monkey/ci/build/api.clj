@@ -2,8 +2,10 @@
   "Functions for invoking the build script API."
   (:require [aleph.http :as http]
             [aleph.http.client-middleware :as mw]
+            [babashka.fs :as fs]
             [buddy.core.codecs :as bcc]
             [clj-commons.byte-streams :as bs]
+            [clojure.java.io :as io]
             [clojure.tools.logging :as log]
             [manifold
              [bus :as bus]
@@ -11,8 +13,12 @@
              [stream :as ms]]
             [medley.core :as mc]
             [monkey.ci
+             [blob :as blob]
              [build :as b]
-             [errors :as err]]
+             [errors :as err]
+             [protocols :as p]
+             [utils :as u]]
+            [monkey.ci.build.archive :as archive]
             [monkey.ci.events.http :as eh]
             [monkey.ci.web.crypto :as crypto]))
 
@@ -163,3 +169,52 @@
     {:bus eb
      :close close-fn}))
 
+(defrecord BuildApiArtifactRepository [client base-path]
+  p/ArtifactRepository
+  (restore-artifact [this _ id dest]
+    (log/debug "Restoring artifact using build API:" id "to" dest)
+    (u/log-deferred-elapsed
+     (-> (client {:method :get
+                  :path (str base-path id)
+                  :as :stream})
+         (md/chain
+          :body
+          #(archive/extract % dest))
+         (md/catch (fn [ex]
+                     (if (= 404 (:status (ex-data ex)))
+                       (log/warn "Artifact not found:" id)
+                       (throw ex)))))
+     (str "Restored artifact from build API: " id)))
+
+  (save-artifact [this _ id src]
+    (let [tmp (fs/create-temp-file)
+          ;; TODO Skip the tmp file intermediate step, it takes up disk space and is slower
+          arch (try
+                 (blob/make-archive src (fs/file tmp))
+                 (catch Exception ex
+                   (log/error "Unable to create archive from" src ex)
+                   (throw ex)))
+          stream (io/input-stream (fs/file tmp))]
+      (log/debugf "Uploading artifact/cache to api server: %s from %s (compressed size: %.2f MB)"
+                  id src (u/mb arch))
+      (u/log-deferred-elapsed
+       (-> (client (as-edn {:method :put
+                            :path (str base-path id)
+                            :body stream}))
+           (md/chain
+            :body
+            (partial merge arch))
+           (md/finally
+             ;; Clean up
+             (fn []
+               (.close stream)
+               (fs/delete tmp))))
+       (str "Saved artifact to build API: " id)))))
+
+(defn make-artifact-repository [client]
+  (->BuildApiArtifactRepository client "/artifact/"))
+
+(defn make-cache-repository
+  "Creates an `ArtifactRepository` that can be used to upload/download caches"
+  [client]
+  (->BuildApiArtifactRepository client "/cache/"))

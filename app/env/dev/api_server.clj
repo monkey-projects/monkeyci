@@ -4,7 +4,6 @@
             [com.stuartsierra.component :as csc]
             [manifold.deferred :as md]
             [monkey.ci
-             [cache :as cache]
              [protocols :as p]
              [storage :as st]]
             [monkey.ci.blob.disk :as blob]
@@ -58,7 +57,7 @@
     (ba/make-client (str "http://localhost:" port) token)))
 
 (defn download-cache [client id]
-  (let [repo (cache/make-build-api-repository client)
+  (let [repo (ba/make-cache-repository client)
         dest (fs/file (fs/create-temp-dir))]
     (md/chain
      (p/restore-artifact repo nil id dest)

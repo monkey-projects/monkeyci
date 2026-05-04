@@ -30,8 +30,6 @@
   ;; Make storage dir relative to the work dir
   (bd/->DiskBlobStore (u/abs-path (:work-dir conf) (get-in conf [k :dir]))))
 
-(def extension bc/extension)
-
 (defmethod make-blob-store :oci [conf k]
   (let [oci-conf (get conf k)
         client (-> (os/make-client oci-conf)

@@ -8,3 +8,5 @@
 (def pro-credits 30000)
 
 (def plan-types #{:basic :startup :pro})
+
+(def blob-extension ".tgz")
