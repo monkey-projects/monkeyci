@@ -20,16 +20,14 @@
 
 (deftest verify-test
   (testing "returns nil"
-    (with-redefs [fs/path         (fn [& parts] (apply str parts))
-                  fs/exists?      (constantly false)
+    (with-redefs [fs/exists?      (constantly false)
                   verify/verify   (constantly [])
                   p/print-summary (constantly nil)]
       (is (nil? (sut/verify {:dir "/some/dir"})))))
 
   (testing "lints the .monkeyci subdirectory when it exists"
     (let [linted-path (atom nil)]
-      (with-redefs [fs/path         (fn [& parts] (apply str parts))
-                    fs/exists?      (constantly true)
+      (with-redefs [fs/exists?      (constantly true)
                     verify/verify   (fn [dir]
                                       (reset! linted-path dir)
                                       [])
@@ -39,8 +37,7 @@
 
   (testing "lints the given dir when .monkeyci subdirectory does not exist"
     (let [linted-path (atom nil)]
-      (with-redefs [fs/path         (fn [& parts] (apply str parts))
-                    fs/exists?      (constantly false)
+      (with-redefs [fs/exists?      (constantly false)
                     verify/verify   (fn [p]
                                       (reset! linted-path p)
                                       [])
@@ -65,9 +62,10 @@
 
   (testing "does not call print/print-findings when there are no findings"
     (let [called (atom false)]
-      (with-redefs [fs/path          (fn [& parts] (apply str parts))
-                    fs/exists?       (constantly false)
-                    lint/run!        (constantly {:summary {} :findings []})
+      (with-redefs [fs/exists?       (constantly false)
+                    verify/verify    (constantly
+                                      [{:details
+                                        {:summary {} :findings []}}])
                     p/print-summary  (constantly nil)
                     p/print-findings (fn [_] (reset! called true))]
         (sut/verify {:dir "/project"})

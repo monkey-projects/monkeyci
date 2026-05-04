@@ -18,7 +18,8 @@
     (println "Verifying directory:" path)
     (let [r (verify/verify path)]
       (doseq [{:keys [details]} r]
-        (p/print-findings (:findings details))))))
+        (when-let [f (not-empty (:findings details))]
+          (p/print-findings f))))))
 
 (def dir-opt
   {:as "Project directory"
