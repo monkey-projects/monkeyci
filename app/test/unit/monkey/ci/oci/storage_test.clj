@@ -1,4 +1,4 @@
-(ns monkey.ci.storage.oci-test
+(ns monkey.ci.oci.storage-test
   (:require [clojure.test :refer [deftest testing is]]
             [buddy.core.keys.pem :as pem]
             [manifold.deferred :as md]
@@ -6,7 +6,7 @@
              [protocols :as p]
              [spec :as s]
              [storage :as st]]
-            [monkey.ci.storage.oci :as sut]
+            [monkey.ci.oci.storage :as sut]
             [monkey.oci.os.core :as os]))
 
 (deftest oci-object-storage

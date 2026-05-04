@@ -15,7 +15,7 @@
              [utils :as u]
              [workspace :as ws]]
             [monkey.ci.build.api-server :as bas]
-            [monkey.ci.containers.oci :as c-oci]
+            [monkey.ci.oci.containers :as c-oci]
             [monkey.ci.events.mailman :as em]
             [monkey.ci.events.mailman
              [interceptors :as emi]

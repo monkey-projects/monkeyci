@@ -1,4 +1,4 @@
-(ns monkey.ci.containers.oci-test
+(ns monkey.ci.oci.containers-test
   (:require [babashka.fs :as fs]
             [clj-yaml.core :as yaml]
             [clojure.java.io :as io]
@@ -8,13 +8,13 @@
             [medley.core :as mc]
             [monkey.ci
              [cuid :as cuid]
-             [oci :as oci]
              [utils :as u]]
             [monkey.ci.common.preds :as cp]
-            [monkey.ci.containers
-             [common :as cc]
-             [oci :as sut]]
+            [monkey.ci.containers.common :as cc]
             [monkey.ci.events.mailman :as em]
+            [monkey.ci.oci
+             [core :as oci]
+             [containers :as sut]]
             [monkey.ci.sidecar
              [config :as cs]
              [spec :as ss]]

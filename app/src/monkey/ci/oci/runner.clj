@@ -1,4 +1,4 @@
-(ns monkey.ci.runners.oci
+(ns monkey.ci.oci.runner
   "Another implementation of a job runner that uses OCI container instances.
    This one uses mailman-style events instead of manifold.  This should make
    it more robust and better suited for multiple replicas.  Instead of waiting
@@ -13,7 +13,6 @@
              [build :as b]
              [containers :as co]
              [edn :as edn]
-             [oci :as oci]
              [process :as proc]
              [protocols :as p]
              [storage :as st]
@@ -23,6 +22,7 @@
             [monkey.ci.events.mailman.interceptors :as emi]
             [monkey.ci.runners.interceptors :as ri]
             [monkey.ci.script.config :as sc]
+            [monkey.ci.oci.core :as oci]
             [monkey.ci.web.auth :as auth]
             [monkey.oci.container-instance.core :as ci]))
 

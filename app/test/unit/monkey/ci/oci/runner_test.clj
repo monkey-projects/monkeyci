@@ -1,4 +1,4 @@
-(ns monkey.ci.runners.oci-test
+(ns monkey.ci.oci.runner-test
   (:require [clojure
              [string :as cstr]
              [test :refer [deftest is testing]]]
@@ -7,14 +7,15 @@
             [monkey.ci
              [cuid :as cuid]
              [edn :as edn]
-             [oci :as oci]
              [protocols :as p]
              [storage :as st]]
             [monkey.ci.events
              [mailman :as em]
              [spec :as es]]
             [monkey.ci.events.mailman.interceptors :as emi]
-            [monkey.ci.runners.oci :as sut]
+            [monkey.ci.oci
+             [core :as oci]
+             [runner :as sut]]
             [monkey.ci.script.config :as sc]
             [monkey.ci.test.helpers :as h]
             [monkey.ci.vault

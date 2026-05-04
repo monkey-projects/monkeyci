@@ -2,15 +2,13 @@
   "Blob storage functionality, used to store and restore large files
    or entire directories."
   (:require [monkey.ci
-             [oci :as oci]
              [protocols :as p]
              [utils :as u]]
             [monkey.ci.blob
              [common :as bc]
              [disk :as bd]
-             [oci :as bo]
              [s3 :as bs3]]
-            [monkey.oci.os.core :as os]))
+            [monkey.ci.oci.blob :as oci]))
 
 (defn save
   "Saves blob from src to dest, with optional metadata"
@@ -31,10 +29,7 @@
   (bd/->DiskBlobStore (u/abs-path (:work-dir conf) (get-in conf [k :dir]))))
 
 (defmethod make-blob-store :oci [conf k]
-  (let [oci-conf (get conf k)
-        client (-> (os/make-client oci-conf)
-                   (oci/add-inv-interceptor :blob))]
-    (bo/->OciBlobStore client oci-conf )))
+  (oci/make-blob-store (get conf k)))
 
 (defmethod make-blob-store :s3 [conf k]
   (let [s3-config (get conf k)]

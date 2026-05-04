@@ -5,7 +5,7 @@
              [config :as config]
              [protocols :as p]
              [storage :as s]]
-            [monkey.ci.storage.oci]
+            [monkey.ci.oci.storage]
             [monkey.oci.os.core :as os]))
 
 (defn- storage-config []

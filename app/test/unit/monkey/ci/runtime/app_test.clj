@@ -6,13 +6,13 @@
             [manifold.deferred :as md]
             [monkey.ci
              [cuid :as cuid]
-             [oci :as oci]
              [protocols :as p]
              [storage :as st]
              [utils :as u]
              [vault :as v]]
             [monkey.ci.logging.log-ingest :as li]
             [monkey.ci.metrics.otlp :as mo]
+            [monkey.ci.oci.core :as oci]
             [monkey.ci.runtime.app :as sut]
             [monkey.ci.vault
              [common :as vc]

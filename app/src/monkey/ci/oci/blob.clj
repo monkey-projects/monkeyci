@@ -1,4 +1,4 @@
-(ns monkey.ci.blob.oci
+(ns monkey.ci.oci.blob
   "Blob implementation that uses OCI buckets"
   (:require [babashka.fs :as fs]
             [clj-commons.byte-streams :as bs]
@@ -9,11 +9,11 @@
             [manifold.deferred :as md]
             [medley.core :as mc]
             [monkey.ci
-             [oci :as oci]
              [protocols :as p]
              [utils :as u]]
             [monkey.ci.blob.common :as c]
             [monkey.ci.build.archive :as a]
+            [monkey.ci.oci.core :as oci]
             [monkey.oci.os
              [core :as os]
              [martian :as om]
@@ -149,3 +149,8 @@
                (mc/assoc-some
                 :last-modified (some->> (:last-modified headers)
                                         (jt/instant (jt/formatter :rfc-1123-date-time)))))))))))
+
+(defn make-blob-store [conf]
+  (let [client (-> (os/make-client conf)
+                   (oci/add-inv-interceptor :blob))]
+    (->OciBlobStore client conf)))

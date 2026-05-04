@@ -1,4 +1,4 @@
-(ns monkey.ci.oci
+(ns monkey.ci.oci.core
   "Oracle cloud specific functionality"
   (:require [babashka.fs :as fs]
             [clojure.tools.logging :as log]

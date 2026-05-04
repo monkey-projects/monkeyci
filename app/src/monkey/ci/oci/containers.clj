@@ -1,4 +1,4 @@
-(ns monkey.ci.containers.oci
+(ns monkey.ci.oci.containers
   "Container runner implementation that uses OCI container instances."
   (:require [clojure.java.io :as io]
             [clojure.string :as cs]
@@ -9,13 +9,13 @@
              [build :as b]
              [containers :as mcc]
              [edn :as edn]
-             [jobs :as j]
-             [oci :as oci]]
+             [jobs :as j]]
             [monkey.ci.containers
              [common :as c]
              [promtail :as pt]]
             [monkey.ci.events.builders :as eb]
             [monkey.ci.events.mailman.interceptors :as emi]
+            [monkey.ci.oci.core :as oci]
             [monkey.oci.container-instance.core :as ci]))
 
 ;; TODO Get this information from the OCI shapes endpoint

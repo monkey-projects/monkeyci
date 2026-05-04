@@ -9,7 +9,6 @@
             [monkey.ci
              [blob :as blob]
              [invoicing :as inv]
-             [oci :as oci]
              [protocols :as p]
              [reporting :as rep]
              [sid :as sid]
@@ -29,14 +28,17 @@
              [events :as me]
              [otlp :as mo]]
             [monkey.ci.reporting.print]
-            [monkey.ci.runners.oci :as ro]
             [monkey.ci.runtime.common :as rc]
             [monkey.ci.storage.sql :as sql]
+            [monkey.ci.oci
+             [core :as oci]
+             [runner :as ro]
+             [storage]
+             [vault :as vo]]
             [monkey.ci.vault
              [common :as vc]
              [fixed :as vf]
-             [scw :as v-scw]
-             [oci :as vo]]
+             [scw :as v-scw]]
             [monkey.ci.web
              [handler :as wh]
              [http :as http]]

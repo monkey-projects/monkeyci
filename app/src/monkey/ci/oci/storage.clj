@@ -1,4 +1,4 @@
-(ns monkey.ci.storage.oci
+(ns monkey.ci.oci.storage
   (:require [clojure.string :as cs]
             [clojure.tools.logging :as log]
             [manifold.deferred :as md]

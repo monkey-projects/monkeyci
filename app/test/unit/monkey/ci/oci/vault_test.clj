@@ -1,4 +1,4 @@
-(ns monkey.ci.vault.oci-test
+(ns monkey.ci.oci.vault-test
   (:require [clojure.test :refer [deftest testing is]]
             [buddy.core.nonce :as nonce]
             [com.stuartsierra.component :as co]
@@ -6,9 +6,8 @@
              [cuid :as cuid]
              [protocols :as p]
              [utils :as u]]
-            [monkey.ci.vault
-             [common :as vc]
-             [oci :as sut]]
+            [monkey.ci.oci.vault :as sut]
+            [monkey.ci.vault.common :as vc]
             [monkey.oci.vault :as ov]))
 
 (deftest oci-vault

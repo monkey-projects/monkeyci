@@ -1,11 +1,11 @@
-(ns monkey.ci.oci-test
+(ns monkey.ci.oci.core-test
   (:require [clojure.test :refer [deftest is testing]]
             [java-time.api :as jt]
             [manifold.deferred :as md]
             [monkey.ci
              [config :as c]
-             [oci :as sut]
              [time :as t]]
+            [monkey.ci.oci.core :as sut]
             [monkey.oci.container-instance.core :as ci]
             [monkey.oci.os.stream :as os]
             [taoensso.telemere :as tt])

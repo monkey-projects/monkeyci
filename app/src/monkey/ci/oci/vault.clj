@@ -1,4 +1,4 @@
-(ns monkey.ci.vault.oci
+(ns monkey.ci.oci.vault
   "Vault implementation for Oracle cloud"
   (:require [clojure.tools.logging :as log]
             [com.stuartsierra.component :as co]

@@ -2,9 +2,7 @@
   (:require [clojure.test :refer [deftest testing is]]
             [babashka.process :as bp]
             [monkey.ci.build.v2 :as sut]
-            [monkey.ci
-             [jobs :as j]
-             [oci :as oci]]))
+            [monkey.ci.jobs :as j]))
 
 (def test-ctx {})
 
