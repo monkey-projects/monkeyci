@@ -9,8 +9,7 @@
              [edn :as edn]
              [oci :as oci]
              [protocols :as p]
-             [storage :as st]
-             [vault :as v]]
+             [storage :as st]]
             [monkey.ci.events
              [mailman :as em]
              [spec :as es]]
@@ -18,6 +17,9 @@
             [monkey.ci.runners.oci :as sut]
             [monkey.ci.script.config :as sc]
             [monkey.ci.test.helpers :as h]
+            [monkey.ci.vault
+             [common :as vc]
+             [fixed :as vf]]
             [monkey.mailman.core :as mmc]))
 
 (defn- decode-vol-config [vol fn]
@@ -223,14 +225,14 @@
 
 (deftest decrypt-ssh-keys
   (h/with-memory-store st
-    (let [vault (v/->FixedKeyVault (v/generate-key))
-          iv (v/generate-iv)
+    (let [vault (vf/->FixedKeyVault (vc/generate-key))
+          iv (vc/generate-iv)
           {:keys [enter] :as i} (sut/decrypt-ssh-keys vault)]
       (is (keyword? (:name i)))
 
       (testing "decrypts key using customer iv"
         (let [ssh-key "decrypted-key"
-              cust (h/gen-cust)
+              cust (h/gen-org)
               build (-> (h/gen-build)
                         (assoc :org-id (:id cust))
                         (assoc-in [:git :ssh-keys] [{:private-key (p/encrypt vault iv ssh-key)

@@ -73,7 +73,7 @@
       (let [org-id (cuid/random-cuid)
             build {:dek "encrypted-key"
                    :org-id org-id}
-            dek (v/generate-key)
+            dek (vc/generate-key)
             init-ctx {:build build
                       :api
                       {:client (fake-decrypter-client dek)}}]
@@ -540,7 +540,7 @@
         (testing "encrypts newly added env vars"
           (let [org-id (cuid/random-cuid)
                 job-id "dynamic-container"
-                dek (v/generate-key)
+                dek (vc/generate-key)
                 build {:org-id org-id
                        :dek dek}
                 init-ctx {:api

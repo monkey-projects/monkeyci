@@ -45,6 +45,13 @@
           (fs/create-file))
   rt)
 
+(defn calc-checkout-dir
+  "Calculates the checkout directory for the build, by combining the checkout
+   base directory and the build id."
+  [rt build]
+  (some-> (get-in rt [:config :checkout-base-dir])
+          (u/combine (:build-id build))))
+
 (defn- download-git
   "Downloads from git into a temp dir, and designates that as the working dir."
   [build rt]
@@ -52,7 +59,7 @@
   (let [git (get-in rt [:git :clone])
         conf (-> build
                  :git
-                 (update :dir #(or % (b/calc-checkout-dir rt build))))
+                 (update :dir #(or % (calc-checkout-dir rt build))))
         cd (git conf)]
     (log/debug "Checking out git repo" (:url conf) "into" (:dir conf))
     (-> build

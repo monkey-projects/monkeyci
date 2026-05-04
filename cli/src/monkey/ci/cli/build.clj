@@ -41,13 +41,13 @@
                                   :cache-dir    (str sdir "/cache")})]
     (log/info "Build API server started on port" (:port server))
     (try
-      (let [url      (srv/server->url server)
-            token    (:token server)
-            exit     (run-build-process! sdir
-                                         {api-url-env   url
-                                          api-token-env token})]
+      (let [url   (srv/server->url server)
+            token (:token server)
+            exit  (run-build-process! sdir
+                                      {api-url-env   url
+                                       api-token-env token})]
         ;; TODO Actually run the build
-        (Thread/sleep 2000)
+        ;;(Thread/sleep 2000)
         (log/info "Build process exited with code" exit)
         exit)
       (finally

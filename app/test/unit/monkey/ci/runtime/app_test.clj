@@ -167,7 +167,7 @@
 (deftest crypto
   (h/with-memory-store st
     (let [k {:enc "encrypted-dek"
-             :key (bcc/bytes->b64 (v/generate-key))}]
+             :key (bcc/bytes->b64 (vc/generate-key))}]
       (defmethod sut/dek-utils ::test [_]
         {:generator (constantly k)
          :decrypter (fn [v]

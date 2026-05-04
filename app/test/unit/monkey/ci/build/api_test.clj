@@ -6,9 +6,7 @@
              [bus :as bus]
              [deferred :as md]
              [stream :as ms]]
-            [monkey.ci
-             [cuid :as cuid]
-             [vault :as v]]
+            [monkey.ci.cuid :as cuid]
             [monkey.ci.build
              [api :as sut]
              [api-server :as server]]
@@ -17,6 +15,7 @@
              [api-server :as tas]
              [helpers :as h]
              [mailman :as tm]]
+            [monkey.ci.vault.common :as vc]
             [monkey.ci.web.crypto :as crypto]
             [monkey.mailman.core :as mmc])
   (:import (java.io PipedInputStream PipedOutputStream PrintWriter)))
@@ -72,7 +71,7 @@
       (is (= "decrypted key" (sut/decrypt-key m "encrypted-key"))))))
 
 (deftest build-params
-  (let [dek (v/generate-key)
+  (let [dek (vc/generate-key)
         m (fn [req]
             (cond
               (= "/params" (:path req))

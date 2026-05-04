@@ -12,6 +12,13 @@
             [monkey.ci.utils :as u]
             [monkey.mailman.core :as mmc]))
 
+(deftest calc-checkout-dir
+  (testing "combines build id with checkout base dir from config"
+    (let [rt {:config {:checkout-base-dir "/tmp/checkout-base"}}
+          build {:build-id "test-build"}]
+      (is (= "/tmp/checkout-base/test-build"
+             (sut/calc-checkout-dir rt build))))))
+
 (deftest download-src
   (testing "no-op if the source is local"
     (let [build {}]
@@ -39,7 +46,7 @@
 
   (testing "calculates checkout dir if not specified"
     (is (cs/ends-with? (-> {:git {:url "http:/test.git"}
-                                    :build-id "test-build"}
+                            :build-id "test-build"}
                            (sut/download-src
                             {:config {:checkout-base-dir "test-work-dir"}
                              :git {:clone :dir}})

@@ -34,7 +34,9 @@
             [monkey.ci.storage.sql :as sql]
             [monkey.ci.vault
              [common :as vc]
-             [scw :as v-scw]]
+             [fixed :as vf]
+             [scw :as v-scw]
+             [oci :as vo]]
             [monkey.ci.web
              [handler :as wh]
              [http :as http]]
@@ -107,8 +109,16 @@
   ;; Return a map because component doesn't allow nils
   (select-keys conf [:jwk]))
 
+(defmulti make-vault :type)
+
+(defmethod make-vault :oci [config]
+  (vo/make-oci-vault config))
+
+(defmethod make-vault :fixed [config]
+  (vf/make-fixed-key-vault config))
+
 (defn- new-vault [config]
-  (v/make-vault (:vault config)))
+  (make-vault (:vault config)))
 
 (defmulti dek-utils
   "Creates DEK functions: 
