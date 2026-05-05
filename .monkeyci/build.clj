@@ -261,10 +261,13 @@
             (assoc :save-artifacts [gui-release-artifact]))
         (p/release? ctx) (update :script override-gui-version (config/tag-version ctx)))))
 
+(def cli-uberjar-artifact (m/artifact "cli-uberjar" "cli/target/monkeyci-cli.jar"))
+
 (defn cli-uberjar [ctx]
   (when (p/publish-cli? ctx)
     (-> (clj-container "cli-uberjar" "cli" "-T:uberjar")
-        (m/depends-on "test-cli"))))
+        (m/depends-on "test-cli")
+        (m/save-artifacts [cli-uberjar-artifact]))))
 
 (defn cli-native-img [ctx]
   (when (p/publish-cli? ctx)
@@ -282,7 +285,8 @@
                                "--no-fallback"
                                "-march=native"
                                "monkeyci"])])
-          (m/depends-on "cli-uberjar")))))
+          (m/depends-on "cli-uberjar")
+          (m/restore-artifacts [(m/artifact "cli-uberjar" "target")])))))
 
 (defn scw-images
   "Generates a job that patches the scw-images repo in order to build a new
