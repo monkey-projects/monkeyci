@@ -1,0 +1,6 @@
+{:paths ["src"]
+ :deps {com.monkeyci/script {:local/root "."}}
+
+ :tasks
+ {test {:extra-paths ["test"]
+        :task (clojure.test/run-all-tests (re-pattern "^monkey.*$"))}}}

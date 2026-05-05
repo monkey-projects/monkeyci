@@ -38,6 +38,13 @@
                (sut/test-app)
                :dependencies)))))
 
+(deftest test-cli
+  (testing "creates job if cli files changed"
+    (is (m/container-job?
+         (-> mt/test-ctx
+             (mt/with-changes (mt/modified ["cli/deps.edn"]))
+             (sut/test-cli))))))
+
 (deftest test-gui
   (testing "creates job if gui files changed"
     (is (m/container-job?
@@ -227,6 +234,17 @@
                            (mt/with-git-ref "refs/tags/0.1.2")
                            (sut/upload-install-script))))))
 
+(deftest cli-native-img
+  (testing "`nil` if publishing is not needed"
+    (is (nil? (sut/cli-native-img mt/test-ctx))))
+  
+  (testing "container job if on main and cli files changed"
+    (is (m/container-job?
+         (-> mt/test-ctx
+             (mt/with-changes (mt/modified ["cli/deps.edn"]))
+             (mt/with-git-ref "refs/heads/main")
+             (sut/cli-native-img))))))
+
 (deftest jobs
   (with-redefs [clojars/latest-version (constantly "1.0.0")]
     (mt/with-build-params {}
@@ -251,4 +269,10 @@
             (is (contains? ids "test-common")))
 
           (testing "contains common publish job"
-            (is (contains? ids "publish-common"))))))))
+            (is (contains? ids "publish-common")))
+
+          (testing "contains test cli job"
+            (is (contains? ids "test-cli")))
+
+          (testing "contains cli native image job"
+            (is (contains? ids "cli-native-img"))))))))

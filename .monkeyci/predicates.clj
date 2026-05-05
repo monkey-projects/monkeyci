@@ -53,3 +53,4 @@
                            release?))
 (def publish-test-lib? (some-fn (every-pred test-lib-changed? should-publish?) release?))
 (def publish-common? (some-fn (every-pred common-changed? should-publish?) release?))
+(def publish-cli? (some-fn (every-pred cli-changed? should-publish?) release?))
