@@ -11,7 +11,8 @@
         ring/ring-core                 {:mvn/version "1.13.0"}
         com.monkeyci/core              {:local/root "../core"}
         com.monkeyprojects/mailman-core {:mvn/version "0.4.0-SNAPSHOT"}
-        com.monkeyprojects/mailman-core-async {:mvn/version "0.4.0-SNAPSHOT"}}
+        com.monkeyprojects/mailman-core-async {:mvn/version "0.4.0-SNAPSHOT"}
+        com.monkeyprojects/mailman-sieppari {:mvn/version "0.4.0-SNAPSHOT"}}
 
  :aliases
  {:uberjar

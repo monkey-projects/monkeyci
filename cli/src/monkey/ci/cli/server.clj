@@ -288,17 +288,18 @@
      :cache-dir     — directory for cache storage
      :workspace-file — path to the workspace archive
      :key-decrypter — fn [build enc-key] -> key
+     :channel       - optional core.async channel for events
 
    Returns a map with:
      :server        — http-kit server object
      :port          — actual bound port
      :token         — bearer token (generated or supplied)
      :event-mult-ch — the upstream channel; put events here to broadcast to SSE clients"
-  [{:keys [port token] :or {port 0} :as opts}]
+  [{:keys [port token channel] :or {port 0} :as opts}]
   (let [token        (or token (generate-token))
         ;; Single upstream channel; broadcast via mult so multiple SSE
         ;; clients each get their own tap.
-        event-ch     (ca/chan (ca/sliding-buffer 100))
+        event-ch     (or channel (ca/chan (ca/sliding-buffer 100)))
         event-mult   (ca/mult event-ch)
         ctx          (assoc opts
                             :token token
