@@ -3,8 +3,8 @@
   (:require [babashka.fs :as fs]
             [cli-matic.core :as cli]
             [monkey.ci.cli
-             [build :as b]
              [print :as p]
+             [run :as r]
              [test :as t]
              [utils :as u]
              [verify :as verify]
@@ -53,7 +53,7 @@
             watch-opt]}
     {:command "build"
      :description "Run a local build of the MonkeyCI script in the given directory"
-     :runs #'b/build
+     :runs #'r/build
      :opts [dir-opt]}]})
 
 (defn -main [& args]

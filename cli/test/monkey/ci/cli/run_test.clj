@@ -1,9 +1,9 @@
-(ns monkey.ci.cli.build-test
+(ns monkey.ci.cli.run-test
   (:require [clojure.core.async :as ca]
             [clojure.test :refer [deftest is testing]]
             [monkey.ci.cli
-             [build :as sut]
              [process :as proc]
+             [run :as sut]
              [server :as srv]]))
 
 (def ^:private dummy-server
