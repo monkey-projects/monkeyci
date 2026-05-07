@@ -3,7 +3,8 @@
   (:require [clojure.tools.logging :as log]
             [medley.core :as mc]
             [monkey.ci.errors :as errors]
-            [monkey.ci.events.builders :as b]))
+            [monkey.ci.events.builders :as b]
+            [monkey.ci.time :as t]))
 
 (def get-result :result)
 
@@ -14,6 +15,23 @@
   "Interceptor that empties result"
   {:name ::no-result
    :leave #(dissoc % :result)})
+
+(def add-time
+  {:name ::add-evt-time
+   :leave (letfn [(set-time [evt]
+                    (update evt :time #(or % (t/now))))]
+            (fn [ctx]
+              (update ctx :result (partial map set-time))))})
+
+(def trace-evt
+  "Logs event info, for debugging purposes."
+  {:name ::trace
+   :enter (fn [ctx]
+            (log/trace "Incoming event:" (:event ctx))
+            ctx)
+   :leave (fn [ctx]
+            (log/trace "Result from handling" (get-in ctx [:event :type]) ":" (get-result ctx))
+            ctx)})
 
 (def get-state ::state)
 
