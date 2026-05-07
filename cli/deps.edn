@@ -1,4 +1,5 @@
-{:deps {cheshire/cheshire              {:mvn/version "6.2.0"}
+{:deps {babashka/process               {:mvn/version "0.6.25"}
+        cheshire/cheshire              {:mvn/version "6.2.0"}
         cli-matic/cli-matic            {:mvn/version "0.5.4"}
         clj-kondo/clj-kondo            {:mvn/version "2026.04.15"}
         clj-commons/clj-yaml           {:mvn/version "1.0.29"}

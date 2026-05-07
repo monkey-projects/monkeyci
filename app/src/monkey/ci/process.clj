@@ -6,7 +6,6 @@
              [process :as bp]]
             [manifold.deferred :as md]
             [monkey.ci
-             [build :as b]
              [utils :as utils]
              [version :as v]]))
 

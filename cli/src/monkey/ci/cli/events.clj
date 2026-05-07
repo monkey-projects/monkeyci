@@ -1,13 +1,16 @@
 (ns monkey.ci.cli.events
   "Mailman event handlers for CLI builds.  Note that these events are dispatched
    and handled purely internal."
-  (:require [babashka.fs :as fs]
+  (:require [babashka
+             [fs :as fs]
+             [process :as bp]]
             [clojure.tools.logging :as log]
             [medley.core :as mc]
             [monkey.ci.cli
              [build :as b]
              [config :as conf]
              [process :as p]]
+            [monkey.ci.events.builders :as eb]
             [monkey.ci.events.mailman.interceptors :as emi]
             [monkey.ci.utils.path :as up]
             [monkey.mailman.core :as mmc]))
@@ -53,6 +56,11 @@
 
 (defn set-build-opts [ctx bo]
   (assoc ctx ::build-opts bo))
+
+(def get-process ::process)
+
+(defn set-process [ctx ws]
+  (assoc ctx ::process ws))
 
 ;;; Interceptors
 
@@ -106,6 +114,15 @@
    :enter (fn [{:keys [event] :as ctx}]
             (update-job-in-state ctx (:job-id event) merge (select-keys event [:status :result])))})
 
+(def start-process
+  "Starts a child process using the command line stored in the result"
+  {:name ::start-process
+   :leave (fn [ctx]
+            (let [cmd (get-result ctx)]
+              (log/debug "Starting child process:" cmd)
+              (cond-> ctx
+                cmd (set-process (bp/process cmd)))))})
+
 ;;; Handlers
 
 (defn make-build-init-evt
@@ -113,7 +130,7 @@
   [ctx]
   (-> (get-in ctx [:event :build])
       (assoc :status :initializing)
-      (b/build-init-evt)))
+      (eb/build-init-evt)))
 
 (defn- absolutize-script-dir [build]
   (b/set-script-dir build (up/abs-path (b/checkout-dir build) (or (b/script-dir build)
@@ -122,7 +139,7 @@
 (defn- child-config [ctx]
   (let [build (ctx->build ctx)
         {:keys [port token]} (get-api ctx)]
-    (-> sc/empty-config
+    #_(-> sc/empty-config
         (sc/set-build (absolutize-script-dir build))
         (sc/set-api {:url (str "http://localhost:" port)
                      :token token})
@@ -147,7 +164,7 @@
                   (log/info "Child process exited with exit code" exit)
                   (try
                     (mmc/post-events (get-mailman ctx)
-                                     [(b/build-end-evt build exit)])
+                                     [(eb/build-end-evt build exit)])
                     (catch Exception ex
                       (log/error "Unable to post build/end event" ex))))]
     {:dir (b/calc-script-dir (b/checkout-dir build) (b/script-dir build))
@@ -161,7 +178,7 @@
      :exit-fn (p/exit-fn on-exit)}))
 
 (defn build-init [ctx]
-  (b/build-start-evt (ctx->build ctx)))
+  (eb/build-start-evt (ctx->build ctx)))
 
 (defn build-end [ctx]
   ;; Return the build with job details from state, it will be set in the result
@@ -179,7 +196,7 @@
         :interceptors [emi/handle-build-error
                        state
                        emi/no-result
-                       emi/start-process
+                       start-process
                        (emi/add-mailman mailman)
                        (add-api (conf/get-api conf))
                        (add-log-dir (conf/get-log-dir conf))
@@ -196,7 +213,7 @@
       [{:handler build-end
         :interceptors [emi/no-result
                        state
-                       (emi/realize-deferred (conf/get-ending conf))]}]]
+                       #_(emi/realize-deferred (conf/get-ending conf))]}]]
 
      [:job/end
       ;; Updates state to add job result

@@ -1,7 +1,7 @@
-(ns monkey.ci.local.config
+(ns monkey.ci.cli.config
   "Configuration management functions for local builds"
   (:require [babashka.fs :as fs]
-            [monkey.ci.version :as v]))
+            [monkey.ci.cli.version :as v]))
 
 (def empty-config {})
 
