@@ -8,6 +8,7 @@
   (:require [babashka.fs :as fs]
             [clojure.tools.logging :as log]
             [monkey.ci.cli
+             [config :as c]
              [events :as e]
              [process :as proc]
              [server :as srv]
@@ -29,11 +30,12 @@
 (defn run-build-process! [sdir env]
   (proc/run ["clojure" "-X:monkeyci/build"] sdir env))
 
-(defn setup-events [conf]
-  (let [m (mmca/core-async-broker)
+(defn setup-events [conf ch]
+  (let [m (mmca/core-async-broker :channel ch)
         routes (e/make-routes conf m)
         router (mmc/make-router routes {:executor mms/execute})]
     (mmc/add-listener m {:handler router})
+    (mmca/start-broker m)
     m))
 
 (defn build
@@ -51,22 +53,25 @@
    Returns the exit code of the child process."
   [{:keys [dir] :or {dir "."} :as conf}]
   (let [sdir   (script-dir dir)
-        broker (setup-events conf)
+        result (or (c/get-ending conf) (promise))
         server (srv/start-server {:artifact-dir (fs/path sdir "artifacts")
-                                  :cache-dir    (fs/path sdir "cache")
-                                  :channel (.chan broker)})]
+                                  :cache-dir    (fs/path sdir "cache")})
+        build {:checkout-dir dir} ; TODO
+        broker (-> conf
+                   (c/set-api {:url (srv/server->url server)
+                               :token (:token server)})
+                   (c/set-build build)
+                   (c/set-ending result)
+                   (setup-events (:event-mult-ch server)))]
     (log/info "Build API server started on port" (:port server))
     (try
       (let [url   (srv/server->url server)
-            token (:token server)
-            build {:checkout-dir dir} ; TODO
-            exit  (run-build-process! sdir
-                                      {api-url-env   url
-                                       api-token-env token})]
-        ;; Run the build by posting a :build/start event
+            token (:token server)]
+        ;; Trigger the build by posting a :build/start event
         (mmc/post-events broker [(eb/build-start-evt build)])
-        ;; TODO Wait for :build/end
-        (log/info "Build process exited with code" exit)
-        exit)
+        ;; Wait for build end
+        (let [exit @result]
+          (log/info "Build process exited with code" exit)
+          exit))
       (finally
         (srv/stop-server server)))))

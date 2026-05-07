@@ -123,6 +123,12 @@
               (cond-> ctx
                 cmd (set-process (bp/process cmd)))))})
 
+(defn deliver-end [p]
+  {:name ::deliver-end
+   :leave (fn [ctx]
+            (deliver p (get-result ctx))
+            ctx)})
+
 ;;; Handlers
 
 (defn make-build-init-evt
@@ -213,7 +219,7 @@
       [{:handler build-end
         :interceptors [emi/no-result
                        state
-                       #_(emi/realize-deferred (conf/get-ending conf))]}]]
+                       (deliver-end (conf/get-ending conf))]}]]
 
      [:job/end
       ;; Updates state to add job result

@@ -2,6 +2,7 @@
   (:require [clojure.core.async :as ca]
             [clojure.test :refer [deftest is testing]]
             [monkey.ci.cli
+             [config :as c]
              [process :as proc]
              [run :as sut]
              [server :as srv]]
@@ -16,24 +17,24 @@
    :event-mult-ch (ca/chan 1)
    :event-mult    nil})
 
+(defn- test-config [conf & [res]]
+  (let [result (promise)]
+    (deliver result (or res ::test-result))
+    (c/set-ending conf result)))
+
 (deftest build-test
   (let [broker (mmca/core-async-broker)]
     (with-redefs [sut/setup-events (constantly broker)]
-      (testing "starts the API server before running the child process"
+      (testing "starts the API server"
         (let [server-started? (atom false)
-              server-stopped? (atom false)
-              process-run?    (atom false)]
+              server-stopped? (atom false)]
           (with-redefs [srv/start-server (fn [_opts]
                                            (reset! server-started? true)
                                            dummy-server)
-                        proc/run         (fn [_cmd _dir _env]
-                                           (reset! process-run? true)
-                                           0)
                         srv/stop-server  (fn [_s]
                                            (reset! server-stopped? true))]
-            (sut/build {:dir "."})
+            (sut/build (test-config {:dir "."}))
             (is @server-started?)
-            (is @process-run?)
             (is @server-stopped?))))
 
       (testing "posts `:build/start` event"
@@ -43,55 +44,48 @@
                      first
                      :type)))))
 
-      (testing "passes the API URL and token as environment variables"
-        (let [received-env (atom nil)]
-          (with-redefs [srv/start-server (fn [_opts] dummy-server)
-                        proc/run         (fn [_cmd _dir env]
-                                           (reset! received-env env)
-                                           0)
-                        srv/stop-server  (fn [_s] nil)]
-            (sut/build {:dir "."})
+      (let [received-conf (atom nil)]
+        (with-redefs [sut/setup-events (fn [conf _]
+                                         (reset! received-conf conf)
+                                         broker)
+                      srv/start-server (fn [_opts] dummy-server)
+                      srv/stop-server  (fn [_s] nil)]
+          (sut/build (test-config {:dir "/some/project"}))
+          
+          (testing "passes the API URL and token to route config"
             (is (= "http://localhost:9999"
-                   (get @received-env sut/api-url-env)))
+                   (-> @received-conf
+                       (c/get-api)
+                       :url)))
             (is (= "fake-token"
-                   (get @received-env sut/api-token-env))))))
+                   (-> @received-conf
+                       (c/get-api)
+                       :token))))
 
-      (testing "stops the server even when the child process throws"
+          (testing "passes the script dir (not raw dir) to the process"
+            ;; find-script-dir returns the dir itself when .monkeyci doesn't exist
+            (is (string? (-> @received-conf
+                             (c/get-build)
+                             :checkout-dir))))))
+
+      (testing "stops the server even on error"
         (let [server-stopped? (atom false)]
           (with-redefs [srv/start-server (fn [_opts] dummy-server)
-                        proc/run         (fn [_cmd _dir _env]
-                                           (throw (ex-info "process error" {})))
                         srv/stop-server  (fn [_s]
-                                           (reset! server-stopped? true))]
+                                           (reset! server-stopped? true))
+                        sut/setup-events (constantly nil)]
             (try
-              (sut/build {:dir "."})
+              (sut/build (test-config {:dir "."}))
               (catch Exception _))
             (is @server-stopped?))))
 
       (testing "returns the process exit code"
         (with-redefs [srv/start-server (fn [_opts] dummy-server)
-                      proc/run         (fn [_cmd _dir _env] 42)
                       srv/stop-server  (fn [_s] nil)]
-          (is (= 42 (sut/build {:dir "."})))))
-
-      (testing "returns 0 on success"
-        (with-redefs [srv/start-server (fn [_opts] dummy-server)
-                      proc/run         (fn [_cmd _dir _env] 0)
-                      srv/stop-server  (fn [_s] nil)]
-          (is (zero? (sut/build {:dir "."})))))
-
-      (testing "passes the script dir (not raw dir) to the process"
-        (let [received-dir (atom nil)]
-          (with-redefs [srv/start-server (fn [_opts] dummy-server)
-                        proc/run         (fn [_cmd dir _env]
-                                           (reset! received-dir dir)
-                                           0)
-                        srv/stop-server  (fn [_s] nil)]
-            (sut/build {:dir "/some/project"})
-            ;; find-script-dir returns the dir itself when .monkeyci doesn't exist
-            (is (string? @received-dir))))))))
+          (is (= 42 (sut/build (test-config {:dir "."} 42)))))))))
 
 (deftest setup-events
-  (testing "creates mailman broker"
-    (let [b (sut/setup-events {})]
-      (is (satisfies? mmc/EventReceiver b)))))
+  (testing "creates mailman broker with channel"
+    (let [b (sut/setup-events {} ::test-chan)]
+      (is (satisfies? mmc/EventReceiver b))
+      (is (= ::test-chan (mmca/get-channel b))))))

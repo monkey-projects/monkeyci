@@ -50,7 +50,7 @@
   (assoc conf :filter f))
 
 (def get-ending
-  "Retrieves the result deferred, that is used to pass build result to the caller."
+  "Retrieves the result promise, that is used to pass build result to the caller."
   :ending)
 
 (defn set-ending [conf r]

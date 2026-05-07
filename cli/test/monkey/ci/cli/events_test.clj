@@ -178,3 +178,15 @@
              (-> {:event {:build build}}
                  (sut/update-job-in-state "test-job" assoc :status :success)
                  (sut/build-end)))))))
+
+(deftest deliver-end
+  (let [p (promise)
+        {:keys [leave] :as i} (sut/deliver-end p)]
+    (is (keyword? (:name i)))
+    
+    (testing "`leave` delivers result to configured end promise"
+      (is (some? (-> {}
+                     (sut/set-result ::test-result)
+                     (leave))))
+      (is (realized? p))
+      (is (= ::test-result (deref p 500 ::timeout))))))
