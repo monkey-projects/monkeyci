@@ -8,12 +8,14 @@
   (:require [babashka.fs :as fs]
             [clojure.core.async :as ca]
             [clojure.tools.logging :as log]
+            [monkey.ci.time :as t]
             [monkey.ci.cli
              [config :as c]
              [events :as e]
              [process :as proc]
              [server :as srv]
-             [utils :as u]]
+             [utils :as u]
+             [version :as v]]
             [monkey.ci.events.builders :as eb]
             [monkey.mailman
              [core :as mmc]
@@ -35,6 +37,7 @@
   (log/debug "Processing events:" evt))
 
 (defn setup-events [conf]
+  (log/debug "Setting up events with config:" conf)
   (let [m (mmca/core-async-broker)
         routes (e/make-routes conf m)
         router (mmc/make-router routes {:executor mms/execute})]
@@ -52,6 +55,9 @@
     (ca/pipe p (mmca/get-channel broker) false)
     (ca/tap (:event-mult server) p false)))
 
+(defn- args->conf [args]
+  {:lib-coords {:mvn/version (or (:lib-version args) v/version)}})
+
 (defn build
   "Runs a local build.
 
@@ -66,12 +72,16 @@
 
    Returns the exit code of the child process."
   [{:keys [dir] :or {dir "."} :as conf}]
-  (let [sdir   (script-dir dir)
+  (let [dir (str (fs/absolutize dir))
+        sdir   (script-dir dir)
         result (or (c/get-ending conf) (promise))
         server (srv/start-server {:artifact-dir (fs/path sdir "artifacts")
                                   :cache-dir    (fs/path sdir "cache")})
-        build {:checkout-dir dir}       ; TODO
-        broker (-> conf
+        build {:checkout-dir dir
+               :org-id "local-org"
+               :repo-id (fs/file-name (fs/cwd))
+               :build-id (str "local-build-" (t/now))}
+        broker (-> (args->conf conf)
                    (c/set-api {:url (srv/server->url server)
                                :token (:token server)})
                    (c/set-build build)

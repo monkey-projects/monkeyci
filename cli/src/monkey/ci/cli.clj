@@ -34,6 +34,11 @@
    :short "w"
    :type :with-flag})
 
+(def lib-version-opt
+  {:as "MonkeyCI Library version"
+   :option "lib-version"
+   :type :string})
+
 (def config
   {:command "monkey-ci"
    :description "Clojure-powered CI/CD tool"
@@ -54,7 +59,8 @@
     {:command "build"
      :description "Run a local build of the MonkeyCI script in the given directory"
      :runs #'r/build
-     :opts [dir-opt]}]})
+     :opts [dir-opt
+            lib-version-opt]}]})
 
 (defn -main [& args]
   (cli/run-cmd args config))

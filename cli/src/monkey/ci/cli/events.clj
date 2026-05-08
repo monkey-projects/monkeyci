@@ -153,7 +153,7 @@
 (defn generate-deps [script-dir {:keys [lib-coords log-config m2-cache-dir]}]
   (cond-> (p/generate-deps script-dir nil)
     ;; TODO Replace app with script lib
-    true (update-in [:aliases :monkeyci/build :extra-deps] mc/assoc-some 'com.monkeyci/app lib-coords)
+    lib-coords (update-in [:aliases :monkeyci/build :extra-deps] mc/assoc-some 'com.monkeyci/app lib-coords)
     log-config (p/update-alias assoc :jvm-opts
                                [(str "-Dlogback.configurationFile=" log-config)]))
     ;; m2 cache dir?
