@@ -11,19 +11,24 @@
              [core-async :as mmca]]))
 
 (def ^:private dummy-server
-  {:server        nil
-   :port          9999
-   :token         "fake-token"
-   :event-mult-ch (ca/chan 1)
-   :event-mult    nil})
+  (let [ch (ca/chan 1)]
+    {:server        nil
+     :port          9999
+     :token         "fake-token"
+     :event-mult-ch ch
+     :event-mult    (ca/mult ch)}))
 
 (defn- test-config [conf & [res]]
   (let [result (promise)]
     (deliver result (or res ::test-result))
     (c/set-ending conf result)))
 
-(deftest build-test
-  (let [broker (mmca/core-async-broker)]
+(deftest build
+  (let [broker (mmca/core-async-broker)
+        p (promise)
+        l (mmc/add-listener broker (fn [evt]
+                                     (deliver p evt)
+                                     nil))]
     (with-redefs [sut/setup-events (constantly broker)]
       (testing "starts the API server"
         (let [server-started? (atom false)
@@ -38,14 +43,12 @@
             (is @server-stopped?))))
 
       (testing "posts `:build/pending` event to start"
-        (let [timeout (ca/timeout 1000)]
-          (is (= :build/pending
-                 (-> (ca/alts!! [(.chan broker) timeout])
-                     first
-                     :type)))))
+        (is (= :build/pending
+               (-> (deref p 100 ::timeout)
+                   :type))))
 
       (let [received-conf (atom nil)]
-        (with-redefs [sut/setup-events (fn [conf _]
+        (with-redefs [sut/setup-events (fn [conf]
                                          (reset! received-conf conf)
                                          broker)
                       srv/start-server (fn [_opts] dummy-server)

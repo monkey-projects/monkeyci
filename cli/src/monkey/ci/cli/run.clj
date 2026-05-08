@@ -77,9 +77,9 @@
                    (c/set-build build)
                    (c/set-ending result)
                    (setup-events))]
-    (link-broker-server-events broker server)
-    (log/info "Build API server started on port" (:port server))
     (try
+      (link-broker-server-events broker server)
+      (log/info "Build API server started on port" (:port server))
       ;; Trigger the build by posting a :build/pending event
       (mmc/post-events broker [(eb/build-pending-evt build)])
       (log/debug "Build/pending event posted")

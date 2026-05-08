@@ -89,7 +89,8 @@
             resp (call handler :post "/events" token evts)]
         (is (= 202 (:status resp)))
         ;; The events are on the channel
-        (let [received (ca/poll! event-ch)]
+        (let [received (ca/alt!! event-ch ([v] v)
+                                 (ca/timeout 100) ::timeout)]
           (is (= (first evts) received)))))))
 
 ;;;; GET /events — SSE
