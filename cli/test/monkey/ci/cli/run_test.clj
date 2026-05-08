@@ -37,9 +37,9 @@
             (is @server-started?)
             (is @server-stopped?))))
 
-      (testing "posts `:build/start` event"
+      (testing "posts `:build/pending` event to start"
         (let [timeout (ca/timeout 1000)]
-          (is (= :build/start
+          (is (= :build/pending
                  (-> (ca/alts!! [(.chan broker) timeout])
                      first
                      :type)))))
@@ -85,7 +85,6 @@
           (is (= 42 (sut/build (test-config {:dir "."} 42)))))))))
 
 (deftest setup-events
-  (testing "creates mailman broker with channel"
-    (let [b (sut/setup-events {} ::test-chan)]
-      (is (satisfies? mmc/EventReceiver b))
-      (is (= ::test-chan (mmca/get-channel b))))))
+  (testing "creates mailman broker"
+    (let [b (sut/setup-events {})]
+      (is (satisfies? mmc/EventReceiver b)))))

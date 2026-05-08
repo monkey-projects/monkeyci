@@ -90,7 +90,7 @@
         (is (= 202 (:status resp)))
         ;; The events are on the channel
         (let [received (ca/poll! event-ch)]
-          (is (= evts received)))))))
+          (is (= (first evts) received)))))))
 
 ;;;; GET /events — SSE
 

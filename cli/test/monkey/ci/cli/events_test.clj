@@ -8,7 +8,7 @@
              [config :as cc]
              [events :as sut]]
             [monkey.ci.events.mailman.interceptors :as emi]
-            #_[monkey.ci.script.config :as sc]
+            [monkey.ci.script.config :as sc]
             [monkey.mailman.core-async :as mmca]))
 
 (defn edn-> [s]
@@ -121,7 +121,7 @@
                {:type :build/pending
                 :build build}}
               (emi/set-mailman mailman)
-              (sut/set-api {:port 1234
+              (sut/set-api {:url "http://localhost:1234"
                             :token "test-token"})
               (sut/set-child-opts {:log-config "test-config.xml"
                                    :lib-coords {:mvn/version "test"}})
@@ -134,10 +134,10 @@
       (testing "runs clojure"
         (is (= "clojure" (-> r :cmd first))))
 
-      #_(testing "passes config"
+      (testing "passes config"
         (let [conf (-> r :cmd last (edn->) :config)]
           (testing "with build script dir"
-            (is (= (:dir r) (b/script-dir (sc/build conf)))))
+            (is (= (str (:dir r)) (b/script-dir (sc/build conf)))))
           
           (testing "with api settings"
             (let [api (sc/api conf)]

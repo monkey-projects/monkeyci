@@ -12,6 +12,7 @@
              [process :as p]]
             [monkey.ci.events.builders :as eb]
             [monkey.ci.events.mailman.interceptors :as emi]
+            [monkey.ci.script.config :as sc]
             [monkey.ci.utils.path :as up]
             [monkey.mailman.core :as mmc]))
 
@@ -143,12 +144,10 @@
                                                                   b/default-script-dir))))
 
 (defn- child-config [ctx]
-  (let [build (ctx->build ctx)
-        {:keys [port token]} (get-api ctx)]
-    #_(-> sc/empty-config
+  (let [build (ctx->build ctx)]
+    (-> sc/empty-config
         (sc/set-build (absolutize-script-dir build))
-        (sc/set-api {:url (str "http://localhost:" port)
-                     :token token})
+        (sc/set-api (select-keys (get-api ctx) [:url :token]))
         (sc/set-job-filter (:filter (get-build-opts ctx))))))
 
 (defn generate-deps [script-dir {:keys [lib-coords log-config m2-cache-dir]}]

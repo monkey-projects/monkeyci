@@ -79,7 +79,7 @@
   (try
     (let [body (-> req :body slurp edn/read-string)]
       (log/debug "Received events from build script:" body)
-      (ca/put! event-mult-ch body)
+      (ca/onto-chan! event-mult-ch body false)
       {:status 202})
     (catch Exception ex
       (log/error "Unable to dispatch events" ex)
