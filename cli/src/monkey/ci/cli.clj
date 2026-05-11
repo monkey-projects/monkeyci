@@ -39,6 +39,12 @@
    :option "lib-version"
    :type :string})
 
+(def no-clean-opt
+  {:as "Do not delete workspace after build completes"
+   :option "no-clean"
+   :short "N"
+   :type :with-flag})
+
 (def config
   {:command "monkey-ci"
    :description "Clojure-powered CI/CD tool"
@@ -60,7 +66,8 @@
      :description "Run a local build of the MonkeyCI script in the given directory"
      :runs #'r/build
      :opts [dir-opt
-            lib-version-opt]}]})
+            lib-version-opt
+            no-clean-opt]}]})
 
 (defn -main [& args]
   (cli/run-cmd args config))

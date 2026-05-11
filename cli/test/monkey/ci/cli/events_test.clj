@@ -2,6 +2,7 @@
   (:require [babashka.fs :as fs]
             [clojure.core.async :as ca]
             [clojure.edn :as edn]
+            [clojure.java.io :as io]
             [clojure.test :refer [deftest is testing]]
             [monkey.ci.cli
              [build :as b]
@@ -183,10 +184,86 @@
   (let [p (promise)
         {:keys [leave] :as i} (sut/deliver-end p)]
     (is (keyword? (:name i)))
-    
+
     (testing "`leave` delivers result to configured end promise"
       (is (some? (-> {}
                      (sut/set-result ::test-result)
                      (leave))))
       (is (realized? p))
       (is (= ::test-result (deref p 500 ::timeout))))))
+
+(deftest save-workspace-test
+  (fs/with-temp-dir [src-dir]
+    (fs/with-temp-dir [dest-root]
+      (let [dest    (fs/path dest-root "workspace")
+            ;; Populate the source with some files
+            _       (spit (str (fs/path src-dir "file.txt")) "hello")
+            _       (fs/create-dirs (fs/path src-dir "subdir"))
+            _       (spit (str (fs/path src-dir "subdir" "nested.txt")) "world")
+            ctx     {:event {:build {:checkout-dir (str src-dir)}}}
+            {:keys [enter] :as i} (sut/save-workspace dest)]
+
+        (testing "has a keyword name"
+          (is (keyword? (:name i))))
+
+        (let [result (enter ctx)]
+          (testing "copies checkout dir contents to dest"
+            (is (fs/exists? (fs/path dest "file.txt")))
+            (is (fs/exists? (fs/path dest "subdir" "nested.txt"))))
+
+          (testing "stores workspace path in context state"
+            (is (= (str dest) (sut/get-workspace result))))
+
+          (testing "returns a context map"
+            (is (map? result))))))))
+
+(deftest save-workspace-no-checkout-dir-test
+  (fs/with-temp-dir [dest-root]
+    (let [dest  (fs/path dest-root "workspace")
+          ctx   {:event {:build {}}}           ; no :checkout-dir
+          {:keys [enter]} (sut/save-workspace dest)]
+
+      (testing "returns context unchanged when no checkout-dir is present"
+        (let [result (enter ctx)]
+          (is (map? result))
+          (is (nil? (sut/get-workspace result))))))))
+
+(deftest delete-workspace-test
+  (testing "deletes workspace on leave when no-clean is false"
+    (fs/with-temp-dir [ws-dir]
+      (let [conf    {}                       ; no-clean not set → should delete
+            ctx     (-> {}
+                        (emi/update-state assoc :workspace (str ws-dir)))
+            {:keys [leave]} (sut/delete-workspace conf)]
+        (is (fs/exists? ws-dir) "workspace must exist before leave")
+        (leave ctx)
+        (is (not (fs/exists? ws-dir)) "workspace must be deleted after leave"))))
+
+  (testing "does NOT delete workspace on leave when no-clean is true"
+    (fs/with-temp-dir [ws-dir]
+      (let [conf    (cc/set-no-clean {} true)
+            ctx     (-> {}
+                        (emi/update-state assoc :workspace (str ws-dir)))
+            {:keys [leave]} (sut/delete-workspace conf)]
+        (leave ctx)
+        (is (fs/exists? ws-dir) "workspace must NOT be deleted when --no-clean"))))
+
+  (testing "does nothing when workspace path is nil"
+    (let [conf {}
+          ctx  {}
+          {:keys [leave]} (sut/delete-workspace conf)]
+      ;; Should not throw
+      (is (map? (leave ctx)))))
+
+  (testing "has a keyword name"
+    (is (keyword? (:name (sut/delete-workspace {}))))))
+
+(deftest make-routes-workspace-test
+  (testing "save-workspace is wired into :build/pending"
+    (let [routes (into {} (sut/make-routes {} (test-mailman)))]
+      (is (has-interceptor? routes :build/pending ::sut/save-workspace))))
+
+  (testing "delete-workspace is wired into :build/end"
+    (let [routes (into {} (sut/make-routes {} (test-mailman)))]
+      (is (has-interceptor? routes :build/end ::sut/delete-workspace)))))
+

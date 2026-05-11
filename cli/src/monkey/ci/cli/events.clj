@@ -4,6 +4,7 @@
   (:require [babashka
              [fs :as fs]
              [process :as bp]]
+            [clojure.java.io :as io]
             [clojure.tools.logging :as log]
             [medley.core :as mc]
             [monkey.ci.cli
@@ -107,6 +108,57 @@
    :enter (fn [ctx]
             (set-build-opts ctx (select-keys config [:filter])))})
 
+(defn save-workspace
+  "Interceptor that copies the build checkout directory into a temporary workspace
+   directory before the child process starts.  The destination path is taken from
+   the build configuration.  The workspace path is stored in context state so that
+   subsequent interceptors (e.g. container jobs) can locate it.
+
+   On `:enter`: copies `checkout-dir` → `dest`, records `:workspace` in state.
+   The copy respects the directory structure but does NOT apply .gitignore filtering
+   (that would require shelling out to git; a future iteration can add that).
+
+   `dest` should be an absolute path, typically `(conf/get-workspace run-conf)`."
+  [dest]
+  {:name ::save-workspace
+   :enter (fn [ctx]
+            (let [src (get-checkout-dir ctx)
+                  dst (io/file (str dest))]
+              (log/debug "Saving workspace from" src "to" dst)
+              (if src
+                (do
+                  (fs/create-dirs dst)
+                  (fs/copy-tree src dst {:replace-existing true})
+                  (set-workspace ctx (str dst)))
+                (do
+                  (log/warn "No checkout dir in build, skipping workspace save")
+                  ctx))))})
+
+(defn delete-workspace
+  "Interceptor that deletes the saved workspace directory on `:leave`, unless the
+   `no-clean` flag is set in the run configuration.
+
+   Wire this into the `:build/end` route so cleanup happens after the build
+   terminates.
+
+   `run-conf` — the CLI run configuration map (used to read `:no-clean`)."
+  [run-conf]
+  {:name ::delete-workspace
+   :leave (fn [ctx]
+            (if (conf/get-no-clean run-conf)
+              (do
+                (log/info "Skipping workspace cleanup (--no-clean)")
+                ctx)
+              (let [ws (get-workspace ctx)]
+                (if ws
+                  (do
+                    (log/debug "Deleting workspace at" ws)
+                    (fs/delete-tree ws)
+                    ctx)
+                  (do
+                    (log/debug "No workspace path in state, nothing to delete")
+                    ctx)))))})
+
 (defn update-job-in-state [ctx job-id f & args]
   (apply emi/update-state ctx update-in [:jobs job-id] f args))
 
@@ -194,34 +246,39 @@
 
 (defn make-routes [conf mailman]
   (let [state (emi/with-state (atom {}))]
-    [[:build/pending
-      ;; Responsible for preparing the build environment and starting the
-      ;; child process or container.
-      [{:handler prepare-child-cmd
-        :interceptors [emi/handle-build-error
-                       state
-                       emi/no-result
-                       start-process
-                       (emi/add-mailman mailman)
-                       (add-api (conf/get-api conf))
-                       (add-log-dir (conf/get-log-dir conf))
-                       (add-child-opts (conf/get-child-opts conf))
-                       (add-build-opts conf)]}
-       {:handler make-build-init-evt}]]
-     
-     [:build/initializing
-      ;; Build process is starting
-      [{:handler build-init}]]
-     
-     [:build/end
-      ;; Build has completed, clean up
-      [{:handler build-end
-        :interceptors [emi/no-result
-                       state
-                       (deliver-end (conf/get-ending conf))]}]]
+    (concat
+     [[:build/pending
+       ;; Responsible for preparing the build environment and starting the
+       ;; child process or container.  `save-workspace` runs on enter (before
+       ;; `start-process`) so the workspace is ready before the child starts.
+       [{:handler prepare-child-cmd
+         :interceptors [emi/handle-build-error
+                        state
+                        emi/no-result
+                        start-process
+                        (emi/add-mailman mailman)
+                        (add-api (conf/get-api conf))
+                        (add-log-dir (conf/get-log-dir conf))
+                        (add-child-opts (conf/get-child-opts conf))
+                        (add-build-opts conf)
+                        (save-workspace (conf/get-workspace conf))]}
+        {:handler make-build-init-evt}]]
 
-     [:job/end
-      ;; Updates state to add job result
-      [{:handler (constantly nil)
-        :interceptors [state
-                       add-job-to-state]}]]]))
+      [:build/initializing
+       ;; Build process is starting
+       [{:handler build-init}]]
+
+      [:build/end
+       ;; Build has completed.  `delete-workspace` runs on leave so cleanup
+       ;; happens after the result has been delivered.
+       [{:handler build-end
+         :interceptors [emi/no-result
+                        state
+                        (delete-workspace conf)
+                        (deliver-end (conf/get-ending conf))]}]]
+
+      [:job/end
+       ;; Updates state to add job result
+       [{:handler (constantly nil)
+         :interceptors [state
+                        add-job-to-state]}]]])))

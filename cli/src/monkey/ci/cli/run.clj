@@ -16,6 +16,7 @@
              [server :as srv]
              [utils :as u]
              [version :as v]]
+            [monkey.ci.cli.containers.podman :as podman]
             [monkey.ci.events.builders :as eb]
             [monkey.mailman
              [core :as mmc]
@@ -36,12 +37,25 @@
 (defn- evt-logger [evt]
   (log/debug "Processing events:" evt))
 
+(defn- make-router [routes]
+  (mmc/make-router routes {:executor mms/execute}))
+
+(defn- make-podman-routes [conf mailman]
+  (let [state (atom {})]
+    (podman/make-routes {:work-dir (str (c/get-jobs-dir conf))
+                         :mailman  mailman
+                         :state    state
+                         :podman   (c/get-podman conf)
+                         :cleanup? (not (c/get-no-clean conf))})))
+
+(defn- add-routes-listener [mailman routes]
+  (mmc/add-listener mailman {:handler (make-router routes)}))
+
 (defn setup-events [conf]
   (log/debug "Setting up events with config:" conf)
-  (let [m (mmca/core-async-broker)
-        routes (e/make-routes conf m)
-        router (mmc/make-router routes {:executor mms/execute})]
-    (mmc/add-listener m {:handler router})
+  (let [m (mmca/core-async-broker)]
+    (add-routes-listener m (e/make-routes conf m))
+    (add-routes-listener m (make-podman-routes conf m))
     (mmc/add-listener m {:handler evt-logger})
     m))
 
@@ -62,31 +76,40 @@
   "Runs a local build.
 
    Options (from CLI):
-     :dir   — project root directory (default \".\")
+     :dir      — project root directory (default \".\")
+     :no-clean — when truthy, the workspace directory is NOT deleted after
+                 the build completes (useful for debugging container jobs)
 
-   Starts a build API server on a random port, then invokes:
-     clojure -X:monkeyci/build
-
-   in the script directory, with MONKEYCI_API_URL and MONKEYCI_API_TOKEN
-   set in the child process environment.
+   Creates a temporary work directory that holds the workspace copy, artifacts,
+   cache and log files for this build.  Starts a build API server on a random
+   port, triggers the build via a `:build/pending` event, waits for completion,
+   then stops the server.  The work directory (including workspace) is deleted
+   on exit unless `--no-clean` was supplied.
 
    Returns the exit code of the child process."
-  [{:keys [dir] :or {dir "."} :as conf}]
-  (let [dir (str (fs/absolutize dir))
-        sdir   (script-dir dir)
-        result (or (c/get-ending conf) (promise))
-        server (srv/start-server {:artifact-dir (fs/path sdir "artifacts")
-                                  :cache-dir    (fs/path sdir "cache")})
-        build {:checkout-dir dir
-               :org-id "local-org"
-               :repo-id (fs/file-name (fs/cwd))
-               :build-id (str "local-build-" (t/now))}
-        broker (-> (args->conf conf)
-                   (c/set-api {:url (srv/server->url server)
-                               :token (:token server)})
-                   (c/set-build build)
-                   (c/set-ending result)
-                   (setup-events))]
+  [{:keys [dir no-clean] :or {dir "."} :as conf}]
+  (let [dir      (str (fs/absolutize dir))
+        sdir     (script-dir dir)
+        work-dir (fs/create-temp-dir {:prefix "monkeyci-"})
+        result   (or (c/get-ending conf) (promise))
+        run-conf (-> (args->conf conf)
+                     (c/set-work-dir work-dir)
+                     (c/set-no-clean no-clean))
+        server   (srv/start-server
+                  {:artifact-dir (c/get-artifact-dir run-conf)
+                   :cache-dir    (c/get-cache-dir run-conf)
+                   :workspace-file (c/get-workspace run-conf)})
+        build    {:checkout-dir dir
+                  :org-id       "local-org"
+                  :repo-id      (fs/file-name (fs/cwd))
+                  :build-id     (str "local-build-" (t/now))}
+        broker   (-> run-conf
+                     (c/set-api {:url   (srv/server->url server)
+                                 :token (:token server)})
+                     (c/set-build build)
+                     (c/set-ending result)
+                     (setup-events))]
+    (log/info "Work directory:" (str work-dir))
     (try
       (link-broker-server-events broker server)
       (log/info "Build API server started on port" (:port server))

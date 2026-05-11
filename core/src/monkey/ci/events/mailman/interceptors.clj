@@ -1,7 +1,9 @@
 (ns monkey.ci.events.mailman.interceptors
   "Generic mailman interceptors"
-  (:require [clojure.tools.logging :as log]
+  (:require [babashka.process :as bp]
+            [clojure.tools.logging :as log]
             [medley.core :as mc]
+            [monkey.ci.build.core :as bc]
             [monkey.ci.errors :as errors]
             [monkey.ci.events.builders :as b]
             [monkey.ci.time :as t]))
@@ -71,3 +73,55 @@
             (set-result ctx (b/build-end-evt (-> (:build event)
                                                  (assoc :message (ex-message ex)))
                                              errors/error-process-failure)))})
+
+(def handle-job-error
+  "Marks job as failed on error."
+  {:name ::handle-job-error
+   :error (fn [ctx ex]
+            (let [{:keys [job-id sid] :as e} (:event ctx)]
+              (log/error "Got error while handling event" e "for job" job-id ex)
+              (set-result ctx
+                          [(b/job-end-evt job-id sid
+                                          (-> bc/failure
+                                              (bc/with-message (ex-message ex))))])))})
+
+;;;; ─── Process lifecycle ────────────────────────────────────────────────────
+
+(def get-process ::process)
+
+(defn set-process [ctx ws]
+  (assoc ctx ::process ws))
+
+(def start-process
+  "Starts a child process using the command map stored in the context result.
+   GraalVM-compatible: uses babashka.process directly."
+  {:name ::start-process
+   :leave (fn [ctx]
+            (let [cmd (get-result ctx)]
+              (log/debug "Starting child process:" cmd)
+              (cond-> ctx
+                cmd (set-process (bp/process cmd)))))})
+
+;;;; ─── Job context ──────────────────────────────────────────────────────────
+
+(def get-job-ctx ::job-ctx)
+
+(defn set-job-ctx [ctx jc]
+  (assoc ctx ::job-ctx jc))
+
+(defn update-job-ctx [ctx f & args]
+  (apply update ctx ::job-ctx f args))
+
+;;;; ─── Termination ─────────────────────────────────────────────────────────
+
+(defn terminate-when
+  "Interceptor that terminates the chain (without error) when `pred` returns
+   truthy.  Sets `:terminated true` in the context so callers can inspect it.
+
+   GraalVM-compatible: does NOT use io.pedestal.interceptor.chain/terminate —
+   the sieppari executor used by the CLI honours `:terminated true`."
+  [id pred]
+  {:name id
+   :enter (fn [ctx]
+            (cond-> ctx
+              (pred ctx) (assoc :terminated true)))})

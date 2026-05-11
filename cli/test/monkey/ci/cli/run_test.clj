@@ -1,8 +1,10 @@
 (ns monkey.ci.cli.run-test
-  (:require [clojure.core.async :as ca]
+  (:require [babashka.fs :as fs]
+            [clojure.core.async :as ca]
             [clojure.test :refer [deftest is testing]]
             [monkey.ci.cli
              [config :as c]
+             [events]
              [process :as proc]
              [run :as sut]
              [server :as srv]]
@@ -91,3 +93,18 @@
   (testing "creates mailman broker"
     (let [b (sut/setup-events {})]
       (is (satisfies? mmc/EventReceiver b)))))
+
+(deftest build-routes-podman
+  (testing "build passes work-dir in conf to setup-events"
+    (let [received-conf (atom nil)]
+      (with-redefs [sut/setup-events  (fn [conf]
+                                        (reset! received-conf conf)
+                                        (mmca/core-async-broker))
+                    srv/start-server  (fn [_] dummy-server)
+                    srv/stop-server   (fn [_] nil)
+                    srv/server->url   (fn [_] "http://localhost:9999")]
+        (let [result (promise)]
+          (deliver result 0)
+          (sut/build (c/set-ending {} result)))
+        (is (some? (c/get-work-dir @received-conf))
+            "work-dir must be present so make-routes wires podman routes")))))

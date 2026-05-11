@@ -82,5 +82,20 @@
 (defn set-m2-cache-dir [conf p]
   (assoc conf :m2-cache-dir p))
 
+(def get-no-clean
+  "Returns true if the workspace should NOT be deleted after the build completes."
+  :no-clean)
+
+(defn set-no-clean [conf v]
+  (assoc conf :no-clean v))
+
 (defn get-child-opts [conf]
   (select-keys conf [:lib-coords :log-config :m2-cache-dir]))
+
+(def get-podman
+  "Returns the podman configuration map (e.g. {:podman-cmd \"podman\",
+   :expose-ports [20000 21000]})."
+  :podman)
+
+(defn set-podman [conf opts]
+  (assoc conf :podman opts))

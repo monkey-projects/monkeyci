@@ -1,5 +1,6 @@
-{:deps {babashka/fs {:mvn/version "0.5.33"}
-        medley/medley {:mvn/version "1.4.0"}}
+{:deps {babashka/fs      {:mvn/version "0.5.33"}
+        babashka/process {:mvn/version "0.6.25"}
+        medley/medley    {:mvn/version "1.4.0"}}
  :paths ["src"]
 
  :aliases
