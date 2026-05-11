@@ -68,7 +68,7 @@
 (def handle-build-error
   "Marks build as failed"
   {:name ::build-error-handler
-   :error (fn [{:keys [event] :as ctx} ex]
+   :error (fn build-error [{:keys [event] ex :error :as ctx}]
             (log/error "Failed to handle event" (:type event) ", marking build as failed" ex)
             (set-result ctx (b/build-end-evt (-> (:build event)
                                                  (assoc :message (ex-message ex)))
@@ -77,7 +77,7 @@
 (def handle-job-error
   "Marks job as failed on error."
   {:name ::handle-job-error
-   :error (fn [ctx ex]
+   :error (fn job-error [{ex :error :as ctx}]
             (let [{:keys [job-id sid] :as e} (:event ctx)]
               (log/error "Got error while handling event" e "for job" job-id ex)
               (set-result ctx
@@ -96,7 +96,7 @@
   "Starts a child process using the command map stored in the context result.
    GraalVM-compatible: uses babashka.process directly."
   {:name ::start-process
-   :leave (fn [ctx]
+   :leave (fn start-proc [ctx]
             (let [cmd (get-result ctx)]
               (log/debug "Starting child process:" cmd)
               (cond-> ctx

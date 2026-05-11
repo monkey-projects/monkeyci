@@ -63,9 +63,9 @@
   "Ensures events get sent from the broker to the server channel and vice versa."
   [broker server]
   (let [p (ca/chan 1 (filter (comp (partial not= :cli) :src)))]
-    (mmc/add-listener broker (fn [evt]
-                               (ca/put! (:event-mult-ch server) (assoc evt :src :cli))
-                               nil))
+    (mmc/add-listener broker {:handler (fn [evt]
+                                         (ca/put! (:event-mult-ch server) (assoc evt :src :cli))
+                                         nil)})
     (ca/pipe p (mmca/get-channel broker) false)
     (ca/tap (:event-mult server) p false)))
 

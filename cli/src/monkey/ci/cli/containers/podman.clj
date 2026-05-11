@@ -22,6 +22,7 @@
              [containers :as mcc]
              [jobs :as j]]
             [monkey.ci.build.core :as bc]
+            [monkey.ci.cli.process :as p]
             [monkey.ci.events
              [builders :as eb]
              [edn :as ee]]
@@ -401,7 +402,7 @@
                   (recur)))
               ;; Producer: tail events file → put on channel
               (ee/read-edn
-               (io/reader (uio/wait-for-file e))
+               (io/reader (fs/file (uio/wait-for-file e)))
                (-> (fn [evt]
                      (ca/put! ch (augment evt))
                      true)
@@ -445,14 +446,15 @@
      :out (log-file "out.log")
      :err (log-file "err.log")
      :extra-env (->> (mcc/env job) (mc/filter-keys (complement reserved?)))
-     :exit-fn (fn [exit]
-                (log/info "Container job" job-id "exited with code" exit)
-                (try
-                  (mmc/post-events (emi/get-mailman ctx)
-                                   [(container-end-evt job-id sid
-                                                       (if (zero? exit) bc/success bc/failure))])
-                  (catch Exception ex
-                    (log/error "Failed to post container/end event" ex))))}))
+     :exit-fn (p/exit-fn
+               (fn [{:keys [exit]}]
+                 (log/info "Container job" job-id "exited with code" exit)
+                 (try
+                   (mmc/post-events (emi/get-mailman ctx)
+                                    [(container-end-evt job-id sid
+                                                        (if (zero? exit) bc/success bc/failure))])
+                   (catch Exception ex
+                     (log/error "Failed to post container/end event" ex)))))}))
 
 (defn job-init [ctx]
   (let [job                  (get-job ctx)
