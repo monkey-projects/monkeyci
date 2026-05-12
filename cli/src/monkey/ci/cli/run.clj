@@ -66,7 +66,10 @@
   [broker server]
   (let [p (ca/chan 1 (filter (comp (partial not= :cli) :src)))]
     (mmc/add-listener broker {:handler (fn [evt]
-                                         (ca/put! (:event-mult-ch server) (assoc evt :src :cli))
+                                         ;; Do not send back script events, because we received them
+                                         ;; from that source.
+                                         (when (not= :script (:src evt))
+                                           (ca/put! (:event-mult-ch server) (assoc evt :src :cli)))
                                          nil)})
     (ca/pipe p (mmca/get-channel broker) false)
     (ca/tap (:event-mult server) p false)))
@@ -97,14 +100,15 @@
         run-conf (-> (args->conf conf)
                      (c/set-work-dir work-dir)
                      (c/set-no-clean no-clean))
-        server   (srv/start-server
-                  {:artifact-dir (c/get-artifact-dir run-conf)
-                   :cache-dir    (c/get-cache-dir run-conf)
-                   :workspace-file (c/get-workspace run-conf)})
         build    {:checkout-dir dir
                   :org-id       "local-org"
                   :repo-id      (fs/file-name (fs/cwd))
                   :build-id     (str "local-build-" (t/now))}
+        server   (srv/start-server
+                  {:artifact-dir (c/get-artifact-dir run-conf)
+                   :cache-dir    (c/get-cache-dir run-conf)
+                   :workspace-file (c/get-workspace run-conf)
+                   :build build})
         broker   (-> run-conf
                      (c/set-api {:url   (srv/server->url server)
                                  :token (:token server)})

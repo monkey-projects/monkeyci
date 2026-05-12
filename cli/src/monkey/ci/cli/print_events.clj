@@ -6,48 +6,62 @@
 (def build-id (comp last :sid :event))
 (def job-id (comp :job-id :event))
 
+(defn- print-result [ctx]
+  (when-let [r (not-empty (get-in ctx [:event :result]))]
+    (p/print-timed-msg "Result:" )r))
+
 (defn build-init [ctx]
-  (println "Build initializing:" (build-id ctx)))
+  (p/print-timed-msg "Build initializing:" (build-id ctx)))
 
 (defn build-start [ctx]
-  (println "Build starting:" (build-id ctx)))
+  (p/print-timed-msg "Starting child process..."))
 
 (defn build-end [ctx]
-  (println "Build end:" (build-id ctx))
-  (println "Result:" (get-in ctx [:event :result])))
+  (p/print-timed-msg "Build end:" (build-id ctx))
+  (print-result ctx))
 
 (defn script-init [ctx]
-  (println "Loading script:" (build-id ctx)))
+  (p/print-timed-msg "Running script in temp dir:" (get-in ctx [:event :script-dir])))
 
 (defn script-start [ctx]
-  (println "Script started:" (build-id ctx)))
+  (p/print-timed-msg "Script started:" (build-id ctx))
+  (let [jobs (get-in ctx [:event :jobs])]
+    (p/print-timed-msg "Script contains" (count jobs) "jobs:")
+    (doseq [j jobs]
+      (printf "\t%s - %s job - deps: %s\n" (:id j) (name (:type j)) (:dependencies j)))))
 
 (defn script-end [ctx]
-  (println "Script end:" (build-id ctx))
-  (println "Result:" (get-in ctx [:event :result])))
+  (p/print-timed-msg "Script completed")
+  (print-result ctx))
 
 (defn job-init [ctx]
-  (println "Loading job:" (job-id ctx)))
+  (p/print-timed-msg "Loading job:" (job-id ctx)))
 
 (defn job-start [ctx]
-  (println "Job started:" (job-id ctx)))
+  (p/print-timed-msg "Job started:" (job-id ctx)))
 
 (defn job-end [ctx]
-  (println "Job end:" (job-id ctx))
-  (println "Status:" (get-in ctx [:event :status]))
-  (println "Result:" (get-in ctx [:event :result])))
+  (p/print-timed-msg "Job end:" (job-id ctx))
+  (p/print-timed-msg "Status:" (get-in ctx [:event :status]))
+  (print-result ctx))
 
 (defn job-exec [ctx]
-  (println "Job executed:" (job-id ctx))
-  (println "Status:" (get-in ctx [:event :status]))
-  (println "Result:" (get-in ctx [:event :result])))
+  (p/print-timed-msg "Job executed:" (job-id ctx))
+  (p/print-timed-msg "Status:" (get-in ctx [:event :status]))
+  (print-result ctx))
+
+(defn cmd-start [{:keys [event]}]
+  (p/print-timed-msg "Command started:" (:job-id event) "-" (:command event)))
+
+(defn cmd-end [{:keys [event]}]
+  (p/print-timed-msg "Command ended:" (:job-id event) "-" (:command event) ": exit code" (:exit event)))
 
 (defn container-start [ctx]
-  (println "Container started:" (job-id ctx)))
+  (p/print-timed-msg "Container started:" (job-id ctx)))
 
 (defn container-end [ctx]
-  (println "Container end:" (job-id ctx))
-  (println "Status:" (get-in ctx [:event :status])))
+  (p/print-timed-msg "Container end:" (job-id ctx))
+  (p/print-timed-msg "Status:" (get-in ctx [:event :status])))
 
 (defn make-routes [config]
   [[:build/initializing [{:handler build-init}]]
@@ -60,5 +74,7 @@
    [:job/start [{:handler job-start}]]
    [:job/executed [{:handler job-exec}]]
    [:job/end [{:handler job-end}]]
+   [:command/start [{:handler cmd-start}]]
+   [:command/end [{:handler cmd-end}]]
    [:container/start [{:handler container-start}]]
    [:container/end [{:handler container-end}]]])

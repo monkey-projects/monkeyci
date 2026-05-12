@@ -3,6 +3,8 @@
   (:require [babashka.fs :as fs]
             [monkey.ci.utils.path :as up]))
 
+(def sid (juxt :org-id :repo-id :build-id))
+
 (def script "Gets script from the build"
   :script)
 

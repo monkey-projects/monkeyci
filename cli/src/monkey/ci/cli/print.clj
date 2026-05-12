@@ -1,5 +1,8 @@
 (ns monkey.ci.cli.print
-  (:require [clansi :as ansi]))
+  (:require [clansi :as ansi])
+  (:import java.time.LocalDateTime))
+
+(set! *warn-on-reflection* true)
 
 (defn print-version [version]
   (println (str (ansi/style "Monkey" :green :bright)
@@ -28,3 +31,17 @@
 
 (defn print-msg [& msgs]
   (apply println msgs))
+
+(defn now []
+  (LocalDateTime/now))
+
+(def time-format (java.time.format.DateTimeFormatter/ofLocalizedTime java.time.format.FormatStyle/MEDIUM))
+
+(defn format-time
+  ([^LocalDateTime t]
+   (.format t time-format))
+  ([]
+   (format-time (now))))
+
+(defn print-timed-msg [& parts]
+  (apply println (ansi/style (str "[" (format-time) "]") :bright :green) parts))

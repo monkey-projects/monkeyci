@@ -130,6 +130,14 @@
        (concat cmd)
        vec))
 
+(defn- find-res [f]
+  (some-> f
+          (io/resource)
+          (slurp)))
+
+(defn load-job-script []
+  (find-res "job.sh"))
+
 (defn build-cmd-args
   "Builds the podman run command-line arguments vector."
   [{:keys [job sid mapped-ports] base :work-dir sd :script-dir :as opts}]
@@ -161,8 +169,9 @@
              "MONKEYCI_EVENT_FILE" (str csd "/" events-file)}]
     (when-let [s (:script job)]
       (script->files s sd)
-      (io/copy (slurp (io/resource "job.sh"))
-               (fs/file (fs/path sd "job.sh")))
+      (if-let [r (find-res "job.sh")]
+        (io/copy r (fs/file (fs/path sd "job.sh")))
+        (log/warn "Unable to find job script in any of the configured paths"))
       (let [sf (fs/path sd start)]
         (when-not (fs/exists? sf)
           (fs/create-file sf))))

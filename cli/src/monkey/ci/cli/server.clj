@@ -9,11 +9,13 @@
      - Uses core.async channels instead of manifold streams
      - Uses java.security.SecureRandom for token generation instead of buddy
      - Uses plain Ring routing instead of reitit+schema+muuntaja"
-  (:require [clojure.core.async :as ca]
+  (:require [babashka.fs :as fs]
+            [clojure.core.async :as ca]
             [clojure.edn :as edn]
             [clojure.java.io :as io]
             [clojure.string :as str]
             [clojure.tools.logging :as log]
+            [monkey.ci.cli.build :as b]
             [org.httpkit.server :as http]
             [ring.util.response :as rur])
   (:import [java.security SecureRandom]
@@ -56,12 +58,12 @@
 (defn- artifact-path
   "Returns the File for a given artifact id inside the artifacts base dir."
   [artifact-dir build-sid artifact-id]
-  (io/file artifact-dir (str/join "/" build-sid) artifact-id))
+  (apply fs/file (concat [artifact-dir] build-sid [artifact-id])))
 
 (defn- cache-path
   "Returns the File for a given cache id inside the cache base dir."
   [cache-dir build-sid cache-id]
-  (io/file cache-dir (str/join "/" build-sid) cache-id))
+  (apply fs/file (concat [cache-dir] build-sid [cache-id])))
 
 ;;;; Handlers
 
@@ -86,7 +88,7 @@
       {:status 500})))
 
 (defn- handle-get-events [req {:keys [event-mult build]}]
-  (let [sid (:sid build)
+  (let [sid (b/sid build)
         ;; Each SSE client gets its own tap channel
         tap-ch (ca/chan (ca/sliding-buffer 20))]
     (ca/tap event-mult tap-ch)
@@ -102,7 +104,7 @@
           (if-let [evt (ca/<! tap-ch)]
             (do
               (when (or (nil? sid) (= sid (:sid evt)))
-                (log/trace "Sending event to SSE client:" (:type evt))
+                (log/debug "Sending event to SSE client:" (:type evt))
                 (http/send! ch (->sse evt) false))
               (recur))
             ;; Channel closed — close SSE connection
