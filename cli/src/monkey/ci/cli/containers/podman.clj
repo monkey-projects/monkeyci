@@ -453,6 +453,7 @@
                    (mmc/post-events (emi/get-mailman ctx)
                                     [(container-end-evt job-id sid
                                                         (if (zero? exit) bc/success bc/failure))])
+                   (log/info "Event posted")
                    (catch Exception ex
                      (log/error "Failed to post container/end event" ex)))))}))
 

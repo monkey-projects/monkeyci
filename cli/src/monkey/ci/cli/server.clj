@@ -85,11 +85,11 @@
       (log/error "Unable to dispatch events" ex)
       {:status 500})))
 
-(defn- handle-get-events [req {:keys [event-mult-ch build]}]
+(defn- handle-get-events [req {:keys [event-mult build]}]
   (let [sid (:sid build)
         ;; Each SSE client gets its own tap channel
         tap-ch (ca/chan (ca/sliding-buffer 20))]
-    (ca/tap (ca/mult event-mult-ch) tap-ch)
+    (ca/tap event-mult tap-ch)
     (http/as-channel
      req
      {:on-open
@@ -112,7 +112,7 @@
       :on-close
       (fn [_ch _status]
         (log/debug "SSE client disconnected for build" sid)
-        (ca/untap (ca/mult event-mult-ch) tap-ch)
+        (ca/untap event-mult tap-ch)
         (ca/close! tap-ch))})))
 
 (defn- handle-download-workspace [_req {:keys [workspace-file]}]
@@ -303,7 +303,8 @@
         event-mult   (ca/mult event-ch)
         ctx          (assoc opts
                             :token token
-                            :event-mult-ch event-ch)
+                            :event-mult-ch event-ch
+                            :event-mult event-mult)
         handler      (make-handler ctx)
         srv          (http/run-server handler {:port port
                                               :legacy-return-value? false})]

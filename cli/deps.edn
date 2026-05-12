@@ -18,7 +18,10 @@
  :paths ["src" "resources"]
 
  :aliases
- {:uberjar
+ {:dev
+  {:extra-paths ["dev-resources"]}
+
+  :uberjar
   ;; clj -T:uberjar
   {:deps {com.monkeyprojects/build {:mvn/version "0.3.1"}}
    :exec-fn monkey.build/uberjar

@@ -13,6 +13,7 @@
              [config :as c]
              [events :as e]
              [process :as proc]
+             [print-events :as pe]
              [server :as srv]
              [utils :as u]
              [version :as v]]
@@ -54,10 +55,11 @@
 (defn setup-events [conf]
   (log/debug "Setting up events with config:" conf)
   (let [m (mmca/core-async-broker)]
-    (add-routes-listener m (e/make-routes conf m))
-    (add-routes-listener m (make-podman-routes conf m))
-    (mmc/add-listener m {:handler evt-logger})
-    m))
+    (doto m
+      (mmc/add-listener {:handler evt-logger})
+      (add-routes-listener (e/make-routes conf m))
+      (add-routes-listener (make-podman-routes conf m))
+      (add-routes-listener (pe/make-routes conf)))))
 
 (defn- link-broker-server-events
   "Ensures events get sent from the broker to the server channel and vice versa."
