@@ -136,16 +136,16 @@
 
 (defn delete-workspace
   "Interceptor that deletes the saved workspace directory on `:leave`, unless the
-   `no-clean` flag is set in the run configuration.
+   `clean` flag is `false` in the run configuration.
 
    Wire this into the `:build/end` route so cleanup happens after the build
    terminates.
 
-   `run-conf` — the CLI run configuration map (used to read `:no-clean`)."
+   `run-conf` — the CLI run configuration map."
   [run-conf]
   {:name ::delete-workspace
    :leave (fn [ctx]
-            (if (conf/get-no-clean run-conf)
+            (if (not (conf/get-clean run-conf))
               (do
                 (log/info "Skipping workspace cleanup (--no-clean)")
                 ctx)
@@ -153,7 +153,7 @@
                 (if ws
                   (do
                     (log/debug "Deleting workspace at" ws)
-                    (fs/delete-tree ws)
+                    (fs/delete-tree ws {:force true})
                     ctx)
                   (do
                     (log/debug "No workspace path in state, nothing to delete")
@@ -245,7 +245,7 @@
 ;;; Routes
 
 (defn make-routes [conf mailman]
-  (let [state (emi/with-state (atom {}))]
+  (let [state (emi/with-state (or (:state conf) (atom {})))]
     (concat
      [[:build/pending
        ;; Responsible for preparing the build environment and starting the

@@ -42,19 +42,19 @@
   (mmc/make-router routes {:executor mms/execute}))
 
 (defn- make-podman-routes [conf mailman]
-  (let [state (atom {})]
-    (podman/make-routes {:work-dir (str (c/get-jobs-dir conf))
-                         :mailman  mailman
-                         :state    state
-                         :podman   (c/get-podman conf)
-                         :cleanup? (not (c/get-no-clean conf))})))
+  (podman/make-routes {:work-dir (str (c/get-jobs-dir conf))
+                       :mailman  mailman
+                       :state    (:state conf)
+                       :podman   (c/get-podman conf)
+                       :cleanup? (c/get-clean conf)}))
 
 (defn- add-routes-listener [mailman routes]
   (mmc/add-listener mailman {:handler (make-router routes)}))
 
 (defn setup-events [conf]
   (log/debug "Setting up events with config:" conf)
-  (let [m (mmca/core-async-broker)]
+  (let [m (mmca/core-async-broker)
+        conf (assoc conf :state (atom {}))]
     (doto m
       (mmc/add-listener {:handler evt-logger})
       (add-routes-listener (e/make-routes conf m))
@@ -92,14 +92,15 @@
    on exit unless `--no-clean` was supplied.
 
    Returns the exit code of the child process."
-  [{:keys [dir no-clean] :or {dir "."} :as conf}]
+  [{:keys [dir clean] :or {dir "."} :as conf}]
+  (log/debug "Running build with options:" conf)
   (let [dir      (str (fs/absolutize dir))
         sdir     (script-dir dir)
         work-dir (fs/create-temp-dir {:prefix "monkeyci-"})
         result   (or (c/get-ending conf) (promise))
         run-conf (-> (args->conf conf)
                      (c/set-work-dir work-dir)
-                     (c/set-no-clean no-clean))
+                     (c/set-clean clean))
         build    {:checkout-dir dir
                   :org-id       "local-org"
                   :repo-id      (fs/file-name (fs/cwd))

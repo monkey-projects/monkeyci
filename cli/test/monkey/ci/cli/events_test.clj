@@ -229,9 +229,9 @@
           (is (nil? (sut/get-workspace result))))))))
 
 (deftest delete-workspace-test
-  (testing "deletes workspace on leave when no-clean is false"
+  (testing "deletes workspace on leave when clean is `true`"
     (fs/with-temp-dir [ws-dir]
-      (let [conf    {}                       ; no-clean not set → should delete
+      (let [conf    (cc/set-clean {} true)
             ctx     (-> {}
                         (emi/update-state assoc :workspace (str ws-dir)))
             {:keys [leave]} (sut/delete-workspace conf)]
@@ -239,9 +239,9 @@
         (leave ctx)
         (is (not (fs/exists? ws-dir)) "workspace must be deleted after leave"))))
 
-  (testing "does NOT delete workspace on leave when no-clean is true"
+  (testing "does NOT delete workspace on leave when clean is `false`"
     (fs/with-temp-dir [ws-dir]
-      (let [conf    (cc/set-no-clean {} true)
+      (let [conf    (cc/set-clean {} false)
             ctx     (-> {}
                         (emi/update-state assoc :workspace (str ws-dir)))
             {:keys [leave]} (sut/delete-workspace conf)]

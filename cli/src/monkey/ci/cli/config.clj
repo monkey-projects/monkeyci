@@ -82,12 +82,12 @@
 (defn set-m2-cache-dir [conf p]
   (assoc conf :m2-cache-dir p))
 
-(def get-no-clean
-  "Returns true if the workspace should NOT be deleted after the build completes."
-  :no-clean)
+(def get-clean
+  "Returns true if the workspace should be deleted after the build completes."
+  :clean)
 
-(defn set-no-clean [conf v]
-  (assoc conf :no-clean v))
+(defn set-clean [conf v]
+  (assoc conf :clean v))
 
 (defn get-child-opts [conf]
   (select-keys conf [:lib-coords :log-config :m2-cache-dir]))

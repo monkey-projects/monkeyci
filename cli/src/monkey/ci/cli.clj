@@ -41,9 +41,10 @@
 
 (def no-clean-opt
   {:as "Do not delete workspace after build completes"
-   :option "no-clean"
+   :option "clean"
    :short "N"
-   :type :with-flag})
+   :type :with-flag
+   :default true})
 
 (def config
   {:command "monkey-ci"

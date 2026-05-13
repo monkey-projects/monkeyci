@@ -22,7 +22,9 @@
              [containers :as mcc]
              [jobs :as j]]
             [monkey.ci.build.core :as bc]
-            [monkey.ci.cli.process :as p]
+            [monkey.ci.cli
+             [events :as ce]
+             [process :as p]]
             [monkey.ci.events
              [builders :as eb]
              [edn :as ee]]
@@ -272,7 +274,7 @@
   []
   {:name ::restore-ws
    :enter (fn [ctx]
-            (let [ws   (get-in (emi/get-state ctx) [:workspace])
+            (let [ws (ce/get-workspace ctx)
                   dest (fs/create-dirs (get-work-dir ctx))]
               (if ws
                 (do
@@ -495,15 +497,15 @@
                         :expose-ports [20000 21000]} (optional)
      :cleanup?      — delete job directories after completion (default false)"
   [{:keys [work-dir mailman state] :as conf}]
-  (let [state   (emi/with-state (or state (atom {})))
+  (let [with-state (emi/with-state (or state (atom {})))
         wd      (or work-dir (str (fs/create-temp-dir)))
         job-ctx {}]
     (log/info "Creating podman container routes, work dir:" wd)
     [[:container/job-queued
-      [{:handler     prepare-child-cmd
+      [{:handler      prepare-child-cmd
         :interceptors [emi/handle-job-error
                        (job-queued-result conf)
-                       state
+                       with-state
                        save-job
                        inc-job-count
                        (add-job-dir wd)
@@ -516,22 +518,22 @@
                        (add-podman-opts (:podman conf))]}]]
 
      [:job/initializing
-      [{:handler     job-init
+      [{:handler      job-init
         :interceptors [emi/handle-job-error
-                       state
+                       with-state
                        require-job
                        (add-job-dir wd)
                        (emi/add-mailman mailman)
                        watch-events]}]]
 
      [:container/pending
-      [{:handler     job-pending
-        :interceptors [state
+      [{:handler      job-pending
+        :interceptors [with-state
                        require-job]}]]
 
      [:container/end
-      [{:handler     job-exec
-        :interceptors [state
+      [{:handler      job-exec
+        :interceptors [with-state
                        require-job
                        remove-job
                        dec-job-count
