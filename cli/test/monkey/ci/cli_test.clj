@@ -16,7 +16,7 @@
       (testing "prints version to stdout"
         (is (nil? (sut/print-version {})))
         (is (= 1 (count @printed)))
-        (is (= v/version (first @printed)))))))
+        (is (= (v/version) (first @printed)))))))
 
 (deftest verify-test
   (testing "returns nil"

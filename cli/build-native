@@ -8,7 +8,6 @@ UBERJAR=target/monkeyci-cli.jar
 native-image -cp $UBERJAR -jar $UBERJAR \
   -J-Dclojure.spec.skip.macros=true \
   -J-Dclojure.compiler.direct-linking=true \
-  -Duser.country=BE \
   --initialize-at-build-time \
   --no-fallback \
   -march=native \

@@ -84,10 +84,10 @@
               (catch Exception _))
             (is @server-stopped?))))
 
-      (testing "returns the process exit code"
+      (testing "returns exit code according to status"
         (with-redefs [srv/start-server (fn [_opts] dummy-server)
                       srv/stop-server  (fn [_s] nil)]
-          (is (= 42 (sut/build (test-config {:dir "."} 42)))))))))
+          (is (= 1 (sut/build (test-config {:dir "."} 42)))))))))
 
 (deftest setup-events
   (testing "creates mailman broker"

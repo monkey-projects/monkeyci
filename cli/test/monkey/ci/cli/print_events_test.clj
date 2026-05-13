@@ -18,3 +18,15 @@
                  (enter)
                  (emi/get-state)
                  (sut/get-local-dir)))))))
+
+(deftest save-jobs
+  (let [{:keys [enter] :as i} sut/save-jobs]
+    (is (keyword? (:name i)))
+    
+    (testing "sets jobs in state"
+      (is (= ::test-jobs
+             (-> {:event
+                  {:jobs ::test-jobs}}
+                 (enter)
+                 (emi/get-state)
+                 (sut/get-jobs)))))))

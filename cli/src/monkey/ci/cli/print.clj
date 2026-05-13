@@ -35,7 +35,10 @@
 (defn now []
   (LocalDateTime/now))
 
-(def time-format (java.time.format.DateTimeFormatter/ofLocalizedTime java.time.format.FormatStyle/MEDIUM))
+(def time-format
+  (let [l (System/getenv "LANGUAGE")]
+    (cond-> (java.time.format.DateTimeFormatter/ofLocalizedTime java.time.format.FormatStyle/MEDIUM)
+      l (.withLocale (java.util.Locale/of l)))))
 
 (defn format-time
   ([^LocalDateTime t]
@@ -44,4 +47,13 @@
    (format-time (now))))
 
 (defn print-timed-msg [& parts]
-  (apply println (ansi/style (str "[" (format-time) "]") :bright :green) parts))
+  (apply println (ansi/style (str "[" (format-time) "]") :yellow) parts))
+
+(defn print-job-msg [job & parts]
+  (apply print-timed-msg (ansi/style (str "[" job "]") :bright :cyan) parts))
+
+(defn success [p]
+  (ansi/style p :bright :green))
+
+(defn failure [p]
+  (ansi/style p :bright :red))

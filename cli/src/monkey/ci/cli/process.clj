@@ -28,7 +28,7 @@
    :aliases
    {:monkeyci/build
     {:exec-fn 'monkey.ci.script.runtime/run-script!
-     :extra-deps {'com.monkeyci/app {:mvn/version (or lib-version v/version)}}}}})
+     :extra-deps {'com.monkeyci/app {:mvn/version (or lib-version (v/version))}}}}})
 
 (defn add-logback-config
   "Updates the deps config to add jvm opts that configures logback
@@ -44,7 +44,7 @@
 (defn- version-or [dev? f]
   (if dev?
     {:local/root (f)}
-    {:mvn/version v/version}))
+    {:mvn/version (v/version)}))
 
 (defn generate-test-deps [dev? watch?]
   (letfn [(test-lib-dir []

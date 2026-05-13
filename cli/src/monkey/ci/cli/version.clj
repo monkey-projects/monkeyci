@@ -1,3 +1,4 @@
 (ns monkey.ci.cli.version)
 
-(def version (or (System/getenv "MONKEYCI_VERSION") "dev"))
+(defmacro version []
+  (or (System/getenv "MONKEYCI_VERSION") "dev"))

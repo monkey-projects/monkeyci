@@ -11,7 +11,7 @@
              [version :as v]]))
 
 (defn print-version [_]
-  (p/print-version v/version))
+  (p/print-version (v/version)))
 
 (defn verify [{:keys [dir]}]
   (let [path (u/find-script-dir dir)]
@@ -49,7 +49,7 @@
 (def config
   {:command "monkey-ci"
    :description "Clojure-powered CI/CD tool"
-   :version v/version
+   :version (v/version)
    :subcommands
    [{:command "version"
      :description "Prints current version"
@@ -70,5 +70,14 @@
             lib-version-opt
             no-clean-opt]}]})
 
+(defn print-locale []
+  (doseq [v ["user.language"
+             "user.script"
+             "user.country"
+             "user.variant"
+             "user.extensions"]]
+    (println v "=" (System/getProperty v))))
+
 (defn -main [& args]
+  (print-locale)
   (cli/run-cmd args config))

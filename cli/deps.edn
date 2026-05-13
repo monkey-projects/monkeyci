@@ -19,7 +19,7 @@
 
  :aliases
  {:dev
-  {:extra-paths ["dev-resources"]}
+  {:extra-paths ["dev" "dev-resources"]}
 
   :uberjar
   ;; clj -T:uberjar

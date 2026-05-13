@@ -75,7 +75,7 @@
     (ca/tap (:event-mult server) p false)))
 
 (defn- args->conf [args]
-  {:lib-coords {:mvn/version (or (:lib-version args) v/version)}})
+  {:lib-coords {:mvn/version (or (:lib-version args) (v/version))}})
 
 (defn build
   "Runs a local build.
@@ -124,8 +124,8 @@
       (mmc/post-events broker [(eb/build-pending-evt build)])
       (log/debug "Build/pending event posted")
       ;; Wait for build end
-      (let [exit @result]
-        (log/info "Build process exited with code" exit)
-        exit)
+      (let [{:keys [status]} @result]
+        (log/info "Build process exited with status" status)
+        (if (= :success status) 0 1))
       (finally
         (srv/stop-server server)))))
