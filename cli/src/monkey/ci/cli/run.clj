@@ -125,6 +125,8 @@
       (log/debug "Build/pending event posted")
       ;; Wait for build end
       (let [{:keys [status]} @result]
+        ;; Wait for events to be processed
+        (Thread/sleep 100)
         (log/info "Build process exited with status" status)
         (if (= :success status) 0 1))
       (finally

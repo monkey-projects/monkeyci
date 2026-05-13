@@ -1,6 +1,9 @@
 (ns monkey.ci.cli.print-events
   "Event handlers for printing to console"
-  (:require [monkey.mailman.core :as mmc]
+  (:require [clojure.string :as cs]
+            [clojure.tools.logging :as log]
+            [medley.core :as mc]
+            [monkey.mailman.core :as mmc]
             [monkey.ci.cli.print :as p]
             [monkey.ci.events.mailman.interceptors :as emi]))
 
@@ -17,11 +20,35 @@
 
 (def get-jobs ::jobs)
 
+(defn get-job
+  "Finds job by id in the context state"
+  ([ctx id]
+   (-> ctx
+       (emi/get-state)
+       (get-jobs)
+       (get id)))
+  ([ctx]
+   (get-job ctx (job-id ctx))))
+
+(defn get-cmd
+  "Retrieves the script command at given index, if the job is a container job"
+  ([ctx job-id cmd-idx]
+   (some-> (get-job ctx job-id)
+           :script
+           (nth cmd-idx)))
+  ([ctx cmd-idx]
+   (get-cmd ctx (job-id ctx) cmd-idx)))
+
 (defn- print-result [ctx]
   (let [job (job-id ctx)
         p (if job (partial p/print-job-msg job) p/print-timed-msg)]
     (when-let [r (not-empty (get-in ctx [:event :result]))]
       (p "Result:" r))))
+
+(defn- status [v]
+  (if (= :success v)
+    (p/success (name v))
+    (p/failure (name v))))
 
 ;;; --- Interceptors ---
 
@@ -33,7 +60,14 @@
 (def save-jobs
   {:name ::save-jobs
    :enter (fn [ctx]
-            (emi/update-state ctx set-jobs (get-in ctx [:event :jobs])))})
+            (emi/update-state ctx set-jobs (->> (get-in ctx [:event :jobs])
+                                                (mc/index-by :id))))})
+
+(def handle-error
+  {:name ::error
+   :error (fn [ctx]
+            (log/warn "Got error while handling event" (:event ctx) (:error ctx))
+            (dissoc ctx :error))})
 
 ;;; --- Handlers ---
 
@@ -44,7 +78,7 @@
   (p/print-timed-msg "Starting child process..."))
 
 (defn build-end [ctx]
-  (p/print-timed-msg "Build end:" (build-id ctx))
+  (p/print-timed-msg "Build end:" (status (get-in ctx [:event :status])))
   (print-result ctx))
 
 (defn script-init [ctx]
@@ -54,8 +88,17 @@
   (p/print-timed-msg "Script started:" (build-id ctx))
   (let [jobs (get-in ctx [:event :jobs])]
     (p/print-timed-msg "Script contains" (count jobs) "jobs:")
-    (doseq [j jobs]
-      (printf "\t%s - %s job - deps: %s\n" (:id j) (name (:type j)) (:dependencies j)))))
+    (->> jobs
+         (map-indexed
+          (fn [idx j]
+            (printf "\t%2d. %s (%s)%s\n"
+                    (inc idx)
+                    (:id j)
+                    (name (:type j))
+                    (if-let [d (not-empty (:dependencies j))]
+                      (str " --> [" (cs/join ", " d) "]")
+                      ""))))
+         (doall))))
 
 (defn script-end [ctx]
   (p/print-timed-msg "Script completed")
@@ -65,21 +108,23 @@
   (p/print-job-msg (job-id ctx) "Loading job"))
 
 (defn job-start [ctx]
-  (let [job (job-id ctx)]
-    (p/print-job-msg job "Job started")
-    (p/print-job-msg job "Local dir:" (-> ctx (emi/get-state) (get-local-dir)))))
+  (let [job-id (job-id ctx)
+        job (get-job ctx job-id)]
+    (p/print-job-msg job-id "Job started")
+    (p/print-job-msg job-id "Local dir:" (-> ctx (emi/get-state) (get-local-dir)))))
 
 (defn job-end [ctx]
-  (p/print-job-msg (job-id ctx) "Job end:" (get-in ctx [:event :status]))
+  (p/print-job-msg (job-id ctx) "Job end:" (status (get-in ctx [:event :status])))
   (print-result ctx))
 
 (defn job-exec [ctx]
-  (let [job (job-id ctx)]
-    (p/print-job-msg job "Job executed:" (get-in ctx [:event :status]))
+  #_(let [job (job-id ctx)]
+    (p/print-job-msg job "Job executed:" (status (get-in ctx [:event :status])))
     (print-result ctx)))
 
 (defn cmd-start [{:keys [event] :as ctx}]
-  (p/print-job-msg (job-id ctx) "Command started:" (:command event)))
+  (let [cmd (get-cmd ctx (Integer/parseInt (:command event)))]
+    (p/print-cmd-start (job-id ctx) cmd)))
 
 (defn cmd-end [{:keys [event] :as ctx}]
   (p/print-job-msg (job-id ctx) "Command ended:" (:command event) ", exit code" (:exit event)))
@@ -90,7 +135,7 @@
 (defn container-end [ctx]
   (let [job (job-id ctx)]
     (p/print-job-msg job "Container end")
-    (p/print-job-msg job "Status:" (get-in ctx [:event :status]))))
+    (p/print-job-msg job "Status:" (status (get-in ctx [:event :status])))))
 
 ;;; --- Routing config ---
 
@@ -98,7 +143,8 @@
   (let [state (atom {})]
     (letfn [(handler [h & [extra-int]]
               {:handler h
-               :interceptors (cond-> [(emi/with-state state)]
+               :interceptors (cond-> [handle-error
+                                      (emi/with-state state)]
                                (not-empty extra-int) (concat extra-int))})]
       [[:build/initializing  [(handler build-init)]]
        [:build/start         [(handler build-start)]]

@@ -47,7 +47,7 @@
    (format-time (now))))
 
 (defn print-timed-msg [& parts]
-  (apply println (ansi/style (str "[" (format-time) "]") :yellow) parts))
+  (apply println (ansi/style (format-time) :yellow) parts))
 
 (defn print-job-msg [job & parts]
   (apply print-timed-msg (ansi/style (str "[" job "]") :bright :cyan) parts))
@@ -57,3 +57,6 @@
 
 (defn failure [p]
   (ansi/style p :bright :red))
+
+(defn print-cmd-start [job cmd]
+  (print-job-msg job "Command started:" (ansi/style cmd :bright :magenta)))

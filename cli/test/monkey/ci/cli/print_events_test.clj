@@ -23,10 +23,30 @@
   (let [{:keys [enter] :as i} sut/save-jobs]
     (is (keyword? (:name i)))
     
-    (testing "sets jobs in state"
-      (is (= ::test-jobs
+    (testing "sets jobs in state, grouped by id"
+      (is (= {::test-job {:id ::test-job}}
              (-> {:event
-                  {:jobs ::test-jobs}}
+                  {:jobs [{:id ::test-job}]}}
                  (enter)
                  (emi/get-state)
                  (sut/get-jobs)))))))
+
+(deftest get-job
+  (testing "retrieves job by id from ctx"
+    (let [job {:id "test-job"}]
+      (is (= job
+             (-> {:event
+                  {:job-id (:id job)}}
+                 (emi/set-state (sut/set-jobs {} {(:id job) job}))
+                 (sut/get-job)))))))
+
+(deftest get-cmd
+  (testing "retrieves script cmd by idx"
+    (let [job {:id "test-job"
+               :script ["first cmd"
+                        "second cmd"]}]
+      (is (= "second cmd"
+             (-> {:event
+                  {:job-id (:id job)}}
+                 (emi/set-state (sut/set-jobs {} {(:id job) job}))
+                 (sut/get-cmd 1)))))))

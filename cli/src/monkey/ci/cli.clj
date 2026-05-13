@@ -70,14 +70,5 @@
             lib-version-opt
             no-clean-opt]}]})
 
-(defn print-locale []
-  (doseq [v ["user.language"
-             "user.script"
-             "user.country"
-             "user.variant"
-             "user.extensions"]]
-    (println v "=" (System/getProperty v))))
-
 (defn -main [& args]
-  (print-locale)
   (cli/run-cmd args config))
