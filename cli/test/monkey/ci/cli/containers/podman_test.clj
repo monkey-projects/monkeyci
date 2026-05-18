@@ -164,3 +164,83 @@
         (is (= :job/initializing (-> (emi/get-result result)
                                      first
                                      :type)))))))
+
+(deftest restore-caches
+  (let [restored (atom nil)
+        {:keys [enter] :as i} (sut/restore-caches
+                               (fn [dir a]
+                                 (reset! restored (assoc a :dir dir))))]
+    (is (keyword? (:name i)))
+    (is (fn? enter))
+    
+    (testing "`enter` restores configured caches on job"
+      (is (= [{:id "test-cache"
+               :path "test/location"
+               :dir (fs/path "/tmp/test-dir/work")}]
+             (-> {:event
+                  {:job-id "test-job"}}
+                 (sut/set-job {:id "test-job"
+                               :caches [{:id "test-cache" :path "test/location"}]})
+                 (sut/set-job-dir "/tmp/test-dir")
+                 (enter)
+                 (sut/get-restored-caches)))))))
+
+(deftest save-caches
+  (let [saved (atom nil)
+        {:keys [leave] :as i} (sut/save-caches
+                               (fn [dir a]
+                                 (reset! saved (assoc a :dir dir))))]
+    (is (keyword? (:name i)))
+    (is (fn? leave))
+    
+    (testing "`leave` saves configured caches on job"
+      (is (= [{:id "test-cache"
+               :path "test/location"
+               :dir (fs/path "/tmp/test-dir/work")}]
+             (-> {:event
+                  {:job-id "test-job"}}
+                 (sut/set-job {:id "test-job"
+                               :caches [{:id "test-cache" :path "test/location"}]})
+                 (sut/set-job-dir "/tmp/test-dir")
+                 (leave)
+                 (sut/get-saved-caches)))))))
+
+(deftest restore-artifacts
+  (let [restored (atom nil)
+        {:keys [enter] :as i} (sut/restore-artifacts
+                               (fn [dir a]
+                                 (reset! restored (assoc a :dir dir))))]
+    (is (keyword? (:name i)))
+    (is (fn? enter))
+    
+    (testing "`enter` restores configured artifacts on job"
+      (is (= [{:id "test-artifact"
+               :path "test/location"
+               :dir (fs/path "/tmp/test-dir/work")}]
+             (-> {:event
+                  {:job-id "test-job"}}
+                 (sut/set-job {:id "test-job"
+                               :restore-artifacts [{:id "test-artifact" :path "test/location"}]})
+                 (sut/set-job-dir "/tmp/test-dir")
+                 (enter)
+                 (sut/get-restored-artifacts)))))))
+
+(deftest save-artifacts
+  (let [saved (atom nil)
+        {:keys [leave] :as i} (sut/save-artifacts
+                               (fn [dir a]
+                                 (reset! saved (assoc a :dir dir))))]
+    (is (keyword? (:name i)))
+    (is (fn? leave))
+    
+    (testing "`leave` saves configured artifacts on job"
+      (is (= [{:id "test-artifact"
+               :path "test/location"
+               :dir (fs/path "/tmp/test-dir/work")}]
+             (-> {:event
+                  {:job-id "test-job"}}
+                 (sut/set-job {:id "test-job"
+                               :save-artifacts [{:id "test-artifact" :path "test/location"}]})
+                 (sut/set-job-dir "/tmp/test-dir")
+                 (leave)
+                 (sut/get-saved-artifacts)))))))

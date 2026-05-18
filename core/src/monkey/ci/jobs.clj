@@ -32,6 +32,13 @@
   "Gets artifact save configurations for the job."
   :save-artifacts)
 
+(def restore-artifacts
+  "Gets artifact restore configurations for the job."
+  :restore-artifacts)
+
+(def caches
+  :caches)
+
 ;;;; Status predicates
 
 (def pending?  (comp (some-fn nil? (partial = :pending)) status))

@@ -256,6 +256,26 @@
 (defn podman-src [evt]
   (assoc evt :src :podman))
 
+(def get-restored-caches ::restored-caches)
+
+(defn set-restored-caches [ctx r]
+  (assoc ctx ::restored-caches r))
+
+(def get-saved-caches ::saved-caches)
+
+(defn set-saved-caches [ctx r]
+  (assoc ctx ::saved-caches r))
+
+(def get-restored-artifacts ::restored-artifacts)
+
+(defn set-restored-artifacts [ctx r]
+  (assoc ctx ::restored-artifacts r))
+
+(def get-saved-artifacts ::saved-artifacts)
+
+(defn set-saved-artifacts [ctx r]
+  (assoc ctx ::saved-artifacts r))
+
 ;;;; ─── Interceptors ──────────────────────────────────────────────────────────
 
 (defn add-job-dir
@@ -263,8 +283,8 @@
   [wd]
   {:name ::add-job-dir
    :enter (fn [ctx]
-            (->> (conj (build-sid ctx) (ctx->job-id ctx))
-                 (apply fs/path wd)
+            (->> (ctx->job-id ctx)
+                 (fs/path wd)
                  str
                  (set-job-dir ctx)))})
 
@@ -431,6 +451,50 @@
                 (ca/close! ch))
               (cond-> ctx ch (remove-events-ch))))})
 
+(defn- apply-to-art [a f dir]
+  (->> a
+       (map (partial f dir))
+       (remove nil?)
+       (doall)))
+
+(defn restore-caches [restore-fn]
+  "Interceptor that restores job caches by applying `restore-fn` to each 
+   configured cache on the job."
+  {:name ::restore-caches
+   :enter (fn [ctx]
+            (let [r (-> (j/caches (get-job ctx))
+                        (apply-to-art restore-fn (get-work-dir ctx)))]
+              (log/debug "Restored caches:" (map :id r))
+              (set-restored-caches ctx r)))})
+
+(defn save-caches [save-fn]
+  "Interceptor that saves job caches"
+  {:name ::save-caches
+   :leave (fn [ctx]
+            (let [r (-> (j/caches (get-job ctx))
+                        (apply-to-art save-fn (get-work-dir ctx)))]
+              (log/debug "Saved caches:" (map :id r))
+              (set-saved-caches ctx r)))})
+
+(defn restore-artifacts [restore-fn]
+  "Interceptor that restores job artifacts by applying `restore-fn` to each 
+   configured artifact on the job."
+  {:name ::restore-artifacts
+   :enter (fn [ctx]
+            (let [r (-> (j/restore-artifacts (get-job ctx))
+                        (apply-to-art restore-fn (get-work-dir ctx)))]
+              (log/debug "Restored artifacts:" (map :id r))
+              (set-restored-artifacts ctx r)))})
+
+(defn save-artifacts [save-fn]
+  "Interceptor that saves job artifacts"
+  {:name ::save-artifacts
+   :leave (fn [ctx]
+            (let [r (-> (j/save-artifacts (get-job ctx))
+                        (apply-to-art save-fn (get-work-dir ctx)))]
+              (log/debug "Saved artifacts:" (map :id r))
+              (set-saved-artifacts ctx r)))})
+
 ;;;; ─── Event handlers ────────────────────────────────────────────────────────
 
 (def container-end-evt
@@ -498,7 +562,8 @@
      :cleanup?      — delete job directories after completion (default false)"
   [{:keys [work-dir mailman state] :as conf}]
   (let [with-state (emi/with-state (or state (atom {})))
-        wd      (or work-dir (str (fs/create-temp-dir)))
+        wd (or work-dir (str (fs/create-temp-dir)))
+        ;; TODO Fill up the context with useful data
         job-ctx {}]
     (log/info "Creating podman container routes, work dir:" wd)
     [[:container/job-queued
@@ -514,6 +579,8 @@
                        (assign-ports (get-in conf [:podman :expose-ports]
                                              default-expose-range))
                        (add-job-ctx job-ctx)
+                       (restore-caches (get-in conf [:cache :restore]))
+                       (restore-artifacts (get-in conf [:artifact :restore]))
                        emi/start-process
                        (add-podman-opts (:podman conf))]}]]
 
@@ -542,4 +609,6 @@
                        (add-job-dir wd)
                        (add-job-ctx job-ctx)
                        stop-watch-events
-                       release-ports]}]]]))
+                       release-ports
+                       (save-artifacts (get-in conf [:artifact :save]))
+                       (save-caches (get-in conf [:cache :save]))]}]]]))

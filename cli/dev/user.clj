@@ -1,14 +1,14 @@
 (ns user
   (:require [monkey.ci.cli
-             [print :as p]
-             [print-events :as pe]]))
+             [print :as p]]
+            [monkey.ci.cli.print.scrolling :as ps]))
 
 ;; Enable reflection warnings in all ns'es
 (alter-var-root #'*warn-on-reflection* (constantly true))
 
 (defn print-demo []
   (p/print-timed-msg "This is a timed message")
-  (pe/script-start
+  (ps/script-start
    {:event
     {:jobs [{:id "first-job"
              :type :container}

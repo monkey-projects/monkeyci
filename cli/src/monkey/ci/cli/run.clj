@@ -10,14 +10,15 @@
             [clojure.tools.logging :as log]
             [monkey.ci.time :as t]
             [monkey.ci.cli
+             [artifacts :as art]
              [config :as c]
              [events :as e]
              [process :as proc]
-             [print-events :as pe]
              [server :as srv]
              [utils :as u]
              [version :as v]]
             [monkey.ci.cli.containers.podman :as podman]
+            [monkey.ci.cli.print.scrolling :as ps]
             [monkey.ci.events.builders :as eb]
             [monkey.mailman
              [core :as mmc]
@@ -46,7 +47,13 @@
                        :mailman  mailman
                        :state    (:state conf)
                        :podman   (c/get-podman conf)
-                       :cleanup? (c/get-clean conf)}))
+                       :cleanup? (c/get-clean conf)
+                       :cache
+                       {:save #(art/save-artifact %1 (c/get-cache-dir conf) %2)
+                        :restore (partial art/restore-artifact (c/get-cache-dir conf))}
+                       :artifact
+                       {:save #(art/save-artifact %1 (c/get-artifact-dir conf) %2)
+                        :restore (partial art/restore-artifact (c/get-artifact-dir conf))}}))
 
 (defn- add-routes-listener [mailman routes]
   (mmc/add-listener mailman {:handler (make-router routes)}))
@@ -59,7 +66,7 @@
       (mmc/add-listener {:handler evt-logger})
       (add-routes-listener (e/make-routes conf m))
       (add-routes-listener (make-podman-routes conf m))
-      (add-routes-listener (pe/make-routes conf)))))
+      (add-routes-listener (ps/make-routes conf)))))
 
 (defn- link-broker-server-events
   "Ensures events get sent from the broker to the server channel and vice versa."
@@ -81,9 +88,9 @@
   "Runs a local build.
 
    Options (from CLI):
-     :dir      — project root directory (default \".\")
-     :no-clean — when truthy, the workspace directory is NOT deleted after
-                 the build completes (useful for debugging container jobs)
+     :dir   — project root directory (default \".\")
+     :clean — when truthy (the default), the workspace directory is deleted after
+              the build completes
 
    Creates a temporary work directory that holds the workspace copy, artifacts,
    cache and log files for this build.  Starts a build API server on a random

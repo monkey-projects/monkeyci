@@ -1,10 +1,11 @@
-(ns monkey.ci.cli.print-events
-  "Event handlers for printing to console"
+(ns monkey.ci.cli.print.scrolling
+  "Event handlers for printing to console in a scrolling fashion, useful for non-xterms."
   (:require [clojure.string :as cs]
             [clojure.tools.logging :as log]
             [medley.core :as mc]
             [monkey.mailman.core :as mmc]
             [monkey.ci.cli.print :as p]
+            [monkey.ci.common.jobs :as cj]
             [monkey.ci.events.mailman.interceptors :as emi]))
 
 (def build-id (comp last :sid :event))
@@ -89,6 +90,7 @@
   (let [jobs (get-in ctx [:event :jobs])]
     (p/print-timed-msg "Script contains" (count jobs) "jobs:")
     (->> jobs
+         (cj/sort-by-deps)
          (map-indexed
           (fn [idx j]
             (printf "\t%2d. %s (%s)%s\n"
@@ -118,9 +120,7 @@
   (print-result ctx))
 
 (defn job-exec [ctx]
-  #_(let [job (job-id ctx)]
-    (p/print-job-msg job "Job executed:" (status (get-in ctx [:event :status])))
-    (print-result ctx)))
+  (p/print-job-msg (job-id ctx) "Job executed:" (status (get-in ctx [:event :status]))))
 
 (defn cmd-start [{:keys [event] :as ctx}]
   (let [cmd (get-cmd ctx (Integer/parseInt (:command event)))]

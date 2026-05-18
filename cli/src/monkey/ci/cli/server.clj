@@ -129,6 +129,7 @@
 (defn- handle-upload-artifact [req {:keys [artifact-dir build]}]
   (let [id     (-> req :path-params :artifact-id)
         path   (artifact-path artifact-dir (:sid build) id)]
+    (log/debug "Receiving artifact upload:" id ", location:" path)
     (if (some nil? [id artifact-dir])
       {:status 400 :body "Missing artifact id or store"}
       (try
@@ -149,6 +150,7 @@
   (let [id   (-> req :path-params :artifact-id)
         path (artifact-path artifact-dir (:sid build) id)
         f    (io/file path)]
+    (log/debug "Got artifact download request:" id ", location" path)
     (if (.exists f)
       (-> (rur/response f)
           (rur/content-type "application/octet-stream"))

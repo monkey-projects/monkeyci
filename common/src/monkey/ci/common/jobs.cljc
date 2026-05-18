@@ -1,4 +1,5 @@
-(ns monkey.ci.common.jobs)
+(ns monkey.ci.common.jobs
+  (:require [clojure.set :as cs]))
 
 (defn sort-by-deps
   "Sorts the given list of jobs so those with least dependencies come first,
@@ -15,5 +16,5 @@
           ;; Safety, should not happen
           (concat res rem)
           (recur (remove (set next-jobs) rem)
-                 (clojure.set/union proc? (set (map :id next-jobs)))
+                 (cs/union proc? (set (map :id next-jobs)))
                  (concat res next-jobs))))))  )

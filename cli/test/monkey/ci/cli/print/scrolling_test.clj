@@ -1,6 +1,6 @@
-(ns monkey.ci.cli.print-events-test
+(ns monkey.ci.cli.print.scrolling-test
   (:require [clojure.test :refer [deftest testing is]]
-            [monkey.ci.cli.print-events :as sut]
+            [monkey.ci.cli.print.scrolling :as sut]
             [monkey.ci.events.mailman.interceptors :as emi]))
 
 (deftest make-routes
