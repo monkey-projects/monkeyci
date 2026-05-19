@@ -15,11 +15,15 @@
             [clojure.java.io :as io]
             [clojure.string :as str]
             [clojure.tools.logging :as log]
+            [clompress.archivers :as arch]
             [monkey.ci.cli.build :as b]
             [org.httpkit.server :as http]
             [ring.util.response :as rur])
   (:import [java.security SecureRandom]
-           [java.util Base64]))
+           [java.util Base64]
+           [java.io PipedInputStream PipedOutputStream]))
+
+(set! *warn-on-reflection* true)
 
 ;;;; Token generation
 
@@ -59,11 +63,6 @@
   "Returns the File for a given artifact id inside the artifacts base dir."
   [artifact-dir build-sid artifact-id]
   (apply fs/file (concat [artifact-dir] build-sid [artifact-id])))
-
-(defn- cache-path
-  "Returns the File for a given cache id inside the cache base dir."
-  [cache-dir build-sid cache-id]
-  (apply fs/file (concat [cache-dir] build-sid [cache-id])))
 
 ;;;; Handlers
 
@@ -117,15 +116,6 @@
         (ca/untap event-mult tap-ch)
         (ca/close! tap-ch))})))
 
-(defn- handle-download-workspace [_req {:keys [workspace-file]}]
-  (if workspace-file
-    (let [f (io/file workspace-file)]
-      (if (.exists f)
-        (-> (rur/response f)
-            (rur/content-type "application/octet-stream"))
-        (rur/not-found "Workspace not found")))
-    {:status 204}))
-
 (defn- handle-upload-artifact [req {:keys [artifact-dir build]}]
   (let [id     (-> req :path-params :artifact-id)
         path   (artifact-path artifact-dir (:sid build) id)]
@@ -146,43 +136,39 @@
             (when (instance? java.io.InputStream s)
               (.close ^java.io.InputStream s))))))))
 
+(defn- as-archive
+  "Creates an archive stream from the given directory and wraps it into a response."
+  [f]
+  (let [os (PipedOutputStream.)
+        is (PipedInputStream. os)]
+    (log/debug "Compressing" f "into archive")
+    (doto (Thread.
+           #(arch/archive {:output-stream os
+                           :compression "gz"
+                           :archive-type "tar"
+                           :entry-name-resolver (arch/strip-dir f)}
+                          f))
+      (.start))
+    (-> (rur/response is)
+        (rur/content-type "application/octet-stream"))))
+
 (defn- handle-download-artifact [req {:keys [artifact-dir build]}]
   (let [id   (-> req :path-params :artifact-id)
         path (artifact-path artifact-dir (:sid build) id)
         f    (io/file path)]
     (log/debug "Got artifact download request:" id ", location" path)
-    (if (.exists f)
-      (-> (rur/response f)
-          (rur/content-type "application/octet-stream"))
-      {:status 404})))
-
-(defn- handle-upload-cache [req {:keys [cache-dir build]}]
-  (let [id   (-> req :path-params :cache-id)
-        path (cache-path cache-dir (:sid build) id)]
-    (if (some nil? [id cache-dir])
-      {:status 400 :body "Missing cache id or store"}
-      (try
-        (io/make-parents path)
-        (io/copy (:body req) path)
-        (-> (rur/response {:cache-id id})
-            (rur/content-type "application/edn")
-            (update :body pr-str))
-        (catch Exception ex
-          (log/error "Error uploading cache" id ex)
-          {:status 500})
-        (finally
-          (when-let [s (:body req)]
-            (when (instance? java.io.InputStream s)
-              (.close ^java.io.InputStream s))))))))
-
-(defn- handle-download-cache [req {:keys [cache-dir build]}]
-  (let [id   (-> req :path-params :cache-id)
-        path (cache-path cache-dir (:sid build) id)
-        f    (io/file path)]
-    (if (.exists f)
-      (-> (rur/response f)
-          (rur/content-type "application/octet-stream"))
-      {:status 404})))
+    (cond
+      (.isDirectory f)
+      (as-archive f)
+      (.exists f)
+      (do
+        (log/debug "Sending artifact file to client:" id)
+        (-> (rur/response f)
+            (rur/content-type "application/octet-stream")))
+      :else
+      (do
+        (log/warn "Artifact not found:" id)
+        {:status 404}))))
 
 (defn- handle-decrypt-key [req {:keys [key-decrypter build]}]
   ;; For local builds the DEK is passed through as-is (no vault encryption).
@@ -216,8 +202,6 @@
      :build          — build map with at least :sid (optional, [:org-id :repo-id :build-id])
      :params         — seq of {:name … :value …} maps (optional)
      :artifact-dir   — java.io.File or String for artifact storage (optional)
-     :cache-dir      — java.io.File or String for cache storage (optional)
-     :workspace-file — java.io.File or String for the workspace archive (optional)
      :event-mult-ch  — core.async mult-capable channel for events (required for SSE)
      :key-decrypter  — fn of [build encrypted-key] -> key (optional)"
   [{:keys [token] :as ctx}]
@@ -243,10 +227,6 @@
           (and (= method :get) (= uri "/events"))
           (handle-get-events req ctx)
 
-          ;; GET /workspace
-          (and (= method :get) (= uri "/workspace"))
-          (handle-download-workspace req ctx)
-
           ;; PUT /artifact/:id
           (and (= method :put) (strip-prefix uri "/artifact/"))
           (handle-upload-artifact
@@ -257,18 +237,6 @@
           (and (= method :get) (strip-prefix uri "/artifact/"))
           (handle-download-artifact
            (assoc req :path-params {:artifact-id (strip-prefix uri "/artifact/")})
-           ctx)
-
-          ;; PUT /cache/:id
-          (and (= method :put) (strip-prefix uri "/cache/"))
-          (handle-upload-cache
-           (assoc req :path-params {:cache-id (strip-prefix uri "/cache/")})
-           ctx)
-
-          ;; GET /cache/:id
-          (and (= method :get) (strip-prefix uri "/cache/"))
-          (handle-download-cache
-           (assoc req :path-params {:cache-id (strip-prefix uri "/cache/")})
            ctx)
 
           ;; POST /decrypt-key
@@ -289,8 +257,6 @@
      :build         — build map
      :params        — user-specified build params map
      :artifact-dir  — directory for artifact storage
-     :cache-dir     — directory for cache storage
-     :workspace-file — path to the workspace archive
      :key-decrypter — fn [build enc-key] -> key
      :channel       - optional core.async channel for events
 

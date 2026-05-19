@@ -1,7 +1,7 @@
 (ns monkey.ci.cli.server-test
-  (:require [clojure.core.async :as ca]
+  (:require [babashka.fs :as fs]
+            [clojure.core.async :as ca]
             [clojure.edn :as edn]
-            [clojure.java.io :as io]
             [clojure.string :as str]
             [clojure.test :refer [deftest is testing use-fixtures]]
             [monkey.ci.cli.server :as sut]
@@ -110,69 +110,42 @@
 ;;;; Artifact upload / download round-trip
 
 (deftest artifact-round-trip-test
-  (let [tmp-dir  (io/file (System/getProperty "java.io.tmpdir")
-                          (str "mci-test-" (System/currentTimeMillis)))
-        token    "tok"
-        build    {:sid ["org" "repo" "42"]}
-        event-ch (ca/chan 1)
-        handler  (sut/make-handler {:token token
-                                    :artifact-dir tmp-dir
-                                    :build build
-                                    :event-mult-ch event-ch})]
-    (testing "upload returns 200 with artifact-id"
-      (let [content "artifact content"
-            req     (-> (mock/request :put "/artifact/my-art")
-                        (mock/body content)
-                        (update :headers merge (auth-header token)))
-            resp    (handler req)]
-        (is (= 200 (:status resp)))
-        (is (= {:artifact-id "my-art"} (edn/read-string (:body resp))))))
+  (fs/with-temp-dir [tmp-dir]
+    (let [token    "tok"
+          build    {:sid ["org" "repo" "42"]}
+          event-ch (ca/chan 1)
+          handler  (sut/make-handler {:token token
+                                      :artifact-dir tmp-dir
+                                      :build build
+                                      :event-mult-ch event-ch})]
+      (testing "upload returns 200 with artifact-id"
+        (let [content "artifact content"
+              req     (-> (mock/request :put "/artifact/my-art")
+                          (mock/body content)
+                          (update :headers merge (auth-header token)))
+              resp    (handler req)]
+          (is (= 200 (:status resp)))
+          (is (= {:artifact-id "my-art"} (edn/read-string (:body resp))))))
 
-    (testing "download returns the uploaded content"
-      (let [resp (call handler :get "/artifact/my-art" token)]
-        (is (= 200 (:status resp)))
-        (is (= "artifact content" (slurp (:body resp))))))
+      (testing "download returns the uploaded content"
+        (let [resp (call handler :get "/artifact/my-art" token)]
+          (is (= 200 (:status resp)))
+          (is (= "artifact content" (slurp (:body resp))))))
 
-    (testing "download of unknown artifact returns 404"
-      (let [resp (call handler :get "/artifact/nonexistent" token)]
-        (is (= 404 (:status resp)))))
+      (testing "converts src dir into archive"
+        (is (nil? (-> (apply fs/path tmp-dir (conj (:sid build) "sub"))
+                      (fs/create-dirs)
+                      (fs/path "test.txt")
+                      (fs/file)
+                      (spit "This is a test"))))
+        (let [resp (call handler :get "/artifact/sub" token)]
+          (is (= 200 (:status resp)))
+          (is (instance? java.io.InputStream (:body resp)))
+          (is (not-empty (slurp (:body resp))))))
 
-    ;; Cleanup
-    (doseq [f (reverse (file-seq tmp-dir))]
-      (io/delete-file f true))))
-
-;;;; Cache upload / download round-trip
-
-(deftest cache-round-trip-test
-  (let [tmp-dir  (io/file (System/getProperty "java.io.tmpdir")
-                          (str "mci-cache-test-" (System/currentTimeMillis)))
-        token    "tok"
-        build    {:sid ["org" "repo" "99"]}
-        event-ch (ca/chan 1)
-        handler  (sut/make-handler {:token token
-                                    :cache-dir tmp-dir
-                                    :build build
-                                    :event-mult-ch event-ch})]
-    (testing "upload returns 200 with cache-id"
-      (let [req  (-> (mock/request :put "/cache/my-cache")
-                     (mock/body "cached data")
-                     (update :headers merge (auth-header token)))
-            resp (handler req)]
-        (is (= 200 (:status resp)))
-        (is (= {:cache-id "my-cache"} (edn/read-string (:body resp))))))
-
-    (testing "download returns the uploaded content"
-      (let [resp (call handler :get "/cache/my-cache" token)]
-        (is (= 200 (:status resp)))
-        (is (= "cached data" (slurp (:body resp))))))
-
-    (testing "download of unknown cache returns 404"
-      (let [resp (call handler :get "/cache/missing" token)]
-        (is (= 404 (:status resp)))))
-
-    ;; Cleanup
-    (doseq [f (reverse (file-seq tmp-dir))]
-      (io/delete-file f true))))
+      (testing "download of unknown artifact returns 404"
+        (let [resp (call handler :get "/artifact/nonexistent" token)]
+          (is (= 404 (:status resp))))))))
 
 ;;;; POST /decrypt-key
 

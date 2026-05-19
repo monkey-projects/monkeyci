@@ -12,6 +12,7 @@
         com.monkeyci/common            {:local/root "../common"}
         com.monkeyci/core              {:local/root "../core"}
         com.monkeyci/script            {:local/root "../script"}
+        com.monkeyprojects/clompress   {:mvn/version "0.2.1-SNAPSHOT"}
         com.monkeyprojects/mailman-core {:mvn/version "0.4.0-SNAPSHOT"}
         com.monkeyprojects/mailman-core-async {:mvn/version "0.4.0-SNAPSHOT"}
         com.monkeyprojects/mailman-sieppari {:mvn/version "0.4.0-SNAPSHOT"}}
