@@ -244,3 +244,35 @@
                  (sut/set-job-dir "/tmp/test-dir")
                  (leave)
                  (sut/get-saved-artifacts)))))))
+
+(deftest cleanup
+  (fs/with-temp-dir [dir]
+    (testing "deletes job dir on cleanup"
+      (let [{:keys [leave] :as i} (sut/cleanup {:cleanup? true})
+            jd (fs/create-dirs (fs/path dir "with-cleanup"))]
+        (is (keyword? (:name i)))
+        (is (some? (-> {:event
+                        {:status :success}}
+                       (sut/set-job-dir jd)
+                       (leave))))
+        (is (not (fs/exists? jd)))))
+
+    (testing "keeps job dir when no cleanup"
+      (let [{:keys [leave] :as i} (sut/cleanup {:cleanup? false})
+            jd (fs/create-dirs (fs/path dir "without-cleanup"))]
+        (is (keyword? (:name i)))
+        (is (some? (-> {:event
+                        {:status :success}}
+                       (sut/set-job-dir jd)
+                       (leave))))
+        (is (fs/exists? jd))))
+
+    (testing "keeps job dir on failure"
+      (let [{:keys [leave] :as i} (sut/cleanup {:cleanup? true})
+            jd (fs/create-dirs (fs/path dir "failure"))]
+        (is (keyword? (:name i)))
+        (is (some? (-> {:event
+                        {:status :error}}
+                       (sut/set-job-dir jd)
+                       (leave))))
+        (is (fs/exists? jd))))))

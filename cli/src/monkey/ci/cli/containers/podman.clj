@@ -333,11 +333,12 @@
                                             :checkout-dir (str (get-work-dir ctx))))))})
 
 (defn cleanup
-  "Deletes the job's working directory on `:leave` when `cleanup?` is true."
+  "Deletes the job's working directory on `:leave` when `cleanup?` is true, unless
+   the job fails."
   [{:keys [cleanup?]}]
   {:name ::cleanup
    :leave (fn [ctx]
-            (when cleanup?
+            (when (and cleanup? (= :success (get-in ctx [:event :status])))
               (let [jd (get-job-dir ctx)]
                 (log/debug "Deleting job dir" jd)
                 (fs/delete-tree jd)))

@@ -154,7 +154,11 @@
     (p/print-job-msg p "Local dir:" (-> ctx (emi/get-state) (get-local-dir job-id)))))
 
 (defn job-end [ctx]
-  (p/print-job-msg (pad-job-id ctx) "Job end:" (status (get-in ctx [:event :status])))
+  (if (= :success (get-in ctx [:event :status]))
+    (p/print-job-msg (pad-job-id ctx) (p/success "Job succeeded!"))
+    (p/print-job-msg (pad-job-id ctx)
+                     (p/failure "Job failed.")
+                     "You can review the logs in" (get-local-dir (emi/get-state ctx) (job-id ctx))))
   (print-result ctx))
 
 (defn cmd-start [{:keys [event] :as ctx}]
