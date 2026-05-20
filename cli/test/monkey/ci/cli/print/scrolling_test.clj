@@ -11,13 +11,17 @@
   (let [{:keys [enter] :as i} sut/save-local-dir]
     (is (keyword? (:name i)))
     
-    (testing "sets local dir in state"
-      (is (= "/test/dir"
-             (-> {:event
-                  {:local-dir "/test/dir"}}
-                 (enter)
-                 (emi/get-state)
-                 (sut/get-local-dir)))))))
+    (testing "sets local dir for job in state"
+      (let [ctx (-> {:event
+                  {:job-id "test-job" :local-dir "/test/dir"}}
+                 (emi/set-state (sut/set-jobs {} {"test-job" {}}))
+                 (enter))]
+        (is (= "/test/dir"
+               (-> ctx
+                   (emi/get-state)
+                   (sut/get-local-dir "test-job"))))
+        (is (= {:local-dir "/test/dir"}
+               (sut/get-job ctx "test-job")))))))
 
 (deftest save-jobs
   (let [{:keys [enter] :as i} sut/save-jobs]
@@ -50,3 +54,26 @@
                   {:job-id (:id job)}}
                  (emi/set-state (sut/set-jobs {} {(:id job) job}))
                  (sut/get-cmd 1)))))))
+
+(deftest pad-job-id
+  (testing "returns job id when no other jobs"
+    (is (= "test-job"
+           (-> {}
+               (emi/set-state (sut/set-jobs {} {"test-job" {}}))
+               (sut/pad-job-id "test-job")))))
+
+  (testing "returns default job id"
+    (is (= "test-job"
+           (-> {:event
+                {:job-id "test-job"}}
+               (emi/set-state (sut/set-jobs {} {"test-job" {}}))
+               (sut/pad-job-id)))))
+
+  (testing "pads right to max length"
+    (is (= "short    "
+           (-> {}
+               (emi/set-state 
+                (sut/set-jobs {}
+                              {"short" {}
+                               "very long" {}}))
+               (sut/pad-job-id "short"))))))

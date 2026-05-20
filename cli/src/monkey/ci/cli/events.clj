@@ -134,8 +134,8 @@
                   (log/warn "No checkout dir in build, skipping workspace save")
                   ctx))))})
 
-(defn delete-workspace
-  "Interceptor that deletes the saved workspace directory on `:leave`, unless the
+(defn delete-work-dir
+  "Interceptor that deletes the working directory on `:leave`, unless the
    `clean` flag is `false` in the run configuration.
 
    Wire this into the `:build/end` route so cleanup happens after the build
@@ -143,21 +143,22 @@
 
    `run-conf` — the CLI run configuration map."
   [run-conf]
-  {:name ::delete-workspace
+  {:name ::delete-work-dir
    :leave (fn [ctx]
-            (if (not (conf/get-clean run-conf))
-              (do
-                (log/info "Skipping workspace cleanup (--no-clean)")
-                ctx)
-              (let [ws (get-workspace ctx)]
-                (if ws
-                  (do
-                    (log/debug "Deleting workspace at" ws)
-                    (fs/delete-tree ws {:force true})
-                    ctx)
-                  (do
-                    (log/debug "No workspace path in state, nothing to delete")
-                    ctx)))))})
+            (let [ws (conf/get-work-dir run-conf)]
+              (cond
+                (not= :success (get-in ctx [:result :status]))
+                (log/info "Build failed, keeping working directory for inspection.")
+                (not (conf/get-clean run-conf))
+                (log/info "Skipping working directory cleanup (--no-clean)")
+                ws
+                (do
+                  (log/debug "Deleting working directory at" ws)
+                  (when-not (fs/delete-tree ws {:force true})
+                    (log/warn "Failed to delete work dir" ws)))
+                :else
+                (log/debug "No working directory configured, nothing to delete")))
+            ctx)})
 
 (defn update-job-in-state [ctx job-id f & args]
   (apply emi/update-state ctx update-in [:jobs job-id] f args))
@@ -274,7 +275,7 @@
        [{:handler build-end
          :interceptors [emi/no-result
                         state
-                        (delete-workspace conf)
+                        (delete-work-dir conf)
                         (deliver-end (conf/get-ending conf))]}]]
 
       [:job/end

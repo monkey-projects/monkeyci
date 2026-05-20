@@ -58,5 +58,8 @@
 (defn failure [p]
   (ansi/style p :bright :red))
 
+(defn em [s]
+  (ansi/style s :bright :magenta))
+
 (defn print-cmd-start [job cmd]
-  (print-job-msg job "Command started:" (ansi/style cmd :bright :magenta)))
+  (print-job-msg job "Command started:" (em cmd)))

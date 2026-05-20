@@ -228,42 +228,56 @@
           (is (map? result))
           (is (nil? (sut/get-workspace result))))))))
 
-(deftest delete-workspace-test
-  (testing "deletes workspace on leave when clean is `true`"
-    (fs/with-temp-dir [ws-dir]
-      (let [conf    (cc/set-clean {} true)
-            ctx     (-> {}
-                        (emi/update-state assoc :workspace (str ws-dir)))
-            {:keys [leave]} (sut/delete-workspace conf)]
-        (is (fs/exists? ws-dir) "workspace must exist before leave")
-        (leave ctx)
-        (is (not (fs/exists? ws-dir)) "workspace must be deleted after leave"))))
+(deftest delete-work-dir-test
+  (testing "has a keyword name"
+    (is (keyword? (:name (sut/delete-work-dir {})))))
 
-  (testing "does NOT delete workspace on leave when clean is `false`"
+  (testing "deletes work-dir on leave when clean is `true`"
     (fs/with-temp-dir [ws-dir]
-      (let [conf    (cc/set-clean {} false)
-            ctx     (-> {}
-                        (emi/update-state assoc :workspace (str ws-dir)))
-            {:keys [leave]} (sut/delete-workspace conf)]
+      (let [conf (-> {}
+                     (cc/set-clean true)
+                     (cc/set-work-dir ws-dir))
+            ctx  {:result {:status :success}}
+            {:keys [leave]} (sut/delete-work-dir conf)]
+        (is (fs/exists? ws-dir) "work-dir must exist before leave")
         (leave ctx)
-        (is (fs/exists? ws-dir) "workspace must NOT be deleted when --no-clean"))))
+        (is (not (fs/exists? ws-dir)) "work-dir must be deleted after leave"))))
 
-  (testing "does nothing when workspace path is nil"
+  (testing "does NOT delete work-dir on leave when clean is `false`"
+    (fs/with-temp-dir [ws-dir]
+      (let [conf (-> {}
+                     (cc/set-clean false)
+                     (cc/set-work-dir ws-dir))
+            ctx {:result {:status :success}}
+            {:keys [leave]} (sut/delete-work-dir conf)]
+        (leave ctx)
+        (is (fs/exists? ws-dir) "work-dir must NOT be deleted when --no-clean"))))
+
+  (testing "does nothing when work-dir path is `nil`"
     (let [conf {}
-          ctx  {}
-          {:keys [leave]} (sut/delete-workspace conf)]
+          ctx  {:result {:status :success}}
+          {:keys [leave]} (sut/delete-work-dir conf)]
       ;; Should not throw
       (is (map? (leave ctx)))))
 
-  (testing "has a keyword name"
-    (is (keyword? (:name (sut/delete-workspace {}))))))
+  (testing "does not delete work dir if build failed"
+    (fs/with-temp-dir [ws-dir]
+      (let [conf (-> {}
+                     (cc/set-clean true)
+                     (cc/set-work-dir ws-dir))
+            ctx  {:result
+                  {:status :error}}
+            {:keys [leave]} (sut/delete-work-dir conf)]
+        (is (fs/exists? ws-dir) "work-dir must exist before leave")
+        (leave ctx)
+        (is (fs/exists? ws-dir) "work-dir must not be deleted after leave")))))
 
 (deftest make-routes-workspace-test
   (testing "save-workspace is wired into :build/pending"
     (let [routes (into {} (sut/make-routes {} (test-mailman)))]
       (is (has-interceptor? routes :build/pending ::sut/save-workspace))))
 
-  (testing "delete-workspace is wired into :build/end"
+  (testing "delete-work-dir is wired into :build/end"
     (let [routes (into {} (sut/make-routes {} (test-mailman)))]
-      (is (has-interceptor? routes :build/end ::sut/delete-workspace)))))
+      (is (has-interceptor? routes :build/end ::sut/delete-work-dir)))))
 
