@@ -1,4 +1,6 @@
-{:deps {babashka/fs {:mvn/version "0.5.33"}
+{:paths ["src"]
+ 
+ :deps {babashka/fs {:mvn/version "0.5.33"}
         camel-snake-kebab/camel-snake-kebab {:mvn/version "0.4.3"}
         cheshire/cheshire {:mvn/version "6.2.0"}
         clj-commons/clj-yaml {:mvn/version "1.0.29"}
@@ -7,7 +9,8 @@
  :aliases
  {:test
   ;; clj -X:test
-  {:extra-deps {ch.qos.logback/logback-classic {:mvn/version "1.5.18"}
+  {:extra-paths ["test"]
+   :extra-deps {ch.qos.logback/logback-classic {:mvn/version "1.5.18"}
                 com.monkeyprojects/build {:mvn/version "0.3.1"}}
    :exec-fn monkey.test/all}
 
