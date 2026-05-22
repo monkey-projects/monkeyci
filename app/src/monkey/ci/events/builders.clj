@@ -2,7 +2,6 @@
   "Common event builders"
   (:require [medley.core :as mc]
             [monkey.ci.build.core :as bc]
-            [monkey.ci.containers :as co]
             [monkey.ci.events.core :as ec]))
 
 (defn script-event [type build-sid]

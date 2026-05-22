@@ -18,18 +18,16 @@
             [monkey.ci.agent
              [api-server :as aa]
              [events :as e]]
-            [monkey.ci.build
-             [api-server :as bas]
-             [api :as ba]]
+            [monkey.ci.build.api-server :as bas]
             [monkey.ci.containers
              [log-ingest :as cl]
-             [oci :as c-oci]
              [podman :as c-podman]]
             [monkey.ci.events
              [mailman :as em]
              [polling :as ep]]
             [monkey.ci.logging.log-ingest :as log-ingest]
             [monkey.ci.metrics.core :as mc]
+            [monkey.ci.oci.containers :as c-oci]
             [monkey.ci.runners.runtime :as rr]
             [monkey.ci.web.auth :as auth]
             [monkey.mailman.core :as mmc]))
@@ -79,20 +77,10 @@
 
 ;; TODO Move this implementation to api-server ns
 (defn new-ssh-keys-fetcher [config]
-  (let [maker (api-with-token-maker config)
-        try-slurp (fn [x]
-                    (try
-                      (slurp x)
-                      (catch Exception ex x)))]
+  (let [maker (api-with-token-maker config)]
     (fn [[org-id repo-id :as sid]]
       (let [api (maker sid)]
-        (log/debug "Retrieving ssh keys for" sid)
-        (-> (ba/api-request api {:path (format "/org/%s/repo/%s/ssh-keys" org-id repo-id)
-                                 :method :get
-                                 :accept "application/edn"})
-            (deref)
-            :body
-            (edn/edn->))))))
+        (bas/fetch-ssh-keys-from-api api sid)))))
 
 (defn new-build-key-decrypter
   "Build key decrypter, to decrypt the build data encryption key, which is then

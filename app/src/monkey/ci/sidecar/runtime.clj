@@ -2,14 +2,13 @@
   "Functions for creating a runtime for a build-aware environment for the sidecar"
   (:require [com.stuartsierra.component :as co]
             [monkey.ci
-             [artifacts :as art]
-             [cache :as cache]
              [spec :as spec]
              [workspace :as ws]]
-            [monkey.ci.build.api :as api]
             [monkey.ci.containers.common :as cc]
-            [monkey.ci.events.mailman.build-api :as eba]
             [monkey.ci.runtime.common :as rc]
+            [monkey.ci.script
+             [api-client :as api]
+             [mailman :as eba]]
             [monkey.ci.sidecar
              [config :as cs]
              [spec :as ss]]))
@@ -41,10 +40,10 @@
   (ws/make-build-api-workspace nil cc/work-dir))
 
 (defn- new-artifacts []
-  (art/make-build-api-repository nil))
+  (api/make-artifact-repository nil))
 
 (defn- new-cache []
-  (cache/make-build-api-repository nil))
+  (api/make-cache-repository nil))
 
 (defn make-system
   "Given a sidecar configuration object, creates component system.  When started,

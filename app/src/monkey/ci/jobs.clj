@@ -22,7 +22,7 @@
 (def status "Get job status" :status)
 (def labels "Get job labels" :labels)
 (def save-artifacts "Gets artifacts saved by job" :save-artifacts)
-(def job-id "Gets job id" :id)
+(def job-id "Gets job id" bc/job-id)
 (def work-dir "Gets job work dir" :work-dir)
 
 (def default-job-timeout
@@ -180,7 +180,8 @@
    successful)."
   [others job]
   (->> (deps job)
-       (map (partial (comp others job-id) others))
+       (map others)
+       (map (partial (comp others job-id)))
        (every? success?)))
 
 (defn- next-jobs*
@@ -192,9 +193,7 @@
                   jobs-by-id))
 
 (defn- group-by-id [jobs]
-  (->> jobs
-       (group-by :id)
-       (mc/map-vals first)))
+  (mc/index-by :id jobs))
 
 (defn next-jobs
   "Returns a list of next jobs that are eligible for execution.  If all jobs are

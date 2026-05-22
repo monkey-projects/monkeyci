@@ -166,11 +166,6 @@
 
 (def now t/now)
 
-(defn ->seq
-  "Converts `x` into a sequential"
-  [x]
-  (if (sequential? x) x [x]))
-
 (defn or-nil
   "Wraps `f` so that when the argument is `nil`, it also returns `nil` and does not invoke `f`."
   [f]
@@ -263,3 +258,10 @@
   (inetaddr->str [a]
     ;; Drop the scope id
     (.getHostAddress (java.net.InetAddress/getByAddress nil (.getAddress a)))))
+
+(defn mb
+  "Returns file size in MB"
+  [f]
+  (if (fs/exists? f)
+    (float (/ (fs/size f) (* 1024 1024)))
+    0.0))

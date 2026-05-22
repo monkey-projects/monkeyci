@@ -1,0 +1,6 @@
+{:paths ["bb"]
+ :deps {com.monkeyci/script {:local/root "."}}
+
+ :tasks
+ {test {:requires ([test-runner :as tr])
+        :task (tr/run-tests)}}}

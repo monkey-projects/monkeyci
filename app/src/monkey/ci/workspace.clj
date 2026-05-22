@@ -3,22 +3,22 @@
             [clojure.tools.logging :as log]
             [manifold.deferred :as md]
             [monkey.ci
-             [blob :as b]
              [build :as build]
              [protocols :as p]]
-            [monkey.ci.build.archive :as arch]))
+            [monkey.ci.build.archive :as arch]
+            [monkey.ci.common.constants :as const]))
 
 (defn workspace-dest
   "Determines the workspace destination path for this build"
   [sid]
-  (str (cs/join "/" sid) b/extension))
+  (str (cs/join "/" sid) const/blob-extension))
 
 (defn create-workspace [{:keys [checkout-dir] :as build} {ws :workspace}]
   (let [dest (workspace-dest (build/sid build))]
     (when checkout-dir
       (log/info "Creating workspace using files from" checkout-dir)
       @(md/chain
-        (b/save ws checkout-dir dest)   ; TODO Check for errors
+        (p/save-blob ws checkout-dir dest nil)   ; TODO Check for errors
         (constantly (assoc build :workspace dest))))))
 
 (defrecord BlobWorkspace [store dir]
@@ -27,7 +27,7 @@
     (if (and store sid dir)
       (let [src (workspace-dest sid)]
         (log/info "Restoring workspace" src)
-        (b/restore store src dir))
+        (p/restore-blob store src dir))
       ;; Did nothing if not configured
       (md/success-deferred nil))))
 

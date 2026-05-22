@@ -5,9 +5,8 @@
             [meta-merge.core :as mm]
             [monkey.ci
              [config :as config]
-             [oci :as oci]
              [storage]]
-            [monkey.ci.storage.oci])
+            [monkey.ci.oci.storage])
   (:import java.io.PushbackReader))
 
 ;; Global config state

@@ -253,6 +253,9 @@
                   (assoc-in b [:script :script-dir] (get-in ctx [:event :script-dir])))))
 
 (def script-start
+  ;; TODO Keep track of time elapsed since :script/initializing and add this to the
+  ;; consumed credits.  This to avoid users "hiding" expensive calculations outside
+  ;; of actual jobs.
   (build-update (fn [b ctx]
                   (assoc-in b [:script :jobs] (->> (get-in ctx [:event :jobs])
                                                    (map #(vector (j/job-id %) %))

@@ -1,0 +1,17 @@
+<configuration>
+
+  <!--
+  <appender name="SYSLOG" class="ch.qos.logback.classic.net.SyslogAppender">
+    <syslogHost>localhost</syslogHost>
+    <facility>USER</facility>
+    <suffixPattern>[%thread] %logger{36} - %msg%n</suffixPattern>
+    </appender>
+  -->
+  
+  <appender name="NOP" class="ch.qos.logback.core.helpers.NOPAppender">
+  </appender>
+  
+  <root level="INFO">
+    <appender-ref ref="NOP"/>
+  </root>
+</configuration>

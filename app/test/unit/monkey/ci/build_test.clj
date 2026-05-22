@@ -5,14 +5,6 @@
              [runtime :as rt]
              [utils :as u]]))
 
-(deftest calc-checkout-dir
-  (testing "combines build id with checkout base dir from config"
-    (let [rt {:config {:checkout-base-dir "/tmp/checkout-base"}}
-          build {:build-id "test-build"}]
-      (is (= "/tmp/checkout-base" ((rt/from-config :checkout-base-dir) rt)))
-      (is (= "/tmp/checkout-base/test-build"
-             (sut/calc-checkout-dir rt build))))))
-
 (deftest job-work-dir
   (testing "returns job work dir as absolute path"
     (is (= "/job/work/dir"

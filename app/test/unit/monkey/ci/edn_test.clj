@@ -1,15 +1,13 @@
 (ns monkey.ci.edn-test
-  (:require
-   [aero.core :as ac]
-   [buddy.core.codecs :as codecs]
-   [clojure.test :refer [deftest is testing]]
-   [monkey.ci.edn :as sut]
-   [monkey.ci.test.helpers :as h]
-   [monkey.ci.utils :as u]
-   [monkey.ci.vault :as vault]
-   [monkey.ci.version :as v])
-  (:import
-   (java.io StringReader)))
+  (:require [aero.core :as ac]
+            [buddy.core.codecs :as codecs]
+            [clojure.test :refer [deftest is testing]]
+            [monkey.ci
+             [edn :as sut]
+             [version :as v]]
+            [monkey.ci.test.helpers :as h]
+            [monkey.ci.vault.common :as vc])
+  (:import (java.io StringReader)))
 
 (deftest edn-conversion
   (testing "can convert objects to edn and back"
@@ -38,7 +36,7 @@
 
 (deftest aes-key
   (testing "parses to byte array"
-    (let [orig (vault/generate-key)
+    (let [orig (vc/generate-key)
           b64-key (codecs/bytes->b64-str orig)
           parsed (ac/read-config (StringReader. (str "#aes-key \"" b64-key "\"")))]
       (is (= (count orig) (count parsed)))

@@ -2,7 +2,6 @@
   "Event handlers for commands"
   (:require [aleph.http :as http]
             [babashka.fs :as fs]
-            [buddy.core.codecs :as codecs]
             [cheshire.core :as json]
             [clj-commons.byte-streams :as bs]
             [clj-yaml.core :as yaml]
@@ -20,8 +19,7 @@
              [process :as proc]
              [runtime :as rt]
              [spec :as spec]
-             [utils :as u]
-             [vault :as v]]
+             [utils :as u]]
             [monkey.ci.events
              [core :as ec]
              [mailman :as em]]
@@ -102,7 +100,8 @@
            :org-id (get-in config [:account :org-id] "local-org")
            :repo-id (get-in config [:account :repo-id] "local-repo")
            :build-id (b/local-build-id)
-           :dek (codecs/bytes->b64-str (v/generate-key))}
+           ;; Generate semi-random key, avoid dependency on vault stuff
+           :dek (u/->base64 (.replaceAll (str (random-uuid)) "-" ""))}
     git-url (assoc-in [:git :url] git-url)
     commit-id (assoc-in [:git :ref] commit-id)
     branch (assoc-in [:git :branch] branch)

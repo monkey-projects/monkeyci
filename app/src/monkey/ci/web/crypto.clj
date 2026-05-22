@@ -15,7 +15,7 @@
   ([st org-id]
    (if-let [crypto (st/find-crypto st org-id)]
      (:iv crypto)
-     (let [iv (v/generate-iv)]
+     (let [iv (vc/generate-iv)]
        (log/debug "No crypto record found for org" org-id ", generating a new one")
        (when (st/save-crypto st {:org-id org-id
                                  :iv iv})
@@ -70,7 +70,7 @@
 (defn generate-build-dek
   "Generates a new build-specific DEK, encrypted using the DEK of the org."
   [rt org-id]
-  (let [dek (-> (v/generate-key)
+  (let [dek (-> (vc/generate-key)
                 (bcc/bytes->b64-str))
         e (get-in rt [:crypto :encrypter])]
     {:key dek

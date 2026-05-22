@@ -7,11 +7,12 @@
             [monkey.ci
              [config :as config]
              [containers :as c]
-             [oci :as oci]
              [protocols :as p]
              [runtime :as rt]
              [utils :as u]]
-            [monkey.ci.containers.oci :as oci-cont]
+            [monkey.ci.oci
+             [containers :as oci-cont]
+             [core :as oci]]
             [monkey.oci.container-instance.core :as ci]
             [manifold
              [deferred :as md]

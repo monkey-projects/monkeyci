@@ -2,7 +2,6 @@
   "Build script configuration functions, used by the process controller to 
    create a valid configuration that can then be read by the build script runner."
   (:require [clojure.spec.alpha :as s]
-            [manifold.deferred :as md]
             [monkey.ci.spec
              [build-api :as ba]
              [job :as j]]))
@@ -11,7 +10,7 @@
 (s/def ::build map?) ; TODO specify
 (s/def ::job ::j/job)
 (s/def ::filter (s/coll-of string?))
-(s/def ::result md/deferred?)
+(s/def ::result some?)
 
 (def empty-config {})
 

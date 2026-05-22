@@ -17,13 +17,14 @@
              [artifacts :as art]
              [build :as build]
              [cache :as cache]
+             [edn :as edn]
              [protocols :as p]
              [spec :as spec]
              [utils :as u]]
-            [monkey.ci.build.api :as ba]
             [monkey.ci.events
              [http :as eh]
              [mailman :as em]]
+            [monkey.ci.script.api-client :as ba]
             [monkey.ci.spec.api-server :as aspec]
             [monkey.ci.web
              [common :as c]
@@ -95,6 +96,15 @@
                           :headers {"content-type" "application/edn"
                                     "content-length" (str (count body))}}))
         (md/chain :body :key))))
+
+(defn fetch-ssh-keys-from-api [api [org-id repo-id :as sid]]
+  (log/debug "Retrieving ssh keys for" sid)
+  (-> (ba/api-request api {:path (format "/org/%s/repo/%s/ssh-keys" org-id repo-id)
+                           :method :get
+                           :accept "application/edn"})
+      (deref)
+      :body
+      (edn/edn->)))
 
 (defn- invalid-config [& _]
   (-> (rur/response {:error "Invalid or incomplete API context configuration"})

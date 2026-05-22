@@ -6,8 +6,8 @@
             [clojure.tools.logging :as log]
             [monkey.ci.build :as b]
             [monkey.ci.build
-             [api :as api]
-             [core :as core]]))
+             [core :as core]]
+            [monkey.ci.script.api-client :as api]))
 
 (defn bash [& args]
   (core/as-job

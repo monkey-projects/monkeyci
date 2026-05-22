@@ -8,7 +8,7 @@
              [helpers :as eh]
              [migrations :as sut]]
             [monkey.ci.test.helpers :as h]
-            [monkey.ci.vault :as v]
+            [monkey.ci.vault.common :as vc]
             [monkey.ci.web.crypto :as crypto]
             [ragtime
              [core :as rc]
@@ -173,7 +173,7 @@
     (let [org (ec/insert-org conn (gen-org))
           crypto (ec/insert-crypto conn
                                    {:org-id (:id org)
-                                    :iv (v/generate-iv)})
+                                    :iv (vc/generate-iv)})
           conn (assoc conn :crypto {:dek-generator (fn [org-id]
                                                      {:enc (str "test-dek for " org-id)
                                                       :key "plain-key"})})]
@@ -197,7 +197,7 @@
           pv (ec/insert-org-param conn {:org-id (:id org)})
           crypto (ec/insert-crypto conn
                                    {:org-id (:id org)
-                                    :iv (v/generate-iv)})
+                                    :iv (vc/generate-iv)})
           conn (assoc conn
                       :crypto {:encrypter (fn [p org-id id]
                                             (when (= "vault-decrypted" p)
@@ -244,7 +244,7 @@
                                       :private-key "vault-encrypted"})
           crypto (ec/insert-crypto conn
                                    {:org-id (:id org)
-                                    :iv (v/generate-iv)})
+                                    :iv (vc/generate-iv)})
           conn (assoc conn
                       :crypto {:encrypter (fn [p org-id id]
                                             (when (= "vault-decrypted" p)
