@@ -64,6 +64,12 @@
 (def test-common
   (test-sublib {:dir "common" :should? p/build-common?}))
 
+(def test-core
+  (test-sublib {:dir "core" :should? p/build-core?}))
+
+(def test-script
+  (test-sublib {:dir "script" :should? p/build-script?}))
+
 (def test-cli
   (test-sublib {:dir "cli" :should? p/build-cli?}))
 
@@ -324,9 +330,11 @@
 ;; List of jobs
 (def jobs
   [test-common
+   test-core
    test-app
    test-gui
    test-test-lib
+   test-script
            
    app-uberjar
    upload-uberjar
