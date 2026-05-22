@@ -19,9 +19,9 @@
         com.github.loki4j/loki-logback-appender {:mvn/version "2.0.3"}
         com.github.seancorfield/honeysql {:mvn/version "2.7.1368"}
         com.github.seancorfield/next.jdbc {:mvn/version "1.3.1093"}
-        com.monkeyci/common {:mvn/version "0.26.7-SNAPSHOT"}
+        com.monkeyci/common {:mvn/version "0.26.7"}
         com.monkeyprojects/aero-ext {:mvn/version "0.3.1"}
-        com.monkeyprojects/clj-scw-client {:mvn/version "0.1.5-SNAPSHOT"}
+        com.monkeyprojects/clj-scw-client {:mvn/version "0.1.5"}
         com.monkeyprojects/clompress {:mvn/version "0.2.0"}
         com.monkeyprojects/flow {:mvn/version "0.1.0"}
         com.monkeyprojects/mailman-core {:mvn/version "0.3.1"}
