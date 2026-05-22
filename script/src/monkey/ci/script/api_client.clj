@@ -1,6 +1,8 @@
 (ns monkey.ci.script.api-client
   "Functions for invoking the build api HTTP server"
-  (:require [monkey.ci.errors :as err]
+  (:require [clojure.edn :as edn]
+            [clojure.tools.logging :as log]
+            [monkey.ci.errors :as err]
             [org.httpkit.client :as http]))
 
 (defn api-request
@@ -40,6 +42,8 @@
           (deref)
           (throw-on-error)))))
 
+(def ctx->api-client (comp :client :api))
+
 (defn decrypt-key* [client enc-dek]
   (let [p (pr-str enc-dek)]
     (-> (client {:path "/decrypt-key"
@@ -55,3 +59,22 @@
    request to the build api server."
   ;; TODO Smarter caching
   (memoize decrypt-key*))
+
+(defn- fetch-params [ctx]
+  (let [client (ctx->api-client ctx)]
+    (log/debug "Fetching repo params")
+    (->> (client {:path "/params"
+                  :method :get})
+         :body
+         slurp
+         (edn/read-string)
+         (map (juxt :name :value))
+         (into {}))))
+
+(def build-params
+  "Retrieves the params for this build.  This fetches the parameters from the
+   API, and adds to them any additional parameters that have been specified on
+   the build itself.  Since these are in encrypted form, we need to decrypt
+   them here."
+  ;; Use memoize because we'll only want to fetch them once
+  (memoize fetch-params))

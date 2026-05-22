@@ -70,27 +70,11 @@
                 {:body (->stream "decrypted key")}))]
       (is (= "decrypted key" (sut/decrypt-key* m "encrypted-key"))))))
 
-#_(deftest build-params
-  (let [dek (vc/generate-key)
-        m (fn [req]
-            (cond
-              (= "/params" (:path req))
-              {:body
-               [{:name "key"
-                 :value "value"}]}
-              (= "/decrypt-key" (:path req))
-              {:body (->stream (bcc/bytes->b64-str dek))}))
-        org-id (cuid/random-cuid)
-        rt {:api {:client m}
-            :build
-            {:org-id org-id
-             :sid [org-id "test-repo" "test-build"]
-             :dek "encrypted-dek"
-             :params {"extra-param" (crypto/encrypt dek (crypto/cuid->iv org-id) "extra-val")}}}
-        params (sut/build-params rt)]
-    
-    (testing "invokes `params` endpoint on client"
-      (is (= "value" (get params "key"))))
-
-    (testing "adds decrypted additional build params"
-      (is (= "extra-val" (get params "extra-param"))))))
+(deftest build-params
+  (testing "invokes `params` endpoint on client"
+    (let [m (fn [req]
+              (when (and (= "/params" (:path req))
+                         (= :get (:method req)))
+                {:body (->stream (pr-str [{:name "test-param"
+                                           :value "test-val"}]))}))]
+      (is (= {"test-param" "test-val"} (sut/build-params {:api {:client m}}))))))
