@@ -5,9 +5,8 @@
             [monkey.ci.entities
              [build :as eb]
              [core :as ec]]
-            [monkey.ci
-             [protocols :as mp]
-             [vault :as vault]]
+            [monkey.ci.protocols :as mp]
+            [monkey.ci.vault.common :as vc]
             [ragtime
              [core :as rt]
              [next-jdbc :as rj]
@@ -132,7 +131,7 @@
        (log/debug "Creating crypto records for" (count cust) "customers")
        (doseq [c cust]
          (ec/insert-crypto conn {:customer-id (:id c)
-                                 :iv (vault/generate-iv)}))))
+                                 :iv (vc/generate-iv)}))))
    ;; No rollback
    (constantly nil)))
 

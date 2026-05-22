@@ -53,15 +53,19 @@
           (cond->
             (p/build-common? ctx) (m/depends-on ["test-common"]))))
 
-(defn test-test-lib [ctx]
-  (run-tests ctx {:id "test-test-lib"
-                  :dir "test-lib"
-                  :should-test? p/build-test-lib?}))
+(defn- test-sublib [{:keys [dir id should?]}]
+  (let [id (or id (str "test-" dir))]
+    (fn [ctx]
+      (run-tests ctx {:id id :dir dir :should-test? should?}))))
 
-(defn test-common [ctx]
-  (run-tests ctx {:id "test-common"
-                  :dir "common"
-                  :should-test? p/build-common?}))
+(def test-test-lib
+  (test-sublib {:dir "test-lib" :should? p/build-test-lib?}))
+
+(def test-common
+  (test-sublib {:dir "common" :should? p/build-common?}))
+
+(def test-cli
+  (test-sublib {:dir "cli" :should? p/build-cli?}))
 
 (def uberjar-artifact
   (m/artifact "uberjar" "app/target/monkeyci-standalone.jar"))
@@ -257,6 +261,33 @@
             (assoc :save-artifacts [gui-release-artifact]))
         (p/release? ctx) (update :script override-gui-version (config/tag-version ctx)))))
 
+(def cli-uberjar-artifact (m/artifact "cli-uberjar" "cli/target/monkeyci-cli.jar"))
+
+(defn cli-uberjar [ctx]
+  (when (p/publish-cli? ctx)
+    (-> (clj-container "cli-uberjar" "cli" "-T:uberjar")
+        (m/depends-on "test-cli")
+        (m/save-artifacts [cli-uberjar-artifact]))))
+
+(defn cli-native-img [ctx]
+  (when (p/publish-cli? ctx)
+    (let [uberjar "target/monkeyci-cli.jar"]
+      (-> (m/container-job "cli-native-img")
+          (m/image "ghcr.io/graalvm/native-image-community:25-muslib")
+          (m/work-dir "cli")
+          (m/script [(cs/join " "
+                              ["native-image"
+                               "-cp" uberjar
+                               "-jar" uberjar
+                               "-J-Dclojure.spec.skip.macros=true"
+                               "-J-Dclojure.compiler.direct-linking=true"
+                               "--initialize-at-build-time"
+                               "--no-fallback"
+                               "-march=native"
+                               "monkeyci"])])
+          (m/depends-on "cli-uberjar")
+          (m/restore-artifacts [(m/artifact "cli-uberjar" "target")])))))
+
 (defn scw-images
   "Generates a job that patches the scw-images repo in order to build a new
    Scaleway-specific image, using the version associated with this build."
@@ -309,6 +340,11 @@
    build-gui-release
    build-app-image
    build-gui-image
+
+   ;; CLI
+   test-cli
+   cli-uberjar
+   cli-native-img
    
    ;; Trigger scaleway images
    scw-images

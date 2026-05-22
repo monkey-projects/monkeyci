@@ -464,7 +464,7 @@
 
     (testing "`enter` decrypts job env vars"
       (let [[org-id :as sid] (repeatedly 3 cuid/random-cuid)
-            dek (v/generate-key)
+            dek (vc/generate-key)
             v "test-secret"
             enc-val (vc/encrypt dek (v/cuid->iv org-id) v)]
         (is (= v

@@ -2,10 +2,9 @@
   "Build parameter related functionality"
   (:require [clojure.tools.logging :as log]
             [manifold.deferred :as md]
-            [monkey.ci.build
-             [api :as ba]
-             [api-server :as bas]]
-            [monkey.ci.protocols :as p]))
+            [monkey.ci.build.api-server :as bas]
+            [monkey.ci.protocols :as p]
+            [monkey.ci.script.api-client :as ba]))
 
 (defrecord ApiBuildParams [api-maker]
   p/BuildParams

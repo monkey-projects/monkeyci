@@ -3,13 +3,8 @@
    represents the current build."
   (:require [babashka.fs :as fs]
             [clojure.java.io :as io]
-            [clojure.string :as cs]
             [medley.core :as mc]
-            [monkey.ci
-             [runtime :as rt]
-             [sid :as sid]
-             [time :as t]
-             [utils :as u]]
+            [monkey.ci.utils :as u]
             [monkey.ci.build.core :as bc]
             [monkey.ci.events.core :as ec]))
 
@@ -52,10 +47,6 @@
 (defn set-script-dir [b d]
   (assoc-in b [:script :script-dir] d))
 
-(def ^:deprecated rt->script-dir
-  "Gets script dir for the build from runtime"
-  (comp script-dir rt/build))
-
 (defn- maybe-set-git-opts
   "If a git url is specified, updates the build with git information, taken from
    the arguments and from runtime."
@@ -78,13 +69,6 @@
           (base-dir-key)
           (u/combine build-id)))
 
-(defn calc-checkout-dir
-  "Calculates the checkout directory for the build, by combining the checkout
-   base directory and the build id."
-  [rt build]
-  (some-> (get-in rt [rt/config :checkout-base-dir])
-          (u/combine (:build-id build))))
-
 (def checkout-dir
   "Gets the checkout dir as stored in the build structure"
   :checkout-dir)
@@ -97,8 +81,6 @@
 (defn set-credit-multiplier [b cm]
   (assoc b credit-multiplier cm))
 
-(def ^:deprecated rt->checkout-dir (comp checkout-dir rt/build))
-
 (defn calc-script-dir
   "Given an (absolute) working directory and scripting directory, determines
    the absolute script dir."
@@ -107,10 +89,6 @@
        (u/abs-path wd)
        (io/file)
        (.getCanonicalPath)))
-
-(def ssh-keys-dir
-  "Calculates ssh keys dir for the build"
-  (partial build-related-dir (rt/from-config :ssh-keys-dir)))
 
 (defn exit-code->status [exit]
   (if (and (number? exit) (zero? exit))

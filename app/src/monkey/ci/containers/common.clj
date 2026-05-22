@@ -47,9 +47,19 @@
     (cond-> work-dir
       wd (u/combine wd))))
 
+(def internal-cmd
+  "Base command line for app processes"
+  ["java" "-cp" "monkeyci.jar"
+   "-Dlogback.configurationFile=config/logback.xml"
+   "monkey.ci.internal"])
+
+(defn make-internal-cmd [& args]
+  (vec (concat internal-cmd args)))
+
 (def sidecar-cmd
   "Sidecar command list"
-  (c/make-cmd
+  ;; TODO Bypass cli, invoke main directly
+  (make-internal-cmd
    "-c" (str config-dir "/" config-file)
    "internal"
    "sidecar"

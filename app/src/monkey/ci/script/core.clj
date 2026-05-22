@@ -11,9 +11,7 @@
              [build :as build]
              [edn :as edn]
              [jobs :as j]
-             [protocols :as p]
-             [utils :as u]]
-            [monkey.ci.build.core :as bc]))
+             [protocols :as p]]))
 
 ;;; Script loading
 
@@ -25,9 +23,14 @@
   ;; Currently, only container jobs are supported in non-clj files
   (assoc job :type :container))
 
+(defn- ->seq
+  "Converts `x` into a sequential"
+  [x]
+  (if (sequential? x) x [x]))
+
 (defn- normalize [jobs]
   (->> jobs
-       (u/->seq)
+       (->seq)
        (map infer-type)))
 
 (defn- load-edn [path]
@@ -84,7 +87,7 @@
   "Assigns an id to each job that does not have one already."
   [jobs]
   (letfn [(assign-id [x id]
-            (if (nil? (bc/job-id x))
+            (if (nil? (j/job-id x))
               (assoc x :id id)
               x))]
     ;; TODO Sanitize existing ids

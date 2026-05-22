@@ -1,19 +1,17 @@
 (ns monkey.ci.cache
-  "Functionality for saving/restoring caches.  This uses blobs."
+  "Functionality for saving/restoring caches.  This mostly resembles artifacts and as such
+   most functions delegate there."
   (:require [babashka.fs :as fs]
             [clojure.string :as cs]
             [clojure.tools.logging :as log]
             [manifold.deferred :as md]
-            [monkey.ci
-             [artifacts :as art]
-             [blob :as blob]
-             [build :as b]
-             [oci :as oci]]))
+            [monkey.ci.artifacts :as art]
+            [monkey.ci.common.constants :as const]))
 
 (defn cache-archive-path [sid id]
   ;; The cache archive path is the repo sid with the cache id added.
   ;; Build id is not used since caches are meant to supersede builds.
-  (str (cs/join "/" (concat (butlast sid) [id])) blob/extension))
+  (str (cs/join "/" (concat (butlast sid) [id])) const/blob-extension))
 
 (defn- rt->config [rt]
   (-> (art/rt->config rt)
@@ -50,11 +48,6 @@
    (art/->BlobArtifactRepository store (fn [_ id] (cache-archive-path sid id))))
   ([store]
    (art/->BlobArtifactRepository store cache-archive-path)))
-
-(defn make-build-api-repository
-  "Creates an `ArtifactRepository` that can be used to upload/download caches"
-  [client]
-  (art/->BuildApiArtifactRepository client "/cache/"))
 
 ;;; Interceptors
 

@@ -9,10 +9,9 @@
              [state :as ds]]
             [monkey.ci.events.mailman :as em]
             [monkey.ci.metrics.core :as metrics]
-            [monkey.ci
-             [oci :as oci]
-             [storage :as st]]
+            [monkey.ci.storage :as st]
             [monkey.ci.storage.sql]
+            [monkey.ci.oci.core :as oci]
             [monkey.ci.web.http :as http]
             [monkey.oci.container-instance.core :as ci]))
 

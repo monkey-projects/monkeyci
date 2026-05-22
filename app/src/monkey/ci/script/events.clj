@@ -12,15 +12,15 @@
              [extensions :as ext]
              [jobs :as j]
              [vault :as v]]
-            [monkey.ci.build
-             [api :as ba]
-             [core :as bc]]
+            [monkey.ci.build.core :as bc]
             [monkey.ci.events
              [builders :as eb]
              [core :as ec]
              [mailman :as em]]
             [monkey.ci.events.mailman.interceptors :as emi]
-            [monkey.ci.script.core :as s]
+            [monkey.ci.script
+             [api-client :as ba]
+             [core :as s]]
             [monkey.ci.vault.common :as vc]))
 
 ;;; Context management

@@ -4,12 +4,14 @@
             [monkey.ci
              [cuid :as cuid]
              [protocols :as p]
-             [storage :as st]
-             [vault :as v]]
+             [storage :as st]]
             [monkey.ci.test
              [aleph-test :as at]
              [helpers :as h]
              [runtime :as trt]]
+            [monkey.ci.vault
+             [common :as vc]
+             [fixed :as vf]]
             [monkey.ci.web
              [auth :as auth]
              [bitbucket :as sut]
@@ -217,7 +219,7 @@
                (trt/set-decrypter (constantly "decrypted"))
                (assoc :config {:ssh-keys-dir "/tmp"}))
         s (:storage rt)
-        vault (v/make-fixed-key-vault {})
+        vault (vf/make-fixed-key-vault {})
         rt (-> rt
                (trt/set-vault vault))
         repo (-> (h/gen-repo)
@@ -270,7 +272,7 @@
                          :last-inv-time)))))
 
     (testing "adds configured encrypted ssh key matching repo labels"
-      (let [iv (v/generate-iv)
+      (let [iv (vc/generate-iv)
             ssh-key {:id "test-key"
                      :private-key "encrypted-key"}]
         (is (st/sid? (st/save-repo s (assoc repo :labels [{:name "ssh-lbl"

@@ -25,7 +25,7 @@
 
 (defn generate-dek
   "Generates a new AES256 data encryption key (DEK).  Returns a deferred that 
-   contains the generated key and it's encrypted value (for storage).  The DEK 
+   contains the generated key and its encrypted value (for storage).  The DEK 
    should be used to encrypt data, or other encryption keys.  The key should 
    be decoded from base64 before passing it to `common/encrypt`."
   [client]

@@ -5,7 +5,7 @@
             [monkey.ci.dispatcher
              [runtime :as sut]
              [state :as ds]]
-            [monkey.ci.oci :as oci]
+            [monkey.ci.oci.core :as oci]
             [monkey.oci.container-instance.core :as ci]))
 
 (deftest make-system

@@ -6,13 +6,13 @@
             [manifold.deferred :as md]
             [monkey.ci
              [cuid :as cuid]
-             [oci :as oci]
              [protocols :as p]
              [storage :as st]
              [utils :as u]
              [vault :as v]]
             [monkey.ci.logging.log-ingest :as li]
             [monkey.ci.metrics.otlp :as mo]
+            [monkey.ci.oci.core :as oci]
             [monkey.ci.runtime.app :as sut]
             [monkey.ci.vault
              [common :as vc]
@@ -167,7 +167,7 @@
 (deftest crypto
   (h/with-memory-store st
     (let [k {:enc "encrypted-dek"
-             :key (bcc/bytes->b64 (v/generate-key))}]
+             :key (bcc/bytes->b64 (vc/generate-key))}]
       (defmethod sut/dek-utils ::test [_]
         {:generator (constantly k)
          :decrypter (fn [v]

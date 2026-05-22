@@ -1,0 +1,91 @@
+(ns monkey.ci.cli-test
+  (:require [clojure.test :refer [deftest is testing]]
+            [babashka.fs :as fs]
+            [cli-matic.platform :as cp]
+            [monkey.ci.cli
+             [print :as p]
+             [verify :as verify]
+             [version :as v]]
+            [monkey.ci.cli :as sut]))
+
+(deftest print-version
+  (let [printed (atom [])]
+    (with-redefs [p/print-version (fn [v]
+                                    (swap! printed conj v)
+                                    nil)]
+      (testing "prints version to stdout"
+        (is (nil? (sut/print-version {})))
+        (is (= 1 (count @printed)))
+        (is (= (v/version) (first @printed)))))))
+
+(deftest verify-test
+  (testing "returns nil"
+    (with-redefs [fs/exists?      (constantly false)
+                  verify/verify   (constantly [])
+                  p/print-summary (constantly nil)]
+      (is (nil? (sut/verify {:dir "/some/dir"})))))
+
+  (testing "lints the .monkeyci subdirectory when it exists"
+    (let [linted-path (atom nil)]
+      (with-redefs [fs/exists?      (constantly true)
+                    verify/verify   (fn [dir]
+                                      (reset! linted-path dir)
+                                      [])
+                    p/print-summary (constantly nil)]
+        (sut/verify {:dir "/project"})
+        (is (= "/project/.monkeyci" @linted-path)))))
+
+  (testing "lints the given dir when .monkeyci subdirectory does not exist"
+    (let [linted-path (atom nil)]
+      (with-redefs [fs/exists?      (constantly false)
+                    verify/verify   (fn [p]
+                                      (reset! linted-path p)
+                                      [])
+                    p/print-summary (constantly nil)]
+        (sut/verify {:dir "/project"})
+        (is (= "/project" @linted-path)))))
+
+  (testing "delegates to print/print-findings when lint returns findings"
+    (let [received (atom nil)]
+      (with-redefs [fs/path          (fn [& parts] (apply str parts))
+                    fs/exists?       (constantly false)
+                    verify/verify    (constantly [{:details
+                                                   {:summary {}
+                                                    :findings [{:filename "foo.clj"
+                                                                :row      10
+                                                                :message  "unused var"}]}}])
+                    p/print-summary  (constantly nil)
+                    p/print-findings (fn [f] (reset! received f))]
+        (sut/verify {:dir "/project"})
+        (is (= [{:filename "foo.clj" :row 10 :message "unused var"}]
+               @received)))))
+
+  (testing "does not call print/print-findings when there are no findings"
+    (let [called (atom false)]
+      (with-redefs [fs/exists?       (constantly false)
+                    verify/verify    (constantly
+                                      [{:details
+                                        {:summary {} :findings []}}])
+                    p/print-summary  (constantly nil)
+                    p/print-findings (fn [_] (reset! called true))]
+        (sut/verify {:dir "/project"})
+        (is (false? @called))))))
+
+(deftest -main
+  (with-redefs [cp/exit-script identity]
+    (testing "`version` prints version"
+      (let [printed (atom nil)]
+        (with-redefs [sut/print-version (partial reset! printed)]
+          (is (zero? (sut/-main "version")))
+          (is (some? @printed)))))
+
+    (testing "`verify`"
+      (let [v (atom nil)]
+        (with-redefs [sut/verify (partial reset! v)]
+          (testing "verifies script"
+            (is (zero? (sut/-main "verify")))
+            (is (some? @v)))
+
+          (testing "accepts dir"
+            (is (zero? (sut/-main "verify" "-d" "test/dir")))
+            (is (= "test/dir" (:dir @v)))))))))

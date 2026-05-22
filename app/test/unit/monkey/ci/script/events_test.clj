@@ -4,9 +4,7 @@
             [clojure.test :refer [deftest is testing]]
             [manifold.deferred :as md]
             [medley.core :as mc]
-            [monkey.ci.build
-             [api :as ba]
-             [core :as bc]]
+            [monkey.ci.build.core :as bc]
             [monkey.ci.events
              [mailman :as em]
              [spec :as es]]
@@ -18,6 +16,7 @@
              [jobs :as j]
              [vault :as v]]
             [monkey.ci.script
+             [api-client :as ba]
              [core :as sc]
              [events :as sut]]
             [monkey.ci.test
@@ -73,7 +72,7 @@
       (let [org-id (cuid/random-cuid)
             build {:dek "encrypted-key"
                    :org-id org-id}
-            dek (v/generate-key)
+            dek (vc/generate-key)
             init-ctx {:build build
                       :api
                       {:client (fake-decrypter-client dek)}}]
@@ -540,7 +539,7 @@
         (testing "encrypts newly added env vars"
           (let [org-id (cuid/random-cuid)
                 job-id "dynamic-container"
-                dek (v/generate-key)
+                dek (vc/generate-key)
                 build {:org-id org-id
                        :dek dek}
                 init-ctx {:api

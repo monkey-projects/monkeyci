@@ -3,7 +3,7 @@
             [clojure.test :refer [deftest is testing]]
             [com.stuartsierra.component :as co]
             [manifold.stream :as ms]
-            [monkey.ci.containers.oci :as c-oci]
+            [monkey.ci.oci.containers :as c-oci]
             [monkey.ci.events.mailman :as em]
             [monkey.ci.metrics.core :as m]
             [monkey.ci.runners.runtime :as sut]

@@ -4,20 +4,18 @@
             [com.stuartsierra.component :as co]
             [manifold.deferred :as md]
             [monkey.ci
-             [artifacts :as art]
              [build :as b]
-             [cache :as cache]
-             [config :as config]
              [errors :as err]
              [spec :as spec]]
-            [monkey.ci.build.api :as api]
+            [monkey.ci.common.constants :as const]
             [monkey.ci.events
              [builders :as eb]
              [mailman :as em]]
-            [monkey.ci.events.mailman.build-api :as emba]
             [monkey.ci.script
+             [api-client :as api]
              [config :as sc]
-             [events :as se]]))
+             [events :as se]
+             [mailman :as emba]]))
 
 (defn- client-url [{:keys [url port]}]
   (if port
@@ -30,10 +28,10 @@
     (api/make-client (client-url ac) token)))
 
 (defn- new-artifacts []
-  (art/make-build-api-repository nil))
+  (api/make-artifact-repository nil))
 
 (defn- new-cache []
-  (cache/make-build-api-repository nil))
+  (api/make-cache-repository nil))
 
 (defrecord EventStream [client]
   co/Lifecycle
@@ -116,7 +114,7 @@
   [{:keys [config]}]
   (try
     (-> (run-script config)
-        (deref config/max-script-timeout {:status err/error-script-timeout})
+        (deref const/max-script-timeout {:status err/error-script-timeout})
         (status->exit-code)
         (exit!))
     (catch Throwable ex

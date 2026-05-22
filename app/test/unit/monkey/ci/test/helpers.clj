@@ -13,8 +13,8 @@
             [monkey.ci
              [cuid :as cuid]
              [protocols :as p]
-             [storage :as s]
-             [vault :as v]]
+             [storage :as s]]
+            [monkey.ci.runtime.app :as app]
             [monkey.ci.storage.spec :as ss]
             [monkey.ci.web
              [auth :as auth]
@@ -333,7 +333,7 @@
 
 (def fake-vault dummy-vault)
 
-(defmethod v/make-vault :noop [_]
+(defmethod app/make-vault :noop [_]
   (fake-vault))
 
 (defrecord FakeMailer [mailings]
