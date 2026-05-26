@@ -2,10 +2,11 @@
   (:require [clojure.test :refer [deftest testing is]]
             [babashka.fs :as fs]
             [cheshire.core :as json]
+            [monkey.ci.build.core :as bc]
             [monkey.ci.script
              [build :as b]
-             [core :as sut]
-             [jobs :as j]]))
+             [jobs :as j]
+             [load :as sut]]))
 
 (defn- action-job [id f]
   {:type :action
@@ -100,8 +101,25 @@
         (is (j/container-job? (-> (sut/load-jobs build {})
                                   (first))))))
 
-    (testing "combines jobs loaded from multiple sources")))
+    (testing "combines jobs loaded from multiple sources"
+      (let [sd (fs/file (fs/create-dir (fs/path dir "combi")))
+            build (b/set-script-dir {} sd)]
+        (is (nil? (spit (fs/file (fs/path sd "build.json"))
+                        (to-json [{:id "json-job"
+                                   :image "test-img"}]))))
+        (is (nil? (spit (fs/file (fs/path sd "build.edn")) (pr-str [{:id "edn-job"
+                                                                     :type :container
+                                                                     :image "test-img"}]))))
+        (let [loaded (sut/load-jobs build {})]
+          (is (= 2 (count loaded)))
+          (is (= #{"json-job"
+                   "edn-job"}
+                 (->> loaded (map j/job-id) set))))))
 
-
-
-
+    (testing "loads clj files"
+      (let [build (b/set-script-dir {} "dev-resources/test")
+            loaded (sut/load-jobs build {})]
+        (is (= 1 (count loaded)))
+        (is (bc/action-job? (first loaded)))
+        (is (nil? ((-> loaded first :action) {}))
+            "can invoke action")))))

@@ -1,5 +1,5 @@
-(ns monkey.ci.script.core
-  "Core script functionality"
+(ns monkey.ci.script.load
+  "Script loading functionality"
   (:require [babashka.fs :as fs]
             [clojure.tools.logging :as log]
             [monkey.ci.script

@@ -1,5 +1,15 @@
 (ns monkey.ci.script.jobs
-  (:require [monkey.ci.script.utils :as u]))
+  (:require [clojure.core.async :as ca]
+            [clojure.set :as cs]
+            [clojure.tools.logging :as log]
+            [medley.core :as mc]
+            [monkey.ci.events.builders :as eb]
+            [monkey.ci.script
+             [build :as b]
+             [utils :as u]]
+            [monkey.ci.time :as t]
+            [monkey.ci.utils.path :as up]
+            [monkey.mailman.core :as mmc]))
 
 (def job-id :id)
 
@@ -38,6 +48,9 @@
 (defprotocol JobResolvable
   "Able to resolve into jobs (zero or more)"
   (resolve-jobs [x ctx]))
+
+(defn resolvable? [x]
+  (satisfies? JobResolvable x))
 
 (defn job-fn? [x]
   (true? (:job (meta x))))
@@ -82,3 +95,102 @@
   clojure.lang.LazySeq
   (resolve-jobs [v rt]
     (resolve-sequential v rt)))
+
+(defn filter-jobs
+  "Applies a filter to the given jobs, but includes all dependencies of jobs that
+   match the filter, even though the dependencies themselves may not match it."
+  [pred jobs]
+  (let [g (mc/index-by job-id jobs)
+        add-missing-deps (fn [r]
+                           (let [all (->> (vals r)
+                                          (mapcat :dependencies)
+                                          (set))
+                                 missing (cs/difference all (set (:keys r)))]
+                             (merge r (select-keys g missing))))]
+    (loop [p {}
+           r (mc/index-by job-id (filter pred jobs))]
+      (if (= p r)
+        (vals r)
+        (recur r (add-missing-deps r))))))
+
+(defn- make-job-dir-absolute
+  "Rewrites the job dir in the context so it becomes an absolute path, calculated
+   relative to the checkout dir."
+  [{:keys [job build] :as rt}]
+  (let [checkout-dir (b/checkout-dir build)]
+    (update-in rt [:job :work-dir]
+               (fn [d]
+                 (if d
+                   (up/abs-path checkout-dir d)
+                   checkout-dir)))))
+
+(defn rt->context [rt]
+  ;; TODO Move all these into a "components" key so we can remove them all at once
+  (dissoc rt :events :containers :artifacts :cache :mailman))
+
+(defn- add-output [r writer]
+  ;; Add output to the result
+  (.flush writer)
+  (let [out (.toString writer)]
+    (log/trace "Output from job:" out)
+    (cond-> r
+      (not-empty out) (assoc :output out))))
+
+(declare execute!)
+
+(defn- recurse-action
+  "An action may return another job definition, especially in legacy builds.
+   This function checks the result, and if it's not a regular response, it
+   tries to construct a new job from it and execute it recursively."
+  [{:keys [action] :as job}]
+  (fn [rt]
+    (letfn [(assign-id [j]
+              (cond-> j
+                (nil? (job-id j)) (assoc :id (job-id job))))]
+      (let [writer (java.io.StringWriter.)]
+        (ca/go
+         ;; Ensure this executes async
+          (let [r (ca/<! (ca/thread
+                           (binding [*out* writer] ; Capture output
+                             (action (rt->context rt)))))] ; Only pass necessary info
+            (log/debug "Action result:" r)
+            (cond
+              ;; `nil` is treated as a success
+              (nil? r) (add-output b/success writer)
+              ;; Valid response
+              (b/status? r) (add-output r writer)
+              ;; XXX This is not really supported by the user interface right now, but it
+              ;; would be quite powerful.
+              (resolvable? r) (when-let [child (some-> (resolve-jobs r rt)
+                                                       first
+                                                       (assign-id))]
+                                (execute! child (assoc rt :job child)))
+              ;; Treat any other result as a success, but add a warning
+              :else (-> b/success
+                        (b/add-warning {:message "Invalid action result"
+                                        :result r})
+                        (add-output writer)))))))))
+
+(defn execute!
+  "Executes the given action job"
+  [job ctx]
+  (let [build (:build ctx)
+        build-sid (b/sid build)
+        a (-> (recurse-action job)
+              ;; TODO Caches and artifacts
+              #_(cache/wrap-caches)
+              #_(art/wrap-artifacts))
+        job (assoc job
+                   :start-time (t/now))]
+    (mmc/post-events (:mailman ctx)
+                     [(-> (eb/job-start-evt (job-id job) build-sid)
+                          ;; For action jobs, add the credit multiplier on job start since there is
+                          ;; no `initializing` event.
+                          (merge (select-keys build [:credit-multiplier])))])
+    (ca/go
+      (let [r (ca/<! (-> ctx
+                         (make-job-dir-absolute)
+                         (a)))]
+        (log/debug "Action job" (job-id job) "executed with result:" r)
+        (mmc/post-events (:mailman ctx) [(eb/job-executed-evt (job-id job) build-sid r)])
+        r))))

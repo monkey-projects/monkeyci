@@ -57,7 +57,6 @@
 (def decrypt-key
   "Given an encrypted data encryption key, decrypts it by sending a decryption
    request to the build api server."
-  ;; TODO Smarter caching
   (memoize decrypt-key*))
 
 (defn- fetch-params [ctx]
