@@ -18,6 +18,10 @@
                 com.monkeyprojects/build {:mvn/version "0.3.1"}}
    :exec-fn monkey.test/all}
 
+  ;; clj -X:test:junit
+  :junit
+  {:exec-fn monkey.test/junit}
+
   :watch
   ;; clj -X:test:watch
   {:exec-fn monkey.test/watch}}}
