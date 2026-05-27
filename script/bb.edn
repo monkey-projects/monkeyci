@@ -2,5 +2,11 @@
  :deps {com.monkeyci/script {:local/root "."}}
 
  :tasks
- {test {:requires ([test-runner :as tr])
-        :task (tr/run-tests)}}}
+ {test
+  {:requires ([test-runner :as tr])
+   :task (tr/run-tests)}
+
+  test-junit
+  ;; Runs unit tests and outputs results to an xml file
+  {:requires ([test-runner :as tr])
+   :task (tr/run-junit-tests "junit-bb.xml")}}}

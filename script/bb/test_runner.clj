@@ -1,5 +1,7 @@
 (ns test-runner
-  (:require [clojure.test :as t]
+  (:require [clojure.java.io :as io]
+            [clojure.test :as t]
+            [clojure.test.junit :as j]
             [babashka.classpath :as cp]))
 
 (defn run-tests []
@@ -12,3 +14,9 @@
   (let [{:keys [fail error]} (t/run-all-tests (re-pattern "^monkey.ci.script.*-test$"))]
     (when (pos? (+ fail error))
       (System/exit 1))))
+
+(defn run-junit-tests [path]
+  (with-open [pw (io/writer (io/file path))]
+    (binding [t/*test-out* pw]
+      (j/with-junit-output
+        (run-tests)))))

@@ -60,61 +60,52 @@
                                             :job job))
                    :wd)))))
     
-    #_(testing "restores/saves cache if configured"
-        (let [saved (atom false)]
-          (with-redefs [cache/save-caches
-                        (fn [rt]
-                          (reset! saved true)
-                          rt)
-                        cache/restore-caches
-                        (fn [rt]
-                          (->> (get-in rt [:job :caches])
-                               (mapv :id)))]
-            (let [job (bc/action-job ::job-with-caches
-                                     (fn [rt]
-                                       (when-not (= [:test-cache] (get-in rt [:job :caches]))
-                                         bc/failure))
-                                     {:caches [{:id :test-cache
-                                                :path "test-cache"}]})
-                  r @(sut/execute! job (assoc ctx :job job))]
+    (testing "restores/saves caches"
+        (let [caches (atom {})]
+          (letfn [(save-cache [c]
+                    (swap! caches update :saved conj c))
+                  (restore-cache [c]
+                    (swap! caches update :restored conj c))]
+            (let [cache {:id :test-cache
+                         :path "test-cache"}
+                  job (bc/action-job ::job-with-caches
+                                     (constantly bc/success)
+                                     {:caches [cache]})
+                  r (execute-sync job (assoc ctx
+                                             :job job
+                                             :cache {:save save-cache
+                                                     :restore restore-cache}))]
               (is (bc/success? r))
-              (is (true? @saved))))))
+              (is (= [cache] (get @caches :saved)))
+              (is (= [cache] (get @caches :restored)))))))
 
-    #_(testing "saves artifacts if configured"
-        (let [saved (atom false)]
-          (with-redefs [art/save-artifacts
-                        (fn [rt]
-                          (reset! saved true)
-                          rt)]
-            (let [job (bc/action-job ::job-with-artifacts
-                                     (fn [rt]
-                                       (when-not (= :test-artifact (-> (get-in rt [:job :save-artifacts])
-                                                                       first
-                                                                       :id))
-                                         bc/failure))
-                                     {:save-artifacts [{:id :test-artifact
-                                                        :path "test-artifact"}]})
-                  r @(sut/execute! job (assoc ctx :job job))]
-              (is (bc/success? r))
-              (is (true? @saved))))))
+    (testing "saves artifacts"
+        (let [saved (atom nil)]
+          (let [art {:id :test-artifact
+                     :path "test-artifact"}
+                job (bc/action-job ::job-with-artifacts
+                                   (constantly bc/success)
+                                   {:save-artifacts [art]})
+                r (execute-sync job (assoc ctx
+                                           :job job
+                                           :artifact {:save (partial swap! saved conj)
+                                                      :restore (constantly nil)}))]
+            (is (bc/success? r))
+            (is (= [art] @saved)))))
 
-    #_(testing "restores artifacts if configured"
-        (let [restored (atom false)]
-          (with-redefs [art/restore-artifacts
-                        (fn [rt]
-                          (reset! restored true)
-                          rt)]
-            (let [job (bc/action-job ::job-with-artifacts
-                                     (fn [rt]
-                                       (when-not (= :test-artifact (-> (get-in rt [:job :restore-artifacts])
-                                                                       first
-                                                                       :id))
-                                         (assoc bc/failure)))
-                                     {:restore-artifacts [{:id :test-artifact
-                                                           :path "test-artifact"}]})
-                  r @(sut/execute! job (assoc ctx :job job))]
-              (is (bc/success? r))
-              (is (true? @restored))))))
+    (testing "restores artifacts"
+        (let [restored (atom nil)]
+          (let [art {:id :test-artifact
+                     :path "test-artifact"}
+                job (bc/action-job ::job-with-artifacts
+                                   (constantly bc/success)
+                                   {:restore-artifacts [art]})
+                r (execute-sync job (assoc ctx
+                                           :job job
+                                           :artifact {:save (constantly nil)
+                                                      :restore (partial swap! restored conj)}))]
+            (is (bc/success? r))
+            (is (= [art] @restored)))))
 
     (testing "recursion"
 

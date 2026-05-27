@@ -152,7 +152,12 @@
     (-> (rur/response is)
         (rur/content-type "application/octet-stream"))))
 
-(defn- handle-download-artifact [req {:keys [artifact-dir build]}]
+(defn- handle-download-artifact
+  "Since scripts are often unable to unzip artifacts (e.g. if they run in babashka),
+   downloading artifacts is not provided.  Instead, this handler copies the artifact
+   files to a location indicated by the script.  The call returns the path where the
+   script can find the files."
+  [req {:keys [artifact-dir build]}]
   (let [id   (-> req :path-params :artifact-id)
         path (artifact-path artifact-dir (:sid build) id)
         f    (io/file path)]

@@ -5,6 +5,7 @@
             [medley.core :as mc]
             [monkey.ci.build.core :as bc]
             [monkey.ci.events.builders :as eb]
+            [monkey.ci.jobs :as j]
             [monkey.ci.script
              [build :as b]
              [utils :as u]]
@@ -180,6 +181,34 @@
                    [(eb/job-end-evt (job-id job) sid (-> bc/failure
                                                          (bc/with-message (ex-message ex))))]))
 
+(defn- wrap-caches [f job ctx]
+  (fn [rt]
+    (let [c (not-empty (j/caches job))
+          save (get-in ctx [:cache :save])
+          restore (get-in ctx [:cache :restore])]
+      (when c
+        (doseq [r c]
+          (restore r)))
+      (ca/go
+        (let [v (ca/<! (f rt))]
+          (doseq [r c]
+            (save r))
+          v)))))
+
+(defn- wrap-artifacts [f job ctx]
+  (fn [rt]
+    (let [save (get-in ctx [:artifact :save])
+          restore (get-in ctx [:artifact :restore])]
+      (when-let [c (not-empty (j/restore-artifacts job))]
+        (doseq [r c]
+          (restore r)))
+      (ca/go
+        (let [v (ca/<! (f rt))]
+          (when-let [c (not-empty (j/save-artifacts job))]
+            (doseq [r c]
+              (save r)))
+          v)))))
+
 (defn execute!
   "Executes the given action job.  Posts start/end events to the broker provided in the
    context.  Returns a channel that will hold the result."
@@ -187,9 +216,8 @@
   (let [build (:build ctx)
         build-sid (b/sid build)
         a (-> (recurse-action job (partial post-error mailman job build-sid))
-              ;; TODO Caches and artifacts
-              #_(cache/wrap-caches)
-              #_(art/wrap-artifacts))
+              (wrap-caches job ctx)
+              (wrap-artifacts job ctx))
         job (assoc job
                    :start-time (t/now))]
     (mmc/post-events mailman

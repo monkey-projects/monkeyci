@@ -59,14 +59,18 @@
    request to the build api server."
   (memoize decrypt-key*))
 
+(defn- body->edn [v]
+  (some-> v
+          slurp
+         (edn/read-string)))
+
 (defn- fetch-params [ctx]
   (let [client (ctx->api-client ctx)]
     (log/debug "Fetching repo params")
     (->> (client {:path "/params"
                   :method :get})
          :body
-         slurp
-         (edn/read-string)
+         (body->edn)
          (map (juxt :name :value))
          (into {}))))
 
@@ -77,3 +81,42 @@
    them here."
   ;; Use memoize because we'll only want to fetch them once
   (memoize fetch-params))
+
+(defn- store-path [client req id src]
+  (->> (client {:path (str "/" req "/" id)
+                :method :post
+                :body (pr-str {:path src})})
+       :body
+       (body->edn)
+       :path))
+
+(defn- restore-path [client req id dest]
+  (->> (client {:path (str "/" req "/" id)
+                :query-params {:path dest}
+                :method :get})
+       :body
+       (body->edn)
+       :path))
+
+(defn get-artifact
+  "Since scripts are often unable to unzip artifacts (e.g. if they run in babashka),
+   downloading artifacts is not available.  Instead we request the server to copy
+   the desired files to a specified location."
+  [client art-id dest]
+  (restore-path client "artifact" art-id dest))
+
+(defn put-artifact
+  "Similar to `get-artifact`, does not actually upload the artifact but does instruct
+   the server to copy the files at given path to artifact storage."
+  [client art-id src]
+  (store-path client "artifact" art-id src))
+
+(defn get-cache
+  "Similar to `get-artifact`."
+  [client art-id dest]
+  (restore-path client "cache" art-id dest))
+
+(defn put-cache
+  "Similar to `put-artifact`"
+  [client art-id src]
+  (store-path client "cache" art-id src))
