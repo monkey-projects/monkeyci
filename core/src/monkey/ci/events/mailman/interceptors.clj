@@ -68,7 +68,7 @@
 (def handle-build-error
   "Marks build as failed"
   {:name ::build-error-handler
-   :error (fn build-error [{:keys [event] ex :error :as ctx}]
+   :error (fn build-error [{:keys [event] :as ctx} ex]
             (log/error "Failed to handle event" (:type event) ", marking build as failed" ex)
             (set-result ctx (b/build-end-evt (-> (:build event)
                                                  (assoc :message (ex-message ex)))

@@ -7,6 +7,7 @@
             [monkey.ci.jobs :as cj]
             [monkey.ci.script
              [events :as sut]
+             [helpers :as h]
              [load :as l]]
             [monkey.mailman.core-async :as mmca]))
 
@@ -126,27 +127,22 @@
             a (sut/get-running-actions r)]
         (is (empty? a))))
 
-    #_(testing "fires `job/end` event"
-      (testing "on exception"
-        (let [job (bc/action-job "failing-sync" nil)
+    (testing "fires `job/end` event"
+      (testing "on config exception"
+        (let [job (bc/action-job "invalid-job" nil)
               r (-> {:event {:job-id (:id job)}}
                     (sut/set-jobs (jobs->map [job]))
                     (emi/set-job-ctx (assoc job-ctx :job job))
                     (enter))]
           (is (= 1 (count (sut/get-running-actions r))))
-          (is (not= :timeout (h/wait-until #(contains? (->> (tm/get-posted broker) (map :type) set)
-                                                       :job/end)
-                                           1000)))
-          (let [evt (->> (tm/get-posted broker)
-                         (filter (comp (partial = :job/end) :type))
-                         (first))]
+          (let [evt (h/wait-for-evt broker (comp (partial = :job/end) :type))]
+            (is (some? evt))
             (is (= :failure (:status evt)))
             (is (string? (-> evt :result :message))))))
 
-      (testing "on async exception"
-        (tm/clear-posted! broker)
+      (testing "on action exception"
         (let [job (bc/action-job
-                   "failing-async"
+                   "failing-action"
                    (fn [_]
                      (throw (ex-info "Test error" {}))))
               r (-> {:event {:job-id (:id job)}}
@@ -154,12 +150,7 @@
                     (emi/set-job-ctx (assoc job-ctx :job job))
                     (enter))]
           (is (= 1 (count (sut/get-running-actions r))))
-          (is (not= :timeout (h/wait-until #(contains? (->> (tm/get-posted broker) (map :type) set)
-                                                       :job/end)
-                                           1000)))
-          (let [evt (->> (tm/get-posted broker)
-                         (filter (comp (partial = :job/end) :type))
-                         (first))]
+          (let [evt (h/wait-for-evt broker (comp (partial = :job/end) :type))]
             (is (= :job/end (:type evt)))
             (is (= :failure (:status evt)))
             (is (= "Test error" (get-in evt [:result :message])))))))))

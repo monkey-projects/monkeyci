@@ -148,11 +148,7 @@
           (execute-job [job ctx]
             (log/debug "Scheduling action job for execution:" (j/job-id job))
             (let [job-ctx (emi/get-job-ctx ctx)]
-              ;; Execute the job onto a fixed thread executor, to limit number of
-              ;; concurrent actions.
-              #_(-> (j/execute! job job-ctx)
-                  ;; Catch exceptions and mark job failed in that case
-                  (md/catch (partial post-job-error job (:mailman job-ctx) (:event ctx))))))]
+              (j/execute! job job-ctx)))]
     {:name ::execute-action
      :enter (fn [ctx]
               ;; Use the job from the context, so extensions can modify it

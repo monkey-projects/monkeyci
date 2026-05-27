@@ -1,4 +1,4 @@
-(ns monkey.ci.script.core-test
+(ns monkey.ci.script.load-test
   (:require [clojure.test :refer [deftest testing is]]
             [babashka.fs :as fs]
             [cheshire.core :as json]

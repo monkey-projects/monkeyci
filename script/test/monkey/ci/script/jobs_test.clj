@@ -2,7 +2,9 @@
   (:require [clojure.test :refer [deftest testing is]]
             [clojure.core.async :as ca]
             [monkey.ci.build.core :as bc]
-            [monkey.ci.script.jobs :as sut]
+            [monkey.ci.script
+             [helpers :as h]
+             [jobs :as sut]]
             [monkey.mailman.core-async :as mmca]))
 
 (defn dummy-job
@@ -29,8 +31,8 @@
       (is (= jobs (sut/filter-jobs (comp (partial = ::first) sut/job-id) jobs))))))
 
 (defn- execute-sync [job ctx]
-  (ca/alts!! [(sut/execute! job ctx)
-              (ca/timeout 100)]))
+  (first (ca/alts!! [(sut/execute! job ctx)
+                     (ca/timeout 100)])))
 
 (deftest action-job
   (let [job (bc/action-job ::test-job (constantly bc/success))
@@ -151,12 +153,8 @@
         ctx {:mailman mailman
              :build {:sid ["test" "build" "sid"]
                      :credit-multiplier 10}}
-        recv (atom [])
+        recv (h/store-events mailman)
         ch (mmca/get-channel mailman)]
-    (ca/go-loop [v (ca/<! ch)]
-      (when v
-        (swap! recv conj v)
-        (recur (ca/<! ch))))
     (is (bc/success? (execute-sync job ctx)))
     (is (nil? (ca/close! ch)))
 

@@ -3,6 +3,7 @@
             [clojure.set :as cs]
             [clojure.tools.logging :as log]
             [medley.core :as mc]
+            [monkey.ci.build.core :as bc]
             [monkey.ci.events.builders :as eb]
             [monkey.ci.script
              [build :as b]
@@ -142,7 +143,7 @@
   "An action may return another job definition, especially in legacy builds.
    This function checks the result, and if it's not a regular response, it
    tries to construct a new job from it and execute it recursively."
-  [{:keys [action] :as job}]
+  [{:keys [action] :as job} on-error]
   (fn [rt]
     (letfn [(assign-id [j]
               (cond-> j
@@ -152,7 +153,10 @@
          ;; Ensure this executes async
           (let [r (ca/<! (ca/thread
                            (binding [*out* writer] ; Capture output
-                             (action (rt->context rt)))))] ; Only pass necessary info
+                             (try
+                               (action (rt->context rt)) ; Only pass necessary info
+                               (catch Exception ex
+                                 (on-error ex))))))] 
             (log/debug "Action result:" r)
             (cond
               ;; `nil` is treated as a success
@@ -164,25 +168,31 @@
               (resolvable? r) (when-let [child (some-> (resolve-jobs r rt)
                                                        first
                                                        (assign-id))]
-                                (execute! child (assoc rt :job child)))
+                                (ca/<! (execute! child (assoc rt :job child))))
               ;; Treat any other result as a success, but add a warning
               :else (-> b/success
                         (b/add-warning {:message "Invalid action result"
                                         :result r})
                         (add-output writer)))))))))
 
+(defn- post-error [broker job sid ex]
+  (mmc/post-events broker
+                   [(eb/job-end-evt (job-id job) sid (-> bc/failure
+                                                         (bc/with-message (ex-message ex))))]))
+
 (defn execute!
-  "Executes the given action job"
-  [job ctx]
+  "Executes the given action job.  Posts start/end events to the broker provided in the
+   context.  Returns a channel that will hold the result."
+  [job {:keys [mailman] :as ctx}]
   (let [build (:build ctx)
         build-sid (b/sid build)
-        a (-> (recurse-action job)
+        a (-> (recurse-action job (partial post-error mailman job build-sid))
               ;; TODO Caches and artifacts
               #_(cache/wrap-caches)
               #_(art/wrap-artifacts))
         job (assoc job
                    :start-time (t/now))]
-    (mmc/post-events (:mailman ctx)
+    (mmc/post-events mailman
                      [(-> (eb/job-start-evt (job-id job) build-sid)
                           ;; For action jobs, add the credit multiplier on job start since there is
                           ;; no `initializing` event.
@@ -192,5 +202,5 @@
                          (make-job-dir-absolute)
                          (a)))]
         (log/debug "Action job" (job-id job) "executed with result:" r)
-        (mmc/post-events (:mailman ctx) [(eb/job-executed-evt (job-id job) build-sid r)])
+        (mmc/post-events mailman [(eb/job-executed-evt (job-id job) build-sid r)])
         r))))
