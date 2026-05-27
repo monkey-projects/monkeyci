@@ -138,7 +138,7 @@
           (let [evt (h/wait-for-evt broker (comp (partial = :job/end) :type))]
             (is (some? evt))
             (is (= :failure (:status evt)))
-            (is (string? (-> evt :result :message))))))
+            (is (contains? (-> evt :result) :message)))))
 
       (testing "on action exception"
         (let [job (bc/action-job

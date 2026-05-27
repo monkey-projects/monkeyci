@@ -1,6 +1,7 @@
 (ns monkey.ci.script.jobs-test
   (:require [clojure.test :refer [deftest testing is]]
             [clojure.core.async :as ca]
+            [clojure.edn :as edn]
             [monkey.ci.build.core :as bc]
             [monkey.ci.script
              [helpers :as h]
@@ -153,24 +154,22 @@
         ctx {:mailman mailman
              :build {:sid ["test" "build" "sid"]
                      :credit-multiplier 10}}
-        recv (h/store-events mailman)
         ch (mmca/get-channel mailman)]
     (is (bc/success? (execute-sync job ctx)))
-    (is (nil? (ca/close! ch)))
 
-    (let [events (group-by :type @recv)]
-      (testing "fires `job/start` event"
-        (let [evt (first (get events :job/start))]
-          (is (some? evt))
-          (is (= (sut/job-id job) (:job-id evt)))
-          ;;(is (spec/valid? ::es/event evt))
-          ;;(is (= evt (edn/edn-> (edn/->edn evt))) "Event should be serializable to edn")
-          (is (= 10 (:credit-multiplier evt)) "Adds credit multiplier from build")))
+    (testing "fires `job/start` event"
+      (let [evt (h/wait-for-evt mailman (comp (partial = :job/start) :type))]
+        (is (some? evt))
+        (is (= (sut/job-id job) (:job-id evt)))
+        ;;(is (spec/valid? ::es/event evt))
+        (is (= evt (edn/read-string (pr-str evt))) "Event should be serializable to edn")
+        (is (= 10 (:credit-multiplier evt)) "Adds credit multiplier from build")))
 
-      (testing "fires `job/executed` event"
-        (let [evt (first (get events :job/executed))]
-          (is (some? evt))
-          ;;(is (spec/valid? ::es/event evt))
-          (is (= (sut/job-id job) (:job-id evt)))
-          ;;(is (= evt (edn/edn-> (edn/->edn evt))) "Event should be serializable to edn")
-          )))))
+    (testing "fires `job/executed` event"
+      (let [evt (h/wait-for-evt mailman (comp (partial = :job/executed) :type))]
+        (is (some? evt))
+        ;;(is (spec/valid? ::es/event evt))
+        (is (= (sut/job-id job) (:job-id evt)))
+        (is (= evt (edn/read-string (pr-str evt))) "Event should be serializable to edn")))
+
+    (is (nil? (ca/close! ch)))))
