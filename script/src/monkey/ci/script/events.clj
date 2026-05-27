@@ -2,11 +2,13 @@
   "Mailman event handlers for scripts"
   (:require [clojure.tools.logging :as log]
             [medley.core :as mc]
+            [meta-merge.core :as mm]
             [monkey.ci.build.core :as bc]
             [monkey.ci.events
              [builders :as eb]
              [core :as ec]]
             [monkey.ci.events.mailman.interceptors :as emi]
+            [monkey.ci.jobs :as cj]
             [monkey.ci.script
              [build :as b]
              [jobs :as j]
@@ -206,3 +208,205 @@
   {:name ::update-job-init
    :leave (fn [ctx]
             (update-job ctx (job-id ctx) assoc :agent (get-in ctx [:event :agent])))})
+
+;;; Handlers
+
+(defn script-init
+  "Loads all jobs in the build script, then starts the script"
+  [ctx]
+  (letfn [(mark-pending [job]
+            (assoc job :status :pending))]
+    (-> (base-event (get-build ctx) :script/start)
+        (assoc :jobs (map (comp mark-pending eb/job->event) (vals (get-jobs ctx)))))))
+
+(defn make-job-queued-evt [job build-sid]
+  (if (cj/should-block? job)
+    (eb/job-blocked-evt (j/job-id job) build-sid)
+    (eb/job-queued-evt job build-sid)))
+
+(defn script-start
+  "Queues all jobs that have no dependencies"
+  [ctx]
+  (let [jobs (get-jobs ctx)
+        build-sid (b/sid (get-build ctx))
+        next-jobs (j/next-jobs (vals jobs))]
+    (log/debug "Starting script with" (count jobs) "job(s):" (keys jobs))
+    (if (empty? next-jobs)
+      ;; TODO Should be warning instead of error      
+      [(-> (script-end-evt ctx :error)
+           (bc/with-message "No jobs to run"))]
+      (let [next-jobs (j/next-jobs (vals jobs))]
+        (map #(make-job-queued-evt % build-sid) next-jobs)))))
+
+(defn script-end [ctx]
+  (log/debug "Script ended, realizing deferred")
+  ;; Just set the event in the result, so it can be passed to the deferred
+  (:event ctx))
+
+(defn- apply-init [{:keys [init] :as job} ctx]
+  (if (fn? init)
+    (some-> (init (emi/get-job-ctx ctx))
+            ;; Encrypt any additional env vars
+            #_(encrypt-env-vars #(@(get-encrypter ctx) %))
+            (as-> upd (mm/meta-merge job upd)))
+    job))
+
+(defn job-queued
+  "Dispatches queued event for action or container job, depending on the type."
+  [ctx]
+  (letfn [(job-queued-evt [t job dek]
+            (-> (eb/job-queued-evt job (build-sid ctx))
+                (assoc :type t
+                       :dek dek)))]
+    (let [job (get-job-from-ctx ctx)
+          dek (:dek (get-build ctx))]
+      ;; Action jobs do not result in an event, instead they are executed immediately.
+      (when (bc/container-job? job)
+        ;; If the container job has an initializer, invoke it with the context to
+        ;; configure additional props.
+        [(if-let [job (apply-init job ctx)]
+           (job-queued-evt :container/job-queued job dek)
+           ;; If the initializer returns `nil`, then the job should be skipped.
+           (eb/job-skipped-evt (job-id ctx) (build-sid ctx)))]))))
+
+(defn job-unblocked
+  "Received when a blocked job becomes unblocked: schedule it immediately."
+  [ctx]
+  [(eb/job-queued-evt (get-job-from-state ctx) (b/sid (get-build ctx)))])
+
+(defn job-executed
+  "Runs any extensions for the job in interceptors, then ends the job."
+  [ctx]
+  (let [{:keys [job-id sid status result]} (:event ctx)
+        job-ctx (emi/get-job-ctx ctx)]
+    ;; Safeguard: treat `nil` states as success, otherwise the job is re-queued
+    (when (nil? status)
+      (log/warn "Got job/executed event without status, treating it as a success"))
+    [(eb/job-end-evt job-id sid (assoc (-> job-ctx :job :result) :status (or status :success)))]))
+
+(defn- script-status
+  "Determines script status according to the status of all jobs"
+  [ctx]
+  (cond
+    (build-canceled? ctx)
+    :canceled
+    (some bc/failed? (vals (get-jobs ctx)))
+    :error
+    :else
+    :success))
+
+(defn- filter-jobs [ctx pred]
+  (->> (get-jobs ctx)
+       vals
+       (filter pred)))
+
+(defn- pending-jobs [ctx]
+  (filter-jobs ctx cj/pending?))
+
+(defn- pending-or-blocked-jobs [ctx]
+  (filter-jobs ctx (some-fn cj/pending? cj/blocked?)))
+
+(defn- active-jobs [ctx]
+  (filter-jobs ctx cj/active?))
+
+(defn- make-jobs-skipped-evts [ctx jobs]
+  (map #(eb/job-skipped-evt (j/job-id %) (build-sid ctx)) jobs))
+
+(defn job-end
+  "Queues jobs that have their dependencies resolved, or ends the script
+   if all jobs have been executed, or the build has been canceled.  Blocked
+   jobs are not queued, but marked as blocked."
+  [ctx]
+  ;; Enqueue jobs that have become ready to run
+  (let [all-jobs (vals (get-jobs ctx))
+        next-jobs (j/next-jobs all-jobs)
+        active-jobs (j/filter-jobs cj/active? all-jobs)]
+    (log/debug "Active jobs:" (map j/job-id active-jobs))
+    (if (or (build-canceled? ctx)
+            (and (empty? next-jobs) (empty? active-jobs)))
+      ;; No more jobs eligible for execution, end the script
+      (->> (pending-jobs ctx)
+           (make-jobs-skipped-evts ctx)
+           (into [(script-end-evt ctx (script-status ctx))]))
+      ;; Otherwise, enqueue next jobs
+      (map #(make-job-queued-evt % (build-sid ctx)) next-jobs))))
+
+(defn build-canceled
+  "Marks all pending or blocked jobs in the script as skipped.  If no other jobs remain,
+   the script is ended."
+  [ctx]
+  (cond-> (->> (pending-or-blocked-jobs ctx)
+               (make-jobs-skipped-evts ctx))
+    (empty? (active-jobs ctx)) (into [(script-end-evt ctx :canceled)])))
+
+(defn make-job-ctx
+  "Constructs job context object from the route configuration"
+  [conf]
+  (-> conf
+      (select-keys [:artifacts :cache :mailman :build :archs])
+      (assoc :api {:client (:api-client conf)})))
+
+(defn make-routes [{:keys [result] :as conf}]
+  (let [state (or (:state conf) ; For testing
+                  (atom (-> conf
+                            (select-keys [:build :filter])
+                            (assoc ::initial-job-ctx (make-job-ctx conf)))))
+        state-int (emi/with-state state)]
+    [[:script/initializing
+      [{:handler script-init
+        :interceptors [handle-script-error
+                       state-int
+                       load-jobs]}]]
+
+     [:script/start
+      [{:handler script-start
+        :interceptors [handle-script-error
+                       state-int
+                       enqueue-jobs]}]]
+
+     [:script/end
+      [{:handler script-end
+        :interceptors [emi/no-result
+                       #_(emi/realize-deferred result)]}]]
+
+     [:job/queued
+      ;; Raised when a new job is queued.  This handler splits it up according to
+      ;; type and executes before-extensions.  Action jobs are executed immediately.
+      [{:handler job-queued
+        :interceptors [emi/handle-job-error
+                       state-int
+                       with-job-ctx
+                       (add-job-retriever state)
+                       #_ext/before-interceptor
+                       execute-action]}]]
+
+     [:job/unblocked
+      [{:handler job-unblocked
+        :interceptors [emi/handle-job-error
+                       state-int
+                       add-job-ctx]}]]
+
+     [:job/initializing
+      [{:handler (constantly nil)
+        :interceptors [state-int
+                       update-job-init]}]]
+
+     [:job/executed
+      ;; Handle this for both container and action jobs
+      [{:handler job-executed
+        :interceptors [emi/handle-job-error
+                       state-int
+                       add-job-ctx
+                       add-result-to-ctx
+                       #_ext/after-interceptor]}]]
+
+     [:job/end
+      [{:handler job-end
+        :interceptors [state-int
+                       enqueue-jobs
+                       set-job-result]}]]
+
+     [:build/canceled
+      [{:handler build-canceled
+        :interceptors [state-int
+                       mark-canceled]}]]]))

@@ -39,6 +39,10 @@
 (def caches
   :caches)
 
+(def should-block?
+  "True if the block should be blocked"
+  (comp true? :blocked))
+
 ;;;; Status predicates
 
 (def pending?  (comp (some-fn nil? (partial = :pending)) status))

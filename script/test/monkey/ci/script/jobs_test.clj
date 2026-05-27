@@ -164,3 +164,27 @@
         (is (= evt (edn/read-string (pr-str evt))) "Event should be serializable to edn")))
 
     (is (nil? (ca/close! ch)))))
+
+(deftest next-jobs
+  (testing "returns starting jobs if all are pending"
+    (let [[a :as jobs] [(dummy-job ::root)
+                        (dummy-job ::child {:dependencies [::root]})]]
+      (is (= [a] (sut/next-jobs jobs)))))
+
+  (testing "returns jobs that have succesful dependencies"
+    (let [[_ b :as jobs] [(dummy-job ::root {:status :success})
+                          (dummy-job ::child {:dependencies [::root]})]]
+      (is (= [b] (sut/next-jobs jobs)))))
+
+  (testing "does not return jobs that have failed dependencies"
+    (let [[_ _ c :as jobs] [(dummy-job ::root {:status :success})
+                            (dummy-job ::other-root {:status :failure})
+                            (dummy-job ::child {:dependencies [::root]})
+                            (dummy-job ::other-child {:dependencies [::other-root]})]]
+      (is (= [c] (sut/next-jobs jobs)))))
+
+  (testing "returns jobs that have multiple succesful dependencies"
+    (let [[_ _ c :as jobs] [(dummy-job ::root {:status :success})
+                            (dummy-job ::other-root {:status :success})
+                            (dummy-job ::child {:dependencies [::root ::other-root]})]]
+      (is (= [c] (sut/next-jobs jobs))))))

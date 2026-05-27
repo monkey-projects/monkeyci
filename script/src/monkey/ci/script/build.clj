@@ -57,3 +57,6 @@
 (def checkout-dir
   "Gets the checkout dir as stored in the build structure"
   :checkout-dir)
+
+(defn set-checkout-dir [b d]
+  (assoc b :checkout-dir d))

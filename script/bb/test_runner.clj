@@ -8,6 +8,7 @@
   (cp/add-classpath "src:test")
   (require 'monkey.ci.script.api-client-test
            'monkey.ci.script.config-test
+           'monkey.ci.script.core-test
            'monkey.ci.script.events-test
            'monkey.ci.script.jobs-test
            'monkey.ci.script.load-test)

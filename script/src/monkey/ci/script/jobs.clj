@@ -181,33 +181,26 @@
                    [(eb/job-end-evt (job-id job) sid (-> bc/failure
                                                          (bc/with-message (ex-message ex))))]))
 
-(defn- wrap-caches [f job ctx]
+(defn- wrap-files [kind to-save to-restore ctx f]
   (fn [rt]
-    (let [c (not-empty (j/caches job))
-          save (get-in ctx [:cache :save])
-          restore (get-in ctx [:cache :restore])]
-      (when c
+    (let [save (get-in ctx [kind :save])
+          restore (get-in ctx [kind :restore])]
+      (when-let [c (not-empty to-restore)]
         (doseq [r c]
           (restore r)))
       (ca/go
         (let [v (ca/<! (f rt))]
-          (doseq [r c]
-            (save r))
-          v)))))
-
-(defn- wrap-artifacts [f job ctx]
-  (fn [rt]
-    (let [save (get-in ctx [:artifact :save])
-          restore (get-in ctx [:artifact :restore])]
-      (when-let [c (not-empty (j/restore-artifacts job))]
-        (doseq [r c]
-          (restore r)))
-      (ca/go
-        (let [v (ca/<! (f rt))]
-          (when-let [c (not-empty (j/save-artifacts job))]
+          (when-let [c (not-empty to-save)]
             (doseq [r c]
               (save r)))
           v)))))
+
+(defn- wrap-caches [f job ctx]
+  (let [c (j/caches job)]
+    (wrap-files :cache c c ctx f)))
+
+(defn- wrap-artifacts [f job ctx]
+  (wrap-files :artifact (j/save-artifacts job) (j/restore-artifacts job) ctx f))
 
 (defn execute!
   "Executes the given action job.  Posts start/end events to the broker provided in the
@@ -232,3 +225,33 @@
         (log/debug "Action job" (job-id job) "executed with result:" r)
         (mmc/post-events mailman [(eb/job-executed-evt (job-id job) build-sid r)])
         r))))
+
+(defn- fulfilled?
+  "True if all this job's dependencies have been fulfilled (i.e. they are
+   successful)."
+  [others job]
+  (->> (j/deps job)
+       (map others)
+       (map (partial (comp others job-id)))
+       (every? j/success?)))
+
+(defn- next-jobs*
+  "Retrieves next jobs eligible for execution, using a map of `{job-id job}`
+   for performance reasons."
+  [jobs-by-id]
+  (mc/filter-vals (every-pred j/pending?
+                              (partial fulfilled? jobs-by-id))
+                  jobs-by-id))
+
+(defn- group-by-id [jobs]
+  (mc/index-by :id jobs))
+
+(defn next-jobs
+  "Returns a list of next jobs that are eligible for execution.  If all jobs are
+   pending, returns the starting jobs, those that don't have any dependencies.  
+   Otherwise returns all pending jobs that have their dependencies fulfilled."
+  [jobs]
+  (->> jobs
+       (group-by-id)
+       (next-jobs*)
+       (vals)))
