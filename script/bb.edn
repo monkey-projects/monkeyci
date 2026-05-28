@@ -1,5 +1,6 @@
 {:paths ["bb"]
- :deps {com.monkeyci/script {:local/root "."}}
+ :deps {com.monkeyci/script {:local/root "."}
+        meta-merge/meta-merge {:mvn/version "1.0.0"}}
 
  :tasks
  {test

@@ -10,6 +10,7 @@
            'monkey.ci.script.config-test
            'monkey.ci.script.core-test
            'monkey.ci.script.events-test
+           'monkey.ci.script.interceptors-test
            'monkey.ci.script.jobs-test
            'monkey.ci.script.load-test)
   (let [{:keys [fail error]} (t/run-all-tests (re-pattern "^monkey.ci.script.*-test$"))]

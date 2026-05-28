@@ -12,11 +12,11 @@
              [api-client :as ac]
              [events :as sut]
              [helpers :as h]
+             [interceptors :as i]
              [load :as l]]
             [monkey.mailman
              [core :as mmc]
-             [core-async :as mmca]
-             [sieppari :as mms]]))
+             [core-async :as mmca]]))
 
 (defn- jobs->map [jobs]
   (->> jobs
@@ -267,6 +267,18 @@
                    :agent
                    :address)))))))
 
+(deftest put-result
+  (let [ch (ca/chan 1)
+        {:keys [leave] :as i} (sut/put-result ch)]
+    (is (keyword? (:name i)))
+    
+    (testing "`leave` puts result onto channel"
+      (is (some? (-> {}
+                     (emi/set-result ::test-result)
+                     (leave))))
+      (is (= ::test-result (-> (ca/alts!! [ch (ca/timeout 100)])
+                               first))))))
+
 (deftest routes
   (let [types [:script/initializing
                :script/start
@@ -293,7 +305,7 @@
                                                            (ac/ctx->api-client)))
                                       (sut/set-jobs {"test-job" {:id "test-job"}})))}
               r (-> (sut/make-routes {:api-client ::test-client})
-                    (mmc/router {:executor mms/execute})
+                    (mmc/router {:executor i/execute})
                     (mmc/replace-interceptors [fake-loader]))]
           (is (not-empty (-> (r {:type :script/initializing})
                              (first)
@@ -307,7 +319,7 @@
                                     (when (= f (sut/get-job-filter ctx))
                                       (sut/set-jobs ctx {"test-job" {:id "test-job"}})))}
               r (-> (sut/make-routes {:filter f})
-                    (mmc/router {:executor mms/execute})
+                    (mmc/router {:executor i/execute})
                     (mmc/replace-interceptors [fake-loader]))]
           (is (not-empty (-> (r {:type :script/initializing})
                              (first)
@@ -315,30 +327,30 @@
                              :jobs))))))
 
     #_(testing "`job/executed` adds result from extensions to event"
-      (let [ext-id ::test-ext
-            test-ext {:key ext-id
-                      :after (fn [rt]
-                               (ext/set-value rt ext-id (str (:value (ext/get-config rt ext-id)) " - updated")))}
-            job {:id "test-job"
-                 ext-id {:value "test"}
-                 :status :success
-                 :result {:message "test message"}}
-            test-state (emi/with-state (atom {:jobs (jobs->map [job])
-                                              ::sut/job-ctx {(:id job) (select-keys job [:status :result])}}))
-            r (-> (sut/make-routes {:api-client ::test-client})
-                  (mmc/router)
-                  (mmc/replace-interceptors [test-state]))]
-        (te/with-extensions
-          (is (some? (ext/register! test-ext)))
-          (is (= "test - updated"
-                 (-> {:type :job/executed
-                      :job-id (:id job)}
-                     (r)
-                     first
-                     :result
-                     first
-                     :result
-                     ext-id))))))
+        (let [ext-id ::test-ext
+              test-ext {:key ext-id
+                        :after (fn [rt]
+                                 (ext/set-value rt ext-id (str (:value (ext/get-config rt ext-id)) " - updated")))}
+              job {:id "test-job"
+                   ext-id {:value "test"}
+                   :status :success
+                   :result {:message "test message"}}
+              test-state (emi/with-state (atom {:jobs (jobs->map [job])
+                                                ::sut/job-ctx {(:id job) (select-keys job [:status :result])}}))
+              r (-> (sut/make-routes {:api-client ::test-client})
+                    (mmc/router)
+                    (mmc/replace-interceptors [test-state]))]
+          (te/with-extensions
+            (is (some? (ext/register! test-ext)))
+            (is (= "test - updated"
+                   (-> {:type :job/executed
+                        :job-id (:id job)}
+                       (r)
+                       first
+                       :result
+                       first
+                       :result
+                       ext-id))))))
 
     (testing "`job/queued`"
       (let [exec-ctx (atom nil)
@@ -349,7 +361,7 @@
                               ::sut/initial-job-ctx {:mailman (mmca/core-async-broker)}})
             r (-> (sut/make-routes {:api-client ::test-client
                                     :state test-state})
-                  (mmc/router {:executor mms/execute}))]
+                  (mmc/router {:executor i/execute}))]
         (testing "executes action job"
           (is (some? (-> {:type :job/queued
                           :job-id (:id job)}

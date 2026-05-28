@@ -1,6 +1,7 @@
 (ns monkey.ci.script.events
   "Mailman event handlers for scripts"
-  (:require [clojure.tools.logging :as log]
+  (:require [clojure.core.async :as ca]
+            [clojure.tools.logging :as log]
             [medley.core :as mc]
             [meta-merge.core :as mm]
             [monkey.ci.build.core :as bc]
@@ -205,6 +206,14 @@
    :leave (fn [ctx]
             (update-job ctx (job-id ctx) assoc :agent (get-in ctx [:event :agent])))})
 
+(defn put-result
+  "Interceptor that puts the result onto the result channel."
+  [ch]
+  {:name ::put-result
+   :leave (fn [ctx]
+            (ca/go (ca/>! ch (emi/get-result ctx)))
+            ctx)})
+
 ;;; Handlers
 
 (defn script-init
@@ -361,7 +370,7 @@
      [:script/end
       [{:handler script-end
         :interceptors [emi/no-result
-                       #_(emi/realize-deferred result)]}]]
+                       (put-result result)]}]]
 
      [:job/queued
       ;; Raised when a new job is queued.  This handler splits it up according to
