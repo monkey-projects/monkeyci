@@ -16,14 +16,15 @@
   (let [client (ac/make-client (c/api conf))
         broker (mmca/core-async-broker)
         result (ca/chan)
-        routes (-> conf
-                   (assoc :mailman broker
-                          :api-client client
-                          :result result)
-                   (e/make-routes))
+        build (c/build conf)
+        routes (e/make-routes
+                {:mailman broker
+                 :api-client client
+                 :result result
+                 :build build})
         router (mmc/make-router routes {:executor i/execute})
         listener (mmc/add-listener broker {:handler router})]
-    {:build (c/build conf)
+    {:build build
      :mailman broker
      :router router
      :listener listener
@@ -33,8 +34,9 @@
   "Loads and runs the build script using the given configuration, which contains
    details about where to find the files, how to connect to the build api, etc.
    Returns a channel that will hold the result of the build."
-  [{:keys [build] :as conf}]
-  (let [{:keys [mailman result] :as runner} (setup-runner conf)]
+  [conf]
+  (let [build (c/build conf)
+        {:keys [mailman result] :as runner} (setup-runner conf)]
     ;; Kickstart the build script
     (mmc/post-events mailman [(eb/script-init-evt (b/sid build) (b/script-dir build))])
     result))
