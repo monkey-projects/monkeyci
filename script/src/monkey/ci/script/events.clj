@@ -107,10 +107,11 @@
      :enter (fn [ctx]
               (let [job-ctx (select-keys (get-initial-job-ctx ctx) [:build :api :archs])]
                 (log/debug "Loading script jobs using context" job-ctx
-                           "and filter" (get-job-filter ctx))
+                           "and filter" (get-job-filter ctx)
+                           "from dir" (b/script-dir (get-build ctx)))
                 (->> (l/load-jobs (get-build ctx) job-ctx)
                      (filter-jobs (get-job-filter ctx))
-                     (group-by j/job-id)
+                     (mc/index-by j/job-id)
                      (set-jobs ctx))))}))
 
 (def add-job-ctx
@@ -244,9 +245,11 @@
         (map #(make-job-queued-evt % build-sid) next-jobs)))))
 
 (defn script-end [ctx]
-  (log/debug "Script ended, realizing deferred")
+  (log/debug "Script ended, reporting result")
   ;; Just set the event in the result, so it can be passed to the deferred
-  (:event ctx))
+  ;;(:event ctx)
+  {:build (get-build ctx)
+   :jobs (get-jobs ctx)})
 
 (defn- apply-init [{:keys [init] :as job} ctx]
   (if (fn? init)

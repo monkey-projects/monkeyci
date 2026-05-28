@@ -454,11 +454,15 @@
         (is (bc/failed? (first r)))))))
 
 (deftest script-end
-  (testing "sets event in result for realization"
-    (let [evt {:type :script/end
-               :status :success}]
-      (is (= evt (-> {:event evt}
-                     (sut/script-end)))))))
+  (testing "sets build and jobs in result for realization"
+    (let [jobs ::test-jobs
+          build ::test-build]
+      (is (= {:build ::test-build
+              :jobs ::test-jobs}
+             (-> {}
+                 (sut/set-jobs jobs)
+                 (sut/set-build build)
+                 (sut/script-end)))))))
 
 (deftest job-queued
   (let [aj (bc/action-job "action-job" (constantly nil))
