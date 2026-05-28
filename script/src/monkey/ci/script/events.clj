@@ -246,10 +246,8 @@
 
 (defn script-end [ctx]
   (log/debug "Script ended, reporting result")
-  ;; Just set the event in the result, so it can be passed to the deferred
-  ;;(:event ctx)
   {:build (get-build ctx)
-   :jobs (get-jobs ctx)})
+   :jobs (vals (get-jobs ctx))})
 
 (defn- apply-init [{:keys [init] :as job} ctx]
   (if (fn? init)
@@ -373,6 +371,7 @@
      [:script/end
       [{:handler script-end
         :interceptors [emi/no-result
+                       state-int
                        (put-result result)]}]]
 
      [:job/queued

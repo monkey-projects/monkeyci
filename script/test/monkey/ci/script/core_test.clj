@@ -37,5 +37,6 @@
           (is (some? res))
           (is (= build (select-keys (:build res) (keys build)))
               "result contains input build")
-          (is (some? (:jobs res))
-              "result contains executed jobs"))))))
+          (is (= 1 (count (:jobs res)))
+              "result contains executed jobs")
+          (is (= :success (-> res :jobs first :status))))))))

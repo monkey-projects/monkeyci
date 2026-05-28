@@ -455,10 +455,10 @@
 
 (deftest script-end
   (testing "sets build and jobs in result for realization"
-    (let [jobs ::test-jobs
+    (let [jobs {"test-job" ::test-job}
           build ::test-build]
       (is (= {:build ::test-build
-              :jobs ::test-jobs}
+              :jobs [::test-job]}
              (-> {}
                  (sut/set-jobs jobs)
                  (sut/set-build build)
