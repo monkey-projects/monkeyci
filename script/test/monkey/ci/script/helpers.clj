@@ -24,3 +24,14 @@
                              v
                              (recur (ca/<! ch)))))
                        (ca/timeout 1000)]))))
+
+(defn wait-until [pred timeout]
+  (let [delay 100]
+    (loop [e 0]
+      (if-let [v (pred)]
+        v
+        (if (> e timeout)
+          :timeout
+          (do
+            (Thread/sleep delay)
+            (recur (+ e delay))))))))

@@ -143,11 +143,7 @@
   "Interceptor that executes the job in the input event in a new thread, provided
    it's an action job.  The job context must contain all necessary components for 
    the job to run properly, such as artifacts, cache and events."
-  (letfn [(post-job-error [job mailman {:keys [job-id sid]} ex]
-            (mmc/post-events mailman
-                             [(eb/job-end-evt job-id sid (-> bc/failure
-                                                             (bc/with-message (ex-message ex))))]))
-          (execute-job [job ctx]
+  (letfn [(execute-job [job ctx]
             (log/debug "Scheduling action job for execution:" (j/job-id job))
             (let [job-ctx (emi/get-job-ctx ctx)]
               (j/execute! job job-ctx)))]
@@ -246,8 +242,6 @@
 (defn- apply-init [{:keys [init] :as job} ctx]
   (if (fn? init)
     (some-> (init (emi/get-job-ctx ctx))
-            ;; Encrypt any additional env vars
-            #_(encrypt-env-vars #(@(get-encrypter ctx) %))
             (as-> upd (mm/meta-merge job upd)))
     job))
 

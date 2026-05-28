@@ -1,0 +1,358 @@
+(ns monkey.ci.api
+  "Api functions, which can be invoked by build scripts.  These often delegate
+   to more specific namespaces, but this namespace is provided as a convenient
+   entry point.
+
+   The general intention is to provide functions for most purposes, without the user
+   having to resort to using keywords and maps."
+
+  (:require [babashka
+             [fs :as fs]
+             [process :as bp]]
+            [monkey.ci.build.core :as bc]
+            [monkey.ci
+             [containers :as co]
+             [jobs :as j]]
+            [monkey.ci.script
+             [api-client :as api]
+             [build :as b]]))
+
+(def action-job
+  "Declares an action job with id, action and options"
+  bc/action-job)
+
+(def action-job?
+  "Checks if argument is an action job"
+  bc/action-job?)
+
+;; Job return values
+(def success
+  "Job result that indicates the job was successful"
+  bc/success)
+
+(def failure
+  "Indicates the job has failed"
+  bc/failure)
+
+(def error
+  "Same as `failure`"
+  failure)
+
+(def failed
+  "Same as `failure`"
+  failure)
+
+(def skipped
+  "Indicates the job was intentionally skipped"
+  bc/skipped)
+
+(def with-message
+  "Sets a human-readable message on the return value"
+  bc/with-message)
+
+(defn container-job
+  "Declares an container job with id and container options"
+  [id & [opts]]
+  (bc/container-job id (or opts {})))
+
+(def container-job?
+  "Checks if argument is an container job"
+  bc/container-job?)
+
+(def job-id
+  "Gets the id of the given job"
+  bc/job-id)
+
+(def dependencies
+  "Gets the configured dependencies of a job"
+  :dependencies)
+
+(defn ^:no-doc try-unwrap
+  "Applies `f` to the job.  If `job` is a function, returns a new function 
+   that applies `f` to the result of the function."
+  [job f & args]
+  (if (fn? job)
+    (fn [& job-args]
+      (apply try-unwrap (apply job job-args) f args))
+    (apply f job args)))
+
+(defn depends-on
+  "Adds dependencies to the given job.  Does not overwrite existing dependencies."
+  [job & deps]
+  (try-unwrap job bc/depends-on (flatten deps)))
+
+(defn image
+  "Gets or sets container image"
+  ([job]
+   (co/image job))
+  ([job img]
+   (try-unwrap job assoc :container/image img)))
+
+(defn script
+  "Gets or sets container job script"
+  ([job]
+   (:script job))
+  ([job script]
+   (try-unwrap job assoc :script script)))
+
+(defn expose
+  "Gets or sets exposed ports"
+  ([job]
+   (:expose job))
+  ([job ports]
+   (try-unwrap job assoc :expose ports)))
+
+(defn init
+  "Gets or sets container job initializer"
+  ([job]
+   (:init job))
+  ([job init]
+   (try-unwrap job assoc :init init)))
+
+(defn- set-env [job e]
+  (cond
+    (action-job? job) (assoc job :env e)
+    (container-job? job) (assoc job co/env e)))
+
+(defn env
+  "Gets or sets environment vars for the job"
+  ([job]
+   (or (co/env job) (:env job)))
+  ([job e]
+   (try-unwrap job set-env e)))
+
+(defn work-dir
+  "Gets or sets work dir for the job"
+  ([job]
+   (:work-dir job))
+  ([job wd]
+   (try-unwrap job assoc :work-dir wd)))
+
+(defn size
+  "Gets or sets the resource size of the container job.  Size 1 means 1 cpu,
+   2 GB, size 2 doubles that, etc..."
+  ([job]
+   (:size job))
+  ([job s]
+   (try-unwrap job assoc :size s)))
+
+(defn blocked
+  "Gets or sets job blocked status.  A blocked job will be marked as `blocked` once it
+   is eligible for execution.  An explicit unblock action is required to execute it."
+  [job]
+  (assoc job :blocked true))
+
+(defn unblocked
+  "Unmarks a previously blocked job as unblocked.  Note that this has no effect if the
+   job lifecycle status is already blocked, it only affects the job `blocked` status 
+   before the script is started."
+  [job]
+  (dissoc job :blocked))
+
+(def blocked?
+  "Checks if given job is marked as blocked"
+  (comp true? :blocked))
+
+(defn artifact
+  "Defines a new artifact with given id, located at given `path`.  This can be passed
+   to `save-artifacts` or `restore-artifacts`."
+  [id path]
+  {:id id
+   :path path})
+
+(defn dir-artifact
+  "Converts artifact that points to a file, to one that points to its parent
+   directory.  If there is no parent directory, uses the current directory."
+  [art]
+  (update art :path (comp str #(or % ".") fs/parent)))
+
+(defn- get-or-update-list-prop [p]
+  (fn [job & xs]
+    (if (empty? xs)
+      (try-unwrap job p)
+      (try-unwrap job update p concat (flatten xs)))))
+
+(def save-artifacts
+  "Configures the artifacts to save on a job."
+  (get-or-update-list-prop :save-artifacts))
+
+(def restore-artifacts
+  "Configures the artifacts to restore on a job."
+  (get-or-update-list-prop :restore-artifacts))
+
+(def cache
+  "Defines a cache with given id an path, that can be passed to `caches`"
+  artifact)
+
+(def caches
+  "Configures the caches a job uses."
+  (get-or-update-list-prop :caches))
+
+(defn- file-test [tester]
+  (fn test-fn
+    ([ctx pred]
+     (some? (tester [ctx pred])))
+    ([pred]
+     (fn [ctx]
+       (test-fn ctx pred)))))
+
+(def files-added
+  "List of files that have been added for this build"
+  bc/files-added)
+
+(def files-modified
+  "List of modified files for this build"
+  bc/files-modified)
+
+(def files-removed
+  "List of removed files for this build"
+  bc/files-removed)
+
+(def added?
+  "Checks if files have been added in this build using the given predicate, which can either be a
+   regex, a string or a matcher function.  Accepts one or two arguments: when given one argument,
+   returns a function that accepts the context to check if the predicate matches.  When given two
+   arguments, accepts the context and the predicate."
+  (file-test bc/added?))
+
+(def removed?
+  "Checks if files have been removed in this build using the given predicate, which can either be a
+   regex, a string or a matcher function.  Similar to `added?`."
+  (file-test bc/removed?))
+
+(def modified?
+  "Checks if files have been modified in this build using the given predicate, which can either be a
+   regex, a string or a matcher function.  Similar to `added?`."
+  (file-test bc/modified?))
+
+(def touched?
+  "Checks if files have been touched in this build using the given predicate, which can either be a
+   regex, a string or a matcher function.  Similar to `added?`."
+  (file-test (partial apply bc/touched?)))
+
+(def tag
+  "Gets commit tag (if any) from the context."
+  bc/tag)
+
+(def branch
+  "Gets commit branch from the context."
+  bc/branch)
+
+(def main-branch
+  "Gets configured main branch from the build."
+  bc/main-branch)
+
+(def main-branch?
+  "Checks if the build branch is the configured main branch."
+  bc/main-branch?)
+
+(def build-params
+  "Retrieves parameters this build has access to"
+  api/build-params)
+
+(def params
+  "Shorthand for `build-params`"
+  build-params)
+
+(defn- bash-action [& args]
+  (fn [{:keys [job] :as rt}]
+    (let [work-dir (or (:work-dir job) (:checkout-dir rt))
+          [opts args] (if (map? (first args))
+                        [(first args) (rest args)]
+                        [{} args])]
+      (try
+        (let [opts (cond-> {:out :string
+                            :err :string}
+                     ;; Add work dir if specified in the context
+                     work-dir (assoc :dir work-dir)
+                     (:env opts) (assoc :extra-env (:env opts))
+                     (:env job) (update :extra-env merge (:env job)))]
+          (assoc bc/success
+                 :output (:out (apply bp/shell opts args))))
+        (catch Exception ex
+          (let [{:keys [out err]} (ex-data ex)]
+            ;; Report the error
+            (assoc bc/failure
+                   :output out
+                   :error err
+                   :exception ex)))))))
+
+(defn bash
+  "Creates an action job that executes given commands in a bash shell" 
+  [id & cmds]
+  (action-job id (apply bash-action cmds)))
+
+(def shell "Same as `bash`" bash)
+
+(def build-id
+  "Returns current build id"
+  (comp :build-id :build))
+
+(def checkout-dir
+  "Returns the build checkout directory"
+  (comp b/checkout-dir :build))
+
+(defn in-work
+  "Given a relative path `p`, returns it as a subpath to the job working directory.
+   Fails if an absolute path is given."
+  [ctx p]
+  (when (fs/absolute? p)
+    (throw (ex-info "Path must be relative" {:path p})))
+  (let [wd (work-dir ctx)]
+    (str (fs/normalize (fs/path wd p)))))
+
+(def git-ref
+  "The git ref that triggered the build"
+  bc/git-ref)
+
+(def ref-regex
+  "Applies the given regex on the ref from the context, returns the matching groups."
+  bc/ref-regex)
+
+(def archs
+  "Retrieves list of available container architectures from context"
+  :archs)
+
+(def source
+  "Returns the trigger source (e.g. `api`)"
+  bc/trigger-src)
+
+(def api-trigger?
+  "True if the build has been triggered via api (i.e. typically manually by a human)"
+  (comp (partial = :api) source))
+
+(def manual?
+  "Alias for `api-trigger?`"
+  api-trigger?)
+
+(def cli?
+  "True if the build has been triggered from the cli"
+  (comp (partial = :cli) source))
+
+(defmulti job-result
+  "Retrieves the result of the job, if it has finished"
+  bc/job-schema)
+
+(defmethod job-result :v1 [job]
+  (:result job))
+
+(defmethod job-result :v2 [job]
+  (get-in job [:status :result]))
+
+(defn get-job
+  "Retrieves job by id in the current build"
+  [ctx id]
+  ((get-in ctx [:api :jobs]) id))
+
+(defn get-job-exposed-addr
+  "If the given job exposes a port, looks it up in the context and returns the
+   externally accessible address as a map with `:port` and `:address` keys.  If
+   the job is not found, or the given port is not mapped, returns `nil`."
+  [ctx id port]
+  (when-let [a (some-> (get-job ctx id)
+                       :agent)]
+    (when-let [[p _] (->> (:ports a)
+                          (filter (comp (partial = port) second))
+                          first)]
+      {:address (:address a)
+       :port p})))
