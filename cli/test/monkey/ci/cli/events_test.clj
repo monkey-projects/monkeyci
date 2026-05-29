@@ -68,7 +68,7 @@
 (defn- test-mailman []
   (mmca/core-async-broker))
 
-(defn- get-chan [tm]
+(defn- get-chan [^monkey.mailman.core_async.CoreAsyncBroker tm]
   (.chan tm))
 
 (defn- wait-for-posted
@@ -116,60 +116,92 @@
       (is (= :initializing (-> r :build :status))))))
 
 (deftest prepare-child-cmd
-  (let [build {:checkout-dir "/test/checkout"}
-        mailman (test-mailman)
-        r (-> {:event
-               {:type :build/pending
-                :build build}}
-              (emi/set-mailman mailman)
-              (sut/set-api {:url "http://localhost:1234"
-                            :token "test-token"})
-              (sut/set-child-opts {:log-config "test-config.xml"
-                                   :lib-coords {:mvn/version "test"}})
-              (sut/set-build-opts {:filter ["test-filter"]})
-              (sut/prepare-child-cmd))]
-    (testing "starts child process command"
-      (testing "in script dir"
-        (is (= "/test/checkout/.monkeyci" (str (:dir r)))))
+  (let [mailman (test-mailman)
+        base-conf (-> {:event
+                       {:type :build/pending}}
+                      (emi/set-mailman mailman)
+                      (sut/set-api {:url "http://localhost:1234"
+                                    :token "test-token"})
+                      (sut/set-child-opts {:log-config "test-config.xml"
+                                           :lib-coords {:mvn/version "test"}})
+                      (sut/set-build-opts {:filter ["test-filter"]}))]
 
-      (testing "runs clojure"
-        (is (= "clojure" (-> r :cmd first))))
+    (testing "fails if script dir not found"
+      (is (thrown? Exception (-> base-conf
+                                 (assoc-in [:event :build] {:checkout-dir "/nonexisting"})
+                                 (sut/prepare-child-cmd)))))
+    (fs/with-temp-dir [dir]
+      (is (some? (fs/create-dir (fs/path dir ".monkeyci"))))
+      (let [build {:checkout-dir dir}
+            r (-> base-conf
+                  (assoc-in [:event :build] build)
+                  (sut/prepare-child-cmd))]
+        (testing "starts child process command"
+          (testing "in script dir"
+            (is (= (str dir "/.monkeyci") (str (:dir r)))))
 
-      (testing "passes config"
-        (let [conf (-> r :cmd last (edn->) :config)]
-          (testing "with build script dir"
-            (is (= (str (:dir r)) (b/script-dir (sc/build conf)))))
-          
-          (testing "with api settings"
-            (let [api (sc/api conf)]
-              (is (not-empty api))
-              (is (= "http://localhost:1234" (:url api)))
-              (is (= "test-token" (:token api)))))
+          (testing "runs bb cmd"
+            (is (= "bb" (-> r :cmd first))))
 
-          (testing "with job filter"
-            (is (= ["test-filter"] (sc/job-filter conf))))))
+          (testing "generates custom `bb.edn`"
+            (let [[_ p :as c] (->> r :cmd (rest) (take 2))]
+              (is (= "--config" (first c)))
+              (is (fs/exists? p))))
 
-      (testing "passes deps"
-        (let [deps (-> r :cmd (nth 2) (edn->))]
-          (testing "with log config from child opts"
-            (is (= "-Dlogback.configurationFile=test-config.xml"
-                   (-> deps
-                       (get-in [:aliases :monkeyci/build :jvm-opts])
-                       first))))
+          (testing "exit fn fires `build/end`"
+            (let [exit-fn (:exit-fn r)]
+              (is (fn? exit-fn))
+              (is (some? (exit-fn {:exit ::process-result})))
+              (let [p (wait-for-posted mailman)]
+                (is (not (= :timeout p)))
+                (is (= :build/end (:type p)))))))))
 
-          (testing "with lib coords"
-            (is (= {:mvn/version "test"}
-                   (get-in deps [:aliases :monkeyci/build :extra-deps 'com.monkeyci/app]))))
+    (testing "clojure runner"
+      (fs/with-temp-dir [dir]
+        (let [sd (fs/create-dir (fs/path dir ".monkeyci"))]
+          (is (some? sd))
+          (let [build {:checkout-dir (str dir)}
+                r (-> base-conf
+                      (assoc-in [::sut/child-opts :runner] :clj)
+                      (assoc-in [:event :build] build)
+                      (sut/prepare-child-cmd))]
+            (testing "runs clojure")
 
-          (testing "with m2 cache dir"))))
+            (testing "passes config"
+              (let [conf (-> r :cmd last (edn->) :config)]
+                (testing "with build script dir"
+                  (is (= (str (:dir r)) (b/script-dir (sc/build conf)))))
+                
+                (testing "with api settings"
+                  (let [api (sc/api conf)]
+                    (is (not-empty api))
+                    (is (= "http://localhost:1234" (:url api)))
+                    (is (= "test-token" (:token api)))))
 
-    (testing "exit fn fires `build/end`"
-      (let [exit-fn (:exit-fn r)]
-        (is (fn? exit-fn))
-        (is (some? (exit-fn {:exit ::process-result})))
-        (let [p (wait-for-posted mailman)]
-          (is (not (= :timeout p)))
-          (is (= :build/end (:type p))))))))
+                (testing "with job filter"
+                  (is (= ["test-filter"] (sc/job-filter conf))))))
+
+            (testing "passes deps"
+              (let [deps (-> r :cmd (nth 2) (edn->))]
+                (testing "with log config from child opts"
+                  (is (= "-Dlogback.configurationFile=test-config.xml"
+                         (-> deps
+                             (get-in [:aliases :monkeyci/build :jvm-opts])
+                             first))))
+
+                (testing "with lib coords"
+                  (is (= {:mvn/version "test"}
+                         (get-in deps [:aliases :monkeyci/build :extra-deps 'com.monkeyci/script]))))
+
+                (testing "with m2 cache dir")))))))))
+
+(deftest generate-bb-conf
+  (let [r (sut/generate-bb-conf {:lib-coords {:mvn/version "test"}})]
+    (testing "returns map"
+      (is (map? r)))
+
+    (testing "includes monkeyci lib"
+      (is (= "test" (get-in r [:deps 'com.monkeyci/script :mvn/version]))))))
 
 (deftest build-end
   (testing "returns build with jobs from state"

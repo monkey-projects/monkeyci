@@ -203,14 +203,45 @@
         (sc/set-api (select-keys (get-api ctx) [:url :token]))
         (sc/set-job-filter (:filter (get-build-opts ctx))))))
 
+(defn get-runner
+  "Determines whether to run babashka or clojure for the scripts."
+  [ctx]
+  (get-in ctx [::child-opts :runner] :bb))
+
 (defn generate-deps [script-dir {:keys [lib-coords log-config m2-cache-dir]}]
   (cond-> (p/generate-deps script-dir nil)
-    ;; TODO Replace app with script lib
-    lib-coords (update-in [:aliases :monkeyci/build :extra-deps] mc/assoc-some 'com.monkeyci/app lib-coords)
+    lib-coords (update-in [:aliases :monkeyci/build :extra-deps] mc/assoc-some 'com.monkeyci/script lib-coords)
     log-config (p/update-alias assoc :jvm-opts
                                [(str "-Dlogback.configurationFile=" log-config)]))
-    ;; m2 cache dir?
+  ;; m2 cache dir?
   )
+
+(defn generate-bb-conf [{:keys [lib-coords]}]
+  {:deps {'com.monkeyci/script lib-coords}})
+
+(defn- bb-cmd [ctx]
+  (let [p (fs/create-temp-file {:prefix "bb-" :suffix ".edn"})]
+    (spit (fs/file p) (generate-bb-conf (get-child-opts ctx)))
+    ["bb"
+     "--config" (str p)]))
+
+(defn- clj-cmd [ctx]
+  ["clojure"
+   "-Sdeps" (pr-str (generate-deps (-> ctx ctx->build b/script-dir)
+                                   (get-child-opts ctx)))
+   "-X:monkeyci/build"
+   (pr-str {:config (child-config ctx)})])
+
+(defn- gen-cmd [ctx]
+  (let [build (ctx->build ctx)
+        sd (b/calc-script-dir (b/checkout-dir build) (b/script-dir build))]
+    (when-not (fs/exists? sd)
+      (throw (ex-info "Script dir does not exist" {:dir sd})))
+    ;; FIXME bb also reads deps.edn, so we need some other way to determine this
+    (case (get-runner ctx)
+      :clj (clj-cmd ctx)
+      ;; default
+      (bb-cmd ctx))))
 
 (defn prepare-child-cmd
   "Initializes child process command line"
@@ -226,11 +257,7 @@
                     (catch Exception ex
                       (log/error "Unable to post build/end event" ex))))]
     {:dir (b/calc-script-dir (b/checkout-dir build) (b/script-dir build))
-     :cmd ["clojure"
-           "-Sdeps" (pr-str (generate-deps (b/script-dir build)
-                                           (get-child-opts ctx)))
-           "-X:monkeyci/build"
-           (pr-str {:config (child-config ctx)})]
+     :cmd (gen-cmd ctx)
      :out (log-file "out.log")
      :err (log-file "err.log")
      :exit-fn (p/exit-fn on-exit)}))

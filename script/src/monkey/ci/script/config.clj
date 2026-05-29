@@ -37,3 +37,7 @@
     true (dissoc job-filter)
     (not-empty f) (assoc job-filter f)))
 
+(def runner ::runner)
+
+(defn set-runner [c r]
+  (assoc c runner r))
