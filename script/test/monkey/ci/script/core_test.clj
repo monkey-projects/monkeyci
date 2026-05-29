@@ -11,7 +11,7 @@
   (let [build (-> {:build-id "test-build"}
                   (b/set-script-dir "/test/dir/script")
                   (b/set-checkout-dir "/test/dir"))
-        conf (-> {}
+        conf (-> c/empty-config
                  (c/set-build build)
                  (c/set-api {:url "http://localhost:1234"
                              :token "test-token"}))
@@ -27,7 +27,7 @@
           build (-> {:build-id "test-build"}
                     (b/set-script-dir sd)
                     (b/set-checkout-dir dir))
-          conf (-> {}
+          conf (-> c/empty-config
                    (c/set-build build)
                    (c/set-api {:url "http://localhost:1234"
                                :token "test-token"}))]
@@ -42,3 +42,29 @@
           (is (= 1 (count (:jobs res)))
               "result contains executed jobs")
           (is (= :success (-> res :jobs first :status))))))))
+
+(deftest run-cli
+  (testing "invokes `run-script` with config from args"
+    (with-redefs [sut/run-script identity]
+      (let [r (sut/run-cli {:url "http://test-url" :sid "a/b/c"})]
+        (is (= "http://test-url" (-> r
+                                     (c/api)
+                                     :url)))))))
+
+(deftest cli->conf
+  (let [args {:url "http://test-url"
+              :token "test-token"
+              :sid "test-org/test-repo/test-build"
+              :checkout-dir "/test/dir"}
+        conf (sut/cli->conf args)]
+    (testing "sets api config"
+      (is (= {:url "http://test-url"
+              :token "test-token"}
+             (c/api conf))))
+
+    (testing "sets build"
+      (is (= {:org-id "test-org"
+              :repo-id "test-repo"
+              :build-id "test-build"
+              :checkout-dir "/test/dir"}
+             (c/build conf))))))

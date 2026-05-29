@@ -10,4 +10,8 @@
   test-junit
   ;; Runs unit tests and outputs results to an xml file
   {:requires ([test-runner :as tr])
-   :task (tr/run-junit-tests "junit-bb.xml")}}}
+   :task (tr/run-junit-tests "junit-bb.xml")}
+
+  script
+  ;; Runs a build script.  Provided for testing purposes.
+  {:task (exec 'monkey.ci.script.core/run-cli)}}}
