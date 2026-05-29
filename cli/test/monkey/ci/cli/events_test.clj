@@ -196,12 +196,30 @@
                 (testing "with m2 cache dir")))))))))
 
 (deftest generate-bb-conf
-  (let [r (sut/generate-bb-conf {:lib-coords {:mvn/version "test"}})]
+  (let [r (-> {:event
+               {:build
+                {:org-id "a"
+                 :repo-id "b"
+                 :build-id "c"}}}
+              (sut/set-child-opts {:lib-coords {:mvn/version "test"}})
+              (sut/set-api {:url "http://test"
+                            :token "test-token"})
+              (sut/generate-bb-conf))]
     (testing "returns map"
       (is (map? r)))
 
     (testing "includes monkeyci lib"
-      (is (= "test" (get-in r [:deps 'com.monkeyci/script :mvn/version]))))))
+      (is (= "test" (get-in r [:deps 'com.monkeyci/script :mvn/version]))))
+
+    (testing "passes api url and token"
+      (is (= "http://test"
+             (get-in r [:tasks 'script :exec-args :url])))
+      (is (= "test-token"
+             (get-in r [:tasks 'script :exec-args :token]))))
+
+    (testing "passes sid from build"
+      (is (= "a/b/c"
+             (get-in r [:tasks 'script :exec-args :sid]))))))
 
 (deftest build-end
   (testing "returns build with jobs from state"

@@ -5,6 +5,7 @@
              [fs :as fs]
              [process :as bp]]
             [clojure.java.io :as io]
+            [clojure.string :as cs]
             [clojure.tools.logging :as log]
             [medley.core :as mc]
             [monkey.ci.cli
@@ -216,14 +217,25 @@
   ;; m2 cache dir?
   )
 
-(defn generate-bb-conf [{:keys [lib-coords]}]
-  {:deps {'com.monkeyci/script lib-coords}})
+(defn generate-bb-conf [ctx]
+  (let [{:keys [lib-coords]} (get-child-opts ctx)
+        api (get-api ctx)]
+    {:deps {'com.monkeyci/script lib-coords
+            'meta-merge/meta-merge {:mvn/version "1.0.0"}}
+     :paths ["."]
+     :tasks
+     {'script
+      {:task '(exec 'monkey.ci.script.core/run-cli)
+       :exec-args (-> (select-keys api [:url :token])
+                      (assoc :sid (->> (b/sid (ctx->build ctx))
+                                       (cs/join "/"))))}}}))
 
 (defn- bb-cmd [ctx]
   (let [p (fs/create-temp-file {:prefix "bb-" :suffix ".edn"})]
-    (spit (fs/file p) (generate-bb-conf (get-child-opts ctx)))
+    (spit (fs/file p) (generate-bb-conf ctx))
     ["bb"
-     "--config" (str p)]))
+     "--config" (str p)
+     "run" "script"]))
 
 (defn- clj-cmd [ctx]
   ["clojure"
