@@ -68,17 +68,20 @@
 (def handle-build-error
   "Marks build as failed"
   {:name ::build-error-handler
-   :error (fn build-error [{:keys [event] :as ctx} ex]
-            (log/error "Failed to handle event" (:type event) ", marking build as failed" ex)
-            (set-result ctx (b/build-end-evt (-> (:build event)
-                                                 (assoc :message (ex-message ex)))
-                                             errors/error-process-failure)))})
+   :error (fn build-error [{:keys [event] :as ctx} & [ex]]
+            ;; Depending on the interceptor impl, the error is passed differently
+            (let [ex (or ex (:error ctx))]
+              (log/error "Failed to handle event" (:type event) ", marking build as failed" ex)
+              (set-result ctx (b/build-end-evt (-> (:build event)
+                                                   (assoc :message (ex-message ex)))
+                                               errors/error-process-failure))))})
 
 (def handle-job-error
   "Marks job as failed on error."
   {:name ::handle-job-error
-   :error (fn job-error [{ex :error :as ctx}]
-            (let [{:keys [job-id sid] :as e} (:event ctx)]
+   :error (fn job-error [ctx & [ex]]
+            (let [ex (or ex (:error ctx))
+                  {:keys [job-id sid] :as e} (:event ctx)]
               (log/error "Got error while handling event" e "for job" job-id ex)
               (set-result ctx
                           [(b/job-end-evt job-id sid

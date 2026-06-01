@@ -10,7 +10,7 @@
 
 (defn api-request
   "Sends a request to the api at configured url"
-  [{:keys [url token] :as opts} req]
+  [{:keys [url token] :as opts} req & [callback]]
   (letfn [(build-request [req]
             (-> req
                 (merge (dissoc opts [:url :token]))
@@ -18,7 +18,7 @@
                        :oauth-token token)))]
     (-> req
         (build-request)
-        (http/request))))
+        (http/request callback))))
 
 (defn make-async-client
   "Creates a new api client function for the given url.  It returns a function
@@ -30,8 +30,8 @@
   [opts]
   (partial api-request opts))
 
-(defn- throw-on-error [resp]
-  (if (<= 400 (:status resp))
+(defn- throw-on-error [{:keys [status] :as resp}]
+  (if (or (nil? status) (<= 400 status))
     (throw (ex-info "Api request error" resp))
     resp))
 
@@ -40,10 +40,14 @@
    on errors."
   [opts]
   (let [c (make-async-client opts)]
-    (fn [req]
-      (-> (c req)
-          (deref)
-          (throw-on-error)))))
+    (fn [req & [callback]]
+      (if callback
+        (do
+          (log/debug "Sending async request using callback")
+          (c req callback))
+        (-> (c req)
+            (deref)
+            (throw-on-error))))))
 
 (def ctx->api-client (comp :client :api))
 
@@ -134,25 +138,34 @@
       :status
       (= 202)))
 
-(defn get-events
-  "Opens a stream that will receive all events for the build."
-  [client]
-  (let [prefix "data: "
+(defn- read-evt-stream [body c]
+  (log/debug "Started reading event stream")
+  (let [r (-> body
+              (io/reader)
+              (line-seq))
+        prefix "data: "
         parse-evt (fn [l]
                     (when (cs/starts-with? l prefix)
-                      (edn/read-string (subs l (count prefix)))))
-        c (ca/chan)
-        r (->> (client {:path "/events"
-                        :method :get})
-               :body
-               (io/reader)
-               (line-seq))]
+                      (edn/read-string (subs l (count prefix)))))]
     (ca/go-loop [n r]
       (if-let [evt (first n)]
         (do
           (when-let [p (parse-evt evt)]
+            (log/debug "Received streamed event:" p)
             (ca/>! c p))
           (recur (rest n)))
         ;; No more data to read, close channel
-        (ca/close! c)))
+        (ca/close! c)))))
+
+(defn get-events
+  "Opens a stream that will receive all events for the build."
+  [client]
+  (let [c (ca/chan)]
+    (client {:path "/events"
+             :method :get
+             :as :stream}
+            (fn [{:keys [body error]}]
+              (if error
+                (log/error "Unable to receive events:" error)
+                (read-evt-stream body c))))
     c))

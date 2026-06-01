@@ -15,8 +15,18 @@
              [core-async :as mmca]]))
 
 (defn connect-events [broker client]
-  ;; TODO Connect to build server and read/post events
-  )
+  (let [e (ac/get-events client)]
+    (ca/go-loop [r (ca/<! e)]
+      (when r
+        (log/debug "Dispatching event received from server:" r)
+        (mmc/post-events broker [e])))
+    ;; Also push all events we're generating
+    (mmc/add-listener broker
+                      {:handler (fn [evt]
+                                  ;; Only push our own events
+                                  (when (= :script (:src evt))
+                                    (ac/push-events client [evt])
+                                    nil))})))
 
 (defn setup-runner [conf]
   (log/debug "Build API url:" (:url (c/api conf)))
@@ -68,4 +78,5 @@
                               :u :url}}}
   [cli-args]
   (log/debug "Running script from cli with args:" cli-args)
-  (run-script (cli->conf cli-args)))
+  ;; TODO Return nonzero on error
+  (ca/<!! (run-script (cli->conf cli-args))))

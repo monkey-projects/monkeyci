@@ -247,7 +247,8 @@
 (defn script-end [ctx]
   (log/debug "Script ended, reporting result")
   {:build (get-build ctx)
-   :jobs (vals (get-jobs ctx))})
+   :jobs (vals (get-jobs ctx))
+   :status (get-in ctx [:event :status])})
 
 (defn- apply-init [{:keys [init] :as job} ctx]
   (if (fn? init)

@@ -137,10 +137,11 @@
           s (->> events
                  (map (comp (partial format "data: %s\n\n") pr-str))
                  (apply str))
-          m (fn [req]
+          m (fn [req callback]
               (when (and (= "/events" (:path req))
                          (= :get (:method req)))
-                {:body (->stream s)}))
+                (callback
+                 {:body (->stream s)})))
           r (sut/get-events m)]
       (is (some? r))
       (is (= (first events) (first (ca/alts!! [r (ca/timeout 100)]))))

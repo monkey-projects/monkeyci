@@ -458,8 +458,9 @@
     (let [jobs {"test-job" ::test-job}
           build ::test-build]
       (is (= {:build ::test-build
-              :jobs [::test-job]}
-             (-> {}
+              :jobs [::test-job]
+              :status :success}
+             (-> {:event {:status :success}}
                  (sut/set-jobs jobs)
                  (sut/set-build build)
                  (sut/script-end)))))))
