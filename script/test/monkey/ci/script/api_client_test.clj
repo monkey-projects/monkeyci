@@ -1,6 +1,7 @@
 (ns monkey.ci.script.api-client-test
   (:require [clojure.test :refer [deftest testing is]]
             [babashka.fs :as fs]
+            [clojure.core.async :as ca]
             [clojure.edn :as edn]
             [monkey.ci.script.api-client :as sut]
             [org.httpkit
@@ -115,3 +116,33 @@
                            (= "/test/path" p))
                   {:body (->stream (pr-str {:path p}))})))]
       (is (= "/test/path" (sut/put-cache m "test-cache" "/test/path"))))))
+
+(deftest push-events
+  (testing "pushes events using client"
+    (let [pushed (atom [])
+          events [{:type ::test-event}]
+          m (fn [req]
+              (when (and (= "/events" (:path req))
+                         (= :post (:method req)))
+                (reset! pushed (-> req :body edn/read-string))
+                {:body (->stream (pr-str {}))
+                 :status 202}))]
+      (is (true? (sut/push-events m events)))
+      (is (= events @pushed)))))
+
+(deftest get-events
+  (testing "returns SSE stream that receives events"
+    (let [events [{:type ::first}
+                  {:type ::second}]
+          s (->> events
+                 (map (comp (partial format "data: %s\n\n") pr-str))
+                 (apply str))
+          m (fn [req]
+              (when (and (= "/events" (:path req))
+                         (= :get (:method req)))
+                {:body (->stream s)}))
+          r (sut/get-events m)]
+      (is (some? r))
+      (is (= (first events) (first (ca/alts!! [r (ca/timeout 100)]))))
+      (is (= (second events) (first (ca/alts!! [r (ca/timeout 100)]))))
+      (is (nil? (first (ca/alts!! [r (ca/timeout 100)])))))))

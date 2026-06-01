@@ -130,7 +130,7 @@
   ;; TODO Move all these into a "components" key so we can remove them all at once
   (dissoc rt :events :containers :artifacts :cache :mailman))
 
-(defn- add-output [r writer]
+(defn- add-output [r ^java.io.PrintWriter writer]
   ;; Add output to the result
   (.flush writer)
   (let [out (.toString writer)]

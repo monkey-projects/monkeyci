@@ -1,6 +1,9 @@
 (ns monkey.ci.script.api-client
   "Functions for invoking the build api HTTP server"
-  (:require [clojure.edn :as edn]
+  (:require [clojure.core.async :as ca]
+            [clojure.edn :as edn]
+            [clojure.java.io :as io]
+            [clojure.string :as cs]
             [clojure.tools.logging :as log]
             [monkey.ci.errors :as err]
             [org.httpkit.client :as http]))
@@ -120,3 +123,36 @@
   "Similar to `put-artifact`"
   [client art-id src]
   (store-path client "cache" art-id src))
+
+(defn push-events
+  "Pushes events to the build api server, which is responsible for propagating
+   them further up."
+  [client evts]
+  (-> (client {:path "/events"
+               :method :post
+               :body (pr-str evts)})
+      :status
+      (= 202)))
+
+(defn get-events
+  "Opens a stream that will receive all events for the build."
+  [client]
+  (let [prefix "data: "
+        parse-evt (fn [l]
+                    (when (cs/starts-with? l prefix)
+                      (edn/read-string (subs l (count prefix)))))
+        c (ca/chan)
+        r (->> (client {:path "/events"
+                        :method :get})
+               :body
+               (io/reader)
+               (line-seq))]
+    (ca/go-loop [n r]
+      (if-let [evt (first n)]
+        (do
+          (when-let [p (parse-evt evt)]
+            (ca/>! c p))
+          (recur (rest n)))
+        ;; No more data to read, close channel
+        (ca/close! c)))
+    c))

@@ -14,7 +14,12 @@
              [core :as mmc]
              [core-async :as mmca]]))
 
+(defn connect-events [broker client]
+  ;; TODO Connect to build server and read/post events
+  )
+
 (defn setup-runner [conf]
+  (log/debug "Build API url:" (:url (c/api conf)))
   (let [client (ac/make-client (c/api conf))
         broker (mmca/core-async-broker)
         result (ca/chan)
@@ -26,6 +31,7 @@
                  :build build})
         router (mmc/make-router routes {:executor i/execute})
         listener (mmc/add-listener broker {:handler router})]
+    (connect-events broker client)
     {:build build
      :mailman broker
      :router router
