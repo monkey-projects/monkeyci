@@ -13,4 +13,25 @@
 
   ;; clj -X:test:junit
   :junit
-  {:exec-fn monkey.test/junit}}}
+  {:exec-fn monkey.test/junit}
+
+  :jar
+  ;; clj -T:jar
+  {:deps {com.monkeyprojects/build {:mvn/version "0.3.1"}}
+   :exec-fn monkey.build/jar
+   :exec-args {:lib com.monkeyci/core
+               :jar "target/monkeyci-core.jar"
+               :version [[:env "MONKEYCI_VERSION"] "0.27.0-SNAPSHOT"]
+               :scm {:url "https://github.com/monkey-projects/monkeyci"}
+               :pom-data [[:licenses
+                           [:license
+                            [:name "GPL v3"]
+                            [:url "https://www.gnu.org/licenses/gpl-3.0.en.html#license-text"]]]]}}
+
+  :install
+  ;; clj -T:jar:install
+  {:exec-fn monkey.build/jar+install}
+
+  :deploy
+  ;; clj -T:jar:deploy
+  {:exec-fn monkey.build/jar+install}}}

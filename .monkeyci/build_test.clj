@@ -271,6 +271,18 @@
           (testing "contains common publish job"
             (is (contains? ids "publish-common")))
 
+          (testing "contains core test job"
+            (is (contains? ids "test-core")))
+
+          (testing "contains core publish job"
+            (is (contains? ids "publish-core")))
+
+          (testing "contains script test job"
+            (is (contains? ids "test-script")))
+
+          (testing "contains script publish job"
+            (is (contains? ids "publish-script")))
+
           (testing "contains test cli job"
             (is (contains? ids "test-cli")))
 
