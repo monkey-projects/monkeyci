@@ -4,6 +4,7 @@
   (:require [babashka
              [fs :as fs]
              [process :as bp]]
+            [clojure.edn :as edn]
             [clojure.java.io :as io]
             [clojure.string :as cs]
             [clojure.tools.logging :as log]
@@ -205,9 +206,11 @@
         (sc/set-job-filter (:filter (get-build-opts ctx))))))
 
 (defn get-runner
-  "Determines whether to run babashka or clojure for the scripts."
-  [ctx]
-  (get-in ctx [::child-opts :runner] :bb))
+  "Determines whether to run babashka or clojure for the scripts.  Either by reading
+   the child options, or checking if a `deps.edn` file exists.  By default, returns `:bb`"
+  [ctx sd]
+  (or (get-in ctx [::child-opts :runner])
+      (if (fs/exists? (fs/path sd "deps.edn")) :clj :bb)))
 
 (defn generate-deps [script-dir {:keys [lib-coords log-config m2-cache-dir]}]
   (cond-> (p/generate-deps script-dir nil)
@@ -217,23 +220,38 @@
   ;; m2 cache dir?
   )
 
+(defn- ctx->script-dir [ctx]
+  (let [build (ctx->build ctx)]
+    (b/calc-script-dir (b/checkout-dir build) (b/script-dir build))))
+
+(defn- read-existing-bb-edn [ctx]
+  (let [p (fs/path (ctx->script-dir ctx) "bb.edn")]
+    (when (fs/exists? p)
+      (edn/read-string (slurp (fs/file p))))))
+
 (defn generate-bb-conf [ctx]
   (let [{:keys [lib-coords]} (get-child-opts ctx)
-        api (get-api ctx)]
-    {:deps {'com.monkeyci/script lib-coords
-            'meta-merge/meta-merge {:mvn/version "1.0.0"}}
-     :paths ["."]
-     :tasks
-     {'script
-      {:task '(exec 'monkey.ci.script.core/run-cli)
-       :exec-args (-> (select-keys api [:url :token])
-                      (assoc :sid (->> (b/sid (ctx->build ctx))
-                                       (cs/join "/"))))}}}))
+        api (get-api ctx)
+        bb (read-existing-bb-edn ctx)]
+    (mc/deep-merge
+     bb
+     {:deps {'com.monkeyci/script lib-coords
+             'meta-merge/meta-merge {:mvn/version "1.0.0"}}
+      :paths ["."]
+      :tasks
+      {'script
+       {:task '(exec 'monkey.ci.script.core/run-cli)
+        :exec-args (-> (select-keys api [:url :token])
+                       (assoc :sid (->> (b/sid (ctx->build ctx))
+                                        (cs/join "/"))))}}})))
 
 (defn- bb-cmd [ctx]
-  (let [p (fs/create-temp-file {:prefix "bb-" :suffix ".edn"})]
+  (let [p (fs/create-temp-file {:prefix "bb-" :suffix ".edn"})
+        bb-path (fs/which "bb")]
+    (when-not bb-path
+      (throw (ex-info "Babashka installation has not been found.  Please install babashka first." {})))
     (spit (fs/file p) (generate-bb-conf ctx))
-    ["bb"
+    [(str bb-path)
      "--config" (str p)
      "run" "script"]))
 
@@ -245,12 +263,10 @@
    (pr-str {:config (child-config ctx)})])
 
 (defn- gen-cmd [ctx]
-  (let [build (ctx->build ctx)
-        sd (b/calc-script-dir (b/checkout-dir build) (b/script-dir build))]
+  (let [sd (ctx->script-dir ctx)]
     (when-not (fs/exists? sd)
       (throw (ex-info "Script dir does not exist" {:dir sd})))
-    ;; FIXME bb also reads deps.edn, so we need some other way to determine this
-    (case (get-runner ctx)
+    (case (get-runner ctx sd)
       :clj (clj-cmd ctx)
       ;; default
       (bb-cmd ctx))))

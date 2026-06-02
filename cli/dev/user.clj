@@ -23,4 +23,5 @@
 
 (defn run-script [dir]
   (run/build {:dir dir
-              :lib-coords {:local/root (str (fs/path (fs/cwd) "../script"))}}))
+              :lib-coords {:local/root (str (fs/path (fs/cwd) "../script"))}
+              :runner :bb}))

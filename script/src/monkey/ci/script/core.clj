@@ -78,5 +78,6 @@
                               :u :url}}}
   [cli-args]
   (log/debug "Running script from cli with args:" cli-args)
-  ;; TODO Return nonzero on error
-  (ca/<!! (run-script (cli->conf cli-args))))
+  (let [r (ca/<!! (run-script (cli->conf cli-args)))]
+    (when (b/failed? r)
+      (System/exit 1))))

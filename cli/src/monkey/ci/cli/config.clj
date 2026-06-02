@@ -90,7 +90,7 @@
   (assoc conf :clean v))
 
 (defn get-child-opts [conf]
-  (select-keys conf [:lib-coords :log-config :m2-cache-dir]))
+  (select-keys conf [:lib-coords :log-config :m2-cache-dir :runner]))
 
 (def get-podman
   "Returns the podman configuration map (e.g. {:podman-cmd \"podman\",

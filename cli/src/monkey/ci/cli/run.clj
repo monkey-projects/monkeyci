@@ -8,6 +8,7 @@
   (:require [babashka.fs :as fs]
             [clojure.core.async :as ca]
             [clojure.tools.logging :as log]
+            [medley.core :as mc]
             [monkey.ci.time :as t]
             [monkey.ci.cli
              [artifacts :as art]
@@ -83,7 +84,8 @@
     (ca/tap (:event-mult server) p false)))
 
 (defn- args->conf [args]
-  {:lib-coords {:mvn/version (or (:lib-version args) (v/version))}})
+  (-> {:lib-coords {:mvn/version (or (:lib-version args) (v/version))}}
+      (mc/assoc-some :runner (some-> (:runner args) keyword))))
 
 (defn build
   "Runs a local build.

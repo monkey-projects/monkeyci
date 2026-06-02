@@ -132,29 +132,36 @@
                                  (sut/prepare-child-cmd)))))
     (fs/with-temp-dir [dir]
       (is (some? (fs/create-dir (fs/path dir ".monkeyci"))))
-      (let [build {:checkout-dir dir}
-            r (-> base-conf
-                  (assoc-in [:event :build] build)
-                  (sut/prepare-child-cmd))]
-        (testing "starts child process command"
-          (testing "in script dir"
-            (is (= (str dir "/.monkeyci") (str (:dir r)))))
+      (with-redefs [fs/which (constantly "/usr/bin/bb")]
+        (let [build {:checkout-dir dir}
+              r (-> base-conf
+                    (assoc-in [:event :build] build)
+                    (sut/prepare-child-cmd))]
+          (testing "starts child process command"
+            (testing "in script dir"
+              (is (= (str dir "/.monkeyci") (str (:dir r)))))
 
-          (testing "runs bb cmd"
-            (is (= "bb" (-> r :cmd first))))
+            (testing "runs bb cmd"
+              (is (re-matches #".*bb$" (-> r :cmd first))))
 
-          (testing "generates custom `bb.edn`"
-            (let [[_ p :as c] (->> r :cmd (rest) (take 2))]
-              (is (= "--config" (first c)))
-              (is (fs/exists? p))))
+            (testing "generates custom `bb.edn`"
+              (let [[_ p :as c] (->> r :cmd (rest) (take 2))]
+                (is (= "--config" (first c)))
+                (is (fs/exists? p))))
 
-          (testing "exit fn fires `build/end`"
-            (let [exit-fn (:exit-fn r)]
-              (is (fn? exit-fn))
-              (is (some? (exit-fn {:exit ::process-result})))
-              (let [p (wait-for-posted mailman)]
-                (is (not (= :timeout p)))
-                (is (= :build/end (:type p)))))))))
+            (testing "exit fn fires `build/end`"
+              (let [exit-fn (:exit-fn r)]
+                (is (fn? exit-fn))
+                (is (some? (exit-fn {:exit ::process-result})))
+                (let [p (wait-for-posted mailman)]
+                  (is (not (= :timeout p)))
+                  (is (= :build/end (:type p)))))))))
+
+      (testing "fails when no `bb` found"
+        (with-redefs [fs/which (constantly nil)]
+          (is (thrown? Exception (sut/prepare-child-cmd
+                                  (-> base-conf
+                                      (assoc-in [:event :build :checkout-dir] dir))))))))
 
     (testing "clojure runner"
       (fs/with-temp-dir [dir]
@@ -219,7 +226,19 @@
 
     (testing "passes sid from build"
       (is (= "a/b/c"
-             (get-in r [:tasks 'script :exec-args :sid]))))))
+             (get-in r [:tasks 'script :exec-args :sid])))))
+
+  (testing "merges in existing `bb.edn`"
+    (fs/with-temp-dir [dir]
+      (is (nil? (spit (fs/file
+                       (fs/create-dir (fs/path dir ".monkeyci"))
+                       "bb.edn")
+                      {:deps {'test-lib {:mvn/version "test-version"}}})))
+      (let [r (sut/generate-bb-conf
+               {:event
+                {:build
+                 {:checkout-dir dir}}})]
+        (is (= "test-version" (get-in r [:deps 'test-lib :mvn/version])))))))
 
 (deftest build-end
   (testing "returns build with jobs from state"

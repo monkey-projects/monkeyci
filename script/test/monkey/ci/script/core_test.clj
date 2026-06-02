@@ -49,11 +49,13 @@
 
 (deftest run-cli
   (testing "invokes `run-script` with config from args"
-    (with-redefs [sut/run-script (fn [arg] (ca/to-chan! [arg]))]
-      (let [r (sut/run-cli {:url "http://test-url" :sid "a/b/c"})]
-        (is (= "http://test-url" (-> r
-                                     (c/api)
-                                     :url)))))))
+    (let [args (atom nil)]
+      (with-redefs [sut/run-script (fn [arg]
+                                     (reset! args arg)
+                                     (ca/to-chan! [{:status :success}]))]
+        (is (nil? (sut/run-cli {:url "http://test-url" :sid "a/b/c"})))
+        (is (= "http://test-url"
+               (-> @args c/api :url)))))))
 
 (deftest cli->conf
   (let [args {:url "http://test-url"
