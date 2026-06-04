@@ -381,3 +381,18 @@
   (testing "`true` if build source is `cli`"
     (is (false? (sut/cli? test-ctx)))
     (is (true? (sut/cli? {:build {:source :cli}})))))
+
+(deftest get-artifact
+  (testing "retrieves artifact using api client"
+    (let [path "/test/path"
+          ctx {:api
+               {:client (constantly {:body (pr-str {:path path})})}}
+          art (sut/artifact "test-art" path)]
+      (is (= path (sut/get-artifact ctx art)))))
+
+  (testing "`nil` if artifact not found"
+    (let [path "/test/path"
+          ctx {:api
+               {:client (constantly nil)}}
+          art (sut/artifact "test-art" path)]
+      (is (nil? (sut/get-artifact ctx art))))))

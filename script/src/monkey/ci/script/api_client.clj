@@ -51,6 +51,12 @@
 
 (def ctx->api-client (comp :client :api))
 
+(defn- body->str [x]
+  (cond
+    (string? x) x
+    (some? x) (slurp x)
+    :else nil))
+
 (defn decrypt-key* [client enc-dek]
   (let [p (pr-str enc-dek)]
     (-> (client {:path "/decrypt-key"
@@ -59,7 +65,7 @@
                  :headers {:content-type "application/edn"
                            :content-length (str (count p))}})
         :body
-        slurp)))
+        body->str)))
 
 (def decrypt-key
   "Given an encrypted data encryption key, decrypts it by sending a decryption
@@ -68,8 +74,8 @@
 
 (defn- body->edn [v]
   (some-> v
-          slurp
-         (edn/read-string)))
+          (body->str)
+          (edn/read-string)))
 
 (defn- fetch-params [ctx]
   (let [client (ctx->api-client ctx)]
