@@ -1,107 +1,76 @@
 (ns monkey.ci.script.core-test
   (:require [clojure.test :refer [deftest testing is]]
             [babashka.fs :as fs]
-            [cheshire.core :as json]
+            [clojure.core.async :as ca]
             [monkey.ci.script
+             [api-client :as ac]
              [build :as b]
-             [core :as sut]
-             [jobs :as j]]))
+             [config :as c]
+             [core :as sut]]))
 
-(defn- action-job [id f]
-  {:type :action
-   :id id
-   :action f})
+(deftest setup-runner
+  (with-redefs [ac/get-events (constantly (ca/to-chan! []))]
+    (let [build (-> {:build-id "test-build"}
+                    (b/set-script-dir "/test/dir/script")
+                    (b/set-checkout-dir "/test/dir"))
+          conf (-> c/empty-config
+                   (c/set-build build)
+                   (c/set-api {:url "http://localhost:1234"
+                               :token "test-token"}))
+          r (sut/setup-runner conf)]
+      (testing "registers listener with router"
+        (is (some? (:router r)))
+        (is (some? (:listener r)))))))
 
-(defn- dummy-job
-  ([r]
-   (action-job ::test-job (constantly r)))
-  ([]
-   (dummy-job b/success)))
+(deftest run-script
+  (with-redefs [ac/get-events (constantly (ca/to-chan! []))
+                ac/push-events (constantly true)]
+    (fs/with-temp-dir [dir]
+      (let [src "dev-resources/test"
+            sd (fs/path dir "script")
+            build (-> {:build-id "test-build"}
+                      (b/set-script-dir sd)
+                      (b/set-checkout-dir dir))
+            conf (-> c/empty-config
+                     (c/set-build build)
+                     (c/set-api {:url "http://localhost:1234"
+                                 :token "test-token"}))]
+        (is (some? (fs/copy-tree src sd)))
 
-(defn- to-json [v]
-  (json/generate-string v))
+        (let [r (sut/run-script conf)]
+          (is (some? r) "returns channel")
+          (let [res (first (ca/alts!! [r (ca/timeout 1000)]))]
+            (is (some? res))
+            (is (= build (select-keys (:build res) (keys build)))
+                "result contains input build")
+            (is (= 1 (count (:jobs res)))
+                "result contains executed jobs")
+            (is (= :success (-> res :jobs first :status)))))))))
 
-(deftest resolve-jobs
-  (testing "invokes fn"
-    (let [job (dummy-job)]
-      (is (= [job] (sut/resolve-jobs (constantly [job]) {})))))
+(deftest run-cli
+  (testing "invokes `run-script` with config from args"
+    (let [args (atom nil)]
+      (with-redefs [sut/run-script (fn [arg]
+                                     (reset! args arg)
+                                     (ca/to-chan! [{:status :success}]))]
+        (is (nil? (sut/run-cli {:url "http://test-url" :sid "a/b/c"})))
+        (is (= "http://test-url"
+               (-> @args c/api :url)))))))
 
-  (testing "auto-assigns ids to jobs"
-    (let [jobs (repeat 10 (action-job nil (constantly ::test)))
-          p (sut/resolve-jobs (vec jobs) {})]
-      (is (not-empty p))
-      (is (every? :id p))
-      (is (= (count jobs) (count (distinct (map :id p)))))))
+(deftest cli->conf
+  (let [args {:url "http://test-url"
+              :token "test-token"
+              :sid "test-org/test-repo/test-build"
+              :checkout-dir "/test/dir"}
+        conf (sut/cli->conf args)]
+    (testing "sets api config"
+      (is (= {:url "http://test-url"
+              :token "test-token"}
+             (c/api conf))))
 
-  (testing "assigns id as metadata to function"
-    (let [p (sut/resolve-jobs [(action-job nil (constantly ::ok))] {})]
-      (is (= 1 (count p)))
-      (is (= "job-1" (-> p
-                         first
-                         j/job-id)))))
-
-  (testing "does not overwrite existing id"
-    (is (= ::test-id (-> [(action-job ::test-id
-                                      (constantly :ok))]
-                         (sut/resolve-jobs {})
-                         first
-                         j/job-id))))
-
-  (testing "returns jobs as-is"
-    (let [jobs (repeatedly 10 dummy-job)]
-      (is (= jobs (sut/resolve-jobs jobs {})))))
-
-  (testing "resolves job resolvables"
-    (let [job (dummy-job)]
-      (is (= [job] (sut/resolve-jobs [(constantly job)] {}))))))
-
-(deftest load-jobs
-  (fs/with-temp-dir [dir]
-    (testing "loads jobs from yaml file"
-      (let [sd (fs/file (fs/create-dir (fs/path dir "yaml")))
-            build (b/set-script-dir {} sd)]
-        (is (nil? (spit (fs/file (fs/path sd "build.yaml"))
-                        "- id: yaml-job\n  image: test-img\n")))
-        (let [loaded (sut/load-jobs build {})]
-          (is (= 1 (count loaded)))
-          (is (= "yaml-job" (-> loaded first j/job-id))))))
-
-    (testing "loads jobs from json file"
-      (let [sd (fs/file (fs/create-dir (fs/path dir "json")))
-            build (b/set-script-dir {} sd)]
-        (is (nil? (spit (fs/file (fs/path sd "build.json"))
-                        (to-json [{:id "json-job"
-                                   :image "test-img"}]))))
-        (let [loaded (sut/load-jobs build {})]
-          (is (= 1 (count loaded)))
-          (is (= "json-job" (-> loaded first j/job-id))))))
-
-    (testing "loads jobs from edn file"
-      (let [sd (fs/file (fs/create-dir (fs/path dir "edn")))
-            build (b/set-script-dir {} sd)]
-        (is (nil? (spit (fs/file (fs/path sd "build.edn")) (pr-str [{:id "test-job"
-                                                                     :type :container
-                                                                     :image "test-img"}]))))
-        (is (= 1 (count (sut/load-jobs build {}))))))
-
-    (testing "loads single job from edn file"
-      (let [sd (fs/file (fs/create-dir (fs/path dir "edn-single")))
-            build (b/set-script-dir {} sd)]
-        (is (nil? (spit (fs/file (fs/path sd "build.edn")) (pr-str {:id "test-job"
-                                                                    :type :container
-                                                                    :image "test-img"}))))
-        (is (= 1 (count (sut/load-jobs build {}))))))
-
-    (testing "always container jobs for non-clj files"
-      (let [sd (fs/file (fs/create-dir (fs/path dir "edn-3")))
-            build (b/set-script-dir {} sd)]
-        (is (nil? (spit (fs/file (fs/path sd "build.edn")) (pr-str [{:id "test-job"
-                                                                     :image "test-img"}]))))
-        (is (j/container-job? (-> (sut/load-jobs build {})
-                                  (first))))))
-
-    (testing "combines jobs loaded from multiple sources")))
-
-
-
-
+    (testing "sets build"
+      (is (= {:org-id "test-org"
+              :repo-id "test-repo"
+              :build-id "test-build"
+              :checkout-dir "/test/dir"}
+             (c/build conf))))))

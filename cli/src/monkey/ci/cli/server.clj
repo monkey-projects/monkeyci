@@ -41,7 +41,9 @@
 (def ^:private sse-prefix "data: ")
 
 (defn- ->sse [evt]
-  (str sse-prefix (pr-str evt) "\n\n"))
+  {:status 200
+   :headers {"content-type" "text/event-stream"}
+   :body (str sse-prefix (pr-str evt) "\n\n")})
 
 (defn- keepalive-evt []
   (->sse {:type :ping}))
@@ -97,7 +99,8 @@
       (fn [ch]
         (log/info "SSE client connected for build" sid)
         ;; Send an immediate keepalive so the client sees the connection open
-        (http/send! ch (keepalive-evt) false)
+        (when-not (http/send! ch (keepalive-evt) false)
+          (log/warn "Failed to send initial keepalive event"))
         ;; Pipe events from the tap channel to the SSE client
         (ca/go-loop []
           (if-let [evt (ca/<! tap-ch)]
@@ -152,7 +155,12 @@
     (-> (rur/response is)
         (rur/content-type "application/octet-stream"))))
 
-(defn- handle-download-artifact [req {:keys [artifact-dir build]}]
+(defn- handle-download-artifact
+  "Since scripts are often unable to unzip artifacts (e.g. if they run in babashka),
+   downloading artifacts is not provided.  Instead, this handler copies the artifact
+   files to a location indicated by the script.  The call returns the path where the
+   script can find the files."
+  [req {:keys [artifact-dir build]}]
   (let [id   (-> req :path-params :artifact-id)
         path (artifact-path artifact-dir (:sid build) id)
         f    (io/file path)]

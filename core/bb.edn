@@ -1,7 +1,5 @@
 {:paths ["src" "test"]
- :deps {com.monkeyci/script {:local/root "."}
-        com.monkeyci/core {:local/root "../core"}
-        meta-merge/meta-merge {:mvn/version "1.0.0"}
+ :deps {com.monkeyci/core {:local/root "."}
         io.github.cognitect-labs/test-runner {:git/tag "v0.5.1" :git/sha "dfb30dd"}}
 
  :tasks
@@ -17,8 +15,4 @@
    :task (with-open [pw (io/writer (io/file "junit-bb.xml"))]
           (binding [t/*test-out* pw]
            (j/with-junit-output
-            (run 'test))))}  
-
-  script
-  ;; Runs a build script.  Provided for testing purposes.
-  {:task (exec 'monkey.ci.script.core/run-cli)}}}
+            (run 'test))))}}}

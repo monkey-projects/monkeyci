@@ -8,6 +8,7 @@
   (:require [babashka.fs :as fs]
             [clojure.core.async :as ca]
             [clojure.tools.logging :as log]
+            [medley.core :as mc]
             [monkey.ci.time :as t]
             [monkey.ci.cli
              [artifacts :as art]
@@ -43,17 +44,18 @@
   (mmc/make-router routes {:executor mms/execute}))
 
 (defn- make-podman-routes [conf mailman]
-  (podman/make-routes {:work-dir (str (c/get-jobs-dir conf))
-                       :mailman  mailman
-                       :state    (:state conf)
-                       :podman   (c/get-podman conf)
-                       :cleanup? (c/get-clean conf)
-                       :cache
-                       {:save #(art/save-artifact %1 (c/get-cache-dir conf) %2)
-                        :restore (partial art/restore-artifact (c/get-cache-dir conf))}
-                       :artifact
-                       {:save #(art/save-artifact %1 (c/get-artifact-dir conf) %2)
-                        :restore (partial art/restore-artifact (c/get-artifact-dir conf))}}))
+  (-> conf
+      (assoc :mailman  mailman
+             :state    (:state conf)
+             :podman   (c/get-podman conf)
+             :cleanup? (c/get-clean conf)
+             :cache
+             {:save #(art/save-artifact %1 (c/get-cache-dir conf) %2)
+              :restore (partial art/restore-artifact (c/get-cache-dir conf))}
+             :artifact
+             {:save #(art/save-artifact %1 (c/get-artifact-dir conf) %2)
+              :restore (partial art/restore-artifact (c/get-artifact-dir conf))})
+      (podman/make-routes)))
 
 (defn- add-routes-listener [mailman routes]
   (mmc/add-listener mailman {:handler (make-router routes)}))
@@ -82,7 +84,8 @@
     (ca/tap (:event-mult server) p false)))
 
 (defn- args->conf [args]
-  {:lib-coords {:mvn/version (or (:lib-version args) (v/version))}})
+  (-> {:lib-coords {:mvn/version (or (:lib-version args) (v/version))}}
+      (mc/assoc-some :runner (some-> (:runner args) keyword))))
 
 (defn build
   "Runs a local build.
@@ -122,6 +125,7 @@
                                  :token (:token server)})
                      (c/set-build build)
                      (c/set-ending result)
+                     (c/set-lib-coords (:lib-coords conf))
                      (setup-events))]
     (log/info "Work directory:" (str work-dir))
     (try

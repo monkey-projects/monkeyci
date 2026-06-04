@@ -1,6 +1,8 @@
 (ns monkey.ci.script.api-client-test
   (:require [clojure.test :refer [deftest testing is]]
             [babashka.fs :as fs]
+            [clojure.core.async :as ca]
+            [clojure.edn :as edn]
             [monkey.ci.script.api-client :as sut]
             [org.httpkit
              [client :as hc]
@@ -70,27 +72,78 @@
                 {:body (->stream "decrypted key")}))]
       (is (= "decrypted key" (sut/decrypt-key* m "encrypted-key"))))))
 
-#_(deftest build-params
-  (let [dek (vc/generate-key)
-        m (fn [req]
-            (cond
-              (= "/params" (:path req))
-              {:body
-               [{:name "key"
-                 :value "value"}]}
-              (= "/decrypt-key" (:path req))
-              {:body (->stream (bcc/bytes->b64-str dek))}))
-        org-id (cuid/random-cuid)
-        rt {:api {:client m}
-            :build
-            {:org-id org-id
-             :sid [org-id "test-repo" "test-build"]
-             :dek "encrypted-dek"
-             :params {"extra-param" (crypto/encrypt dek (crypto/cuid->iv org-id) "extra-val")}}}
-        params (sut/build-params rt)]
-    
-    (testing "invokes `params` endpoint on client"
-      (is (= "value" (get params "key"))))
+(deftest build-params
+  (testing "invokes `params` endpoint on client"
+    (let [m (fn [req]
+              (when (and (= "/params" (:path req))
+                         (= :get (:method req)))
+                {:body (->stream (pr-str [{:name "test-param"
+                                           :value "test-val"}]))}))]
+      (is (= {"test-param" "test-val"} (sut/build-params {:api {:client m}}))))))
 
-    (testing "adds decrypted additional build params"
-      (is (= "extra-val" (get params "extra-param"))))))
+(deftest get-artifact
+  (testing "invokes endpoint using client"
+    (let [m (fn [req]
+              (when (and (= "/artifact/test-artifact" (:path req))
+                         (= :get (:method req)))
+                {:body (->stream (pr-str {:path (get-in req [:query-params :path])}))}))]
+      (is (= "/test/path" (sut/get-artifact m "test-artifact" "/test/path"))))))
+
+(deftest put-artifact
+  (testing "invokes endpoint using client"
+    (let [m (fn [req]
+              (let [p (-> req :body edn/read-string :path)]
+                (when (and (= "/artifact/test-artifact" (:path req))
+                           (= :post (:method req))
+                           (= "/test/path" p))
+                  {:body (->stream (pr-str {:path p}))})))]
+      (is (= "/test/path" (sut/put-artifact m "test-artifact" "/test/path"))))))
+
+(deftest get-cache
+  (testing "invokes endpoint using client"
+    (let [m (fn [req]
+              (when (and (= "/cache/test-cache" (:path req))
+                         (= :get (:method req)))
+                {:body (->stream (pr-str {:path (get-in req [:query-params :path])}))}))]
+      (is (= "/test/path" (sut/get-cache m "test-cache" "/test/path"))))))
+
+(deftest put-cache
+  (testing "invokes endpoint using client"
+    (let [m (fn [req]
+              (let [p (-> req :body edn/read-string :path)]
+                (when (and (= "/cache/test-cache" (:path req))
+                           (= :post (:method req))
+                           (= "/test/path" p))
+                  {:body (->stream (pr-str {:path p}))})))]
+      (is (= "/test/path" (sut/put-cache m "test-cache" "/test/path"))))))
+
+(deftest push-events
+  (testing "pushes events using client"
+    (let [pushed (atom [])
+          events [{:type ::test-event}]
+          m (fn [req]
+              (when (and (= "/events" (:path req))
+                         (= :post (:method req)))
+                (reset! pushed (-> req :body edn/read-string))
+                {:body (->stream (pr-str {}))
+                 :status 202}))]
+      (is (true? (sut/push-events m events)))
+      (is (= events @pushed)))))
+
+(deftest get-events
+  (testing "returns SSE stream that receives events"
+    (let [events [{:type ::first}
+                  {:type ::second}]
+          s (->> events
+                 (map (comp (partial format "data: %s\n\n") pr-str))
+                 (apply str))
+          m (fn [req callback]
+              (when (and (= "/events" (:path req))
+                         (= :get (:method req)))
+                (callback
+                 {:body (->stream s)})))
+          r (sut/get-events m)]
+      (is (some? r))
+      (is (= (first events) (first (ca/alts!! [r (ca/timeout 100)]))))
+      (is (= (second events) (first (ca/alts!! [r (ca/timeout 100)]))))
+      (is (nil? (first (ca/alts!! [r (ca/timeout 100)])))))))

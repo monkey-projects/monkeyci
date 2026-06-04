@@ -1,6 +1,7 @@
 (ns monkey.ci.script.config
   "Build script configuration functions, used by the process controller to 
-   create a valid configuration that can then be read by the build script runner.")
+   create a valid configuration that can then be read by the build script runner."
+  (:require [medley.core :as mc]))
 
 (def empty-config {})
 
@@ -14,7 +15,7 @@
 (defn build->out [build]
   (-> build
       (dissoc :status :cleanup?)
-      (update :git dissoc :ssh-keys)))
+      (mc/update-existing :git dissoc :ssh-keys)))
 
 (defn set-build [c b]
   (assoc c build (build->out b)))
@@ -35,4 +36,3 @@
   (cond-> c
     true (dissoc job-filter)
     (not-empty f) (assoc job-filter f)))
-

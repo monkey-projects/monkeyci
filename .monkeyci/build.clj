@@ -64,6 +64,12 @@
 (def test-common
   (test-sublib {:dir "common" :should? p/build-common?}))
 
+(def test-core
+  (test-sublib {:dir "core" :should? p/build-core?}))
+
+(def test-script
+  (test-sublib {:dir "script" :should? p/build-script?}))
+
 (def test-cli
   (test-sublib {:dir "cli" :should? p/build-cli?}))
 
@@ -189,7 +195,7 @@
     ;; This is to be able to re-run a release build when a job down the road has
     ;; previously failed.
     (if (or (nil? v) (not= v (clojars-latest-version dir ctx)))
-      (-> (clj-container id dir "-X:jar:deploy")
+      (-> (clj-container id dir "-T:jar:deploy")
           (assoc :container/env (publish-env ctx v)))
       (m/action-job id (constantly (m/with-message m/success "Version was already published"))))))
 
@@ -199,7 +205,8 @@
             (m/depends-on (cond-> ["test-app"]
                             ;; TODO Since this job may also be excluded depending
                             ;; on clojars, this could still be incorrect
-                            (p/publish-common? ctx) (conj "publish-common"))))))
+                            (p/publish-common? ctx) (conj "publish-common")
+                            (p/publish-core? ctx) (conj "publish-core"))))))
 
 (defn publish-test-lib [ctx]
   (when (p/publish-test-lib? ctx)
@@ -212,6 +219,18 @@
   (when (p/publish-common? ctx)
     (some-> (publish ctx "publish-common" "common")
             (m/depends-on ["test-common"]))))
+
+(defn publish-core [ctx]
+  (when (p/publish-core? ctx)
+    (some-> (publish ctx "publish-core" "core")
+            (m/depends-on ["test-core"]))))
+
+(defn publish-script [ctx]
+  (when (p/publish-script? ctx)
+    (some->
+     (cond-> (publish ctx "publish-script" "script")
+       true (m/depends-on ["test-script"])
+       (p/publish-core? ctx) (m/depends-on ["test-core"])))))
 
 (def github-release
   "Creates a release in github"
@@ -324,9 +343,11 @@
 ;; List of jobs
 (def jobs
   [test-common
+   test-core
    test-app
    test-gui
    test-test-lib
+   test-script
            
    app-uberjar
    upload-uberjar
@@ -334,6 +355,8 @@
    publish-common
    publish-app
    publish-test-lib
+   publish-core
+   publish-script
    github-release
 
    ;; Base images

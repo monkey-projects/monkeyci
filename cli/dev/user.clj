@@ -1,6 +1,8 @@
 (ns user
-  (:require [monkey.ci.cli
-             [print :as p]]
+  (:require [babashka.fs :as fs]
+            [monkey.ci.cli
+             [print :as p]
+             [run :as run]]
             [monkey.ci.cli.print.scrolling :as ps]))
 
 ;; Enable reflection warnings in all ns'es
@@ -18,3 +20,8 @@
   (p/print-job-msg "success-job" "This job has" (p/success "succeeded"))
   (p/print-job-msg "failed-job" "This job has" (p/failure "failed"))
   (p/print-cmd-start "test-job" "ls -l"))
+
+(defn run-script [dir]
+  (run/build {:dir dir
+              :lib-coords {:local/root (str (fs/path (fs/cwd) "../script"))}
+              :runner :bb}))

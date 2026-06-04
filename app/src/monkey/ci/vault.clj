@@ -6,7 +6,8 @@
 (def dek-size 32)
 
 (defn cuid->iv
-  "Generates an iv from the given cuid"
+  "Generates an iv (initialization vector) from the given cuid.  This is in turn
+   used for symmetric encryption/decryption."
   [cuid]
   ;; Take the last 6 bits of each char and add them to a bitset, then take
   ;; this result as the iv.

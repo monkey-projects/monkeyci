@@ -4,18 +4,50 @@
         camel-snake-kebab/camel-snake-kebab {:mvn/version "0.4.3"}
         cheshire/cheshire {:mvn/version "6.2.0"}
         clj-commons/clj-yaml {:mvn/version "1.0.29"}
-        org.clojure/tools.logging {:mvn/version "1.3.0"}
+        com.monkeyci/core {:mvn/version "0.27.0-SNAPSHOT"}
+        com.monkeyprojects/mailman-core-async {:mvn/version "0.4.0"}
+        com.monkeyprojects/mailman-sieppari {:mvn/version "0.4.0"}
         http-kit/http-kit {:mvn/version "2.9.0-beta3"}
-        com.monkeyci/core {:local/root "../core"}}
+        org.clojure/tools.logging {:mvn/version "1.3.0"}}
  
  :aliases
- {:test
+ {:dev
+  {:extra-paths ["dev-resources"]
+   :override-deps {com.monkeyci/core {:local/root "../core"}}}
+
+  :test
   ;; clj -X:test
   {:extra-paths ["test"]
    :extra-deps {ch.qos.logback/logback-classic {:mvn/version "1.5.18"}
                 com.monkeyprojects/build {:mvn/version "0.3.1"}}
+   :override-deps {com.monkeyci/core {:local/root "../core"}}
    :exec-fn monkey.test/all}
+
+  ;; clj -X:test:junit
+  :junit
+  {:exec-fn monkey.test/junit}
 
   :watch
   ;; clj -X:test:watch
-  {:exec-fn monkey.test/watch}}}
+  {:exec-fn monkey.test/watch}
+
+  :jar
+  ;; clj -T:jar
+  {:deps {com.monkeyprojects/build {:mvn/version "0.3.1"}}
+   :exec-fn monkey.build/jar
+   :exec-args {:lib com.monkeyci/script
+               :jar "target/monkeyci-script.jar"
+               :version [[:env "MONKEYCI_VERSION"] "0.27.0-SNAPSHOT"]
+               :scm {:url "https://github.com/monkey-projects/monkeyci"}
+               :pom-data [[:licenses
+                           [:license
+                            [:name "GPL v3"]
+                            [:url "https://www.gnu.org/licenses/gpl-3.0.en.html#license-text"]]]]}}
+
+  :install
+  ;; clj -T:jar:install
+  {:exec-fn monkey.build/jar+install}
+
+  :deploy
+  ;; clj -T:jar:deploy
+  {:exec-fn monkey.build/jar+install}}}

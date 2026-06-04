@@ -74,7 +74,8 @@
 (defn- print-result [ctx]
   (let [job (job-id ctx)
         p (if job (partial p/print-job-msg (pad-job-id ctx job)) p/print-timed-msg)]
-    (when-let [m (not-empty (get-in ctx [:event :result :message]))]
+    (when-let [m (not-empty (or (get-in ctx [:event :result :message])
+                                (get-in ctx [:event :message])))]
       (p "Message:" m))
     (print-test-results ctx)))
 

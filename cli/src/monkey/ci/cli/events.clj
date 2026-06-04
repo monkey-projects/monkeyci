@@ -4,7 +4,9 @@
   (:require [babashka
              [fs :as fs]
              [process :as bp]]
+            [clojure.edn :as edn]
             [clojure.java.io :as io]
+            [clojure.string :as cs]
             [clojure.tools.logging :as log]
             [medley.core :as mc]
             [monkey.ci.cli
@@ -203,14 +205,71 @@
         (sc/set-api (select-keys (get-api ctx) [:url :token]))
         (sc/set-job-filter (:filter (get-build-opts ctx))))))
 
+(defn get-runner
+  "Determines whether to run babashka or clojure for the scripts.  Either by reading
+   the child options, or checking if a `deps.edn` file exists.  By default, returns `:bb`"
+  [ctx sd]
+  (or (get-in ctx [::child-opts :runner])
+      (if (fs/exists? (fs/path sd "deps.edn")) :clj :bb)))
+
 (defn generate-deps [script-dir {:keys [lib-coords log-config m2-cache-dir]}]
   (cond-> (p/generate-deps script-dir nil)
-    ;; TODO Replace app with script lib
-    lib-coords (update-in [:aliases :monkeyci/build :extra-deps] mc/assoc-some 'com.monkeyci/app lib-coords)
+    lib-coords (update-in [:aliases :monkeyci/build :extra-deps] mc/assoc-some 'com.monkeyci/script lib-coords)
     log-config (p/update-alias assoc :jvm-opts
                                [(str "-Dlogback.configurationFile=" log-config)]))
-    ;; m2 cache dir?
+  ;; m2 cache dir?
   )
+
+(defn- ctx->script-dir [ctx]
+  (let [build (ctx->build ctx)]
+    (b/calc-script-dir (b/checkout-dir build) (b/script-dir build))))
+
+(defn- read-existing-bb-edn [ctx]
+  (let [p (fs/path (ctx->script-dir ctx) "bb.edn")]
+    (when (fs/exists? p)
+      (edn/read-string (slurp (fs/file p))))))
+
+(defn generate-bb-conf [ctx]
+  (let [{:keys [lib-coords]} (get-child-opts ctx)
+        api (get-api ctx)
+        bb (read-existing-bb-edn ctx)]
+    (mc/deep-merge
+     bb
+     {:deps {'com.monkeyci/script lib-coords
+             'meta-merge/meta-merge {:mvn/version "1.0.0"}}
+      :paths ["."]
+      :tasks
+      {'script
+       {:task '(exec 'monkey.ci.script.core/run-cli)
+        :exec-args (-> (select-keys api [:url :token])
+                       (assoc :sid (->> (b/sid (ctx->build ctx))
+                                        (cs/join "/"))))}}})))
+
+(defn- bb-cmd [ctx]
+  (let [p (fs/create-temp-file {:prefix "bb-" :suffix ".edn"})
+        bb-path (fs/which "bb")]
+    (when-not bb-path
+      (throw (ex-info "Babashka installation has not been found.  Please install babashka first." {})))
+    (spit (fs/file p) (generate-bb-conf ctx))
+    [(str bb-path)
+     "--config" (str p)
+     "run" "script"]))
+
+(defn- clj-cmd [ctx]
+  ["clojure"
+   "-Sdeps" (pr-str (generate-deps (-> ctx ctx->build b/script-dir)
+                                   (get-child-opts ctx)))
+   "-X:monkeyci/build"
+   (pr-str {:config (child-config ctx)})])
+
+(defn- gen-cmd [ctx]
+  (let [sd (ctx->script-dir ctx)]
+    (when-not (fs/exists? sd)
+      (throw (ex-info "Script dir does not exist" {:dir sd})))
+    (case (get-runner ctx sd)
+      :clj (clj-cmd ctx)
+      ;; default
+      (bb-cmd ctx))))
 
 (defn prepare-child-cmd
   "Initializes child process command line"
@@ -226,11 +285,7 @@
                     (catch Exception ex
                       (log/error "Unable to post build/end event" ex))))]
     {:dir (b/calc-script-dir (b/checkout-dir build) (b/script-dir build))
-     :cmd ["clojure"
-           "-Sdeps" (pr-str (generate-deps (b/script-dir build)
-                                           (get-child-opts ctx)))
-           "-X:monkeyci/build"
-           (pr-str {:config (child-config ctx)})]
+     :cmd (gen-cmd ctx)
      :out (log-file "out.log")
      :err (log-file "err.log")
      :exit-fn (p/exit-fn on-exit)}))
