@@ -1,0 +1,18 @@
+{:paths ["src" "test"]
+ :deps {com.monkeyci/core {:local/root "."}
+        io.github.cognitect-labs/test-runner {:git/tag "v0.5.1" :git/sha "dfb30dd"}}
+
+ :tasks
+ {:requires ([cognitect.test-runner.api :as ca])
+  test
+  {:task (ca/test {:patterns [".*-test$"]})}
+
+  test-junit
+  ;; Runs unit tests and outputs results to an xml file
+  {:requires ([clojure.java.io :as io]
+              [clojure.test :as t]
+              [clojure.test.junit :as j])
+   :task (with-open [pw (io/writer (io/file "junit-bb.xml"))]
+          (binding [t/*test-out* pw]
+           (j/with-junit-output
+            (run 'test))))}}}
