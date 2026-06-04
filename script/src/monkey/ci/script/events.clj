@@ -9,7 +9,9 @@
              [builders :as eb]
              [core :as ec]]
             [monkey.ci.events.mailman.interceptors :as emi]
-            [monkey.ci.jobs :as cj]
+            [monkey.ci
+             [extensions :as ext]
+             [jobs :as cj]]
             [monkey.ci.script
              [build :as b]
              [jobs :as j]
@@ -383,7 +385,7 @@
                        state-int
                        with-job-ctx
                        (add-job-retriever state)
-                       #_ext/before-interceptor
+                       ext/before-interceptor
                        execute-action]}]]
 
      [:job/unblocked
@@ -404,7 +406,7 @@
                        state-int
                        add-job-ctx
                        add-result-to-ctx
-                       #_ext/after-interceptor]}]]
+                       ext/after-interceptor]}]]
 
      [:job/end
       [{:handler job-end

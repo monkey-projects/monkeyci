@@ -24,12 +24,12 @@
   "Convenience macro that executes the body with its own extensions (which
    are initially empty).  Useful for testing."
   [& body]
-  `(let [ext# @sut/registered-extensions]
+  `(let [ext# @registered-extensions]
      (try
-       (reset! sut/registered-extensions sut/new-register)
+       (reset! registered-extensions new-register)
        ~@body
        (finally
-         (reset! sut/registered-extensions ext#)))))
+         (reset! registered-extensions ext#)))))
 
 (defmulti before-job (fn [k _] k))
 

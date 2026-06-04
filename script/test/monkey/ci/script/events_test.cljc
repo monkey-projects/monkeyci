@@ -7,6 +7,7 @@
             [monkey.ci
              [api :as api]
              [cuid :as cuid]
+             [extensions :as ext]
              [jobs :as cj]]
             [monkey.ci.script
              [api-client :as ac]
@@ -326,7 +327,7 @@
                              :result
                              :jobs))))))
 
-    #_(testing "`job/executed` adds result from extensions to event"
+    (testing "`job/executed` adds result from extensions to event"
         (let [ext-id ::test-ext
               test-ext {:key ext-id
                         :after (fn [rt]
@@ -338,9 +339,9 @@
               test-state (emi/with-state (atom {:jobs (jobs->map [job])
                                                 ::sut/job-ctx {(:id job) (select-keys job [:status :result])}}))
               r (-> (sut/make-routes {:api-client ::test-client})
-                    (mmc/router)
+                    (mmc/router {:executor i/execute})
                     (mmc/replace-interceptors [test-state]))]
-          (te/with-extensions
+          (ext/with-extensions
             (is (some? (ext/register! test-ext)))
             (is (= "test - updated"
                    (-> {:type :job/executed
