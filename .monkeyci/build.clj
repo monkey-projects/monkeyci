@@ -368,7 +368,7 @@
    ;; CLI
    test-cli
    cli-uberjar
-   ;;cli-native-img
+   cli-native-img
    
    ;; Trigger scaleway images
    scw-images

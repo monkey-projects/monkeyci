@@ -112,39 +112,105 @@
 (deftest artifact-round-trip-test
   (fs/with-temp-dir [tmp-dir]
     (let [token    "tok"
+          job-id   "test-job"
           build    {:sid ["org" "repo" "42"]}
           event-ch (ca/chan 1)
-          handler  (sut/make-handler {:token token
-                                      :artifact-dir tmp-dir
-                                      :build build
+          wd       (fs/create-dir (fs/path tmp-dir "work"))
+          arch-dir (fs/create-dir (fs/path tmp-dir "artifacts"))
+          handler  (sut/make-handler {:token         token
+                                      :artifact-dir  arch-dir
+                                      :jobs-dir      wd
+                                      :build         build
                                       :event-mult-ch event-ch})]
-      (testing "upload returns 200 with artifact-id"
-        (let [content "artifact content"
-              req     (-> (mock/request :put "/artifact/my-art")
-                          (mock/body content)
-                          (update :headers merge (auth-header token)))
-              resp    (handler req)]
-          (is (= 200 (:status resp)))
-          (is (= {:artifact-id "my-art"} (edn/read-string (:body resp))))))
+      (let [content "artifact content"
+            file    "test.txt"
+            art-id  "my-art"]
+        (testing "upload"
+          (is (nil? (spit (fs/file (fs/create-dir (fs/path wd job-id)) file) content)))
+          (let [req  (-> (mock/request :put (str "/artifact/" job-id "/" art-id))
+                         (mock/body (pr-str {:path file}))
+                         (update :headers merge (auth-header token)))
+                resp (handler req)]
+            (testing "returns 200 with artifact-id and path"
+              (is (= 200 (:status resp)))
+              (is (= {:id   "my-art"
+                      :path file}
+                     (edn/read-string (:body resp)))))
 
-      (testing "download returns the uploaded content"
-        (let [resp (call handler :get "/artifact/my-art" token)]
-          (is (= 200 (:status resp)))
-          (is (= "artifact content" (slurp (:body resp))))))
+            (testing "copies file into archive dir using id"
+              (let [exp (fs/path arch-dir art-id file)]
+                (is (fs/exists? (fs/parent exp)) "artifact dir is created")
+                (is (fs/exists? exp))
+                (is (= content (slurp (fs/file exp))))))))
 
-      (testing "converts src dir into archive"
-        (is (nil? (-> (apply fs/path tmp-dir (conj (:sid build) "sub"))
-                      (fs/create-dirs)
-                      (fs/path "test.txt")
-                      (fs/file)
-                      (spit "This is a test"))))
-        (let [resp (call handler :get "/artifact/sub" token)]
-          (is (= 200 (:status resp)))
-          (is (instance? java.io.InputStream (:body resp)))
-          (is (not-empty (slurp (:body resp))))))
+        (testing "download"
+          (let [rest-path "restore"
+                resp (call handler :get (str "/artifact/" job-id "/" art-id "?path=" rest-path) token)]
+            (testing "returns path and id"
+              (is (= 200 (:status resp)))
+              (is (= {:id art-id
+                      :path rest-path}
+                     (-> resp :body (edn/read-string)))))
+
+            (testing "copies artifact files to requested path"
+              (let [exp (fs/path wd job-id rest-path)]
+                (is (fs/exists? exp))
+                (is (= content (slurp (fs/file exp file)))))))))
 
       (testing "download of unknown artifact returns 404"
-        (let [resp (call handler :get "/artifact/nonexistent" token)]
+        (let [resp (call handler :get "/artifact/test-job/nonexisting?path=test" token)]
+          (is (= 404 (:status resp))))))))
+
+(deftest cache-round-trip-test
+  (fs/with-temp-dir [tmp-dir]
+    (let [token    "tok"
+          job-id   "test-job"
+          build    {:sid ["org" "repo" "42"]}
+          event-ch (ca/chan 1)
+          wd       (fs/create-dir (fs/path tmp-dir "work"))
+          arch-dir (fs/create-dir (fs/path tmp-dir "caches"))
+          handler  (sut/make-handler {:token         token
+                                      :cache-dir     arch-dir
+                                      :jobs-dir      wd
+                                      :build         build
+                                      :event-mult-ch event-ch})]
+      (let [content  "cache content"
+            file     "test.txt"
+            cache-id "my-art"]
+        (testing "upload"
+          (is (nil? (spit (fs/file (fs/create-dir (fs/path wd job-id)) file) content)))
+          (let [req  (-> (mock/request :put (str "/cache/" job-id "/" cache-id))
+                         (mock/body (pr-str {:path file}))
+                         (update :headers merge (auth-header token)))
+                resp (handler req)]
+            (testing "returns 200 with cache-id and path"
+              (is (= 200 (:status resp)))
+              (is (= {:id   "my-art"
+                      :path file}
+                     (edn/read-string (:body resp)))))
+
+            (testing "copies file into cache dir using id"
+              (let [exp (fs/path arch-dir cache-id file)]
+                (is (fs/exists? (fs/parent exp)) "cache dir is created")
+                (is (fs/exists? exp))
+                (is (= content (slurp (fs/file exp))))))))
+
+        (testing "download"
+          (let [rest-path "restore"
+                resp      (call handler :get (str "/cache/" job-id "/" cache-id "?path=" rest-path) token)]
+            (testing "returns path and id"
+              (is (= 200 (:status resp)))
+              (is (= {:id   cache-id
+                      :path rest-path}
+                     (-> resp :body (edn/read-string)))))
+
+            (testing "copies cache files to requested path"
+              (let [exp (fs/path wd job-id rest-path)]
+                (is (fs/exists? exp))
+                (is (= content (slurp (fs/file exp file)))))))))
+
+      (testing "download of unknown cache returns 404"
+        (let [resp (call handler :get "/cache/test-job/nonexisting?path=test" token)]
           (is (= 404 (:status resp))))))))
 
 ;;;; POST /decrypt-key

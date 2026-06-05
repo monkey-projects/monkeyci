@@ -18,7 +18,10 @@
             [clompress.archivers :as arch]
             [monkey.ci.cli.build :as b]
             [org.httpkit.server :as http]
-            [ring.util.response :as rur])
+            [ring.middleware.params :as rmp]
+            [ring.util
+             [request :as rrq]
+             [response :as rur]])
   (:import [java.security SecureRandom]
            [java.util Base64]
            [java.io PipedInputStream PipedOutputStream]))
@@ -66,6 +69,9 @@
   [artifact-dir build-sid artifact-id]
   (apply fs/file (concat [artifact-dir] build-sid [artifact-id])))
 
+(defn- parse-body [req]
+  (some-> req rrq/body-string (edn/read-string)))
+
 ;;;; Handlers
 
 (defn- handle-test [_req]
@@ -80,7 +86,7 @@
 
 (defn- handle-post-events [req {:keys [event-mult-ch]}]
   (try
-    (let [body (-> req :body slurp edn/read-string)]
+    (let [body (parse-body req)]
       (log/debug "Received events from build script:" body)
       (ca/onto-chan! event-mult-ch body false)
       {:status 202})
@@ -119,64 +125,57 @@
         (ca/untap event-mult tap-ch)
         (ca/close! tap-ch))})))
 
-(defn- handle-upload-artifact [req {:keys [artifact-dir build]}]
-  (let [id     (-> req :path-params :artifact-id)
-        path   (artifact-path artifact-dir (:sid build) id)]
-    (log/debug "Receiving artifact upload:" id ", location:" path)
-    (if (some nil? [id artifact-dir])
-      {:status 400 :body "Missing artifact id or store"}
-      (try
-        (io/make-parents path)
-        (io/copy (:body req) path)
-        (-> (rur/response {:artifact-id id})
-            (rur/content-type "application/edn")
-            (update :body pr-str))
-        (catch Exception ex
-          (log/error "Error uploading artifact" id ex)
-          {:status 500})
-        (finally
-          (when-let [s (:body req)]
-            (when (instance? java.io.InputStream s)
-              (.close ^java.io.InputStream s))))))))
+(defn- handle-store-path [req dest-dir id-key {:keys [jobs-dir]}]
+  (let [{:keys [job-id]} (:path-params req)
+        id (get-in req [:path-params id-key])
+        path (-> req (parse-body) :path)
+        _    (log/debug "Saving path" path "for job" job-id)
+        src  (fs/path jobs-dir job-id path)
+        dest (fs/create-dirs (fs/path dest-dir id))]
+    ((if (fs/directory? src)
+       fs/copy-tree
+       fs/copy) src dest {:replace-existing true})
+    (->  {:path path
+          :id id}
+         (pr-str)
+         (rur/response)
+         (rur/content-type "application/edn"))))
 
-(defn- as-archive
-  "Creates an archive stream from the given directory and wraps it into a response."
-  [f]
-  (let [os (PipedOutputStream.)
-        is (PipedInputStream. os)]
-    (log/debug "Compressing" f "into archive")
-    (doto (Thread.
-           #(arch/archive {:output-stream os
-                           :compression "gz"
-                           :archive-type "tar"
-                           :entry-name-resolver (arch/strip-dir f)}
-                          f))
-      (.start))
-    (-> (rur/response is)
-        (rur/content-type "application/octet-stream"))))
+(defn- handle-upload-artifact [req ctx]
+  (handle-store-path req (:artifact-dir ctx) :artifact-id ctx))
+
+(defn- handle-upload-cache [req ctx]
+  (handle-store-path req (:cache-dir ctx) :cache-id ctx))
+
+(defn- handle-restore-path [req src-dir id-key {:keys [jobs-dir]}]
+  (log/debug "Request params:" (:query-params req))
+  (let [{:keys [job-id] id id-key} (:path-params req)
+        path (get-in req [:query-params "path"])
+        src  (fs/path src-dir id)
+        dest (when path (fs/path jobs-dir job-id path))]
+    (log/debug "Restoring path:" id ", location" path ", src dir" src-dir)
+    (if (not path)
+      (rur/status 400)
+      (if (fs/exists? src)
+        (do
+          (fs/copy-tree src dest)
+          (->  {:path path
+                :id id}
+               (pr-str)
+               (rur/response)
+               (rur/content-type "application/edn")))
+        (rur/status 404)))))
 
 (defn- handle-download-artifact
   "Since scripts are often unable to unzip artifacts (e.g. if they run in babashka),
    downloading artifacts is not provided.  Instead, this handler copies the artifact
    files to a location indicated by the script.  The call returns the path where the
    script can find the files."
-  [req {:keys [artifact-dir build]}]
-  (let [id   (-> req :path-params :artifact-id)
-        path (artifact-path artifact-dir (:sid build) id)
-        f    (io/file path)]
-    (log/debug "Got artifact download request:" id ", location" path)
-    (cond
-      (.isDirectory f)
-      (as-archive f)
-      (.exists f)
-      (do
-        (log/debug "Sending artifact file to client:" id)
-        (-> (rur/response f)
-            (rur/content-type "application/octet-stream")))
-      :else
-      (do
-        (log/warn "Artifact not found:" id)
-        {:status 404}))))
+  [req ctx]
+  (handle-restore-path req (:artifact-dir ctx) :artifact-id ctx))
+
+(defn- handle-download-cache [req ctx]
+  (handle-restore-path req (:cache-dir ctx) :cache-id ctx))
 
 (defn- handle-decrypt-key [req {:keys [key-decrypter build]}]
   ;; For local builds the DEK is passed through as-is (no vault encryption).
@@ -213,46 +212,67 @@
      :event-mult-ch  — core.async mult-capable channel for events (required for SSE)
      :key-decrypter  — fn of [build encrypted-key] -> key (optional)"
   [{:keys [token] :as ctx}]
-  (fn [req]
-    (if-not (authorized? req token)
-      (unauthorized)
-      (let [method (:request-method req)
-            uri    (:uri req)]
-        (cond
-          ;; GET /test
-          (and (= method :get) (= uri "/test"))
-          (handle-test req)
+  (letfn [(parse-params [prefix id-key {:keys [uri] :as req}]
+            (assoc req :path-params (-> (strip-prefix uri prefix)
+                                        (str/split #"/")
+                                        (as-> v (zipmap [:job-id id-key] v)))))
+          (parse-artifact-params [{:keys [uri] :as req}]
+            (parse-params "/artifact/" :artifact-id req))
+          (parse-cache-params [req]
+            (parse-params "/cache/" :cache-id req))]
+    (rmp/wrap-params
+     (fn [req]
+       (if-not (authorized? req token)
+         (unauthorized)
+         (let [method (:request-method req)
+               uri    (:uri req)]
+           (cond
+             ;; GET /test
+             (and (= method :get) (= uri "/test"))
+             (handle-test req)
 
-          ;; GET /params
-          (and (= method :get) (= uri "/params"))
-          (handle-get-params req ctx)
+             ;; GET /params
+             (and (= method :get) (= uri "/params"))
+             (handle-get-params req ctx)
 
-          ;; POST /events
-          (and (= method :post) (= uri "/events"))
-          (handle-post-events req ctx)
+             ;; POST /events
+             (and (= method :post) (= uri "/events"))
+             (handle-post-events req ctx)
 
-          ;; GET /events  — SSE stream
-          (and (= method :get) (= uri "/events"))
-          (handle-get-events req ctx)
+             ;; GET /events  — SSE stream
+             (and (= method :get) (= uri "/events"))
+             (handle-get-events req ctx)
 
-          ;; PUT /artifact/:id
-          (and (= method :put) (strip-prefix uri "/artifact/"))
-          (handle-upload-artifact
-           (assoc req :path-params {:artifact-id (strip-prefix uri "/artifact/")})
-           ctx)
+             ;; PUT /artifact/:job-id/:id
+             (and (= method :put) (strip-prefix uri "/artifact/"))
+             (handle-upload-artifact
+              (parse-artifact-params req)
+              ctx)
 
-          ;; GET /artifact/:id
-          (and (= method :get) (strip-prefix uri "/artifact/"))
-          (handle-download-artifact
-           (assoc req :path-params {:artifact-id (strip-prefix uri "/artifact/")})
-           ctx)
+             ;; GET /artifact/:job-id/:id
+             (and (= method :get) (strip-prefix uri "/artifact/"))
+             (handle-download-artifact
+              (parse-artifact-params req)
+              ctx)
 
-          ;; POST /decrypt-key
-          (and (= method :post) (= uri "/decrypt-key"))
-          (handle-decrypt-key req ctx)
+             ;; PUT /cache/:job-id/:id
+             (and (= method :put) (strip-prefix uri "/cache/"))
+             (handle-upload-cache
+              (parse-cache-params req)
+              ctx)
 
-          :else
-          {:status 404 :body "Not found"})))))
+             ;; GET /cache/:job-id/:id
+             (and (= method :get) (strip-prefix uri "/cache/"))
+             (handle-download-cache
+              (parse-cache-params req)
+              ctx)
+
+             ;; POST /decrypt-key
+             (and (= method :post) (= uri "/decrypt-key"))
+             (handle-decrypt-key req ctx)
+
+             :else
+             {:status 404 :body "Not found"})))))))
 
 ;;;; Lifecycle
 
@@ -285,7 +305,7 @@
                             :event-mult event-mult)
         handler      (make-handler ctx)
         srv          (http/run-server handler {:port port
-                                              :legacy-return-value? false})]
+                                               :legacy-return-value? false})]
     (log/debug "Build API server started on port" (http/server-port srv))
     {:server        srv
      :port          (http/server-port srv)

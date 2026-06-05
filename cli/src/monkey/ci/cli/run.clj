@@ -118,6 +118,7 @@
         server   (srv/start-server
                   {:artifact-dir (c/get-artifact-dir run-conf)
                    :cache-dir    (c/get-cache-dir run-conf)
+                   :jobs-dir (c/get-jobs-dir run-conf)
                    :workspace-file (c/get-workspace run-conf)
                    :build build})
         broker   (-> run-conf
