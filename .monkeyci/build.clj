@@ -292,7 +292,7 @@
   (when (p/publish-cli? ctx)
     (let [uberjar "target/monkeyci-cli.jar"]
       (-> (m/container-job "cli-native-img")
-          (m/image "ghcr.io/graalvm/native-image-community:25-muslib")
+          (m/image "ghcr.io/graalvm/native-image-community:25")
           (m/work-dir "cli")
           (m/script [(cs/join " "
                               ["native-image"
@@ -302,10 +302,11 @@
                                "-J-Dclojure.compiler.direct-linking=true"
                                "--initialize-at-build-time"
                                "--no-fallback"
-                               "-march=native"
+                               "-march=compatibility"
                                "monkeyci"])])
           (m/depends-on "cli-uberjar")
-          (m/restore-artifacts [(m/artifact "cli-uberjar" "target")])))))
+          (m/restore-artifacts [(m/artifact "cli-uberjar" "target")])
+          (m/save-artifacts [(m/artifact "native-cli" "monkeyci")])))))
 
 (defn scw-images
   "Generates a job that patches the scw-images repo in order to build a new
@@ -367,7 +368,7 @@
    ;; CLI
    test-cli
    cli-uberjar
-   cli-native-img
+   ;;cli-native-img
    
    ;; Trigger scaleway images
    scw-images

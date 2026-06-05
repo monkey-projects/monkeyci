@@ -1,0 +1,20 @@
+#!/bin/bash -e
+
+echo "Building native cli image in container using MonkeyCI version $MONKEYCI_VERSION"
+clj -T:uberjar
+
+UBERJAR=build/target/monkeyci-cli.jar
+
+podman run \
+       -it \
+       -v $PWD:/app/build \
+       --entrypoint native-image \
+       ghcr.io/graalvm/native-image-community:25 \
+       -cp $UBERJAR -jar $UBERJAR \
+       -J-Dclojure.spec.skip.macros=true \
+       -J-Dclojure.compiler.direct-linking=true \
+       --initialize-at-build-time \
+       --no-fallback \
+       -march=compatibility \
+       build/target/monkeyci
+
