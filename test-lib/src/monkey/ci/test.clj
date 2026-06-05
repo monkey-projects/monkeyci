@@ -2,19 +2,18 @@
   "This is the basic namespace to use in unit tests.  It provides various functions that
    can be used to simulate a MonkeyCI build environment."
   (:require [babashka.fs :as fs]
+            [clojure.core.async :as ca]
             [monkey.ci
              [api :as a]
-             [build :as b]
              [jobs :as j]]
-            [monkey.ci.build
-             [api :as ba]
-             [core :as bc]]
-            [monkey.ci.protocols :as p]))
+            [monkey.ci.build.core :as bc]
+            [monkey.ci.script
+             [build :as b]
+             [jobs :as sj]]
+            [monkey.mailman.mem :as mmm]))
 
 (defn with-build-params* [params f]
-  (with-redefs [a/build-params (constantly params)
-                ;; For backwards compatibility
-                ba/build-params (constantly params)]
+  (with-redefs [a/build-params (constantly params)]
     (f)))
 
 (defmacro with-build-params
@@ -73,7 +72,7 @@
    useful if you want to get a full list of the actual jobs that MonkeyCI will run given
    a specific context."
   [jobs ctx]
-  (p/resolve-jobs jobs ctx))
+  (sj/resolve-jobs jobs ctx))
 
 (defn with-checkout-dir
   "Sets the given directory as the build checkout dir in the context"
@@ -105,23 +104,13 @@
    thing."
   [job ctx]
   (if (a/action-job? job)
-    @(j/execute! job ctx)
+    (ca/<!! (sj/execute! job (update ctx :mailman #(or % (mmm/make-memory-broker)))))
     ;; Fake container job
     (assoc a/success :job job)))
 
-(defn with-tmp-dir*
-  "Creates a temp dir, then invokes `f` on it"
-  [f]
-  (let [dir (fs/create-temp-dir)]
-    (try
-      (f (str dir))
-      (finally
-        (fs/delete-tree dir)))))
-
 (defmacro with-tmp-dir [dir & body]
-  `(with-tmp-dir*
-     (fn [~dir]
-       ~@body)))
+  `(fs/with-temp-dir [~dir]
+     ~@body))
 
 (defn with-archs
   "Configures context to provide specified architectures."
