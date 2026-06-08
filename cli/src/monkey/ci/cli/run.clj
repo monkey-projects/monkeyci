@@ -45,7 +45,8 @@
 
 (defn- make-podman-routes [conf mailman]
   (-> conf
-      (assoc :mailman  mailman
+      (assoc :work-dir (c/get-jobs-dir conf)
+             :mailman  mailman
              :state    (:state conf)
              :podman   (c/get-podman conf)
              :cleanup? (c/get-clean conf)

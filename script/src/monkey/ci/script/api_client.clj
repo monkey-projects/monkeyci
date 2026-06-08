@@ -1,34 +1,24 @@
 (ns monkey.ci.script.api-client
   "Functions for invoking the build api HTTP server"
-  (:require [clojure.core.async :as ca]
+  (:require [babashka.http-client :as http]
+            [clojure.core.async :as ca]
             [clojure.edn :as edn]
             [clojure.java.io :as io]
             [clojure.string :as cs]
             [clojure.tools.logging :as log]
-            [monkey.ci.errors :as err]
-            [org.httpkit.client :as http]))
+            [monkey.ci.errors :as err]))
 
 (defn api-request
   "Sends a request to the api at configured url"
-  [{:keys [url token] :as opts} req & [callback]]
+  [{:keys [url token] :as opts} req]
   (letfn [(build-request [req]
             (-> req
                 (merge (dissoc opts [:url :token]))
-                (assoc :url (str url (:path req))
+                (assoc :uri (str url (:path req))
                        :oauth-token token)))]
     (-> req
         (build-request)
-        (http/request callback))))
-
-(defn make-async-client
-  "Creates a new api client function for the given url.  It returns a function
-   that requires a request object that will send a http request.  The function 
-   returns a promise with the result body.  Options:
-    - :url   The url to connect to
-    - :token The authentication token
-   More options can be specified, they are directly passed to the request function."
-  [opts]
-  (partial api-request opts))
+        (http/request))))
 
 (defn- throw-on-error [{:keys [status] :as resp}]
   (if (or (nil? status) (<= 400 status))
@@ -36,18 +26,16 @@
     resp))
 
 (defn make-client
-  "Same as `make-async-client` but `deref`s any requests and throws exceptions
-   on errors."
+  "Creates a new api client function for the given url.  It returns a function
+   that requires a request object that will send a http request.  The function 
+   returns a result body.  Options:
+    - :url   The url to connect to
+    - :token The authentication token
+   More options can be specified, they are directly passed to the request function."
   [opts]
-  (let [c (make-async-client opts)]
-    (fn [req & [callback]]
-      (if callback
-        (do
-          (log/debug "Sending async request using callback")
-          (c req callback))
-        (-> (c req)
-            (deref)
-            (throw-on-error))))))
+  (fn [req]
+    (-> (api-request opts req)
+        (throw-on-error))))
 
 (def ctx->api-client (comp :client :api))
 
@@ -157,8 +145,9 @@
       (if-let [evt (first n)]
         (do
           (when-let [p (parse-evt evt)]
-            (log/debug "Received streamed event:" p)
-            (ca/>! c p))
+            (when (not= :script (:src p))
+              (log/debug "Received streamed event:" (select-keys p [:type :src]))
+              (ca/>! c p)))
           (recur (rest n)))
         ;; No more data to read, close channel
         (ca/close! c)))))
@@ -166,12 +155,10 @@
 (defn get-events
   "Opens a stream that will receive all events for the build."
   [client]
-  (let [c (ca/chan)]
-    (client {:path "/events"
-             :method :get
-             :as :stream}
-            (fn [{:keys [body error]}]
-              (if error
-                (log/error "Unable to receive events:" error)
-                (read-evt-stream body c))))
+  (let [c (ca/chan)
+        body (-> (client {:path "/events"
+                          :method :get
+                          :as :stream})
+                 :body)]
+    (read-evt-stream body c)
     c))

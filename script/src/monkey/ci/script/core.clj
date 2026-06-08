@@ -18,8 +18,8 @@
   (let [e (ac/get-events client)]
     (ca/go-loop [r (ca/<! e)]
       (when r
-        (log/debug "Dispatching event received from server:" r)
-        (mmc/post-events broker [e])))
+        (mmc/post-events broker [r])
+        (recur (ca/<! e))))
     ;; Also push all events we're generating
     (mmc/add-listener broker
                       {:handler (fn [evt]
@@ -41,6 +41,7 @@
                  :build build})
         router (mmc/make-router routes {:executor i/execute})
         listener (mmc/add-listener broker {:handler router})]
+    ;; FIXME Events are handled multiple times, once internally, once when read back from server
     (connect-events broker client)
     {:build build
      :mailman broker

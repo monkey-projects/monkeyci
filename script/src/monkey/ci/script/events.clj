@@ -284,6 +284,7 @@
 (defn job-executed
   "Runs any extensions for the job in interceptors, then ends the job."
   [ctx]
+  (log/info "Job executed:" (get-in ctx [:event :job-id]))
   (let [{:keys [job-id sid status result]} (:event ctx)
         job-ctx (emi/get-job-ctx ctx)]
     ;; Safeguard: treat `nil` states as success, otherwise the job is re-queued
