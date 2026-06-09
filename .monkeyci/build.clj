@@ -58,8 +58,9 @@
     (fn [ctx]
       (run-tests ctx {:id id :dir dir :should-test? should?}))))
 
-(def test-test-lib
-  (test-sublib {:dir "test-lib" :should? p/build-test-lib?}))
+(defn test-test-lib [ctx]
+  (cond-> ((test-sublib {:dir "test-lib" :should? p/build-test-lib?}) ctx)
+    (p/publish-script? ctx) (m/depends-on "publish-script")))
 
 (def test-common
   (test-sublib {:dir "common" :should? p/build-common?}))
@@ -304,6 +305,7 @@
                                "--no-fallback"
                                "-march=compatibility"
                                "monkeyci"])])
+          (m/size 3) ; Process requires lots of memory
           (m/depends-on "cli-uberjar")
           (m/restore-artifacts [(m/artifact "cli-uberjar" "target")])
           (m/save-artifacts [(m/artifact "native-cli" "monkeyci")])))))

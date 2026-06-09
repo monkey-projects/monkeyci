@@ -57,6 +57,19 @@
          (-> mt/test-ctx
              (sut/test-gui))))))
 
+(deftest test-sublib
+  (testing "depends on script lib"
+    (let [ctx (-> mt/test-ctx
+                  (mt/with-changes (mt/modified ["script/deps.edn"
+                                                 "test-lib/deps.edn"]))
+                  (mt/with-git-ref "refs/heads/main"))
+          job (-> sut/jobs
+                  (mt/resolve-jobs ctx)
+                  (as-> j (filter (comp (partial = "test-test-lib") m/job-id) j))
+                  (first))]
+      (is (some? job))
+      (is (contains? (set (m/dependencies job)) "publish-script")))))
+
 (deftest build-gui-release
   (testing "`nil` if no release"
     (is (nil? (sut/build-gui-release mt/test-ctx))))
