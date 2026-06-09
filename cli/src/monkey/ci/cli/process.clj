@@ -23,11 +23,11 @@
            (.put proc-env (str k) (str v)))))
      (-> pb (.start) (.waitFor)))))
 
-(defn generate-deps [script-dir lib-version]
+(defn generate-deps [lib-version]
   {:paths ["."]
    :aliases
    {:monkeyci/build
-    {:exec-fn 'monkey.ci.script.runtime/run-script!
+    {:exec-fn 'monkey.ci.script.core/run-clj-cli
      :extra-deps {'com.monkeyci/script {:mvn/version (or lib-version (v/version))}}}}})
 
 (defn add-logback-config

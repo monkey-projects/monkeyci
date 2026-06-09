@@ -87,7 +87,7 @@
 (defn- handle-post-events [req {:keys [event-mult-ch]}]
   (try
     (let [body (parse-body req)]
-      (log/debug "Received events from build script:" body)
+      (log/trace "Received events from build script:" body)
       (ca/onto-chan! event-mult-ch body false)
       {:status 202})
     (catch Exception ex
@@ -112,7 +112,7 @@
           (if-let [evt (ca/<! tap-ch)]
             (do
               (when (or (nil? sid) (= sid (:sid evt)))
-                (log/debug "Sending event to SSE client:" (:type evt))
+                (log/trace "Sending event to SSE client:" (:type evt))
                 (http/send! ch (->sse evt) false))
               (recur))
             ;; Channel closed — close SSE connection

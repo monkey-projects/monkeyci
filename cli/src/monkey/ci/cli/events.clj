@@ -68,23 +68,6 @@
 
 ;;; Interceptors
 
-(defn restore-build-cache
-  "Restores build cache to the checkout dir.  This is only done when running 
-   in a container."
-  [blob]
-  {:name ::restore-build-cache
-   :enter (fn [ctx]
-            ;; TODO
-            )})
-
-(defn save-build-cache
-  "Restores build cache from the checkout dir"
-  [blob]
-  {:name ::save-build-cache
-   :enter (fn [ctx]
-            ;; TODO
-            )})
-
 (defn add-api [api]
   "Adds api configuration to the context"
   {:name ::add-api-conf
@@ -212,13 +195,11 @@
   (or (get-in ctx [::child-opts :runner])
       (if (fs/exists? (fs/path sd "deps.edn")) :clj :bb)))
 
-(defn generate-deps [script-dir {:keys [lib-coords log-config m2-cache-dir]}]
-  (cond-> (p/generate-deps script-dir nil)
+(defn generate-deps [{:keys [lib-coords log-config]}]
+  (cond-> (p/generate-deps nil)
     lib-coords (update-in [:aliases :monkeyci/build :extra-deps] mc/assoc-some 'com.monkeyci/script lib-coords)
     log-config (p/update-alias assoc :jvm-opts
-                               [(str "-Dlogback.configurationFile=" log-config)]))
-  ;; m2 cache dir?
-  )
+                               [(str "-Dlogback.configurationFile=" log-config)])))
 
 (defn- ctx->script-dir [ctx]
   (let [build (ctx->build ctx)]
@@ -240,7 +221,7 @@
       :paths ["."]
       :tasks
       {'script
-       {:task '(exec 'monkey.ci.script.core/run-cli)
+       {:task '(exec 'monkey.ci.script.core/run-bb-cli)
         :exec-args (-> (select-keys api [:url :token])
                        (assoc :sid (->> (b/sid (ctx->build ctx))
                                         (cs/join "/"))))}}})))
@@ -257,8 +238,7 @@
 
 (defn- clj-cmd [ctx]
   ["clojure"
-   "-Sdeps" (pr-str (generate-deps (-> ctx ctx->build b/script-dir)
-                                   (get-child-opts ctx)))
+   "-Sdeps" (pr-str (generate-deps (get-child-opts ctx)))
    "-X:monkeyci/build"
    (pr-str {:config (child-config ctx)})])
 

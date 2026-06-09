@@ -90,3 +90,9 @@
     (testing "invokes target fn"
       (is (some? (e ::test)))
       (is (= ::test (ca/<!! inv))))))
+
+(deftest generate-deps
+  (testing "generates basic deps.edn contents with alias"
+    (is (contains? (-> (sut/generate-deps nil)
+                       :aliases)
+                   :monkeyci/build))))

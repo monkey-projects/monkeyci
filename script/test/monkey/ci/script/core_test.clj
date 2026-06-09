@@ -47,13 +47,23 @@
                 "result contains executed jobs")
             (is (= :success (-> res :jobs first :status)))))))))
 
-(deftest run-cli
+(deftest run-bb-cli
   (testing "invokes `run-script` with config from args"
     (let [args (atom nil)]
       (with-redefs [sut/run-script (fn [arg]
                                      (reset! args arg)
                                      (ca/to-chan! [{:status :success}]))]
-        (is (nil? (sut/run-cli {:url "http://test-url" :sid "a/b/c"})))
+        (is (nil? (sut/run-bb-cli {:url "http://test-url" :sid "a/b/c"})))
+        (is (= "http://test-url"
+               (-> @args c/api :url)))))))
+
+(deftest run-clj-cli
+  (testing "invokes `run-script` with config from args"
+    (let [args (atom nil)]
+      (with-redefs [sut/run-script (fn [arg]
+                                     (reset! args arg)
+                                     (ca/to-chan! [{:status :success}]))]
+        (is (nil? (sut/run-clj-cli {:config {::c/api {:url "http://test-url" :sid "a/b/c"}}})))
         (is (= "http://test-url"
                (-> @args c/api :url)))))))
 

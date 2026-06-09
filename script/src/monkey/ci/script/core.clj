@@ -29,7 +29,7 @@
                                     nil))})))
 
 (defn setup-runner [conf]
-  (log/debug "Build API url:" (:url (c/api conf)))
+  (log/info "Build API url:" (:url (c/api conf)))
   (let [client (ac/make-client (c/api conf))
         broker (mmca/core-async-broker)
         result (ca/chan)
@@ -71,7 +71,7 @@
       (c/set-api (select-keys args [:url :token]))
       (c/set-build (cli->build args))))
 
-(defn run-cli
+(defn run-bb-cli
   "Convenience function that allows a script to be executed from the command line 
    (using babashka tasks).  It reads command line args and converts it into a valid
    configuration."
@@ -80,5 +80,12 @@
   [cli-args]
   (log/debug "Running script from cli with args:" cli-args)
   (let [r (ca/<!! (run-script (cli->conf cli-args)))]
+    (when (b/failed? r)
+      (System/exit 1))))
+
+(defn run-clj-cli
+  "Provided as an entrypoint for clj invocations"
+  [{:keys [config]}]
+  (let [r (ca/<!! (run-script config))]
     (when (b/failed? r)
       (System/exit 1))))

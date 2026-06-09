@@ -51,4 +51,4 @@
 
   :deploy
   ;; clj -T:jar:deploy
-  {:exec-fn monkey.build/jar+install}}}
+  {:exec-fn monkey.build/jar+deploy}}}
