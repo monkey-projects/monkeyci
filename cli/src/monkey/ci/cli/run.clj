@@ -127,7 +127,9 @@
                                  :token (:token server)})
                      (c/set-build build)
                      (c/set-ending result)
-                     (c/set-lib-coords (:lib-coords conf))
+                     (c/set-lib-coords (or (:lib-coords conf)
+                                           {:mvn/version (or (:lib-version conf)
+                                                             (v/version))}))
                      (setup-events))]
     (log/info "Work directory:" (str work-dir))
     (try

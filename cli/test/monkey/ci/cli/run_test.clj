@@ -7,7 +7,8 @@
              [events]
              [process :as proc]
              [run :as sut]
-             [server :as srv]]
+             [server :as srv]
+             [version :as v]]
             [monkey.mailman
              [core :as mmc]
              [core-async :as mmca]]))
@@ -55,7 +56,8 @@
                                          broker)
                       srv/start-server (fn [_opts] dummy-server)
                       srv/stop-server  (fn [_s] nil)]
-          (sut/build (test-config {:dir "/some/project"}))
+          (is (number? (sut/build (test-config {:dir "/some/project"})))
+              "returns numeric exit code")
           
           (testing "passes the API URL and token to route config"
             (is (= "http://localhost:9999"
@@ -71,7 +73,19 @@
             ;; find-script-dir returns the dir itself when .monkeyci doesn't exist
             (is (string? (-> @received-conf
                              (c/get-build)
-                             :checkout-dir))))))
+                             :checkout-dir))))
+
+          (testing "uses default lib version"
+            (is (= {:mvn/version (v/version)}
+                   (c/get-lib-coords @received-conf))))
+
+          (testing "passes specified lib version"
+            (is (number? (sut/build (-> (test-config {:dir "/some/project"})
+                                        (assoc :lib-version "test-version")))))
+            (is (= "test-version"
+                   (-> @received-conf
+                       (c/get-lib-coords)
+                       :mvn/version))))))
 
       (testing "stops the server even on error"
         (let [server-stopped? (atom false)]
