@@ -5,7 +5,6 @@
    for a container instance to complete, we just register multiple event 
    handlers that follow the flow."
   (:require [clojure.java.io :as io]
-            [clojure.tools.logging :as log]
             [medley.core :as mc]
             [meta-merge.core :as mm]
             [monkey.ci
@@ -14,14 +13,13 @@
              [process :as proc]
              [protocols :as p]
              [storage :as st]
-             [utils :as u]
-             [version :as v]]
+             [utils :as u]]
+            [monkey.ci.app.events.mailman.interceptors :as emi]
             [monkey.ci.build.api-server :as bas]
             [monkey.ci.containers.common :as cc]
-            [monkey.ci.app.events.mailman.interceptors :as emi]
+            [monkey.ci.oci.core :as oci]
             [monkey.ci.runners.interceptors :as ri]
             [monkey.ci.script.config :as sc]
-            [monkey.ci.oci.core :as oci]
             [monkey.ci.web.auth :as auth]
             [monkey.oci.container-instance.core :as ci]))
 
@@ -268,9 +266,9 @@
                            [(b/build-end-evt
                              (assoc build
                                     :message
-                                    (str "Failed to create container instance: " (get-in resp [:body :message]))))]
-                           ;; Do not proceed
-                           :terminated true)))))})
+                                    (str "Failed to create container instance: " (get-in resp [:body :message]))))])
+                    ;; Do not proceed
+                    (cemi/terminate)))))})
 
 (def save-runner-details
   "Interceptor that stores build runner details for oci, such as container instance ocid.

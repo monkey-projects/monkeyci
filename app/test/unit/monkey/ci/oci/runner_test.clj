@@ -352,6 +352,7 @@
                       first
                       :result
                       first)]
+          (is (map? res))
           (is (spec/valid? ::es/event res))
           (is (= :build/end (:type res)))
           (is (= :error (-> res :build :status))))))))

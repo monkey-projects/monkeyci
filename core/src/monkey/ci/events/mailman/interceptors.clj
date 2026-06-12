@@ -120,6 +120,13 @@
 
 ;;;; ─── Termination ─────────────────────────────────────────────────────────
 
+(defn terminate
+  "Updates the context to indicate processing termination."
+  [ctx]
+  (assoc ctx
+         :terminated true
+         :queue (clojure.lang.PersistentQueue/EMPTY)))
+
 (defn terminate-when
   "Interceptor that terminates the chain (without error) when `pred` returns
    truthy.  Sets `:terminated true` in the context so callers can inspect it.
@@ -130,5 +137,4 @@
   {:name id
    :enter (fn [ctx]
             (cond-> ctx
-              (pred ctx) (assoc :terminated true
-                                :queue (clojure.lang.PersistentQueue/EMPTY))))})
+              (pred ctx) (terminate)))})
