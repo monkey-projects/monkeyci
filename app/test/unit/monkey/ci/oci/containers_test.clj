@@ -12,6 +12,7 @@
             [monkey.ci.common.preds :as cp]
             [monkey.ci.containers.common :as cc]
             [monkey.ci.app.events.mailman :as em]
+            [monkey.ci.app.edn :as edn]
             [monkey.ci.oci
              [core :as oci]
              [containers :as sut]]
@@ -31,7 +32,7 @@
   (let [b (-> (java.util.Base64/getDecoder)
               (.decode s))]
     (with-open [r (io/reader (java.io.ByteArrayInputStream. b))]
-      (u/parse-edn r))))
+      (edn/edn-> r))))
 
 (defn random-build-sid []
   (repeatedly 3 cuid/random-cuid))

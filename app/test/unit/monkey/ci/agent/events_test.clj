@@ -3,8 +3,6 @@
             [clojure.spec.alpha :as spec]
             [clojure.string :as cs]
             [babashka.fs :as fs]
-            [io.pedestal.interceptor :as i]
-            [io.pedestal.interceptor.chain :as ic]
             [monkey.ci.agent.events :as sut]
             [monkey.ci
              [build :as b]
@@ -17,7 +15,8 @@
             [monkey.mailman
              [core :as mmc]
              [mem :as mem]
-             [manifold :as mmm]]))
+             [manifold :as mmm]
+             [sieppari :as mms]]))
 
 (deftest routes
   (let [evts [:build/queued :build/end :script/initializing]
@@ -29,7 +28,7 @@
                             (set))
                        t)))))
 
-  (h/with-tmp-dir dir
+  (fs/with-temp-dir [dir]
     (let [build (h/gen-build)
           procs (atom [])
           builds (atom {})
@@ -45,7 +44,7 @@
                       :ssh-keys-fetcher (constantly nil)
                       :runner-details {:extra-prop "extra value"}}
                      (sut/make-routes)
-                     (mmc/router)
+                     (mmc/router {:executor mms/execute})
                      (mmc/replace-interceptors [fake-proc]))]
       (testing "`build/queued`"
         (let [r (->> (router {:type :build/queued
@@ -136,7 +135,7 @@
           (is (string? (:ssh-keys-dir @args))))))))
 
 (deftest prepare-build-cmd
-  (h/with-tmp-dir dir
+  (fs/with-temp-dir [dir]
     (let [build (-> (h/gen-build)
                     (dissoc :script))
           broker (tm/test-component)
@@ -285,24 +284,22 @@
 
     (testing "`enter`"
       (let [sid (random-sid)
-              builds (atom {"test-token" {:sid sid}})
-              ctx (-> {:event
-                       {:type :build/end
-                        :sid sid}}
-                      (sut/set-config {:builds builds})
-                      (ic/enqueue [(i/interceptor {:name ::test
-                                                   :enter identity})]))]
+            builds (atom {"test-token" {:sid sid}})
+            ctx (-> {:event
+                     {:type :build/end
+                      :sid sid}}
+                    (sut/set-config {:builds builds}))]
         (testing "continues when build has known token"
-          (is (some? (-> (enter ctx)
-                         ::ic/queue))))
+          (is (nil? (-> (enter ctx)
+                        :terminated))))
 
         (testing "terminates when build token is unknown"
           (is (empty? (reset! builds {})))
-          (is (nil? (-> (enter ctx)
-                        ::ic/queue))))))))
+          (is (true? (-> (enter ctx)
+                         :terminated))))))))
 
 (deftest cleanup
-  (h/with-tmp-dir dir
+  (fs/with-temp-dir [dir]
     (let [sid (random-sid)
           conf {:work-dir dir
                 :cleanup? true}

@@ -49,7 +49,3 @@
       ;; Shutdown the agents otherwise the app will block for a while here
       (shutdown-agents))))
 
-(defn -main
-  "Main entry point for the application."
-  [& args]
-  (run-cli mcli/user-config args))

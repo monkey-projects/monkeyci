@@ -12,8 +12,8 @@
              [workspace :as ws]]
             [monkey.ci.app.events
              [core :as ec]
-             [edn :as ee]
              [mailman :as em]]
+            [monkey.ci.events.edn :as ee]
             [monkey.ci.sidecar
              [config :as cs]
              [spec :as ss]]))
@@ -55,9 +55,9 @@
   (log/debug "Read next event:" evt)
   (em/post-events mailman [(make-evt evt rt)]))
 
-(defn- with-exit [h rt]
+(defn- with-exit [h d]
   (letfn [(set-exit! [v]
-            (swap! rt assoc :exit v)
+            (md/success! d v)
             false)]
     (fn [evt]
       (try
@@ -76,15 +76,16 @@
   [rt]
   (let [f (maybe-create-file (get-in rt [:paths :events-file]))
         interval (get rt :poll-interval cs/default-poll-interval)
-        a (atom rt)]
+        a (md/deferred)]
     (log/info "Polling events from" f)
     (let [r (io/reader f)]
-      (-> (ee/read-edn r (-> (partial handle-evt rt)
-                             (ee/sleep-on-eof interval)
-                             (ee/stop-on-file-delete f)
-                             (with-exit a)))
+      (ee/read-edn r (-> (partial handle-evt rt)
+                         (ee/sleep-on-eof interval)
+                         (ee/stop-on-file-delete f)
+                         (with-exit a)))
+      (-> a
           ;; Return the runtime, with exit code set
-          (md/chain (fn [_] @a))
+          (md/chain (fn [v] (assoc rt :exit v)))
           (md/finally #(.close r))))))
 
 (defn run

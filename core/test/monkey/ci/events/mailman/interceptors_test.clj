@@ -59,3 +59,13 @@
       (let [r (:result (error {} test-error))]
         (is (= :build/end (:type r)))
         (is (= "test error" (get-in r [:build :message])))))))
+
+(deftest terminate-when
+  (let [{:keys [enter] :as i} (sut/terminate-when ::test (constantly true))]
+    (testing "sets `terminated` to `true`"
+      (is (true? (:terminated (enter {})))))
+
+    (testing "clears queue in context"
+      (let [q (java.util.LinkedList.)]
+        (is (nil? (.push q ::test)))
+        (is (empty? (:queue (enter {:queue q}))))))))

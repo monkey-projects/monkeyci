@@ -5,113 +5,6 @@
              [commands :as cmd]
              [version :as v]]))
 
-(def script-location-opt
-  {:as "Script location"
-   :option "dir"
-   :short "d"
-   :type :string
-   :default b/default-script-dir})
-
-(def run-build-cmd
-  {:command "run"
-   :description "Runs build locally"
-   :opts [script-location-opt
-          {:as "Git repository url"
-           :option "git-url"
-           :short "u"
-           :type :string}
-          {:as "Repository branch"
-           :option "branch"
-           :short "b"
-           :type :string}
-          {:as "Repository tag"
-           :option "tag"
-           :short "t"
-           :type :string}
-          {:as "Commit id"
-           :option "commit-id"
-           :type :string}
-          {:as "Repository sid"
-           :option "sid"
-           :type :string}
-          {:as "Build param"
-           :option "param"
-           :short "p"
-           :type :string
-           :multiple true}
-          {:as "Build params file"
-           :option "param-file"
-           :type :string
-           :multiple true}
-          {:as "No output"
-           :option "quiet"
-           :short "q"
-           :type :with-flag}
-          {:as "Job filter"
-           :option "filter"
-           :short "f"
-           :type :string
-           :multiple true}]
-   :runs {:command cmd/run-build-local
-          :app-mode :cli}})
-
-(def verify-build-cmd
-  {:command "verify"
-   :description "Verifies local build script"
-   :opts [script-location-opt]
-   :runs {:command cmd/verify-build
-          :app-mode :cli}})
-
-;; (def list-build-cmd
-;;   {:command "list"
-;;    :description "Lists builds for customer or repo"
-;;    :runs {:command cmd/list-builds
-;;           :app-mode :cli}})
-
-;; (def watch-cmd
-;;   {:command "watch"
-;;    :description "Logs build events for customer or repo"
-;;    :runs {:command cmd/watch
-;;           :app-mode :cli}})
-
-(def test-cmd
-  {:command "test"
-   :description "Runs build script unit tests"
-   :opts [script-location-opt
-          {:option "watch"
-           :short "w"
-           :type :with-flag}]
-   :runs {:command cmd/run-tests
-          :app-mode :cli}})
-
-(def build-cmd
-  {:command "build"
-   :description "Build commands"
-   :opts [{:as "API url"
-           :option "api"
-           :short "a"
-           :type :string
-           :env "MONKEYCI_API"}
-          {:as "API key"
-           :option "api-key"
-           :short "k"
-           :type :string
-           :env "MONKEYCI_KEY"}
-          {:as "Organization id"
-           :option "org-id"
-           :short "o"
-           :type :string}
-          {:as "Repository id"
-           :option "repo-id"
-           :short "r"
-           :type :string}]
-   :subcommands [run-build-cmd
-                 verify-build-cmd
-                 ;; Disabled until refactored
-                 #_list-build-cmd
-                 #_watch-cmd
-                 test-cmd]})
-
 (def server-cmd
   {:command "server"
    :description "Start MonkeyCI server"
@@ -225,12 +118,6 @@
            :short "c"
            :type :string
            :multiple true}]})
-
-(def user-config
-  (assoc base-config
-         :subcommands [build-cmd
-                       ;; For backwards compatibility
-                       admin-cmd]))
 
 (def internal-config
   (assoc base-config

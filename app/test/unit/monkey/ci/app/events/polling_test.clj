@@ -4,7 +4,8 @@
             [monkey.ci.test.mailman :as tm]
             [monkey.mailman
              [core :as mmc]
-             [mem :as mem]]))
+             [mem :as mem]
+             [sieppari :as mms]]))
 
 (deftest poll-next
   (let [broker (mem/make-memory-broker)
@@ -49,7 +50,8 @@
   (testing "posts back resulting events to outgoing broker"
     (let [broker-in (tm/test-component)
           broker-out (tm/test-component)
-          router (mmc/router [[:type/allowed [{:handler (constantly [{:type ::second-event}])}]]])]
+          router (mmc/router [[:type/allowed [{:handler (constantly [{:type ::second-event}])}]]]
+                             {:executor mms/execute})]
       (is (some? (mmc/post-events (:broker broker-in) [{:type :type/allowed}])))
       (is (some? (sut/poll-next {:mailman broker-in
                                  :mailman-out broker-out

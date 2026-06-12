@@ -11,7 +11,8 @@
             [monkey.mailman
              [core :as mmc]
              [interceptors :as mi]
-             [manifold :as mm]]))
+             [manifold :as mm]
+             [sieppari :as mms]]))
 
 (def get-result :result)
 
@@ -24,7 +25,8 @@
 
 (defn make-router [routes]
   (mmc/router routes
-              {:interceptors global-interceptors}))
+              {:interceptors global-interceptors
+               :executor mms/execute}))
 
 (defn merge-routes
   "Merges multiple routes together into one routing config"

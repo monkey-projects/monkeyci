@@ -2,7 +2,13 @@
   "Minimal EDN reader helpers, GraalVM-native-image compatible.
    Uses clojure.edn directly; no external dependencies."
   (:require [clojure.java.io :as io])
-  (:import [java.io PushbackReader]))
+  (:import [java.io PushbackReader Reader]))
+
+(defn- ->reader [x]
+  (cond
+    (instance? PushbackReader x) x
+    (instance? Reader x) (java.io.PushbackReader. x)
+    :else (->reader (io/reader x))))
 
 (defn edn->
   "Reads the next EDN value from `reader`.  `reader` must be a java.io.Reader
@@ -13,8 +19,7 @@
   ([src opts]
    (if (string? src)
      (clojure.edn/read-string opts src)
-     (let [r (cond-> (io/reader src)
-               (not (instance? PushbackReader src)) (PushbackReader.))]
+     (let [r (->reader src)]
        (clojure.edn/read (assoc opts :eof (get opts :eof ::eof)) r)))))
 
 (def ->edn pr-str)

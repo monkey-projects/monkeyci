@@ -5,7 +5,7 @@
              [bus :as mb]
              [deferred :as md]
              [stream :as ms]]
-            [monkey.ci.edn :as edn]
+            [monkey.ci.app.edn :as edn]
             [monkey.ci.app.events.core :as ec]
             [monkey.mailman.core :as mmc]
             [ring.util.response :as rur]))
@@ -43,7 +43,8 @@
    on the stream."
   [stream]
   (fn [evt]
-    (ms/put! stream (->sse evt))))
+    (ms/put! stream (->sse evt))
+    nil))
 
 (defn mailman-stream
   "Sets up an event stream using a mailman listener.  It consumes events from the

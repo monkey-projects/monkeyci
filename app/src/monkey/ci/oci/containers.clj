@@ -3,7 +3,6 @@
   (:require [clojure.java.io :as io]
             [clojure.string :as cs]
             [clojure.tools.logging :as log]
-            [io.pedestal.interceptor.chain :as pi]
             [medley.core :as mc]
             [monkey.ci
              [containers :as mcc]
@@ -259,9 +258,9 @@
                              (build-sid ctx)
                              {:status :failure
                               :message
-                              (str "Failed to create container instance: " (get-in resp [:body :message]))})])
-                    ;; Do not proceed
-                    (pi/terminate)))))})
+                              (str "Failed to create container instance: " (get-in resp [:body :message]))})]
+                           ;; Do not proceed
+                           :terminated true)))))})
 
 (def save-instance-id
   "Stores instance id taken from the instance creation response in the job state."

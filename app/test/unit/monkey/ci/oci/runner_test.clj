@@ -21,7 +21,9 @@
             [monkey.ci.vault
              [common :as vc]
              [fixed :as vf]]
-            [monkey.mailman.core :as mmc]))
+            [monkey.mailman
+             [core :as mmc]
+             [sieppari :as mms]]))
 
 (defn- decode-vol-config [vol fn]
   (some->> vol
@@ -315,7 +317,7 @@
         st (st/make-memory-storage)
         conf {:api {:private-key (h/generate-private-key)}}
         router (-> (sut/make-routes conf st (h/fake-vault))
-                   (mmc/router))]
+                   (mmc/router {:executor mms/execute}))]
     
     (testing "`build/queued`"
       (testing "returns `build/initializing` event"

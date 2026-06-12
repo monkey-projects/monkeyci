@@ -6,7 +6,6 @@
    handlers that follow the flow."
   (:require [clojure.java.io :as io]
             [clojure.tools.logging :as log]
-            [io.pedestal.interceptor.chain :as pi]
             [medley.core :as mc]
             [meta-merge.core :as mm]
             [monkey.ci
@@ -269,9 +268,9 @@
                            [(b/build-end-evt
                              (assoc build
                                     :message
-                                    (str "Failed to create container instance: " (get-in resp [:body :message]))))])
-                    ;; Do not proceed
-                    (pi/terminate)))))})
+                                    (str "Failed to create container instance: " (get-in resp [:body :message]))))]
+                           ;; Do not proceed
+                           :terminated true)))))})
 
 (def save-runner-details
   "Interceptor that stores build runner details for oci, such as container instance ocid.

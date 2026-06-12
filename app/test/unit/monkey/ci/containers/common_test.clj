@@ -1,6 +1,5 @@
 (ns monkey.ci.containers.common-test
   (:require [clojure.test :refer [deftest testing is]]
-            [io.pedestal.interceptor.chain :as ic]
             [monkey.ci.containers.common :as sut]
             [monkey.ci.app.events.mailman.interceptors :as emi]))
 
@@ -35,11 +34,10 @@
         (is (= ctx (enter ctx)))))
 
     (testing "terminates if job is not found in state"
-      (is (nil? (-> {:event {:job-id ::other-job
-                             :sid sid}
-                     ::ic/queue ::interceptor-queue}
-                    (enter)
-                    ::ic/queue))))))
+      (is (true? (-> {:event {:job-id ::other-job
+                              :sid sid}}
+                     (enter)
+                     :terminated))))))
 
 (deftest container-end
   (let [se (:enter sut/set-sidecar-status)]

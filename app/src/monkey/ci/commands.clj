@@ -23,9 +23,6 @@
             [monkey.ci.app.events
              [core :as ec]
              [mailman :as em]]
-            [monkey.ci.local
-             [config :as lc]
-             [runtime :as lr]]
             [monkey.ci.runners
              [controller :as rc]
              [runtime :as rr]]
@@ -39,147 +36,6 @@
              [auth :as auth]
              [http :as wh]]))
 
-(defn parse-params [params]
-  (letfn [(parse [l]
-            (let [idx (.indexOf l "=")]
-              (if (neg? idx)
-                (throw (ex-info "Invalid parameter" {:param l}))
-                {:name (.trim (subs l 0 idx)) :value (.trim (subs l (inc idx)))})))]
-    (mapv parse params)))
-
-(def read-yaml (comp yaml/parse-string slurp))
-
-(defn- read-java-props [p]
-  (with-open [r (io/reader (fs/file p))]
-    (doto (java.util.Properties.)
-      (.load r))))
-
-(def ^:private param-readers
-  {"edn" edn/edn->
-   "json" (comp json/parse-string slurp)
-   "yaml" read-yaml
-   "yml" read-yaml
-   "properties" read-java-props})
-
-(defn- read-param-file [p]
-  (if-let [r (get param-readers (fs/extension p))]
-    (r p)
-    (throw (ex-info "Unsupported parameter file type"
-                    {:path (str p)
-                     :supported-extensions (keys param-readers)}))))
-
-(defn load-param-files
-  "Loads parameters files from cli args.  This supports edn, json, yaml and java 
-   properties, which is determined by file extension."
-  [paths]
-  (letfn [(parse-file [p]
-            (->> p
-                 (fs/file)
-                 (read-param-file)
-                 (map (fn [[k v]]
-                        {:name (name k) :value v}))))]
-    (mapcat parse-file paths)))
-
-(defn- args->checkout-dir
-  "Calculates checkout dir from cli args.  This can be either the workdir, the
-   local directory, or a temp dir (if git url is specified)."
-  [{:keys [workdir]}]
-  (let [cwd (u/cwd)]
-    (or (some->> workdir
-                 (u/abs-path cwd)
-                 (fs/canonicalize)
-                 str)
-        cwd)))
-
-(defn config->build
-  "Creates a build object from the command line args or global config"
-  [{{:keys [dir git-url commit-id branch tag] :as args} :args wd :work-dir :as config}]
-  (cond-> {:checkout-dir (some-> wd
-                                 (fs/canonicalize)
-                                 str)
-           :org-id (get-in config [:account :org-id] "local-org")
-           :repo-id (get-in config [:account :repo-id] "local-repo")
-           :build-id (b/local-build-id)
-           ;; Generate semi-random key, avoid dependency on vault stuff
-           :dek (u/->base64 (.replaceAll (str (random-uuid)) "-" ""))}
-    git-url (assoc-in [:git :url] git-url)
-    commit-id (assoc-in [:git :ref] commit-id)
-    branch (assoc-in [:git :branch] branch)
-    tag (assoc-in [:git :tag] tag)
-    (and git-url wd) (assoc-in [:git :dir] wd)
-    dir (b/set-script-dir dir)))
-
-(defn cli->rt-conf
-  "Creates runtime configuration from the cli options or configuration."
-  [{:keys [args] :as opts}]
-  ;; Allow mailman override for testing
-  (-> (select-keys opts [:mailman :lib-coords :log-opts :podman])
-      (lc/set-build (config->build opts))
-      (lc/set-quiet (:quiet args))
-      (lc/set-job-filter (:filter args))
-      (lc/set-params (concat (parse-params (:param args))
-                             (load-param-files (:param-file args))))
-      (lc/set-global-api (-> (select-keys (:account opts) [:url :token])
-                             (update :url #(or % "https://api.monkeyci.com/v1"))))))
-
-(defn run-build-local
-  "Run a build locally, normally from local source but can also be from a git checkout.
-   Returns a deferred that will hold zero if the build succeeds, nonzero if it fails."
-  [config]
-  (let [wd (fs/create-temp-dir)
-        conf (-> (cli->rt-conf config)
-                 (lc/set-work-dir wd))
-        build (-> (lc/get-build conf)
-                  (assoc :source :cli))]
-    (log/info "Running local build for src at:" (b/checkout-dir build))
-    (log/debug "Using working directory" (str wd))
-    (lr/start-and-post conf (ec/make-event :build/pending
-                                           :build build))))
-
-(defn verify-build
-  "Runs a linter on the build script to catch any grammatical errors."
-  [conf]
-  (ra/with-cli-runtime conf
-    (fn [rt]
-      (let [build (config->build conf)
-            d (b/checkout-dir build)
-            res (->> (b/script-dir build)
-                     (u/abs-path-safe d)
-                     (script/verify))]
-        (rt/report rt {:type :verify/result :result res})
-        (if (->> res
-                 (map :result)
-                 (every? (partial = :success)))
-          0
-          errors/error-script-failure)))))
-
-(defn run-tests
-  "Runs unit tests declared in the build"
-  [conf]
-  (ra/with-cli-runtime conf
-    (fn [rt]
-      (let [build (config->build conf)
-            opts {:watch? (true? (get-in conf [:args :watch]))
-                  :dev-mode? (rt/dev-mode? rt)}]
-        (rt/report rt {:type :test/starting
-                       :build build})
-        (-> (b/checkout-dir build)
-            (u/abs-path-safe (b/script-dir build))
-            (proc/test! opts)
-            (deref)
-            :exit)))))
-
-(defn ^:deprecated list-builds [rt]
-  (->> (http/get (apply format "%s/org/%s/repo/%s/builds"
-                        ((juxt :url :org-id :repo-id) (rt/account rt)))
-                 {:headers {"accept" "application/edn"}})
-       (deref)
-       :body
-       (bs/to-reader)
-       (u/parse-edn)
-       (hash-map :type :build/list :builds)
-       (rt/report rt)))
-
 (defn http-server
   "Starts a system with an http server.  Dependency management will take care of
    creating and starting the necessary modules."
@@ -192,39 +48,6 @@
                         (assoc :type :server/started)))
       ;; Wait for server to stop
       (wh/on-server-close http))))
-
-(defn ^:deprecated watch
-  "Starts listening for events and prints the results.  The arguments determine
-   the event filter (all for a customer, project, or repo)."
-  [rt]
-  (let [url (rt/api-url rt)
-        d (md/deferred)
-        pipe-events (fn [r]
-                      (let [read-next (fn [] (u/parse-edn r {:eof ::done}))]
-                        (loop [m (read-next)]
-                          (if (= ::done m)
-                            (do
-                              (log/info "Event stream closed")
-                              (md/success! d 0)) ; Exit code 0
-                            (do
-                              (log/debug "Got event:" m)
-                              (rt/report rt {:type :build/event :event m})
-                              (recur (read-next)))))))]
-    (log/info "Watching the server at" url "for events...")
-    (rt/report rt {:type :watch/started
-                   :url url})
-    ;; TODO Trailing slashes
-    ;; TODO Org and other filtering
-    (-> (md/chain
-         (http/get (str url "/events"))
-         :body
-         bs/to-reader
-         #(java.io.PushbackReader. %)
-         pipe-events)
-        (md/catch (fn [err]
-                    (log/error "Unable to receive server events:" err))))
-    ;; Return a deferred that only resolves when the event stream stops
-    d))
 
 (defn- run-sidecar [{:keys [mailman sid job] :as rt}]
   (let [base-evt {:sid sid

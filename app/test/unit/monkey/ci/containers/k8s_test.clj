@@ -2,7 +2,9 @@
   (:require [clojure.test :refer [deftest testing is]]
             [clojure.string :as cs]
             #_[kubernetes-api.core :as k8s-api]
-            [monkey.mailman.core :as mmc]
+            [monkey.mailman
+             [core :as mmc]
+             [sieppari :as mms]]
             [medley.core :as mc]
             [monkey.ci.containers.k8s :as sut]))
 
@@ -229,7 +231,7 @@
                                (reset! k8s-actions (sut/get-k8s-actions ctx))
                                ctx)}
             r (-> (sut/make-routes test-conf)
-                  (mmc/router)
+                  (mmc/router {:executor mms/execute})
                   (mmc/replace-interceptors [fake-k8s]))
             res (r {:type :k8s/job-queued
                     :job {}})]

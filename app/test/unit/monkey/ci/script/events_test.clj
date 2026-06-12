@@ -24,7 +24,9 @@
              [helpers :as h]
              [mailman :as tm]]
             [monkey.ci.vault.common :as vc]
-            [monkey.mailman.core :as mmc]))
+            [monkey.mailman
+             [core :as mmc]
+             [sieppari :as mms]]))
 
 (defn- jobs->map [jobs]
   (->> jobs
@@ -324,7 +326,7 @@
                                                            (ba/ctx->api-client)))
                                       (sut/set-jobs {"test-job" {:id "test-job"}})))}
               r (-> (sut/make-routes {:api-client ::test-client})
-                    (mmc/router)
+                    (mmc/router {:executor mms/execute})
                     (mmc/replace-interceptors [fake-loader]))]
           (is (not-empty (-> (r {:type :script/initializing})
                              (first)
@@ -338,7 +340,7 @@
                                     (when (= f (sut/get-job-filter ctx))
                                       (sut/set-jobs ctx {"test-job" {:id "test-job"}})))}
               r (-> (sut/make-routes {:filter f})
-                    (mmc/router)
+                    (mmc/router {:executor mms/execute})
                     (mmc/replace-interceptors [fake-loader]))]
           (is (not-empty (-> (r {:type :script/initializing})
                              (first)
@@ -357,7 +359,7 @@
             test-state (emi/with-state (atom {:jobs (jobs->map [job])
                                               ::sut/job-ctx {(:id job) (select-keys job [:status :result])}}))
             r (-> (sut/make-routes {:api-client ::test-client})
-                  (mmc/router)
+                  (mmc/router {:executor mms/execute})
                   (mmc/replace-interceptors [test-state]))]
         (te/with-extensions
           (is (some? (ext/register! test-ext)))
@@ -379,7 +381,7 @@
             test-state (atom {:jobs (jobs->map [job])})
             r (-> (sut/make-routes {:api-client ::test-client
                                     :state test-state})
-                  (mmc/router))]
+                  (mmc/router {:executor mms/execute}))]
         (testing "executes action job"
           (is (some? (-> {:type :job/queued
                           :job-id (:id job)}

@@ -72,9 +72,11 @@
             ;; Depending on the interceptor impl, the error is passed differently
             (let [ex (or ex (:error ctx))]
               (log/error "Failed to handle event" (:type event) ", marking build as failed" ex)
-              (set-result ctx (b/build-end-evt (-> (:build event)
+              (-> ctx
+                  (set-result (b/build-end-evt (-> (:build event)
                                                    (assoc :message (ex-message ex)))
-                                               errors/error-process-failure))))})
+                                               errors/error-process-failure))
+                  (dissoc :error))))})
 
 (def handle-job-error
   "Marks job as failed on error."
@@ -83,10 +85,11 @@
             (let [ex (or ex (:error ctx))
                   {:keys [job-id sid] :as e} (:event ctx)]
               (log/error "Got error while handling event" e "for job" job-id ex)
-              (set-result ctx
-                          [(b/job-end-evt job-id sid
-                                          (-> bc/failure
-                                              (bc/with-message (ex-message ex))))])))})
+              (-> ctx
+                  (set-result [(b/job-end-evt job-id sid
+                                              (-> bc/failure
+                                                  (bc/with-message (ex-message ex))))])
+                  (dissoc :error))))})
 
 ;;;; ─── Process lifecycle ────────────────────────────────────────────────────
 
@@ -121,10 +124,11 @@
   "Interceptor that terminates the chain (without error) when `pred` returns
    truthy.  Sets `:terminated true` in the context so callers can inspect it.
 
-   GraalVM-compatible: does NOT use io.pedestal.interceptor.chain/terminate —
-   the sieppari executor used by the CLI honours `:terminated true`."
+   Since sieppari (the interceptor used by app and cli) does not have a concept
+   of termination, we just clear the queue if it's present in the context."
   [id pred]
   {:name id
    :enter (fn [ctx]
             (cond-> ctx
-              (pred ctx) (assoc :terminated true)))})
+              (pred ctx) (assoc :terminated true
+                                :queue (clojure.lang.PersistentQueue/EMPTY))))})

@@ -25,13 +25,14 @@
         com.monkeyprojects/clj-scw-client {:mvn/version "0.2.0-SNAPSHOT"}
         com.monkeyprojects/clompress {:mvn/version "0.2.0"}
         com.monkeyprojects/flow {:mvn/version "0.1.0"}
-        com.monkeyprojects/mailman-core {:mvn/version "0.3.1"}
-        com.monkeyprojects/mailman-jms {:mvn/version "0.3.1"}
-        com.monkeyprojects/mailman-manifold {:mvn/version "0.3.1"}
-        com.monkeyprojects/mailman-nats {:mvn/version "0.3.1"
+        com.monkeyprojects/mailman-core {:mvn/version "0.4.0"}
+        com.monkeyprojects/mailman-jms {:mvn/version "0.4.0"}
+        com.monkeyprojects/mailman-manifold {:mvn/version "0.4.0"}
+        com.monkeyprojects/mailman-nats {:mvn/version "0.4.0"
                                          ;; Conflicts with other versions
                                          :exclusions [org.bouncycastle/bcprov-lts8on
                                                       org.slf4j/slf4j-api]}
+        com.monkeyprojects/mailman-sieppari {:mvn/version "0.4.0"}
         com.monkeyprojects/metrics {:mvn/version "0.1.0"}
         com.monkeyprojects/minio-clj {:mvn/version "0.1.0"}
         com.monkeyprojects/monkey-jms-artemis {:mvn/version "0.3.2"}

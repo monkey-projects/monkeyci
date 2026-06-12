@@ -1,10 +1,9 @@
-(ns monkey.ci.edn-test
+(ns monkey.ci.app.edn-test
   (:require [aero.core :as ac]
             [buddy.core.codecs :as codecs]
             [clojure.test :refer [deftest is testing]]
-            [monkey.ci
-             [edn :as sut]
-             [version :as v]]
+            [monkey.ci.version :as v]
+            [monkey.ci.app.edn :as sut]
             [monkey.ci.test.helpers :as h]
             [monkey.ci.vault.common :as vc])
   (:import (java.io StringReader)))
