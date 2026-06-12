@@ -4,7 +4,7 @@
    another domain, for example persistence or script processing (e.g. agents)."
   (:require [clojure.spec.alpha :as s]
             [clojure.spec.gen.alpha :as gen]
-            [monkey.ci.events.spec :as evt]
+            [monkey.ci.app.events.spec :as evt]
             [monkey.ci.spec
              [build :as build]
              [common :as c]

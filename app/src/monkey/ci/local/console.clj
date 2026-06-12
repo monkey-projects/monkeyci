@@ -15,7 +15,7 @@
              [version :as v]]
             [monkey.ci.build.core :as bc]
             [monkey.ci.common.jobs :as cj]
-            [monkey.ci.events.mailman.interceptors :as mi]
+            [monkey.ci.app.events.mailman.interceptors :as mi]
             [monkey.ci.local.common :as lc]))
 
 ;;; State management

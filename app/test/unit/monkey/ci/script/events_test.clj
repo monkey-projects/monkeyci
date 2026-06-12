@@ -5,10 +5,10 @@
             [manifold.deferred :as md]
             [medley.core :as mc]
             [monkey.ci.build.core :as bc]
-            [monkey.ci.events
+            [monkey.ci.app.events
              [mailman :as em]
              [spec :as es]]
-            [monkey.ci.events.mailman.interceptors :as emi]
+            [monkey.ci.app.events.mailman.interceptors :as emi]
             [monkey.ci
              [api :as api]
              [cuid :as cuid]

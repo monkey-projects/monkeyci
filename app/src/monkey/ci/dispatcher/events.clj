@@ -4,7 +4,7 @@
             [monkey.ci.dispatcher
              [core :as dc]
              [state :as ds]]
-            [monkey.ci.events.mailman.interceptors :as emi]
+            [monkey.ci.app.events.mailman.interceptors :as emi]
             [monkey.ci
              [build :as b]
              [jobs :as j]

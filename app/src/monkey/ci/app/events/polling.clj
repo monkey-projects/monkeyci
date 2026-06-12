@@ -1,11 +1,11 @@
-(ns monkey.ci.events.polling
+(ns monkey.ci.app.events.polling
   "Functions for event polling.  This is different from event listeners,
    because pollers can decide for themselves when they want to fetch the
    next event.  This is useful for backpressure, when there is limited
    capacity to handle events."
   (:require [clojure.tools.logging :as log]
             [com.stuartsierra.component :as co]
-            [monkey.ci.events.mailman :as em]
+            [monkey.ci.app.events.mailman :as em]
             [monkey.mailman.core :as mmc]))
 
 (defn- repost-results [mailman res]

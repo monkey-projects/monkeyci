@@ -5,7 +5,7 @@
             [manifold
              [deferred :as md]
              [stream :as ms]]
-            [monkey.ci.events.mailman :as em]
+            [monkey.ci.app.events.mailman :as em]
             [monkey.ci.local
              [config :as lc]
              [runtime :as sut]]

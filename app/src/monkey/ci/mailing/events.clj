@@ -6,7 +6,7 @@
              [edn :as edn]
              [protocols :as p]
              [utils :as u]]
-            [monkey.ci.events.core :as ec]
+            [monkey.ci.app.events.core :as ec]
             [monkey.ci.mailing.template :as mt]))
 
 (def get-config ::config)

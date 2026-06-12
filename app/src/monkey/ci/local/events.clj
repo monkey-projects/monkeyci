@@ -23,8 +23,8 @@
              [git :as git]
              [process :as p]
              [utils :as u]]
-            [monkey.ci.events.mailman :as em]
-            [monkey.ci.events.mailman.interceptors :as emi]
+            [monkey.ci.app.events.mailman :as em]
+            [monkey.ci.app.events.mailman.interceptors :as emi]
             [monkey.ci.local.config :as conf]
             [monkey.ci.script.config :as sc]))
 

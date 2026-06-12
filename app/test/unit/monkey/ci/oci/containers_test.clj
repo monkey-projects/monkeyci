@@ -11,7 +11,7 @@
              [utils :as u]]
             [monkey.ci.common.preds :as cp]
             [monkey.ci.containers.common :as cc]
-            [monkey.ci.events.mailman :as em]
+            [monkey.ci.app.events.mailman :as em]
             [monkey.ci.oci
              [core :as oci]
              [containers :as sut]]

@@ -1,4 +1,4 @@
-(ns monkey.ci.events.spec
+(ns monkey.ci.app.events.spec
   "Spec definitions for events.  All events sent (and received) should match `::event`."
   (:require [clojure.set :as set]
             [clojure.spec.alpha :as s]

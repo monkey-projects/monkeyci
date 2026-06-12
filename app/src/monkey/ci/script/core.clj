@@ -9,9 +9,9 @@
             [medley.core :as mc]
             [monkey.ci
              [build :as build]
-             [edn :as edn]
              [jobs :as j]
-             [protocols :as p]]))
+             [protocols :as p]]
+            [monkey.ci.app.edn :as edn]))
 
 ;;; Script loading
 

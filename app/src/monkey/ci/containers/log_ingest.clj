@@ -8,8 +8,8 @@
              [time :as mt]]
             [medley.core :as mc]
             [monkey.ci.containers.podman :as cp]
-            [monkey.ci.events.mailman :as mm]
-            [monkey.ci.events.mailman.interceptors :as mi]
+            [monkey.ci.app.events.mailman :as mm]
+            [monkey.ci.app.events.mailman.interceptors :as mi]
             [monkey.ci.logging.log-ingest :as li]))
 
 (def get-std-files (juxt :stdout :stderr))

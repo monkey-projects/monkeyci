@@ -2,7 +2,7 @@
   (:require [clojure.test :refer [deftest testing is]]
             [clojure.string :as cs]
             [com.stuartsierra.component :as co]
-            [monkey.ci.events.mailman.interceptors :as mi]
+            [monkey.ci.app.events.mailman.interceptors :as mi]
             [monkey.ci.local.console :as sut]
             [monkey.ci.test.helpers :as h]))
 

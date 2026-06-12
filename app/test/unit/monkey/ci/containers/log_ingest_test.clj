@@ -3,7 +3,7 @@
             [clojure.test :refer [deftest testing is]]
             [manifold.stream :as ms]
             [monkey.ci.containers.log-ingest :as sut]
-            [monkey.ci.events.mailman.interceptors :as mi]
+            [monkey.ci.app.events.mailman.interceptors :as mi]
             [monkey.ci.test.helpers :as h]))
 
 (deftest routes

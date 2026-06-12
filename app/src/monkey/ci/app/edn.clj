@@ -1,11 +1,11 @@
-(ns monkey.ci.edn
+(ns monkey.ci.app.edn
   "Functionality for serializing objects to edn and deserializing them back."
   (:require [aero.core :as ac]
             [buddy.core.codecs :as codecs]
             [clj-commons.byte-streams :as bs]
-            [clojure.edn :as edn]
             [clojure.walk :as cw]
             [monkey.ci
+             [edn :as edn]
              [pem :as pem]
              [version :as v]]))
 
@@ -44,10 +44,7 @@
 
 (defn edn-> [edn & [opts]]
   (let [opts (merge opts default-opts)]
-    (if (instance? java.io.PushbackReader edn)
-      (edn/read opts edn)
-      (with-open [r (->reader edn)]
-        (edn/read opts (java.io.PushbackReader. r))))))
+    (edn/edn-> edn opts)))
 
 ;; Also specify an Aero reader, so we can read private keys from config
 (defmethod ac/reader pk-sym

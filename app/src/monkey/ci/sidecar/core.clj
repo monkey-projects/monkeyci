@@ -10,7 +10,7 @@
              [jobs :as j]
              [spec :as spec]
              [workspace :as ws]]
-            [monkey.ci.events
+            [monkey.ci.app.events
              [core :as ec]
              [edn :as ee]
              [mailman :as em]]

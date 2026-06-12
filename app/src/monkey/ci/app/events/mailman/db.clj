@@ -1,4 +1,4 @@
-(ns monkey.ci.events.mailman.db
+(ns monkey.ci.app.events.mailman.db
   "Event handlers that write stuff to the database"
   (:require [clojure.tools.logging :as log]
             [medley.core :as mc]
@@ -7,8 +7,8 @@
              [jobs :as j]
              [storage :as st]
              [time :as t]]
-            [monkey.ci.events.mailman :as em]
-            [monkey.ci.events.mailman.interceptors :as emi]
+            [monkey.ci.app.events.mailman :as em]
+            [monkey.ci.app.events.mailman.interceptors :as emi]
             [monkey.ci.runners.interceptors :as ri]))
 
 (def get-db emi/get-db)

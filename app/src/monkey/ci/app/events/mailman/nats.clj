@@ -1,10 +1,10 @@
-(ns monkey.ci.events.mailman.nats
+(ns monkey.ci.app.events.mailman.nats
   "Configuration for NATS subjects"
   (:require [monkey.nats.core :as nats]
             [clojure.tools.logging :as log]
             [com.stuartsierra.component :as co]
             [medley.core :as mc]
-            [monkey.ci.events.mailman.jms :as jms]
+            [monkey.ci.app.events.mailman.jms :as jms]
             [monkey.ci
              [edn :as edn]
              [protocols :as p]]

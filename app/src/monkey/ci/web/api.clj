@@ -10,7 +10,7 @@
              [runtime :as rt]
              [storage :as st]
              [time :as t]]
-            [monkey.ci.events.http :as eh]
+            [monkey.ci.app.events.http :as eh]
             [monkey.ci.web
              [auth :as auth]
              [common :as c]

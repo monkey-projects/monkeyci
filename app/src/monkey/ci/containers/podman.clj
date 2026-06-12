@@ -26,10 +26,10 @@
              [workspace :as ws]]
             [monkey.ci.build.core :as bc]
             [monkey.ci.containers.common :as cc]
-            [monkey.ci.events
+            [monkey.ci.app.events
              [edn :as ee]
              [mailman :as em]]
-            [monkey.ci.events.mailman.interceptors :as emi]
+            [monkey.ci.app.events.mailman.interceptors :as emi]
             [monkey.ci.vault.common :as vc]))
 
 ;;; Process commandline configuration

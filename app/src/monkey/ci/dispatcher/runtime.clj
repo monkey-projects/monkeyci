@@ -7,7 +7,7 @@
              [events :as de]
              [http :as dh]
              [state :as ds]]
-            [monkey.ci.events.mailman :as em]
+            [monkey.ci.app.events.mailman :as em]
             [monkey.ci.metrics.core :as metrics]
             [monkey.ci.storage :as st]
             [monkey.ci.storage.sql]

@@ -4,7 +4,7 @@
             [camel-snake-kebab.core :as csk]
             [clojure.tools.logging :as log]
             [medley.core :as mc]
-            [monkey.ci.events.mailman :as em]
+            [monkey.ci.app.events.mailman :as em]
             [monkey.ci.web
              [common :as c]
              [response :as r]]

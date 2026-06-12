@@ -1,6 +1,6 @@
-(ns monkey.ci.events.core-test
+(ns monkey.ci.app.events.core-test
   (:require [clojure.test :refer [deftest testing is]]
-            [monkey.ci.events.core :as sut]))
+            [monkey.ci.app.events.core :as sut]))
 
 (deftest make-event
   (testing "adds timestamp to event"
@@ -14,5 +14,3 @@
   (testing "adds properties from map"
     (is (= {:key "value"} (-> (sut/make-event :test-event {:key "value"})
                               (select-keys [:key]))))))
-
-

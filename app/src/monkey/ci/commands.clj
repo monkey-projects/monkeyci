@@ -12,7 +12,6 @@
             [medley.core :as mc]
             [monkey.ci
              [build :as b]
-             [edn :as edn]
              [errors :as errors]
              [jobs :as jobs]
              [pem :as pem]
@@ -20,7 +19,8 @@
              [runtime :as rt]
              [spec :as spec]
              [utils :as u]]
-            [monkey.ci.events
+            [monkey.ci.app.edn :as edn]
+            [monkey.ci.app.events
              [core :as ec]
              [mailman :as em]]
             [monkey.ci.local

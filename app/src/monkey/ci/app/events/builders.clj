@@ -1,8 +1,8 @@
-(ns monkey.ci.events.builders
+(ns monkey.ci.app.events.builders
   "Common event builders"
   (:require [medley.core :as mc]
             [monkey.ci.build.core :as bc]
-            [monkey.ci.events.core :as ec]))
+            [monkey.ci.app.events.core :as ec]))
 
 (defn script-event [type build-sid]
   (ec/make-event 

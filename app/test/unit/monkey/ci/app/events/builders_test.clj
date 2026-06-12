@@ -1,8 +1,8 @@
-(ns monkey.ci.events.builders-test
+(ns monkey.ci.app.events.builders-test
   (:require [clojure.test :refer [deftest testing is]]
             [monkey.ci.api :as api]
             [monkey.ci.edn :as edn]
-            [monkey.ci.events.builders :as sut]))
+            [monkey.ci.app.events.builders :as sut]))
 
 (deftest job-executed-evt
   (testing "adds status from result"

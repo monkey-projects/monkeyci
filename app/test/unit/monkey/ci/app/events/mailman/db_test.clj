@@ -1,4 +1,4 @@
-(ns monkey.ci.events.mailman.db-test
+(ns monkey.ci.app.events.mailman.db-test
   (:require [clojure.spec.alpha :as spec]
             [clojure.test :refer [deftest is testing]]
             [manifold.bus :as mb]
@@ -6,10 +6,10 @@
              [build :as b]
              [cuid :as cuid]
              [storage :as st]]
-            [monkey.ci.events
+            [monkey.ci.app.events
              [mailman :as em]
              [spec :as se]]
-            [monkey.ci.events.mailman
+            [monkey.ci.app.events.mailman
              [db :as sut]
              [interceptors :as emi]]
             [monkey.ci.storage.spec :as ss]

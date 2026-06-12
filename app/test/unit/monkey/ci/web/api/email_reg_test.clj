@@ -1,7 +1,7 @@
 (ns monkey.ci.web.api.email-reg-test
   (:require [clojure.test :refer [deftest testing is]]
             [clojure.spec.alpha :as spec]
-            [monkey.ci.events.spec :as es]
+            [monkey.ci.app.events.spec :as es]
             [monkey.ci.storage :as st]
             [monkey.ci.test
              [helpers :as h]

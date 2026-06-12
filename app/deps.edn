@@ -19,8 +19,8 @@
         com.github.loki4j/loki-logback-appender {:mvn/version "2.0.3"}
         com.github.seancorfield/honeysql {:mvn/version "2.7.1368"}
         com.github.seancorfield/next.jdbc {:mvn/version "1.3.1093"}
-        com.monkeyci/common {:local/root "../common"}
-        com.monkeyci/core {:local/root "../core"}
+        com.monkeyci/common {:mvn/version "0.27.0-SNAPSHOT"}
+        com.monkeyci/core {:mvn/version "0.27.0-SNAPSHOT"}
         com.monkeyprojects/aero-ext {:mvn/version "0.3.1"}
         com.monkeyprojects/clj-scw-client {:mvn/version "0.2.0-SNAPSHOT"}
         com.monkeyprojects/clompress {:mvn/version "0.2.0"}
@@ -77,7 +77,8 @@
   {:extra-deps {org.clojure/test.check {:mvn/version "1.1.3"}
                 org.clojure/tools.namespace {:mvn/version "1.5.1"}}
    :extra-paths ["dev-resources" "env/dev"]
-   :override-deps {com.monkeyci/common {:local/root "../common"}}
+   :override-deps {com.monkeyci/common {:local/root "../common"}
+                   com.monkeyci/core {:local/root "../core"}}
    :jvm-opts ["-Djava.util.logging.config.file=dev-resources/logging.properties"]}
 
   :test-paths ["test/unit" "test/integration" "test/e2e"]
@@ -90,7 +91,8 @@
                 com.github.oliyh/martian-test {:mvn/version "0.2.3"}
                 org.clojure/test.check {:mvn/version "1.1.3"}
                 ring/ring-mock {:mvn/version "0.6.2"}}
-   :override-deps {com.monkeyci/common {:local/root "../common"}}
+   :override-deps {com.monkeyci/common {:local/root "../common"}
+                   com.monkeyci/core {:local/root "../core"}}
    :exec-fn monkey.test/all}
 
   ;; clj -M:test:kaocha

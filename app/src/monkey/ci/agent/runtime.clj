@@ -22,7 +22,7 @@
             [monkey.ci.containers
              [log-ingest :as cl]
              [podman :as c-podman]]
-            [monkey.ci.events
+            [monkey.ci.app.events
              [mailman :as em]
              [polling :as ep]]
             [monkey.ci.logging.log-ingest :as log-ingest]

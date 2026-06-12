@@ -14,10 +14,10 @@
              [utils :as u]
              [workspace :as ws]]
             [monkey.ci.common.constants :as const]
-            [monkey.ci.events
+            [monkey.ci.app.events
              [builders :as eb]
              [mailman :as em]]
-            [monkey.ci.events.mailman.interceptors :as emi]))
+            [monkey.ci.app.events.mailman.interceptors :as emi]))
 
 (def run-path (comp :run-path :config))
 (def abort-path (comp :abort-path :config))

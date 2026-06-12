@@ -30,3 +30,8 @@
   "Uploads the file `f` to given bucket destination"
   [client bucket dest f & [tags]]
   (put-s3-object client bucket dest (io/input-stream f) (fs/size f) tags))
+
+(defn ->stream
+  "Converts string `s` into a stream of bytes"
+  [s]
+  (java.io.ByteArrayInputStream. (.getBytes s)))

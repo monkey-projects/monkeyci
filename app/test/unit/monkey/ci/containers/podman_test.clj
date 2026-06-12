@@ -13,7 +13,7 @@
              [jobs :as j]
              [vault :as v]]
             [monkey.ci.containers.podman :as sut]
-            [monkey.ci.events.mailman.interceptors :as emi]
+            [monkey.ci.app.events.mailman.interceptors :as emi]
             [monkey.ci.test
              [helpers :as h :refer [contains-subseq?]]
              [mailman :as tm]]

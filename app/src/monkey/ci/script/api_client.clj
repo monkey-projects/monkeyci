@@ -18,7 +18,7 @@
              [protocols :as p]
              [utils :as u]]
             [monkey.ci.build.archive :as archive]
-            [monkey.ci.events.http :as eh]
+            [monkey.ci.app.events.http :as eh]
             [monkey.ci.web.crypto :as crypto]))
 
 (defn as-edn [req]

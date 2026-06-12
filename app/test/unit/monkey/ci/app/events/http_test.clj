@@ -1,10 +1,10 @@
-(ns monkey.ci.events.http-test
+(ns monkey.ci.app.events.http-test
   (:require
    [clojure.test :refer [deftest is testing]]
    [manifold.bus :as mb]
    [manifold.stream :as ms]
    [monkey.ci.edn :as edn]
-   [monkey.ci.events.http :as sut]
+   [monkey.ci.app.events.http :as sut]
    [monkey.ci.test.helpers :as h]
    [monkey.mailman.core :as mmc]
    [monkey.mailman.mem :as mmm]))

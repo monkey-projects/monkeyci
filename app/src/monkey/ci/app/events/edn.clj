@@ -1,4 +1,4 @@
-(ns monkey.ci.events.edn
+(ns monkey.ci.app.events.edn
   "Functionality for reading events from an edn reader.  This is used in
    container jobs, where the script writes events about the commands to
    a shared file."

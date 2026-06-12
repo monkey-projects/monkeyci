@@ -8,7 +8,7 @@
              [cuid :as cuid]
              [storage :as st]
              [utils :as u]]
-            [monkey.ci.events.spec :as es]
+            [monkey.ci.app.events.spec :as es]
             [monkey.ci.test
              [helpers :as h]
              [runtime :as trt]]

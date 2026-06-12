@@ -1,11 +1,11 @@
-(ns monkey.ci.events.mailman.interceptors-test
+(ns monkey.ci.app.events.mailman.interceptors-test
   (:require [babashka.process :as bp]
             [clojure.test :refer [deftest is testing]]
             [manifold
              [bus :as mb]
              [deferred :as md]
              [stream :as ms]]
-            [monkey.ci.events.mailman.interceptors :as sut]
+            [monkey.ci.app.events.mailman.interceptors :as sut]
             [monkey.ci.test
              [helpers :as h]
              [mailman :as tm]]))

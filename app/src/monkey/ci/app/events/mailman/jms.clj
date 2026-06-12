@@ -1,4 +1,4 @@
-(ns monkey.ci.events.mailman.jms
+(ns monkey.ci.app.events.mailman.jms
   "JMS-specific functionality for handling events.  This has mainly to do with
    queue and topic configurations and listeners."
   (:require [com.stuartsierra.component :as co]

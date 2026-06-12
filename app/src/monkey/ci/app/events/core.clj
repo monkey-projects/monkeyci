@@ -1,4 +1,4 @@
-(ns monkey.ci.events.core
+(ns monkey.ci.app.events.core
   (:require [monkey.ci.time :as t]))
 
 (defn make-event

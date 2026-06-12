@@ -2,7 +2,7 @@
   "Performs a single, local run of a script in a given directory.
 
    Starts the build API server, then launches the build script as a child
-   process (via `clojure -X:monkeyci/build`).  The child process receives
+   process (either Clojure or Babashka).  The child process receives
    the API URL and token via environment variables so it can communicate
    with the server for params, events, artifacts and caches."
   (:require [babashka.fs :as fs]
@@ -14,7 +14,6 @@
              [artifacts :as art]
              [config :as c]
              [events :as e]
-             [process :as proc]
              [server :as srv]
              [utils :as u]
              [version :as v]]
@@ -34,16 +33,15 @@
   [dir]
   (u/find-script-dir dir))
 
-(defn run-build-process! [sdir env]
-  (proc/run ["clojure" "-X:monkeyci/build"] sdir env))
-
 (defn- evt-logger [evt]
   (log/debug "Processing events:" evt))
 
 (defn- make-router [routes]
   (mmc/make-router routes {:executor mms/execute}))
 
-(defn- make-podman-routes [conf mailman]
+(defn- make-podman-routes
+  "Creates event routing setup for containers using Podman."
+  [conf mailman]
   (-> conf
       (assoc :work-dir (c/get-jobs-dir conf)
              :mailman  mailman
@@ -140,7 +138,7 @@
       (log/debug "Build/pending event posted")
       ;; Wait for build end
       (let [{:keys [status]} @result]
-        ;; Wait for events to be processed
+        ;; Wait for events to be processed.  (Find a better way than this.)
         (Thread/sleep 100)
         (log/info "Build process exited with status" status)
         (if (= :success status) 0 1))

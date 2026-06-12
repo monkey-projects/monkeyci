@@ -1,13 +1,13 @@
-(ns monkey.ci.events.mailman.nats-test
+(ns monkey.ci.app.events.mailman.nats-test
   (:require [monkey.nats
              [core :as nats]
              [jetstream :as js]]
             [clojure.test :refer [deftest testing is]]
             [com.stuartsierra.component :as co]
-            [monkey.ci.events
+            [monkey.ci.app.events
              [mailman :as em]
              [spec :as es]]
-            [monkey.ci.events.mailman.nats :as sut]))
+            [monkey.ci.app.events.mailman.nats :as sut]))
 
 (deftest types-to-subjects
   (let [f (sut/types-to-subjects "monkeyci.test")]

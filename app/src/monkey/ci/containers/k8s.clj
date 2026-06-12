@@ -10,7 +10,7 @@
             [monkey.ci.containers
              [common :as c]
              [promtail :as pt]]
-            [monkey.ci.events.mailman.interceptors :as emi]))
+            [monkey.ci.app.events.mailman.interceptors :as emi]))
 
 (def default-arch :arm)
 (def default-cpus 1)

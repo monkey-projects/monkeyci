@@ -1,6 +1,6 @@
-(ns monkey.ci.events.polling-test
+(ns monkey.ci.app.events.polling-test
   (:require [clojure.test :refer [deftest testing is]]
-            [monkey.ci.events.polling :as sut]
+            [monkey.ci.app.events.polling :as sut]
             [monkey.ci.test.mailman :as tm]
             [monkey.mailman
              [core :as mmc]

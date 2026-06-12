@@ -15,7 +15,7 @@
              [ssh :as ssh]
              [user :as user]]
             [monkey.ci.spec.job.common :as job]
-            [monkey.ci.events.spec :as evt]
+            [monkey.ci.app.events.spec :as evt]
             [monkey.ci.storage.spec :as ss]))
 
 (def id? int?)

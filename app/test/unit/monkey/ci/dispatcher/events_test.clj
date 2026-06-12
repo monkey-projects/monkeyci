@@ -3,7 +3,7 @@
             [monkey.ci.dispatcher
              [events :as sut]
              [state :as ds]]
-            [monkey.ci.events.mailman.interceptors :as emi]
+            [monkey.ci.app.events.mailman.interceptors :as emi]
             [monkey.ci
              [build :as b]
              [cuid :as cuid]

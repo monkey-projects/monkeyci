@@ -12,8 +12,8 @@
             [monkey.ci.containers
              [common :as c]
              [promtail :as pt]]
-            [monkey.ci.events.builders :as eb]
-            [monkey.ci.events.mailman.interceptors :as emi]
+            [monkey.ci.app.events.builders :as eb]
+            [monkey.ci.app.events.mailman.interceptors :as emi]
             [monkey.ci.oci.core :as oci]
             [monkey.oci.container-instance.core :as ci]))
 

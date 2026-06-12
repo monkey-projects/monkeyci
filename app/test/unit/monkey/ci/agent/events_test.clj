@@ -9,7 +9,7 @@
             [monkey.ci
              [build :as b]
              [edn :as edn]]
-            [monkey.ci.events.mailman.interceptors :as emi]
+            [monkey.ci.app.events.mailman.interceptors :as emi]
             [monkey.ci.script.config :as sc]
             [monkey.ci.test
              [helpers :as h]

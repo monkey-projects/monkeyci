@@ -1,8 +1,8 @@
-(ns monkey.ci.events.edn-test
+(ns monkey.ci.app.events.edn-test
   (:require [clojure.test :refer [deftest testing is]]
             [clojure.java.io :as io]
             [manifold.deferred :as md]
-            [monkey.ci.events.edn :as sut]
+            [monkey.ci.app.events.edn :as sut]
             [monkey.ci.test.helpers :as h])
   (:import [java.io StringReader PipedReader PipedWriter]))
 

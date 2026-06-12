@@ -2,7 +2,7 @@
   (:require [com.stuartsierra.component :as co]
             [config :as c]
             [monkey.ci.dispatcher.runtime :as dr]
-            [monkey.ci.events.mailman :as em]))
+            [monkey.ci.app.events.mailman :as em]))
 
 (def default-config
   {:http {:port 3003}})

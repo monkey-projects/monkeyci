@@ -13,7 +13,7 @@
              [time :as t]
              [utils :as u]]
             [monkey.ci.build.core :as bc]
-            [monkey.ci.events
+            [monkey.ci.app.events
              [builders :as eb]
              [core :as ec]
              [mailman :as em]]))

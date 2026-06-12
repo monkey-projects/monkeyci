@@ -1,9 +1,9 @@
-(ns monkey.ci.events.mailman
+(ns monkey.ci.app.events.mailman
   "Mailman-style event handling"
   (:require [clojure.tools.logging :as log]
             [com.stuartsierra.component :as co]
             [manifold.stream :as ms]
-            [monkey.ci.events.mailman
+            [monkey.ci.app.events.mailman
              [interceptors :as emi]
              [jms :as emj]
              [nats :as emn]]
@@ -118,4 +118,3 @@
                  (update r t (comp vec concat) h))
                {})
        (into [])))
-

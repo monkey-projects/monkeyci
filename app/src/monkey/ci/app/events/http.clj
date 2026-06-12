@@ -1,4 +1,4 @@
-(ns monkey.ci.events.http
+(ns monkey.ci.app.events.http
   "Functions for doing events over http"
   (:require [clojure.tools.logging :as log]
             [manifold
@@ -6,7 +6,7 @@
              [deferred :as md]
              [stream :as ms]]
             [monkey.ci.edn :as edn]
-            [monkey.ci.events.core :as ec]
+            [monkey.ci.app.events.core :as ec]
             [monkey.mailman.core :as mmc]
             [ring.util.response :as rur]))
 

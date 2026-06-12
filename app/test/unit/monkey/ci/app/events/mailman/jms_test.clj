@@ -1,10 +1,10 @@
-(ns monkey.ci.events.mailman.jms-test
+(ns monkey.ci.app.events.mailman.jms-test
   (:require [clojure.test :refer [deftest testing is]]
             [com.stuartsierra.component :as co]
-            [monkey.ci.events
+            [monkey.ci.app.events
              [mailman :as em]
              [spec :as es]]
-            [monkey.ci.events.mailman.jms :as sut]
+            [monkey.ci.app.events.mailman.jms :as sut]
             [monkey.jms :as jms]
             [monkey.mailman.core :as mmc]))
 

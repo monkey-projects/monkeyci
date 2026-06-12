@@ -10,10 +10,10 @@
              [time :as t]
              [workspace :as ws]]
             [monkey.ci.build.api-server :as bas]
-            [monkey.ci.events
+            [monkey.ci.app.events
              [mailman :as em]
              [polling :as ep]]
-            [monkey.ci.events.mailman.interceptors :as emi]
+            [monkey.ci.app.events.mailman.interceptors :as emi]
             [monkey.ci.runners.interceptors :as ri]
             [monkey.ci.script.config :as sc]
             [monkey.mailman.core :as mmc]))

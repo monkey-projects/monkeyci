@@ -12,10 +12,10 @@
              [time :as mt]]
             [monkey.ci
              [build :as b]
-             [edn :as edn]
              [errors :as err]
              [time :as t]
              [utils :as u]]
+            [monkey.ci.app.edn :as edn]
             [monkey.flow :as flow]))
 
 (defn make-client [conf]

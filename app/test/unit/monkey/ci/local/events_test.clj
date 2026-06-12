@@ -6,7 +6,7 @@
              [build :as b]
              [edn :as edn]
              [git :as git]]
-            [monkey.ci.events.mailman.interceptors :as emi]
+            [monkey.ci.app.events.mailman.interceptors :as emi]
             [monkey.ci.local
              [config :as lc]
              [events :as sut]]

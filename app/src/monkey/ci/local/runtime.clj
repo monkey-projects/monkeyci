@@ -16,7 +16,7 @@
              [protocols :as p]]
             [monkey.ci.blob.disk :as blob]
             [monkey.ci.containers.podman :as cp]
-            [monkey.ci.events.mailman :as em]
+            [monkey.ci.app.events.mailman :as em]
             [monkey.ci.local
              [config :as lc]
              [console :as lco]

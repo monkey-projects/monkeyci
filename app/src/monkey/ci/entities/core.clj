@@ -7,8 +7,8 @@
             [medley.core :as mc]
             [monkey.ci
              [cuid :as cuid]
-             [edn :as edn]
              [utils :as u]]
+            [monkey.ci.app.edn :as edn]
             [monkey.ci.entities.types]
             [next.jdbc :as jdbc]
             [next.jdbc

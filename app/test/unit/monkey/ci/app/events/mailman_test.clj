@@ -1,8 +1,8 @@
-(ns monkey.ci.events.mailman-test
+(ns monkey.ci.app.events.mailman-test
   (:require [clojure.test :refer [deftest is testing]]
             [com.stuartsierra.component :as co]
             [manifold.stream :as ms]
-            [monkey.ci.events.mailman :as sut]
+            [monkey.ci.app.events.mailman :as sut]
             [monkey.ci.test.mailman :as tm]
             [monkey.mailman.core :as mmc]))
 

@@ -2,7 +2,7 @@
   (:require [clojure.test :refer [deftest testing is]]
             [io.pedestal.interceptor.chain :as ic]
             [monkey.ci.containers.common :as sut]
-            [monkey.ci.events.mailman.interceptors :as emi]))
+            [monkey.ci.app.events.mailman.interceptors :as emi]))
 
 (deftest credit-multiplier
   (testing "calculates value according to arch, cpus and memory"

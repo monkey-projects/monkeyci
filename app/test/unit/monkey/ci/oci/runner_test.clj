@@ -6,13 +6,13 @@
             [com.stuartsierra.component :as co]
             [monkey.ci
              [cuid :as cuid]
-             [edn :as edn]
              [protocols :as p]
              [storage :as st]]
-            [monkey.ci.events
+            [monkey.ci.app.edn :as edn]
+            [monkey.ci.app.events
              [mailman :as em]
              [spec :as es]]
-            [monkey.ci.events.mailman.interceptors :as emi]
+            [monkey.ci.app.events.mailman.interceptors :as emi]
             [monkey.ci.oci
              [core :as oci]
              [runner :as sut]]

@@ -19,7 +19,7 @@
              [version :as v]]
             [monkey.ci.build.api-server :as bas]
             [monkey.ci.containers.common :as cc]
-            [monkey.ci.events.mailman.interceptors :as emi]
+            [monkey.ci.app.events.mailman.interceptors :as emi]
             [monkey.ci.runners.interceptors :as ri]
             [monkey.ci.script.config :as sc]
             [monkey.ci.oci.core :as oci]
