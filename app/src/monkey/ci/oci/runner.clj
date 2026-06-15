@@ -17,6 +17,7 @@
             [monkey.ci.app.events.mailman.interceptors :as emi]
             [monkey.ci.build.api-server :as bas]
             [monkey.ci.containers.common :as cc]
+            [monkey.ci.events.mailman.interceptors :as cemi]
             [monkey.ci.oci.core :as oci]
             [monkey.ci.runners.interceptors :as ri]
             [monkey.ci.script.config :as sc]
@@ -300,9 +301,7 @@
   [conf storage vault]
   (let [client (make-ci-context (:containers conf))
         use-db (emi/use-db storage)]
-    [[;; TODO Replace with build/scheduled when dispatcher works
-      :build/queued
-      ;;:oci/build-scheduled
+    [[:build/queued
       [{:handler initialize-build
         :interceptors [emi/handle-build-error
                        use-db

@@ -45,6 +45,8 @@
 
 (defmulti make-component :type)
 
+(def default-router-opts {:executor mms/execute})
+
 (defrecord GenericComponent [broker routes]
   co/Lifecycle
   (start [this]
@@ -58,7 +60,7 @@
 
   p/AddRouter
   (add-router [this routes opts]
-    [(mmc/add-listener broker {:handler (mmc/router routes opts)})]))
+    [(mmc/add-listener broker {:handler (mmc/router routes (merge default-router-opts opts))})]))
 
 (defn make-generic-component [broker]
   (->GenericComponent broker nil))
