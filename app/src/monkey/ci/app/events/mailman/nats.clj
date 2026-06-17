@@ -8,7 +8,9 @@
             [monkey.ci
              [edn :as edn]
              [protocols :as p]]
-            [monkey.mailman.core :as mmc]
+            [monkey.mailman
+             [core :as mmc]
+             [sieppari :as mms]]
             [monkey.mailman.nats.core :as mnc]
             [monkey.nats.core :as nats]))
 
@@ -65,7 +67,7 @@
 
   p/AddRouter
   (add-router [{:keys [subjects]} routes opts]
-    (let [router (mmc/router routes opts)
+    (let [router (mmc/router routes (assoc opts :executor mms/execute))
           make-handler (fn [s]
                          (log/debug "Creating new handler for subject" s "with options" opts)
                          (-> {:handler router

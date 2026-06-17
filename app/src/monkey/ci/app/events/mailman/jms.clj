@@ -6,7 +6,8 @@
             [monkey.ci.protocols :as p]
             [monkey.mailman
              [core :as mmc]
-             [jms :as mj]]))
+             [jms :as mj]
+             [sieppari :as mms]]))
 
 (def topic-prefix "topic://")
 
@@ -90,7 +91,7 @@
 
   p/AddRouter
   (add-router [{:keys [destinations]} routes opts]
-    (let [router (mmc/router routes opts)]
+    (let [router (mmc/router routes (assoc opts :executor mms/execute))]
       ;; TODO Add listeners for each destination referred to by route event types
       ;; but split up the routes so only those for the destination are added
       ;; TODO Allow specifying an sid selector for efficiency

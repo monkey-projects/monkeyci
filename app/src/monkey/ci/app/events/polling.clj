@@ -6,7 +6,9 @@
   (:require [clojure.tools.logging :as log]
             [com.stuartsierra.component :as co]
             [monkey.ci.app.events.mailman :as em]
-            [monkey.mailman.core :as mmc]))
+            [monkey.mailman
+             [core :as mmc]
+             [sieppari :as mms]]))
 
 (defn- repost-results [mailman res]
   (->> res
@@ -50,7 +52,8 @@
                           (poll-loop (assoc config
                                             :mailman mailman
                                             :mailman-out mailman-out)
-                                     (mmc/router (:routes routes))
+                                     (mmc/router (:routes routes)
+                                                 {:executor mms/execute})
                                      running?
                                      #(max-reached? this)))))
 

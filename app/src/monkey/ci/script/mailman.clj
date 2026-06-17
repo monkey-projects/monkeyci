@@ -10,6 +10,7 @@
             [monkey.mailman
              [core :as mmc]
              [manifold :as mmm]
+             [sieppari :as mms]
              [utils :as mmu]]
             [monkey.ci.script.api-client :as api]))
 
@@ -89,4 +90,4 @@
 
   p/AddRouter
   (add-router [this routes opts]
-    [(mmc/add-listener (:broker this) {:handler (mmc/router routes opts)})]))
+    [(mmc/add-listener (:broker this) {:handler (mmc/router routes (assoc opts :executor mms/execute))})]))
