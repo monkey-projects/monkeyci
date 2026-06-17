@@ -46,6 +46,13 @@
    :type :with-flag
    :default true})
 
+(def runner-opt
+  {:as "Explicitly specify runner"
+   :option "runner"
+   :short "r"
+   :type :keyword
+   :spec #{:clj :bb}})
+
 (def config
   {:command "monkey-ci"
    :description "Clojure-powered CI/CD tool"
@@ -62,13 +69,15 @@
      :description "Run unit tests in the specified directory"
      :runs #'t/run-tests
      :opts [dir-opt
-            watch-opt]}
+            watch-opt
+            runner-opt]}
     {:command "build"
      :description "Run a local build of the MonkeyCI script in the given directory"
      :runs #'r/build
      :opts [dir-opt
             lib-version-opt
-            no-clean-opt]}]})
+            no-clean-opt
+            runner-opt]}]})
 
 (defn -main [& args]
   (cli/run-cmd args config))

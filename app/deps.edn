@@ -133,15 +133,6 @@
                ;; Send notifications to desktop
                :kaocha.plugin.notifier/command "notify-send -a Kaocha %{title} %{message} -i %{icon} -u %{urgency}"}}
   
-  :run
-  ;; clj -M:run
-  {:main-opts ["-m" "monkey.ci.core"]
-   :jvm-opts ["--sun-misc-unsafe-memory-access=allow"]}
-
-  :dispatcher
-  ;; clj -M:dispatcher
-  {:main-opts ["-m" "monkey.ci.dispatcher.main"]}
-
   :agent/builds
   ;; clj -M:agent/builds <config-file>
   {:main-opts ["-m" "monkey.ci.agent.main"]
