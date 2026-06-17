@@ -70,6 +70,7 @@
      :runs #'t/run-tests
      :opts [dir-opt
             watch-opt
+            lib-version-opt
             runner-opt]}
     {:command "build"
      :description "Run a local build of the MonkeyCI script in the given directory"
