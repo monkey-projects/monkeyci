@@ -21,7 +21,7 @@
              [sieppari :as mms]]))
 
 (deftest build-cmd-args
-  (h/with-tmp-dir dir
+  (fs/with-temp-dir [dir]
     (let [wd (str dir "/work")
           sd (str dir "/script")
           job {:id "test-job"
@@ -204,7 +204,7 @@
                (sut/get-job-timeout))))))
 
 (deftest make-routes
-  (h/with-tmp-dir dir
+  (fs/with-temp-dir [dir]
     (let [state (atom nil)
           routes (sut/make-routes {:work-dir dir :state state})
           expected [:container/job-queued
@@ -215,7 +215,7 @@
         (testing (format "handles `%s`" t)
           (is (contains? (set (map first routes)) t))))
 
-      (let [fake-proc {:name ::emi/start-process
+      (let [fake-proc {:name (:name emi/start-process)
                        :leave identity}
             router (-> routes
                        (mmc/router {:executor mms/execute})
@@ -289,7 +289,7 @@
                  (sut/get-job-dir)))))))
 
 (deftest restore-ws
-  (h/with-tmp-dir dir
+  (fs/with-temp-dir [dir]
     (let [ws (h/fake-blob-store (atom {"test-build.tgz" "test-dest"}))
           wd (fs/create-dir (fs/path dir "workdir"))
           {:keys [enter] :as i} (sut/restore-ws ws)]
@@ -397,7 +397,7 @@
     (is (keyword? (:name i)))
 
     (testing "`leave`"
-      (h/with-tmp-dir dir
+      (fs/with-temp-dir [dir]
         (let [wd (fs/create-dirs dir "work")
               {:keys [leave]} (sut/cleanup {:cleanup? false})]
           (testing "does nothing if `cleanup?` is `false`"
@@ -487,7 +487,7 @@
                  (sut/podman-opts)))))))
 
 (deftest watch-events
-  (h/with-tmp-dir dir
+  (fs/with-temp-dir [dir]
     (let [{:keys [leave] :as i} sut/watch-events
           events-file (fs/path dir "script" sut/events-file)
           mm (tm/test-component)
