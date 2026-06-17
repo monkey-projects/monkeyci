@@ -4,11 +4,14 @@
     "scripts": {
         "shadow:watch": "shadow-cljs watch dashboard",
         "shadow:release": "shadow-cljs release dashboard",
+	"shadow:test": "shadow-cljs compile :test/node",
         "postcss:build": "cross-env postcss ./dev-resources/css/tailwind.css -o ./target/js/dashboard/css/main.css --verbose",
         "postcss:watch": "cross-env postcss ./dev-resources/css/tailwind.css -o ./target/js/dashboard/css/main.css --verbose -w --poll 1000ms",
 	"postcss:release": "cross-env NODE_ENV=production postcss ./dev-resources/css/tailwind.css -o ./target/js/dashboard/css/main.css --verbose",
         "dev": "run-p -l *:watch",
-	"prod": "run-s -l *:release"
+	"prod": "run-s -l *:release",
+	"node:test": "node target/js/node.js > junit.xml",
+	"test": "run-s -l *:test"
     },
     "devDependencies": {
         "process": "^0.11.10",

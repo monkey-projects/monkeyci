@@ -4,7 +4,7 @@
             [monkey.ci
              [cuid :as cuid]
              [edn :as edn]]
-            [monkey.ci.events.core :as ec]
+            [monkey.ci.app.events.core :as ec]
             [monkey.ci.mailing.events :as sut]
             [monkey.ci.test.helpers :as h]
             [monkey.mailman.core :as mmc]))

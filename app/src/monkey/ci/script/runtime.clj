@@ -8,7 +8,7 @@
              [errors :as err]
              [spec :as spec]]
             [monkey.ci.common.constants :as const]
-            [monkey.ci.events
+            [monkey.ci.app.events
              [builders :as eb]
              [mailman :as em]]
             [monkey.ci.script

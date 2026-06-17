@@ -1,6 +1,5 @@
 (ns monkey.ci.sidecar.core-test
   (:require [babashka.fs :as fs]
-            [clojure.java.io :as io]
             [clojure.test :refer [deftest is testing]]
             [clojure.tools.logging :as log]
             [manifold
@@ -24,8 +23,8 @@
 
 (deftest poll-events
   (testing "dispatches events from file to bus"
-    (h/with-tmp-dir dir
-      (let [f (io/file dir "events.edn")
+    (fs/with-temp-dir [dir]
+      (let [f (fs/file dir "events.edn")
             evt {:type :test/event
                  :message "This is a test event"}
             {:keys [mailman] :as rt} (-> (trs/make-test-rt)
@@ -42,8 +41,8 @@
         (is (= 0 (wait-for-exit c))))))
 
   (testing "reads events as they are posted"
-    (h/with-tmp-dir dir
-      (let [f (io/file dir "events.edn")
+    (fs/with-temp-dir [dir]
+      (let [f (fs/file dir "events.edn")
             evt {:type :test/event
                  :message "This is a test event"}
             {:keys [mailman] :as rt} (-> (trs/make-test-rt)
@@ -60,8 +59,8 @@
         (is (= 0 (wait-for-exit c))))))
 
   (testing "adds sid and job-id to events"
-    (h/with-tmp-dir dir
-      (let [f (io/file dir "events.edn")
+    (fs/with-temp-dir [dir]
+      (let [f (fs/file dir "events.edn")
             evt {:type :test/event
                  :message "This is a test event"}
             sid (repeatedly 3 cuid/random-cuid)
@@ -82,8 +81,8 @@
         (is (= 0 (wait-for-exit c))))))
 
   (testing "stops when a terminating event is received"
-    (h/with-tmp-dir dir
-      (let [f (io/file dir "events.edn")
+    (fs/with-temp-dir [dir]
+      (let [f (fs/file dir "events.edn")
             evt {:type :test/event
                  :message "This is a test event"
                  :done? true}
@@ -101,15 +100,15 @@
 
 (deftest mark-start
   (testing "creates start file"
-    (h/with-tmp-dir dir
-      (let [start (io/file dir "start")
+    (fs/with-temp-dir [dir]
+      (let [start (fs/file dir "start")
             rt {:paths {:start-file (.getCanonicalPath start)}}]
         (is (= rt (sut/mark-start rt)))
         (is (.exists start)))))
 
   (testing "creates start file directory"
-    (h/with-tmp-dir dir
-      (let [start (io/file dir "sub/start")
+    (fs/with-temp-dir [dir]
+      (let [start (fs/file dir "sub/start")
             rt {:paths {:start-file (.getCanonicalPath start)}}]
         (is (= rt (sut/mark-start rt)))
         (is (.exists start))))))
@@ -142,7 +141,7 @@
           (is (= ::polling (:stage @(sut/run (trs/make-test-rt)))))))
 
       (testing "restores and saves caches if configured"
-        (h/with-tmp-dir dir
+        (fs/with-temp-dir [dir]
           (let [stored (atom {})
                 path "test-path"
                 _ (fs/create-file (fs/path dir path))
@@ -164,7 +163,7 @@
             (is (not-empty @stored)))))
       
       (testing "restores artifacts if configured"
-        (h/with-tmp-dir dir
+        (fs/with-temp-dir [dir]
           (let [stored (atom {"test-cust/test-repo/test-build/test-artifact.tgz" "/tmp/checkout"})
                 build {:org-id "test-cust"
                        :repo-id "test-repo"
@@ -189,7 +188,7 @@
             (is (empty? @stored)))))
 
       (testing "saves artifacts if configured"
-        (h/with-tmp-dir dir
+        (fs/with-temp-dir [dir]
           (let [stored (atom {})
                 path "test-artifact"
                 _ (fs/create-file (fs/path dir path))
@@ -249,8 +248,8 @@
 
       (testing "aborts on async error"
         (with-redefs [sut/poll-events (constantly (md/error-deferred (ex-info "test error" {})))]
-          (h/with-tmp-dir dir
-            (let [abort-file (io/file dir "abort")]
+          (fs/with-temp-dir [dir]
+            (let [abort-file (fs/file dir "abort")]
               (is (some? (-> test-rt
                              (trs/set-abort-file (str abort-file))
                              (sut/run)
@@ -260,8 +259,8 @@
 
       (testing "aborts on exception thrown"
         (with-redefs [ws/restore (fn [_] (throw (ex-info "test error" {})))]
-          (h/with-tmp-dir dir
-            (let [abort-file (io/file dir "abort")]
+          (fs/with-temp-dir [dir]
+            (let [abort-file (fs/file dir "abort")]
               (is (some? (-> test-rt
                              (trs/set-abort-file (str abort-file))
                              (sut/run)

@@ -1,7 +1,7 @@
 (ns monkey.ci.extensions-test
   (:require [clojure.test :refer [deftest is testing]]
             [monkey.ci.build.core :as bc]
-            [monkey.ci.events.mailman.interceptors :as emi]
+            [monkey.ci.app.events.mailman.interceptors :as emi]
             [monkey.ci.extensions :as sut]
             [monkey.ci.test.extensions :refer [with-extensions]]))
 

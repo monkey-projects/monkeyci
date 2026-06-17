@@ -5,8 +5,6 @@
    for a container instance to complete, we just register multiple event 
    handlers that follow the flow."
   (:require [clojure.java.io :as io]
-            [clojure.tools.logging :as log]
-            [io.pedestal.interceptor.chain :as pi]
             [medley.core :as mc]
             [meta-merge.core :as mm]
             [monkey.ci
@@ -15,14 +13,14 @@
              [process :as proc]
              [protocols :as p]
              [storage :as st]
-             [utils :as u]
-             [version :as v]]
+             [utils :as u]]
+            [monkey.ci.app.events.mailman.interceptors :as emi]
             [monkey.ci.build.api-server :as bas]
             [monkey.ci.containers.common :as cc]
-            [monkey.ci.events.mailman.interceptors :as emi]
+            [monkey.ci.events.mailman.interceptors :as cemi]
+            [monkey.ci.oci.core :as oci]
             [monkey.ci.runners.interceptors :as ri]
             [monkey.ci.script.config :as sc]
-            [monkey.ci.oci.core :as oci]
             [monkey.ci.web.auth :as auth]
             [monkey.oci.container-instance.core :as ci]))
 
@@ -271,7 +269,7 @@
                                     :message
                                     (str "Failed to create container instance: " (get-in resp [:body :message]))))])
                     ;; Do not proceed
-                    (pi/terminate)))))})
+                    (cemi/terminate)))))})
 
 (def save-runner-details
   "Interceptor that stores build runner details for oci, such as container instance ocid.
@@ -303,9 +301,7 @@
   [conf storage vault]
   (let [client (make-ci-context (:containers conf))
         use-db (emi/use-db storage)]
-    [[;; TODO Replace with build/scheduled when dispatcher works
-      :build/queued
-      ;;:oci/build-scheduled
+    [[:build/queued
       [{:handler initialize-build
         :interceptors [emi/handle-build-error
                        use-db

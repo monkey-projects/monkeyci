@@ -16,8 +16,8 @@
              [workspace :as ws]]
             [monkey.ci.build.api-server :as bas]
             [monkey.ci.oci.containers :as c-oci]
-            [monkey.ci.events.mailman :as em]
-            [monkey.ci.events.mailman
+            [monkey.ci.app.events.mailman :as em]
+            [monkey.ci.app.events.mailman
              [interceptors :as emi]
              [jms :as emj]]
             [monkey.ci.metrics.core :as m]

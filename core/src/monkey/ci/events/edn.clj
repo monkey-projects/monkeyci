@@ -64,18 +64,18 @@
    or join it if needed."
   [reader callback]
   (let [r (cond-> reader
-             (instance? InputStream reader) (InputStreamReader.)
-             (not (instance? PushbackReader reader)) (PushbackReader.))
+            (instance? InputStream reader) (InputStreamReader.)
+            (not (instance? PushbackReader reader)) (PushbackReader.))
         t (Thread.
            (fn []
              (loop [evt (read-next r)]
                (when
-                 (try
-                   (callback evt)
-                   (catch Exception ex
-                     (log/error "Unable to read next event from reader" ex)
-                     false))
-                 (recur (read-next r))))
+                   (try
+                     (callback evt)
+                     (catch Exception ex
+                       (log/error "Unable to read next event from reader" ex)
+                       false))
+                   (recur (read-next r))))
              (log/debug "Finished reading events from reader")))]
     (doto t
       (.setDaemon true)

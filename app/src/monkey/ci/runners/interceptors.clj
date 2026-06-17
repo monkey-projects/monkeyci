@@ -1,7 +1,7 @@
 (ns monkey.ci.runners.interceptors
   "Reusable mailman interceptors for runners"
   (:require [clojure.tools.logging :as log]
-            [monkey.ci.events.mailman.interceptors :as emi]
+            [monkey.ci.app.events.mailman.interceptors :as emi]
             [monkey.ci.storage :as st]))
 
 (defn save-runner-details [get-details]

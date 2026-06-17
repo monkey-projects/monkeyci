@@ -1,10 +1,12 @@
 (ns monkey.ci.cli.test-test
   (:require [babashka.fs :as fs]
-            [clojure.edn :as edn]
-            [clojure.string :as str]
-            [clojure.test :refer [deftest is testing]]
-            [monkey.ci.cli.process :as process]
-            [monkey.ci.cli.test :as sut]))
+            [clojure
+             [edn :as edn]
+             [test :refer [deftest is testing]]]
+            [monkey.ci.cli
+             [process :as process]
+             [test :as sut]
+             [version :as v]]))
 
 (deftest write-temp-bb-edn-test
   (let [dir  (fs/temp-dir)
@@ -82,4 +84,96 @@
       (let [received (atom nil)]
         (with-redefs [process/run (fn [cmd dir] (reset! received {:cmd cmd :dir dir}) 0)]
           (sut/run-tests {:dir "test/dir"})
-          (is (= (fs/absolutize "test/dir") (:dir @received))))))))
+          (is (= (fs/absolutize "test/dir") (:dir @received)))))))
+
+  (testing "with `clj` runner"
+    (let [received (atom nil)]
+      (with-redefs [process/run (fn [cmd dir] (reset! received {:cmd cmd :dir dir}) 0)]
+        (sut/run-tests {:dir "/some/project"
+                        :runner :clj})
+        
+        (testing "passes -Sdeps with the generated deps config to clj"
+          (is (= "clojure" (first (:cmd @received))))
+          (is (= "-Sdeps" (second (:cmd @received))))
+          (is (string? (nth (:cmd @received) 2))))
+
+        (testing "runs test fn"
+          (is (= ["-X:monkeyci/test"] (drop 3 (:cmd @received)))))
+
+        (testing "runs in the specified directory"
+          (is (= "/some/project" (str (:dir @received)))))
+
+        (testing "deps config"
+          (let [deps (edn/read-string (-> @received :cmd (nth 2)))]
+            (is (map? deps))
+            (testing "contains `monkeyci/test` alias"
+              (is (contains? (:aliases deps) :monkeyci/test)))
+
+            (testing "refers to script lib with default version"
+              (is (= (v/version) (get-in deps [:aliases
+                                               :monkeyci/test
+                                               :extra-deps
+                                               'com.monkeyci/script
+                                               :mvn/version]))))
+
+            (testing "refers to test lib with default version"
+              (is (= (v/version) (get-in deps [:aliases
+                                               :monkeyci/test
+                                               :extra-deps
+                                               'com.monkeyci/test
+                                               :mvn/version]))))))
+
+        (testing "with specific lib version"
+          (let [version "1.2.3"]
+            (sut/run-tests {:dir "/some/project"
+                            :runner :clj
+                            :lib-version version})
+
+            (testing "deps config"
+              (let [deps (edn/read-string (-> @received :cmd (nth 2)))]
+                (is (map? deps))
+                (testing "contains `monkeyci/test` alias"
+                  (is (contains? (:aliases deps) :monkeyci/test)))
+
+                (testing "refers to script lib with configured version"
+                  (is (= version (get-in deps [:aliases
+                                               :monkeyci/test
+                                               :extra-deps
+                                               'com.monkeyci/script
+                                               :mvn/version]))))
+
+                (testing "refers to test lib with configured version"
+                  (is (= version (get-in deps [:aliases
+                                               :monkeyci/test
+                                               :extra-deps
+                                               'com.monkeyci/test
+                                               :mvn/version]))))))))))))
+
+(deftest generate-test-deps
+  (let [deps (sut/generate-test-deps ::lib-coords ::test-coords false)]
+    (testing "includes monkeyci test lib"
+      (is (contains? (-> deps
+                         :aliases
+                         :monkeyci/test
+                         :extra-deps)
+                     'com.monkeyci/test))
+
+      (is (= ::test-coords
+             (get-in deps [:aliases
+                           :monkeyci/test
+                           :extra-deps
+                           `com.monkeyci/test]))))
+
+    (testing "includes monkeyci script lib"
+      (is (= ::lib-coords
+             (get-in deps [:aliases
+                           :monkeyci/test
+                           :extra-deps
+                           `com.monkeyci/script])))))
+
+  (testing "enables watching if specified"
+    (is (true? (-> (sut/generate-test-deps nil nil true)
+                   :aliases
+                   :monkeyci/test
+                   :exec-args
+                   :watch?)))))

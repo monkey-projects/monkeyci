@@ -117,8 +117,10 @@
   "Prepares the cli install script by replacing the version.  Returns the
    script contents."
   [ctx]
-  (cs/replace (slurp (m/in-work ctx "app/dev-resources/install-cli.sh"))
-              "{{version}}" (config/tag-version ctx)))
+  (-> ctx
+      (m/in-work "app/dev-resources/install-cli.sh")
+      (slurp)
+      (cs/replace "{{version}}" (config/tag-version ctx))))
 
 (defn upload-install-script [ctx]
   (when (p/release? ctx)
@@ -130,7 +132,7 @@
               ctx
               #(minio/put-s3-object %1 %2
                                     "install-cli.sh"
-                                    (java.io.ByteArrayInputStream. (.getBytes script))
+                                    (minio/->stream script)
                                     (count script))))))
         (m/depends-on ["upload-uberjar"]))))
 

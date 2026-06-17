@@ -5,7 +5,7 @@
              [deferred :as md]
              [stream :as ms]]
             [monkey.ci.edn :as edn]
-            [monkey.ci.events.mailman :as em]
+            [monkey.ci.app.events.mailman :as em]
             [monkey.ci.script.mailman :as sut]
             [monkey.mailman.core :as mmc]))
 

@@ -7,7 +7,7 @@
              [edn :as edn]
              [jobs :as sut]]
             [monkey.ci.build.core :as bc]
-            [monkey.ci.events.spec :as es]
+            [monkey.ci.app.events.spec :as es]
             [monkey.ci.test
              [helpers :as h]
              [mailman :as tm]]))

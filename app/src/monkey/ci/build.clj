@@ -6,7 +6,7 @@
             [medley.core :as mc]
             [monkey.ci.utils :as u]
             [monkey.ci.build.core :as bc]
-            [monkey.ci.events.core :as ec]))
+            [monkey.ci.app.events.core :as ec]))
 
 (def default-script-dir ".monkeyci")
 

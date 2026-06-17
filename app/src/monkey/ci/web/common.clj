@@ -3,12 +3,12 @@
             [clojure.string :as cs]
             [clojure.tools.logging :as log]
             [monkey.ci
-             [edn :as edn]
              [labels :as lbl]
              [storage :as st]
              [time :as t]
              [utils :as u]
              [version :as v]]
+            [monkey.ci.app.edn :as edn]
             [monkey.ci.common.schemas :as schemas]
             [muuntaja.core :as mc]
             [reitit.ring :as ring]

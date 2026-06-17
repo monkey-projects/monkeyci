@@ -13,11 +13,11 @@
              [jobs :as j]
              [vault :as v]]
             [monkey.ci.build.core :as bc]
-            [monkey.ci.events
+            [monkey.ci.app.events
              [builders :as eb]
              [core :as ec]
              [mailman :as em]]
-            [monkey.ci.events.mailman.interceptors :as emi]
+            [monkey.ci.app.events.mailman.interceptors :as emi]
             [monkey.ci.script
              [api-client :as ba]
              [core :as s]]

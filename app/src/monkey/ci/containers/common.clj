@@ -3,8 +3,8 @@
              [build :as b]
              [containers :as c]
              [utils :as u]]
-            [monkey.ci.events.builders :as eb]
-            [monkey.ci.events.mailman.interceptors :as emi]
+            [monkey.ci.app.events.builders :as eb]
+            [monkey.ci.app.events.mailman.interceptors :as emi]
             [monkey.ci.sidecar.config :as sc]))
 
 (def home-dir "/home/monkeyci")

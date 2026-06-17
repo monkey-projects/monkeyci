@@ -10,7 +10,9 @@
              [mailman :as tm]
              [runtime :as trt]]
             [monkey.ci.utils :as u]
-            [monkey.mailman.core :as mmc]))
+            [monkey.mailman
+             [core :as mmc]
+             [sieppari :as mms]]))
 
 (deftest calc-checkout-dir
   (testing "combines build id with checkout base dir from config"
@@ -233,7 +235,8 @@
           sid (make-sid)]
       (testing "sets script exit for same build"
         (let [exit (md/deferred)
-              r (mmc/router (sut/make-routes sid exit))]
+              r (mmc/router (sut/make-routes sid exit)
+                            {:executor mms/execute})]
           (is (nil? (->  {:type :script/end
                           :sid sid}
                          (r)
@@ -243,7 +246,8 @@
 
       (testing "is ignored for other build"
         (let [exit (md/deferred)
-              r (mmc/router (sut/make-routes sid exit))]
+              r (mmc/router (sut/make-routes sid exit)
+                            {:executor mms/execute})]
           (is (nil? (->  {:type :script/end
                           :sid (make-sid)}
                          (r)

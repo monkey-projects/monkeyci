@@ -3,7 +3,9 @@
             [clojure.test :refer [deftest testing is]]
             [monkey.ci.metrics.events :as sut]
             [monkey.metrics.prometheus :as prom]
-            [monkey.mailman.core :as mmc]))
+            [monkey.mailman
+             [core :as mmc]
+             [sieppari :as mms]]))
 
 (deftest evt-counter
   (testing "increases counter on enter"
@@ -18,7 +20,7 @@
 (deftest routes
   (let [reg (prom/make-registry)
         router (-> (sut/make-routes reg)
-                   (mmc/router))
+                   (mmc/router {:executor mms/execute}))
         type->id #(str (namespace %) "_" (name %))]
     (testing "org events"
       (let [types [:build/triggered

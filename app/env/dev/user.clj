@@ -43,15 +43,6 @@
   (->> @(i/list-active)
        (map (juxt :id :display-name :time-created :lifecycle-state))))
 
-(defn run-local [wd & [sd params]]
-  (cmd/run-build-local
-   {:args
-    {:workdir wd
-     :dir (or sd ".monkeyci")
-     :param params}
-    :lib-coords {:local/root (u/cwd)}
-    :log-config (str (fs/absolutize "dev-resources/logback-script.xml"))}))
-
 (defn run-build-agent
   "Runs build agent with local config, returns a fn that stops the agent
    server and poll loop when invoked."

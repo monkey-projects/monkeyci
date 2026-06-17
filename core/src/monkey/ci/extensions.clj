@@ -14,7 +14,14 @@
 
 (defonce registered-extensions (atom new-register))
 
-(defn register [l ext]
+(defn register
+  "Registers the given extension in registry `l`.  An extension is a map with
+   these keys:
+     `:key`: the job property to activate the extension on (required)
+     `:before`: function to execute before the job starts
+     `:after`: executed after the job ends
+   At least one of `:before` or `:after` is required."
+  [l ext]
   (assoc l (:key ext) ext))
 
 (defn register! [ext]

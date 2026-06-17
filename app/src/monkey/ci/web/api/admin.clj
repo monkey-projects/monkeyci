@@ -8,7 +8,7 @@
              [storage :as s]
              [time :as t]]
             [monkey.ci.common.preds :as cp]
-            [monkey.ci.events
+            [monkey.ci.app.events
              [core :as ec]
              [mailman :as em]]
             [monkey.ci.web

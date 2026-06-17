@@ -2,13 +2,6 @@
   (:require [clojure.test :refer :all]
             [monkey.ci.core :as sut]))
 
-(deftest main-test
-  (binding [*err* (java.io.StringWriter.)]
-    (with-redefs [clojure.core/shutdown-agents (constantly nil)
-                  cli-matic.platform/exit-script (constantly :exit)]
-      (testing "runs cli"
-        (is (= :exit (sut/-main "-?")))))))
-
 (deftest system-invoker
   (testing "creates a fn"
     (is (fn? (sut/system-invoker {} {}))))

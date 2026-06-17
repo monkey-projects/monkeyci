@@ -8,7 +8,7 @@
              [storage :as st]]
             [monkey.ci.blob.disk :as blob]
             [monkey.ci.build.api-server :as bas]
-            [monkey.ci.events.core :as ec]
+            [monkey.ci.app.events.core :as ec]
             [monkey.ci.runners.runtime :as rr]
             [monkey.ci.script.api-client :as ba]))
 

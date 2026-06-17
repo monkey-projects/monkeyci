@@ -14,8 +14,8 @@
              [sid :as sid]
              [storage :as s]
              [vault :as v]]
-            [monkey.ci.events.mailman :as em]
-            [monkey.ci.events.mailman
+            [monkey.ci.app.events.mailman :as em]
+            [monkey.ci.app.events.mailman
              [db :as emd]
              [interceptors :as emi]
              [jms :as emj]]

@@ -11,7 +11,7 @@
              [runtime :as rt]
              [spec :as mcs]
              [utils :as u]]
-            [monkey.ci.events.mailman :as em]
+            [monkey.ci.app.events.mailman :as em]
             [monkey.ci.runtime.app :as ra]
             [monkey.ci.web.auth :as auth]
             [org.httpkit.server :as http]))

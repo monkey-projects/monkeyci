@@ -55,12 +55,13 @@
 (def build-core? (some-fn core-changed? release? m/manual?))
 (def build-script? (some-fn script-changed? release? m/manual?))
 
-(def publish-app? (some-fn (every-pred app-changed? should-publish?)
-                           release?))
-(def publish-gui? (some-fn (every-pred gui-changed? should-publish?)
-                           release?))
-(def publish-test-lib? (some-fn (every-pred test-lib-changed? should-publish?) release?))
-(def publish-common? (some-fn (every-pred common-changed? should-publish?) release?))
-(def publish-core? (some-fn (every-pred core-changed? should-publish?) release?))
-(def publish-script? (some-fn (every-pred script-changed? should-publish?) release?))
-(def publish-cli? (some-fn (every-pred cli-changed? should-publish?) release?))
+(defn- publish-or-changed? [p]
+  (some-fn (every-pred p should-publish?) release?))
+
+(def publish-app? (publish-or-changed? app-changed?))
+(def publish-gui? (publish-or-changed? gui-changed?))
+(def publish-test-lib? (publish-or-changed? test-lib-changed?))
+(def publish-common? (publish-or-changed? common-changed?))
+(def publish-core? (publish-or-changed? core-changed?))
+(def publish-script? (publish-or-changed? script-changed?))
+(def publish-cli? (publish-or-changed? cli-changed?))

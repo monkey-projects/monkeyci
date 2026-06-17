@@ -3,8 +3,6 @@
             [buddy.core.codecs :as bcc]
             [clojure.test :refer [deftest is testing]]
             [clojure.tools.logging :as log]
-            [io.pedestal.interceptor :as i]
-            [io.pedestal.interceptor.chain :as pi]
             [manifold
              [deferred :as md]
              [stream :as ms]]
@@ -13,15 +11,17 @@
              [jobs :as j]
              [vault :as v]]
             [monkey.ci.containers.podman :as sut]
-            [monkey.ci.events.mailman.interceptors :as emi]
+            [monkey.ci.app.events.mailman.interceptors :as emi]
             [monkey.ci.test
              [helpers :as h :refer [contains-subseq?]]
              [mailman :as tm]]
             [monkey.ci.vault.common :as vc]
-            [monkey.mailman.core :as mmc]))
+            [monkey.mailman
+             [core :as mmc]
+             [sieppari :as mms]]))
 
 (deftest build-cmd-args
-  (h/with-tmp-dir dir
+  (fs/with-temp-dir [dir]
     (let [wd (str dir "/work")
           sd (str dir "/script")
           job {:id "test-job"
@@ -204,7 +204,7 @@
                (sut/get-job-timeout))))))
 
 (deftest make-routes
-  (h/with-tmp-dir dir
+  (fs/with-temp-dir [dir]
     (let [state (atom nil)
           routes (sut/make-routes {:work-dir dir :state state})
           expected [:container/job-queued
@@ -215,10 +215,10 @@
         (testing (format "handles `%s`" t)
           (is (contains? (set (map first routes)) t))))
 
-      (let [fake-proc {:name ::emi/start-process
+      (let [fake-proc {:name (:name emi/start-process)
                        :leave identity}
             router (-> routes
-                       (mmc/router)
+                       (mmc/router {:executor mms/execute})
                        (mmc/replace-interceptors [fake-proc]))
             sid ["test" "build"]
             job-id "test-job"]
@@ -267,7 +267,7 @@
                                :leave (fn [_]
                                         (throw (ex-info "Test error" {})))}
                   router (-> routes
-                             (mmc/router)
+                             (mmc/router {:executor mms/execute})
                              (mmc/replace-interceptors [fake-proc failing-art]))]
               (is (some? (swap! state update :job-count inc)))
               (is (some? (swap! state update :jobs assoc-in [sid job-id] {:id job-id})))
@@ -289,7 +289,7 @@
                  (sut/get-job-dir)))))))
 
 (deftest restore-ws
-  (h/with-tmp-dir dir
+  (fs/with-temp-dir [dir]
     (let [ws (h/fake-blob-store (atom {"test-build.tgz" "test-dest"}))
           wd (fs/create-dir (fs/path dir "workdir"))
           {:keys [enter] :as i} (sut/restore-ws ws)]
@@ -309,21 +309,19 @@
 
 (deftest filter-container-job
   (let [{:keys [enter] :as i} sut/filter-container-job
-        ctx (-> {:event {:job {:id "action-job"}}}
-                (pi/enqueue [(i/interceptor {:name ::test-interceptor
-                                             :enter identity})]))]
+        ctx {:event {:job {:id "action-job"}}}]
     (is (keyword? (:name i)))
     
     (testing "terminates if no container job"
-      (is (nil? (-> ctx
-                    (enter)
-                    ::pi/queue))))
+      (is (true? (-> ctx
+                     (enter)
+                     :terminated))))
 
     (testing "continues if container job"
-      (is (some? (-> ctx
-                     (assoc-in [:event :job :image] "test-img")
-                     (enter)
-                     ::pi/queue))))))
+      (is (nil? (-> ctx
+                    (assoc-in [:event :job :image] "test-img")
+                    (enter)
+                    :terminated))))))
 
 (deftest save-job
   (let [{:keys [enter] :as i} sut/save-job]
@@ -337,25 +335,20 @@
                        (sut/get-job (:id job)))))))))
 
 (deftest require-job
-  (let [{:keys [enter] :as i} sut/require-job
-        ctx (-> {}
-                (pi/enqueue [(i/interceptor {:name ::test-interceptor
-                                             :enter identity})]))] 
+  (let [{:keys [enter] :as i} sut/require-job] 
     (is (keyword? (:name i)))
     
     (testing "terminates if no job in state"
-      (is (nil? (-> ctx
-                    (enter)
-                    ::pi/queue))))
+      (is (true? (-> {}
+                     (enter)
+                     :terminated))))
 
     (testing "continues if job in state"
       (let [job (h/gen-job)]
-        (is (some? (-> {:event {:job-id (:id job)}}
-                       (sut/set-job job)
-                       (pi/enqueue [(i/interceptor {:name ::test-interceptor
-                                                    :enter identity})])
-                       (enter)
-                       ::pi/queue)))))))
+        (is (nil? (-> {:event {:job-id (:id job)}}
+                      (sut/set-job job)
+                      (enter)
+                      :terminated)))))))
 
 (deftest add-job-ctx
   (let [job {:id "test-job"}
@@ -404,7 +397,7 @@
     (is (keyword? (:name i)))
 
     (testing "`leave`"
-      (h/with-tmp-dir dir
+      (fs/with-temp-dir [dir]
         (let [wd (fs/create-dirs dir "work")
               {:keys [leave]} (sut/cleanup {:cleanup? false})]
           (testing "does nothing if `cleanup?` is `false`"
@@ -494,7 +487,7 @@
                  (sut/podman-opts)))))))
 
 (deftest watch-events
-  (h/with-tmp-dir dir
+  (fs/with-temp-dir [dir]
     (let [{:keys [leave] :as i} sut/watch-events
           events-file (fs/path dir "script" sut/events-file)
           mm (tm/test-component)

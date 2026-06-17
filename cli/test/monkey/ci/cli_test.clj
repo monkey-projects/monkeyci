@@ -4,6 +4,8 @@
             [cli-matic.platform :as cp]
             [monkey.ci.cli
              [print :as p]
+             [run :as r]
+             [test :as t]
              [verify :as verify]
              [version :as v]]
             [monkey.ci.cli :as sut]))
@@ -88,4 +90,41 @@
 
           (testing "accepts dir"
             (is (zero? (sut/-main "verify" "-d" "test/dir")))
-            (is (= "test/dir" (:dir @v)))))))))
+            (is (= "test/dir" (:dir @v)))))))
+
+    (testing "`test`"
+      (let [v (atom nil)]
+        (with-redefs [t/run-tests (partial reset! v)]
+          (testing "runs script tests"
+            (is (zero? (sut/-main "test")))
+            (is (some? @v)))
+
+          (testing "accepts dir"
+            (is (zero? (sut/-main "test" "-d" "test/dir")))
+            (is (= "test/dir" (:dir @v))))
+
+          (testing "accepts runner" 
+            (is (zero? (sut/-main "test" "-r" "clj")))
+            (is (= :clj (:runner @v)))))))
+
+    (testing "`build`"
+      (let [v (atom nil)]
+        (with-redefs [r/build (partial reset! v)]
+          (testing "runs script"
+            (is (zero? (sut/-main "build")))
+            (is (some? @v)))
+
+          (testing "accepts dir" 
+            (is (zero? (sut/-main "build" "-d" "test/dir")))
+            (is (= "test/dir" (:dir @v))))
+
+          (testing "accepts lib version" 
+            (is (zero? (sut/-main "build" "--lib-version" "1.2.3")))
+            (is (= "1.2.3" (:lib-version @v))))
+
+          (testing "accepts runner" 
+            (is (zero? (sut/-main "build" "-r" "clj")))
+            (is (= :clj (:runner @v))))
+
+          (testing "fails when invalid runner"
+            (is (neg? (sut/-main "build" "-r" "invalid")))))))))

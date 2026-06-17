@@ -1,6 +1,6 @@
 (ns monkey.ci.web.api.job
   "Job-related api handlers"
-  (:require [monkey.ci.events.builders :as eb]
+  (:require [monkey.ci.app.events.builders :as eb]
             [monkey.ci.storage :as st]
             [monkey.ci.web
              [common :as wc]

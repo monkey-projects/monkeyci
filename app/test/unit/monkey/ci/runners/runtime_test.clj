@@ -4,7 +4,7 @@
             [com.stuartsierra.component :as co]
             [manifold.stream :as ms]
             [monkey.ci.oci.containers :as c-oci]
-            [monkey.ci.events.mailman :as em]
+            [monkey.ci.app.events.mailman :as em]
             [monkey.ci.metrics.core :as m]
             [monkey.ci.runners.runtime :as sut]
             [monkey.ci.spec.runner :as sr]

@@ -21,7 +21,7 @@
              [protocols :as p]
              [spec :as spec]
              [utils :as u]]
-            [monkey.ci.events
+            [monkey.ci.app.events
              [http :as eh]
              [mailman :as em]]
             [monkey.ci.script.api-client :as ba]
