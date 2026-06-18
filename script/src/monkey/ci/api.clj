@@ -258,7 +258,10 @@
   "Retrieves artifact with given id and restores it at given location.
    Returns the restored artifact path, or `nil` if the artifact was not found."
   [ctx art]
-  (api/get-artifact (api/ctx->api-client ctx) (:id art) (:path art)))
+  (api/get-artifact (api/ctx->api-client ctx)
+                    (get-in ctx [:job :id])
+                    (:id art)
+                    (:path art)))
 
 (def restore-artifact
   "Alias for `get-artifact`"

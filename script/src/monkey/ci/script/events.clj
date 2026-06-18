@@ -97,6 +97,7 @@
 (defn- script-end-evt [ctx status]
   (-> (base-event (get-build ctx) :script/end)
       (assoc :status status)))
+
 ;;; Interceptors
 
 (def load-jobs
@@ -190,10 +191,13 @@
 (def handle-script-error
   "Marks script as failed"
   {:name ::script-error-handler
-   :error (fn [{:keys [event] :as ctx} ex]
-            (log/error "Failed to handle event" (:type event) ", marking script as failed" ex)
-            (assoc ctx :result [(-> (script-end-evt ctx :error)
-                                    (assoc :message (ex-message ex)))]))})
+   :error (fn [{:keys [event] :as ctx} & [ex]]
+            (let [ex (or (:error ctx) ex)]
+              (log/error "Failed to handle event" (:type event) ", marking script as failed" ex)
+              (-> ctx
+                  (assoc :result [(-> (script-end-evt ctx :error)
+                                      (assoc :message (ex-message ex)))])
+                  (dissoc :error))))})
 
 (def mark-canceled
   "Marks build as canceled, so no other jobs will be enqueued."

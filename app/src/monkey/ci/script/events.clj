@@ -1,5 +1,7 @@
 (ns monkey.ci.script.events
   "Mailman event routes for scripts"
+  ;; TODO Merge this ns with the one from script.  Only difference is env var encryption,
+  ;; but it may be easier to just have this done by the api server.
   (:require [buddy.core.codecs :as bcc]
             [clojure.tools.logging :as log]
             [manifold
@@ -237,8 +239,10 @@
    :error (fn [{:keys [event] :as ctx} & [ex]]
             (let [ex (or (:error ctx) ex)]
               (log/error "Failed to handle event" (:type event) ", marking script as failed" ex)
-              (assoc ctx :result [(-> (script-end-evt ctx :error)
-                                      (assoc :message (ex-message ex)))])))})
+              (-> ctx
+                  (assoc :result [(-> (script-end-evt ctx :error)
+                                      (assoc :message (ex-message ex)))])
+                  (dissoc :error))))})
 
 (def mark-canceled
   "Marks build as canceled, so no other jobs will be enqueued."

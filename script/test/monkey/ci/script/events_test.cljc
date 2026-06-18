@@ -210,11 +210,15 @@
 (deftest handle-script-error
   (let [{:keys [error] :as i} sut/handle-script-error]
     (is (keyword? (:name i)))
-    (testing "adds script/end event to result"
-      (is (= [:script/end]
-             (->> (error {} (ex-info "test error" {}))
-                  (emi/get-result)
-                  (map :type)))))))
+    (let [ctx (error {:error (ex-info "test error" {})})]
+      (testing "adds script/end event to result"
+        (is (= [:script/end]
+               (->> ctx
+                    (emi/get-result)
+                    (map :type)))))
+
+      (testing "marks error as handled"
+        (is (nil? (:error ctx)))))))
 
 (deftest mark-canceled
   (let [{:keys [enter] :as i} sut/mark-canceled
@@ -325,7 +329,21 @@
           (is (not-empty (-> (r {:type :script/initializing})
                              (first)
                              :result
-                             :jobs))))))
+                             :jobs)))))
+
+      (testing "raises `script/end` when initialize fails"
+        (let [fail-loader {:name ::sut/load-jobs
+                           :enter (fn [ctx]
+                                    (throw (ex-info "test error" {})))}
+              r (-> (sut/make-routes {})
+                    (mmc/router {:executor i/execute})
+                    (mmc/replace-interceptors [fail-loader]))
+              res (r {:type :script/initializing})]
+          (is (= [:script/end]
+                 (->> res
+                      (first)
+                      :result
+                      (map :type)))))))
 
     (testing "`job/executed` adds result from extensions to event"
         (let [ext-id ::test-ext

@@ -242,11 +242,15 @@
 (deftest handle-script-error
   (let [{:keys [error] :as i} sut/handle-script-error]
     (is (keyword? (:name i)))
-    (testing "adds script/end event to result"
-      (is (= [:script/end]
-             (->> (error {} (ex-info "test error" {}))
-                  (em/get-result)
-                  (map :type)))))))
+    (let [ctx (error {} (ex-info "test error" {}))]
+      (testing "adds script/end event to result"
+        (is (= [:script/end]
+               (->> ctx
+                    (em/get-result)
+                    (map :type)))))
+
+      (testing "marks error as handled"
+        (is (nil? (:error ctx)))))))
 
 (deftest mark-canceled
   (let [{:keys [enter] :as i} sut/mark-canceled
