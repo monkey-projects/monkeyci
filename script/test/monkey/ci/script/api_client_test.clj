@@ -65,38 +65,38 @@
 (deftest get-artifact
   (testing "invokes endpoint using client"
     (let [m (fn [req]
-              (when (and (= "/artifact/test-artifact" (:path req))
+              (when (and (= "/artifact/test-job/test-artifact" (:path req))
                          (= :get (:method req)))
                 {:body (->stream (pr-str {:path (get-in req [:query-params :path])}))}))]
-      (is (= "/test/path" (sut/get-artifact m "test-artifact" "/test/path"))))))
+      (is (= "/test/path" (sut/get-artifact m "test-job" "test-artifact" "/test/path"))))))
 
 (deftest put-artifact
   (testing "invokes endpoint using client"
     (let [m (fn [req]
               (let [p (-> req :body edn/read-string :path)]
-                (when (and (= "/artifact/test-artifact" (:path req))
+                (when (and (= "/artifact/test-job/test-artifact" (:path req))
                            (= :post (:method req))
                            (= "/test/path" p))
                   {:body (->stream (pr-str {:path p}))})))]
-      (is (= "/test/path" (sut/put-artifact m "test-artifact" "/test/path"))))))
+      (is (= "/test/path" (sut/put-artifact m "test-job" "test-artifact" "/test/path"))))))
 
 (deftest get-cache
   (testing "invokes endpoint using client"
     (let [m (fn [req]
-              (when (and (= "/cache/test-cache" (:path req))
+              (when (and (= "/cache/test-job/test-cache" (:path req))
                          (= :get (:method req)))
                 {:body (->stream (pr-str {:path (get-in req [:query-params :path])}))}))]
-      (is (= "/test/path" (sut/get-cache m "test-cache" "/test/path"))))))
+      (is (= "/test/path" (sut/get-cache m "test-job" "test-cache" "/test/path"))))))
 
 (deftest put-cache
   (testing "invokes endpoint using client"
     (let [m (fn [req]
               (let [p (-> req :body edn/read-string :path)]
-                (when (and (= "/cache/test-cache" (:path req))
+                (when (and (= "/cache/test-job/test-cache" (:path req))
                            (= :post (:method req))
                            (= "/test/path" p))
                   {:body (->stream (pr-str {:path p}))})))]
-      (is (= "/test/path" (sut/put-cache m "test-cache" "/test/path"))))))
+      (is (= "/test/path" (sut/put-cache m "test-job" "test-cache" "/test/path"))))))
 
 (deftest push-events
   (testing "pushes events using client"

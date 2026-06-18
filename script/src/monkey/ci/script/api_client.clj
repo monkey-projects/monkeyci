@@ -83,16 +83,16 @@
   ;; Use memoize because we'll only want to fetch them once
   (memoize fetch-params))
 
-(defn- store-path [client req id src]
-  (->> (client {:path (str "/" req "/" id)
+(defn- store-path [client req job-id id src]
+  (->> (client {:path (cs/join "/" ["" req job-id id])
                 :method :post
                 :body (pr-str {:path src})})
        :body
        (body->edn)
        :path))
 
-(defn- restore-path [client req id dest]
-  (->> (client {:path (str "/" req "/" id)
+(defn- restore-path [client req job-id id dest]
+  (->> (client {:path (cs/join "/" ["" req job-id id])
                 :query-params {:path dest}
                 :method :get})
        :body
@@ -103,24 +103,24 @@
   "Since scripts are often unable to unzip artifacts (e.g. if they run in babashka),
    downloading artifacts is not available.  Instead we request the server to copy
    the desired files to a specified location."
-  [client art-id dest]
-  (restore-path client "artifact" art-id dest))
+  [client job-id art-id dest]
+  (restore-path client "artifact" job-id art-id dest))
 
 (defn put-artifact
   "Similar to `get-artifact`, does not actually upload the artifact but does instruct
    the server to copy the files at given path to artifact storage."
-  [client art-id src]
-  (store-path client "artifact" art-id src))
+  [client job-id art-id src]
+  (store-path client "artifact" job-id art-id src))
 
 (defn get-cache
   "Similar to `get-artifact`."
-  [client art-id dest]
-  (restore-path client "cache" art-id dest))
+  [client job-id art-id dest]
+  (restore-path client "cache" job-id art-id dest))
 
 (defn put-cache
   "Similar to `put-artifact`"
-  [client art-id src]
-  (store-path client "cache" art-id src))
+  [client job-id art-id src]
+  (store-path client "cache" job-id art-id src))
 
 (defn push-events
   "Pushes events to the build api server, which is responsible for propagating
