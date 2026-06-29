@@ -221,6 +221,8 @@
                 (when log-path
                   ["-v" (str cd ":" lcd ":Z")])
                 "--workdir" (script-dir lwd)
+                ;; Allow for custom podman options from config
+                (:podman-opts conf)
                 (:image conf)
                 "clojure"
                 "-Sdeps" (pr-str deps)

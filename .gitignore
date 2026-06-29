@@ -56,3 +56,4 @@ tmp/
 /app/*.sh
 \#.*
 /.claude
+pom.xml

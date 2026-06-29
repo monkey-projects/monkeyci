@@ -149,7 +149,8 @@
                                    {:port 1234}
                                    :log-config "test-log-config"
                                    :resources {:memory "2g"
-                                               :cpus "0.5"}})
+                                               :cpus "0.5"}
+                                   :podman-opts ["--test-opt"]})
                   (sut/prepare-build-cmd))]
       (testing "executes podman"
         (is (= "podman" (-> cmd :cmd first))))
@@ -186,6 +187,9 @@
         (let [c (set (:cmd cmd))]
           (is (contains? c "--cpus=0.5"))
           (is (contains? c "--memory=2g"))))
+
+      (testing "adds configured extra podman options"
+        (is (contains? (set (:cmd cmd)) "--test-opt")))
 
       (testing "deps"
         (let [deps (->> cmd
