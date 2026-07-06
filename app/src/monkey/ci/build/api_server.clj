@@ -98,11 +98,12 @@
         (md/chain :body :key))))
 
 (defn fetch-ssh-keys-from-api [api [org-id repo-id :as sid]]
-  (log/debug "Retrieving ssh keys for" sid)
+  (log/debug "Retrieving ssh keys for" sid "from" api)
   (-> (ba/api-request api {:path (format "/org/%s/repo/%s/ssh-keys" org-id repo-id)
                            :method :get
                            :accept "application/edn"})
       (deref)
+      (log/spy)
       :body
       (edn/edn->)))
 

@@ -79,8 +79,10 @@
 (defn new-ssh-keys-fetcher [config]
   (let [maker (api-with-token-maker config)]
     (fn [[org-id repo-id :as sid]]
-      (let [api (maker sid)]
-        (bas/fetch-ssh-keys-from-api api sid)))))
+      (let [api (maker sid)
+            k (bas/fetch-ssh-keys-from-api api sid)]
+        (log/debug "SSH keys fetched")
+        k))))
 
 (defn new-build-key-decrypter
   "Build key decrypter, to decrypt the build data encryption key, which is then
