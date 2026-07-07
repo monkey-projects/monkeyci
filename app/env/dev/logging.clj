@@ -1,4 +1,5 @@
 (ns logging
+  (:require [monkey.ci.logging.log-ingest :as li])
   (:import ch.qos.logback.classic.joran.JoranConfigurator
            org.slf4j.LoggerFactory))
 
@@ -10,3 +11,7 @@
     (.setContext conf ctx)
     (.reset ctx)
     (.doConfigure conf f)))
+
+(defn fetch-logs [{:keys [client path]}]
+  (let [c (li/make-client client)]
+    (li/fetch-logs c path)))

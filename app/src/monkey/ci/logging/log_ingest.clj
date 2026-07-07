@@ -2,7 +2,6 @@
   "Client for log ingestion microservice"
   (:require [aleph.http :as http]
             [babashka.fs :as fs]
-            [clj-commons.byte-streams :as bs]
             [clojure.java.io :as io]
             [clojure.string :as cs]
             [clojure.tools.logging :as log]
@@ -52,7 +51,9 @@
    (fn [r]
      (when (= 200 (:status r))
        (try
-         (edn/edn-> (:body r))
+         (let [r (edn/edn-> (:body r))]
+           ;; In case of empty stream, also return nil
+           (when (not= :monkey.ci.edn/eof r) r))
          (catch Exception ex
            ;; If body is empty, we should also return `nil`
            (when (not= "EOF while reading" (ex-message ex))

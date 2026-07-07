@@ -73,11 +73,18 @@
       (is (= [["test" "path"]]
              (get @inv :fetch)))))
 
-  (testing "`nil` if empty body"
+  (testing "`nil` if empty body string"
     (is (nil? @(sut/fetch-logs (constantly
                                 (md/success-deferred
                                  {:status 200
                                   :body ""}))
+                               ["test" "path"]))))
+
+  (testing "`nil` if empty body stream"
+    (is (nil? @(sut/fetch-logs (constantly
+                                (md/success-deferred
+                                 {:status 200
+                                  :body (java.io.ByteArrayInputStream. (.getBytes ""))}))
                                ["test" "path"])))))
 
 (deftest make-sink

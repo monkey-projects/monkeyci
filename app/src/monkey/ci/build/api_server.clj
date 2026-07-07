@@ -103,7 +103,6 @@
                            :method :get
                            :accept "application/edn"})
       (deref)
-      (log/spy)
       :body
       (edn/edn->)))
 
