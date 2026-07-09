@@ -42,6 +42,7 @@
                  :api-client client
                  :result result
                  :build build
+                 ;; TODO Cache and artifact config for action jobs
                  :cache {:save (constantly nil)
                          :restore (constantly nil)}
                  :artifact {:save (constantly nil)

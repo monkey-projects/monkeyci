@@ -10,4 +10,4 @@
     (is (= "child" (sut/abs-path nil "child"))))
 
   (testing "returns subpath of parent if child is not absolute"
-    (is (= "parent/child" (sut/abs-path "parent" "child")))))
+    (is (= "/parent/child" (sut/abs-path "/parent" "child")))))
