@@ -27,12 +27,18 @@
 (def error-msg (get-prop :message))
 (def error-cause (get-prop :cause))
 
+(defn- unwrap-causes [ex]
+  (loop [e ex]
+    (if-let [c (ex-cause e)]
+      (recur c)
+      e)))
+
 (defn unwrap-exception
   "Unwraps the exception to its cause, if any.  If the exception contains a body, 
-   returns a new exception with the body converted into  a string.  This is useful
+   returns a new exception with the body converted into a string.  This is useful
    when logging HTTP client errors."
   [ex]
-  (let [ex (or (ex-cause ex) ex)
+  (let [ex (unwrap-causes ex)
         data (ex-data ex)]
     ;; If it's a http error, there may be a body that can be read
     (if (some? (:body data))

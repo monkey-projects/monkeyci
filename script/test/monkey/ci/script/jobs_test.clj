@@ -2,6 +2,7 @@
   (:require [clojure.test :refer [deftest testing is]]
             [clojure.core.async :as ca]
             [clojure.edn :as edn]
+            [monkey.ci.api :as api]
             [monkey.ci.build.core :as bc]
             [monkey.ci.script
              [helpers :as h]
@@ -59,25 +60,34 @@
                                             :build {:checkout-dir "/checkout"}
                                             :job job))
                    :wd)))))
+
+    (testing "on action exception, marks job failed"
+      (is (bc/failed? (execute-sync (bc/action-job ::failing-job (fn [_] (throw (ex-info "test error" {}))))
+                                    ctx))))
+
+    (testing "on wrapper exception, marks job failed"
+      (is (bc/failed? (execute-sync (-> (bc/action-job ::failing-job (fn [_] (throw (ex-info "test error" {}))))
+                                        (api/caches [(api/cache "test-cache" "test-dir")]))
+                                    ctx))))
     
     (testing "restores/saves caches"
-        (let [caches (atom {})]
-          (letfn [(save-cache [c]
-                    (swap! caches update :saved conj c))
-                  (restore-cache [c]
-                    (swap! caches update :restored conj c))]
-            (let [cache {:id :test-cache
-                         :path "test-cache"}
-                  job (bc/action-job ::job-with-caches
-                                     (constantly bc/success)
-                                     {:caches [cache]})
-                  r (execute-sync job (assoc ctx
-                                             :job job
-                                             :cache {:save save-cache
-                                                     :restore restore-cache}))]
-              (is (bc/success? r))
-              (is (= [cache] (get @caches :saved)))
-              (is (= [cache] (get @caches :restored)))))))
+      (let [caches (atom {})]
+        (letfn [(save-cache [c]
+                  (swap! caches update :saved conj c))
+                (restore-cache [c]
+                  (swap! caches update :restored conj c))]
+          (let [cache {:id :test-cache
+                       :path "test-cache"}
+                job (bc/action-job ::job-with-caches
+                                   (constantly bc/success)
+                                   {:caches [cache]})
+                r (execute-sync job (assoc ctx
+                                           :job job
+                                           :cache {:save save-cache
+                                                   :restore restore-cache}))]
+            (is (bc/success? r))
+            (is (= [cache] (get @caches :saved)))
+            (is (= [cache] (get @caches :restored)))))))
 
     (testing "saves artifacts"
         (let [saved (atom nil)]
@@ -108,7 +118,6 @@
             (is (= [art] @restored)))))
 
     (testing "recursion"
-
       (testing "executes actions that return another action"
         (let [result (assoc bc/success :message "recursive result")
               job (bc/action-job "recursing-job"

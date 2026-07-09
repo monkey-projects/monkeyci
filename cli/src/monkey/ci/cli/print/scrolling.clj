@@ -152,7 +152,8 @@
         p (pad-job-id ctx job-id)
         job (get-job ctx job-id)]
     (p/print-job-msg p "Job started")
-    (p/print-job-msg p "Local dir:" (-> ctx (emi/get-state) (get-local-dir job-id)))))
+    (when-let [ld (-> ctx (emi/get-state) (get-local-dir job-id))]
+      (p/print-job-msg p "Local dir:" ld))))
 
 (defn job-end [ctx]
   (if (= :success (get-in ctx [:event :status]))

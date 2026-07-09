@@ -138,7 +138,7 @@
     (cond-> r
       (not-empty out) (assoc :output out))))
 
-(declare execute!)
+(declare execute-sync!)
 
 (defn- recurse-action
   "An action may return another job definition, especially in legacy builds.
@@ -150,36 +150,39 @@
               (cond-> j
                 (nil? (job-id j)) (assoc :id (job-id job))))]
       (let [writer (java.io.StringWriter.)]
-        (ca/go
-         ;; Ensure this executes async
-          (let [r (ca/<! (ca/thread
-                           (binding [*out* writer] ; Capture output
-                             (try
-                               (action (rt->context rt)) ; Only pass necessary info
-                               (catch Exception ex
-                                 (on-error ex))))))] 
-            (log/debug "Action result:" r)
-            (cond
-              ;; `nil` is treated as a success
-              (nil? r) (add-output b/success writer)
-              ;; Valid response
-              (b/status? r) (add-output r writer)
-              ;; XXX This is not really supported by the user interface right now, but it
-              ;; would be quite powerful.
-              (resolvable? r) (when-let [child (some-> (resolve-jobs r rt)
-                                                       first
-                                                       (assign-id))]
-                                (ca/<! (execute! child (assoc rt :job child))))
-              ;; Treat any other result as a success, but add a warning
-              :else (-> b/success
-                        (b/add-warning {:message "Invalid action result"
-                                        :result r})
-                        (add-output writer)))))))))
+        (let [r (binding [*out* writer] ; Capture output
+                  (try
+                    (action (rt->context rt)) ; Only pass necessary info
+                    (catch Exception ex
+                      (on-error ex))))] 
+          (log/debug "Action result:" r)
+          (cond
+            ;; `nil` is treated as a success
+            (nil? r) (add-output b/success writer)
+            ;; Valid response
+            (b/status? r) (add-output r writer)
+            ;; XXX This is not really supported by the user interface right now, but it
+            ;; would be quite powerful.
+            (resolvable? r) (when-let [child (some-> (resolve-jobs r rt)
+                                                     first
+                                                     (assign-id))]
+                              (execute-sync! child (assoc rt :job child)))
+            ;; Treat any other result as a success, but add a warning
+            :else (-> b/success
+                      (b/add-warning {:message "Invalid action result"
+                                      :result r})
+                      (add-output writer))))))))
+
+(defn- error-result [ex]
+  (-> b/failure
+      (b/with-message (ex-message ex))
+      (assoc :error ex)))
 
 (defn- post-error [broker job sid ex]
   (mmc/post-events broker
                    [(eb/job-end-evt (job-id job) sid (-> bc/failure
-                                                         (bc/with-message (ex-message ex))))]))
+                                                         (bc/with-message (ex-message ex))))])
+  (error-result ex))
 
 (defn- wrap-files [kind to-save to-restore ctx f]
   (fn [rt]
@@ -188,12 +191,14 @@
       (when-let [c (not-empty to-restore)]
         (doseq [r c]
           (restore r)))
-      (ca/go
-        (let [v (ca/<! (f rt))]
+      (let [v (f rt)]
+        (try
           (when-let [c (not-empty to-save)]
             (doseq [r c]
               (save r)))
-          v)))))
+          v
+          (catch Exception ex
+            (error-result ex)))))))
 
 (defn- wrap-caches [f job ctx]
   (let [c (j/caches job)]
@@ -202,15 +207,20 @@
 (defn- wrap-artifacts [f job ctx]
   (wrap-files :artifact (j/save-artifacts job) (j/restore-artifacts job) ctx f))
 
-(defn execute!
-  "Executes the given action job.  Posts start/end events to the broker provided in the
-   context.  Returns a channel that will hold the result."
-  [job {:keys [mailman] :as ctx}]
+(defn- wrap-error [f]
+  (fn [ctx]
+    (try
+      (f ctx)
+      (catch Exception ex
+        (error-result ex)))))
+
+(defn execute-sync! [job {:keys [mailman] :as ctx}]
   (let [build (:build ctx)
         build-sid (b/sid build)
         a (-> (recurse-action job (partial post-error mailman job build-sid))
               (wrap-caches job ctx)
-              (wrap-artifacts job ctx))
+              (wrap-artifacts job ctx)
+              (wrap-error))
         job (assoc job
                    :start-time (t/now))]
     (mmc/post-events mailman
@@ -218,13 +228,18 @@
                           ;; For action jobs, add the credit multiplier on job start since there is
                           ;; no `initializing` event.
                           (merge (select-keys build [:credit-multiplier])))])
-    (ca/go
-      (let [r (ca/<! (-> ctx
-                         (make-job-dir-absolute)
-                         (a)))]
-        (log/debug "Action job" (job-id job) "executed with result:" r)
-        (mmc/post-events mailman [(eb/job-executed-evt (job-id job) build-sid r)])
-        r))))
+    (let [r (-> ctx
+                (make-job-dir-absolute)
+                (a))]
+      (log/debug "Action job" (job-id job) "executed with result:" r)
+      (mmc/post-events mailman [(eb/job-executed-evt (job-id job) build-sid r)])
+      r)))
+
+(defn execute!
+  "Executes the given action job.  Posts start/end events to the broker provided in the
+   context.  Returns a channel that will hold the result."
+  [job ctx]
+  (ca/thread (execute-sync! job ctx)))
 
 (defn- fulfilled?
   "True if all this job's dependencies have been fulfilled (i.e. they are
