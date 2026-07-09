@@ -9,7 +9,7 @@
    (if a
      (if (fs/absolute? b)
        b
-       (str (fs/path a b)))
+       (str (fs/canonicalize (fs/path a b))))
      b))
   ([p]
    (some-> p

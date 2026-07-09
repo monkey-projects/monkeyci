@@ -355,7 +355,7 @@
   "Constructs job context object from the route configuration"
   [conf]
   (-> conf
-      (select-keys [:artifacts :cache :mailman :build :archs])
+      (select-keys [:artifact :cache :mailman :build :archs])
       (assoc :api {:client (:api-client conf)})))
 
 (defn make-routes [{:keys [result] :as conf}]

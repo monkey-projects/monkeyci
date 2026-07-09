@@ -1,8 +1,10 @@
 (ns monkey.ci.script.core
   "Main script running functionality."
-  (:require [clojure.core.async :as ca]
+  (:require [babashka.fs :as fs]
+            [clojure.core.async :as ca]
             [clojure.string :as cs]
             [clojure.tools.logging :as log]
+            [medley.core :as mc]
             [monkey.ci.events.builders :as eb]
             [monkey.ci.script
              [api-client :as ac]
@@ -34,14 +36,18 @@
         broker (mmca/core-async-broker)
         result (ca/chan)
         build (c/build conf)
+        ;; TODO Caches and artifacts
         routes (e/make-routes
                 {:mailman broker
                  :api-client client
                  :result result
-                 :build build})
+                 :build build
+                 :cache {:save (constantly nil)
+                         :restore (constantly nil)}
+                 :artifact {:save (constantly nil)
+                            :restore (constantly nil)}})
         router (mmc/make-router routes {:executor i/execute})
         listener (mmc/add-listener broker {:handler router})]
-    ;; FIXME Events are handled multiple times, once internally, once when read back from server
     (connect-events broker client)
     {:build build
      :mailman broker
@@ -64,6 +70,7 @@
 (defn- cli->build [args]
   (-> args
       (select-keys [:checkout-dir])
+      (mc/update-existing :checkout-dir (comp str fs/canonicalize)) 
       (merge (zipmap b/sid-props (cs/split (:sid args) #"/")))))
 
 (defn cli->conf [args]

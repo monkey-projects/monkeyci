@@ -128,7 +128,7 @@
 
 (defn rt->context [rt]
   ;; TODO Move all these into a "components" key so we can remove them all at once
-  (dissoc rt :events :containers :artifacts :cache :mailman))
+  (dissoc rt :events :containers :artifact :cache :mailman))
 
 (defn- add-output [r ^java.io.StringWriter writer]
   ;; Add output to the result
@@ -214,23 +214,26 @@
       (catch Exception ex
         (error-result ex)))))
 
+(defn- fire-job-start [f mailman job build-sid]
+  (fn [ctx]
+    (mmc/post-events mailman [(eb/job-start-evt (job-id job) build-sid)])
+    (f ctx)))
+
 (defn execute-sync! [job {:keys [mailman] :as ctx}]
   (let [build (:build ctx)
         build-sid (b/sid build)
         a (-> (recurse-action job (partial post-error mailman job build-sid))
+              (fire-job-start mailman job build-sid)
               (wrap-caches job ctx)
               (wrap-artifacts job ctx)
               (wrap-error))
         job (assoc job
-                   :start-time (t/now))]
+                   :start-time (t/now))
+        ctx (make-job-dir-absolute ctx)]
     (mmc/post-events mailman
-                     [(-> (eb/job-start-evt (job-id job) build-sid)
-                          ;; For action jobs, add the credit multiplier on job start since there is
-                          ;; no `initializing` event.
-                          (merge (select-keys build [:credit-multiplier])))])
-    (let [r (-> ctx
-                (make-job-dir-absolute)
-                (a))]
+                     [(-> (eb/job-initializing-evt (job-id job) build-sid (:credit-multiplier build))
+                          (assoc :local-dir (get-in ctx [:job :work-dir])))])
+    (let [r (a ctx)]
       (log/debug "Action job" (job-id job) "executed with result:" r)
       (mmc/post-events mailman [(eb/job-executed-evt (job-id job) build-sid r)])
       r)))

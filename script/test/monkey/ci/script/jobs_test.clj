@@ -153,17 +153,24 @@
         mailman (mmca/core-async-broker)
         ctx {:mailman mailman
              :build {:sid ["test" "build" "sid"]
-                     :credit-multiplier 10}}
+                     :credit-multiplier 10
+                     :checkout-dir "/test/dir"}}
         ch (mmca/get-channel mailman)]
     (is (bc/success? (execute-sync job ctx)))
+
+    (testing "fires `job/initializing` event"
+      (let [evt (h/wait-for-evt mailman (comp (partial = :job/initializing) :type))]
+        (is (some? evt))
+        (is (= (sut/job-id job) (:job-id evt)))
+        (is (= evt (edn/read-string (pr-str evt))) "Event should be serializable to edn")
+        (is (= 10 (:credit-multiplier evt)) "Adds credit multiplier from build")
+        (is (= "/test/dir" (:local-dir evt)) "Adds local dir")))
 
     (testing "fires `job/start` event"
       (let [evt (h/wait-for-evt mailman (comp (partial = :job/start) :type))]
         (is (some? evt))
         (is (= (sut/job-id job) (:job-id evt)))
-        ;;(is (spec/valid? ::es/event evt))
-        (is (= evt (edn/read-string (pr-str evt))) "Event should be serializable to edn")
-        (is (= 10 (:credit-multiplier evt)) "Adds credit multiplier from build")))
+        (is (= evt (edn/read-string (pr-str evt))) "Event should be serializable to edn")))
 
     (testing "fires `job/executed` event"
       (let [evt (h/wait-for-evt mailman (comp (partial = :job/executed) :type))]
