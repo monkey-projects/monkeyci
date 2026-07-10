@@ -153,7 +153,7 @@
         path (get-in req [:query-params "path"])
         src  (fs/path src-dir id)
         dest (when path (fs/path jobs-dir job-id path))]
-    (log/debug "Restoring path:" id ", location" path ", src dir" src-dir)
+    (log/debug "Restoring path:" id ", location" path ", src dir" src-dir "to" dest)
     (if (not path)
       (rur/status 400)
       (if (fs/exists? src)

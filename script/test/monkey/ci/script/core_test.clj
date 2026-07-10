@@ -22,6 +22,42 @@
         (is (some? (:router r)))
         (is (some? (:listener r)))))))
 
+(deftest artifact-saver
+  (testing "invokes api client"
+    (let [c (fn [req]
+              {:body (pr-str (select-keys req [:path]))})
+          ctx {:job {:id "test-job"}}
+          r (sut/artifact-saver c)]
+      (is (= "/artifact/test-job/test-art"
+             (r ctx {:id "test-art" :path "test-path"}))))))
+
+(deftest artifact-restorer
+  (testing "invokes api client"
+    (let [c (fn [req]
+              {:body (pr-str (select-keys req [:path]))})
+          ctx {:job {:id "test-job"}}
+          r (sut/artifact-restorer c)]
+      (is (= "/artifact/test-job/test-art"
+             (r ctx {:id "test-art" :path "test-path"}))))))
+
+(deftest cache-saver
+  (testing "invokes api client"
+    (let [c (fn [req]
+              {:body (pr-str (select-keys req [:path]))})
+          ctx {:job {:id "test-job"}}
+          r (sut/cache-saver c)]
+      (is (= "/cache/test-job/test-art"
+             (r ctx {:id "test-art" :path "test-path"}))))))
+
+(deftest cache-restorer
+  (testing "invokes api client"
+    (let [c (fn [req]
+              {:body (pr-str (select-keys req [:path]))})
+          ctx {:job {:id "test-job"}}
+          r (sut/cache-restorer c)]
+      (is (= "/cache/test-job/test-art"
+             (r ctx {:id "test-art" :path "test-path"}))))))
+
 (deftest run-script
   (with-redefs [ac/get-events (constantly (ca/to-chan! []))
                 ac/push-events (constantly true)]

@@ -190,12 +190,12 @@
           restore (get-in ctx [kind :restore])]
       (when-let [c (not-empty to-restore)]
         (doseq [r c]
-          (restore r)))
+          (restore rt r)))
       (let [v (f rt)]
         (try
           (when-let [c (not-empty to-save)]
             (doseq [r c]
-              (save r)))
+              (save rt r)))
           v
           (catch Exception ex
             (error-result ex)))))))
@@ -229,6 +229,8 @@
               (wrap-error))
         job (assoc job
                    :start-time (t/now))
+        ;; TODO Which dir to use for job dir?  Checkout dir for local cli is different from the job work dir,
+        ;; which is where artifacts are restored to.
         ctx (make-job-dir-absolute ctx)]
     (mmc/post-events mailman
                      [(-> (eb/job-initializing-evt (job-id job) build-sid (:credit-multiplier build))

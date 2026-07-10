@@ -30,6 +30,31 @@
                                     (ac/push-events client [evt])
                                     nil))})))
 
+(defn- api-client-file [client f]
+  (fn [ctx art]
+    (log/debug "Invoking" f "for job" (get-in ctx [:job :id]) "and artifact" art)
+    (f client (get-in ctx [:job :id]) (:id art) (:path art))))
+
+(defn artifact-saver
+  "Creates a function that is capable of saving artifacts for action jobs."
+  [client]
+  (api-client-file client ac/put-artifact))
+
+(defn artifact-restorer
+  "Creates a function that is capable of restoring artifacts for action jobs."
+  [client]
+  (api-client-file client ac/get-artifact))
+
+(defn cache-saver
+  "Creates a function that is capable of saving caches for action jobs."
+  [client]
+  (api-client-file client ac/put-cache))
+
+(defn cache-restorer
+  "Creates a function that is capable of restoring caches for action jobs."
+  [client]
+  (api-client-file client ac/get-cache))
+
 (defn setup-runner [conf]
   (log/info "Build API url:" (:url (c/api conf)))
   (let [client (ac/make-client (c/api conf))
@@ -42,11 +67,10 @@
                  :api-client client
                  :result result
                  :build build
-                 ;; TODO Cache and artifact config for action jobs
-                 :cache {:save (constantly nil)
-                         :restore (constantly nil)}
-                 :artifact {:save (constantly nil)
-                            :restore (constantly nil)}})
+                 :cache {:save (cache-saver client)
+                         :restore (cache-restorer client)}
+                 :artifact {:save (artifact-saver client)
+                            :restore (artifact-restorer client)}})
         router (mmc/make-router routes {:executor i/execute})
         listener (mmc/add-listener broker {:handler router})]
     (connect-events broker client)
