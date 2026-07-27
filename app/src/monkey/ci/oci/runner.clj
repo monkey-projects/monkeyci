@@ -11,7 +11,6 @@
              [build :as b]
              [edn :as edn]
              [process :as proc]
-             [protocols :as p]
              [storage :as st]
              [utils :as u]]
             [monkey.ci.app.events.mailman.interceptors :as emi]
@@ -236,20 +235,6 @@
 
 (def evt-build (comp :build :event))
 
-(defn decrypt-ssh-keys
-  "Interceptor that decrypts ssh keys on incoming build event"
-  [vault]
-  (letfn [(decrypt-keys [get-iv ssh-keys]
-            (let [iv (get-iv)]
-              (mapv #(update % :private-key (partial p/decrypt vault iv)) ssh-keys)))]
-    {:name ::decrypt-ssh-keys
-     :enter (fn [ctx]
-              (update-in ctx [:event :build :git]
-                         mc/update-existing
-                         :ssh-keys
-                         (partial decrypt-keys
-                                  (comp :iv #(st/find-crypto (emi/get-db ctx) (-> ctx :event :sid first))))))}))
-
 (defn prepare-ci-config [config]
   "Creates the ci config to run the required containers for the build."
   {:name ::instance-config
@@ -298,14 +283,14 @@
 
 (defn make-routes
   "Creates event handling routes for the given oci configuration"
-  [conf storage vault]
+  [conf storage]
   (let [client (make-ci-context (:containers conf))
         use-db (emi/use-db storage)]
     [[:build/queued
       [{:handler initialize-build
         :interceptors [emi/handle-build-error
                        use-db
-                       (decrypt-ssh-keys vault)
+                       (emi/fetch-ssh-keys (:ssh-keys-fetcher conf))
                        (prepare-ci-config conf)
                        (oci/start-ci-interceptor client)
                        save-runner-details

@@ -7,7 +7,7 @@
             [monkey.ci.web.api.ssh-keys :as sut]))
 
 (deftest get-org-ssh-keys
-  (testing "decrypts private key using vault"
+  (testing "decrypts private key using decrypter"
     (let [{st :storage :as rt} (-> (trt/test-runtime)
                                    (trt/set-decrypter (constantly "decrypted")))
           org (h/gen-org)
@@ -26,7 +26,7 @@
                              :private-key))))))
 
 (deftest get-repo-ssh-keys
-  (testing "decrypts private key using vault"
+  (testing "decrypts private key using decrypter"
     (let [{st :storage :as rt} (-> (trt/test-runtime)
                                    (trt/set-decrypter (constantly "decrypted")))
           repo (h/gen-repo)
@@ -48,7 +48,7 @@
                              first))))))
 
 (deftest update-ssh-keys
-  (testing "encrypts private keys using vault"
+  (testing "encrypts private keys using decrypter"
     (let [{st :storage :as rt} (-> (trt/test-runtime)
                                    (trt/set-encrypter (fn [_ _ cuid]
                                                         (str "encrypted with " cuid))))

@@ -15,5 +15,4 @@
    :runner      {:type :child}
    :mailman     {:type :manifold}})
 
-(def app-config
-  (assoc base-config :vault {:type :noop}))
+(def app-config base-config)

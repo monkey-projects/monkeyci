@@ -516,7 +516,7 @@
 (defrecord DbMigrator [pool]
   co/Lifecycle
   (start [this]
-    (emig/run-migrations! (merge (pool->conn pool) (select-keys this [:vault :crypto])))
+    (emig/run-migrations! (merge (pool->conn pool) (select-keys this [:crypto])))
     this)
 
   (stop [this]

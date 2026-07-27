@@ -39,11 +39,6 @@
 
 (def evt->build (comp :build :event))
 
-(def get-ssh-keys ::ssh-keys)
-
-(defn set-ssh-keys [ctx k]
-  (assoc ctx ::ssh-keys k))
-
 (defn build-work-dir [{:keys [work-dir]} sid]
   (str (apply fs/path work-dir sid)))
 
@@ -135,11 +130,6 @@
           (filter (comp (partial = (get-in ctx [:event :sid]))
                         b/sid))
           (empty?)))))
-
-(defn fetch-ssh-keys [fetcher]
-  {:name ::fetch-ssh-keys
-   :enter (fn [ctx]
-            (set-ssh-keys ctx (fetcher (get-in ctx [:event :sid]))))})
 
 (def git-clone
   "Clones the repository configured in the build into the build checkout dir"
@@ -254,7 +244,7 @@
       :interceptors [emi/handle-build-error
                      (add-config conf)
                      add-token
-                     (fetch-ssh-keys (:ssh-keys-fetcher conf))
+                     (emi/fetch-ssh-keys (:ssh-keys-fetcher conf))
                      git-clone
                      save-workspace
                      result-build-init-evt

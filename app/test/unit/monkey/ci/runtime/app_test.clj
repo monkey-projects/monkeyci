@@ -59,9 +59,6 @@
           (testing "provides process reaper"
             (is (ifn? (:process-reaper rt))))
 
-          (testing "provides vault"
-            (is (p/vault? (:vault rt))))
-
           (testing "provides data encryption key generator"
             (is (fn? (get-in rt [:crypto :dek-generator]))))
 

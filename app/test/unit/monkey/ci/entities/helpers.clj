@@ -43,14 +43,10 @@
 (defn with-memory-db* [f]
   (with-test-db* f h2-config))
 
-(defn add-vault [conn]
-  (assoc conn :vault (h/dummy-vault)))
-
 (defn with-prepared-db* [f]
   (with-test-db*
     (fn [conn]
-      ;; Vault is needed by migrations
-      (m/with-migrations (add-vault conn)
+      (m/with-migrations conn
         #(f conn)))))
 
 (defmacro with-prepared-db [conn & body]

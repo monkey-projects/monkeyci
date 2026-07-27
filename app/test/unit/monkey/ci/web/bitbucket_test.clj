@@ -219,9 +219,6 @@
                (trt/set-decrypter (constantly "decrypted"))
                (assoc :config {:ssh-keys-dir "/tmp"}))
         s (:storage rt)
-        vault (vf/make-fixed-key-vault {})
-        rt (-> rt
-               (trt/set-vault vault))
         repo (-> (h/gen-repo)
                  (assoc :url "http://test-url"))
         org (-> (h/gen-org)

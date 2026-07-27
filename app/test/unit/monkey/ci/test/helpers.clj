@@ -333,9 +333,6 @@
 
 (def fake-vault dummy-vault)
 
-(defmethod app/make-vault :noop [_]
-  (fake-vault))
-
 (defrecord FakeMailer [mailings]
   p/Mailer
   (send-mail [_ mail]

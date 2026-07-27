@@ -37,7 +37,6 @@
              [vault :as vo]]
             [monkey.ci.vault
              [common :as vc]
-             [fixed :as vf]
              [scw :as v-scw]]
             [monkey.ci.web
              [handler :as wh]
@@ -110,17 +109,6 @@
 (defn- new-jwk [conf]
   ;; Return a map because component doesn't allow nils
   (select-keys conf [:jwk]))
-
-(defmulti make-vault :type)
-
-(defmethod make-vault :oci [config]
-  (vo/make-oci-vault config))
-
-(defmethod make-vault :fixed [config]
-  (vf/make-fixed-key-vault config))
-
-(defn- new-vault [config]
-  (make-vault (:vault config)))
 
 (defmulti dek-utils
   "Creates DEK functions: 
@@ -243,7 +231,8 @@
   (letfn [(make-routes [c]
             (ro/make-routes (:runner config)
                             (:storage c)
-                            (:vault c)))]
+                            ;; Vault is deprecated and has been removed
+                            nil))]
     (em/map->RouteComponent {:make-routes make-routes})))
 
 (defmethod make-server-runner :agent [_]
@@ -320,16 +309,16 @@
                [:runtime])
    :runner    (co/using
                (new-server-runner config)
-               (-> (as-map [:storage :vault :mailman])
+               (-> (as-map [:storage :mailman])
                    (assoc :options :queue-options)))
    :runtime   (co/using
                (new-server-runtime config)
-               [:artifacts :metrics :storage :jwk :process-reaper :vault :mailman :update-bus
+               [:artifacts :metrics :storage :jwk :process-reaper :mailman :update-bus
                 :crypto :mailer :invoicing :log-retriever])
    :pool      (new-db-pool config)
    :migrator  (co/using
                (new-db-migrator config)
-               [:pool :vault :crypto])
+               [:pool :crypto])
    :storage   (co/using
                (new-storage config)
                [:pool])
@@ -341,7 +330,6 @@
                     (new-metrics-routes)
                     [:metrics :mailman])
    :process-reaper (new-process-reaper config)
-   :vault     (new-vault config)
    :crypto    (co/using
                (new-crypto config)
                [:storage])

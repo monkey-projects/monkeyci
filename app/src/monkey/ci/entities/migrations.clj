@@ -148,26 +148,6 @@
                     {:id (:id pv)
                      :value (updater (:iv pv) (:value pv))}))
 
-(defn- encrypt-single-param [{:keys [vault] :as conn} pv]
-  (update-single-param conn (partial mp/encrypt vault) pv))
-
-(defn- decrypt-single-param [{:keys [vault] :as conn} pv]
-  (update-single-param conn (partial mp/decrypt vault) pv))
-
-(defn encrypt-params [idx]
-  (->FunctionMigration
-   (str idx "-encrypt-params")
-   (fn [conn]
-     ;; Encrypt all customer parameter values
-     (->> (select-params-with-iv conn)
-          (map (partial encrypt-single-param conn))
-          (doall)))
-   (fn [conn]
-     ;; Decrypt all customer parameter values
-     (->> (select-params-with-iv conn)
-          (map (partial decrypt-single-param conn))
-          (doall)))))
-
 (defn- select-ssh-keys-with-iv [conn]
   (->> {:select [:k.id :k.private-key :c.iv]
         :from [[:ssh-keys :k]]
@@ -177,25 +157,6 @@
 (defn- update-single-ssh-key [conn updater k]
   (ec/update-ssh-key conn {:id (:id k)
                            :private-key (updater (:iv k) (:private-key k))}))
-
-(defn- encrypt-single-ssh-key [{:keys [vault] :as conn} k]
-  (update-single-ssh-key conn (partial mp/encrypt vault) k))
-
-(defn- decrypt-single-ssh-key [{:keys [vault] :as conn} k]
-  (update-single-ssh-key conn (partial mp/decrypt vault) k))
-
-(defn encrypt-ssh-keys [idx]
-  (->FunctionMigration
-   (str idx "-encrypt-ssh-keys")
-   (fn [conn]
-     ;; Encrypt all private ssh keys
-     (->> (select-ssh-keys-with-iv conn)
-          (map (partial encrypt-single-ssh-key conn))
-          (doall)))
-   (fn [conn]
-     (->> (select-ssh-keys-with-iv conn)
-          (map (partial decrypt-single-ssh-key conn))
-          (doall)))))
 
 (defn calc-next-idx
   "For all repos, calculates next build idx and stores it in the `repo-indices` table."
@@ -232,62 +193,6 @@
    (fn [conn]
      ;; Noop
      )))
-
-(defn- re-encrypt-value-mig [id query prop updater]
-  (->FunctionMigration
-   id
-   (fn [{:keys [vault] :as conn}]
-     (let [e (get-in conn [:crypto :encrypter])]
-       (letfn [(re-encrypt [obj]
-                 ;; Decrypt using vault, then re-encrypt using the org id as nonce
-                 (assoc obj prop (-> (prop obj)
-                                     (as-> ev (mp/decrypt vault (:iv obj) ev))
-                                     (e (:org-cuid obj) (:cuid obj)))))]
-         (->> (ec/select conn query)
-              (map re-encrypt)
-              (map (partial updater conn))
-              (doall)))))
-   
-   (fn [{:keys [vault] :as conn}]
-     (let [d (get-in conn [:crypto :decrypter])]
-       (letfn [(re-encrypt [obj]
-                 ;; Decrypt using vault, then re-encrypt using the org id as nonce
-                 (assoc obj prop (-> (prop obj)
-                                     (d (:org-cuid obj) (:cuid obj))
-                                     (as-> dv (mp/encrypt vault (:iv obj) dv)))))]
-         (->> (ec/select conn query)
-              (map re-encrypt)
-              (map (partial updater conn))
-              (doall)))))))
-
-(defn re-encrypt-params
-  "Reads and decrypts all params that do not yet use the organization DEK, and
-   re-encrypts them."
-  [idx]
-  (re-encrypt-value-mig
-   (str idx "-re-encrypt-params")
-   {:select [:pv.id :op.cuid :pv.params-id :pv.value :c.org-id [:o.cuid :org-cuid] :c.dek :c.iv]
-    :from [[:org-param-values :pv]]
-    :join [[:org-params :op] [:= :op.id :pv.params-id]
-           [:orgs :o] [:= :o.id :op.org-id]
-           [:cryptos :c] [:= :c.org-id :op.org-id]]}
-   :value
-   (fn [conn pv]
-     (ec/update-org-param-value conn (select-keys pv [:id :value])))))
-
-(defn re-encrypt-ssh-keys
-  "Reads and decrypts all private ssh keys that do not yet use the organization DEK, and
-   re-encrypts them."
-  [idx]
-  (re-encrypt-value-mig
-   (str idx "-re-encrypt-ssh-keys")
-   {:select [:sk.id :sk.cuid :sk.org-id :sk.private-key :c.dek :c.iv [:o.cuid :org-cuid]]
-    :from [[:ssh-keys :sk]]
-    :join [[:cryptos :c] [:= :c.org-id :sk.org-id]
-           [:orgs :o] [:= :o.id :sk.org-id]]}
-   :private-key
-   (fn [conn k]
-     (ec/update-ssh-key conn (select-keys k [:id :private-key])))))
 
 (def migrations
   [(entity-table-migration
@@ -510,8 +415,6 @@
     [])
 
    (customer-ivs 27)
-   (encrypt-params 28)
-   (encrypt-ssh-keys 29)
 
    (table-migration
     30 :sysadmins
@@ -636,8 +539,6 @@
       :drop-column :dek}])
 
    (generate-org-deks 45)
-   (re-encrypt-params 46)
-   (re-encrypt-ssh-keys 47)
 
    (migration
     (mig-id 48 :add-webhook-timestamps)

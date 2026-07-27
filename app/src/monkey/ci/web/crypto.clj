@@ -9,42 +9,14 @@
             [monkey.ci.vault.common :as vc]
             [monkey.ci.web.common :as wc]))
 
-(defn crypto-iv
-  "Looks up crypto initialization vector for the org associated with the
-   request.  If no crypto record is found, one is generated."
-  ([st org-id]
-   (if-let [crypto (st/find-crypto st org-id)]
-     (:iv crypto)
-     (let [iv (vc/generate-iv)]
-       (log/debug "No crypto record found for org" org-id ", generating a new one")
-       (when (st/save-crypto st {:org-id org-id
-                                 :iv iv})
-         iv))))
-  ([req]
-   (let [org-id (wc/org-id req)
-         st (wc/req->storage req)]
-     (crypto-iv st org-id))))
-
-(defn- with-vault-and-iv [req f]
-  (let [iv (delay (crypto-iv req))
-        v (wc/req->vault req)]
-    (fn [x]
-      ;; Deprecated
-      (log/warn "Calling deprecated crypto fn that uses old-style iv")
-      (f v @iv x))))
-
 (defn- from-crypto [req f]
   (wc/from-rt req (comp f :crypto)))
 
 (defn encrypter [req]
-  (or (from-crypto req :encrypter)
-      ;; For backwards compatibility
-      (with-vault-and-iv req p/encrypt)))
+  (from-crypto req :encrypter))
 
 (defn decrypter [req]
-  (or (from-crypto req :decrypter)
-      ;; For backwards compatibility
-      (with-vault-and-iv req p/decrypt)))
+  (from-crypto req :decrypter))
 
 (defn dek?
   "Checks if the argument is a valid data encryption key"
