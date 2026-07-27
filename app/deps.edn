@@ -88,6 +88,7 @@
   :test
   {:extra-paths [:test-paths]
    :extra-deps {com.monkeyprojects/build {:mvn/version "0.3.1"}
+                com.monkeyci/test-utils {:local/root "../ext/test-utils"}
                 com.h2database/h2 {:mvn/version "2.4.240"}
                 com.github.oliyh/martian-test {:mvn/version "0.2.3"}
                 org.clojure/test.check {:mvn/version "1.1.3"}

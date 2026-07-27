@@ -110,7 +110,7 @@
                         {:build {:git {:ssh-keys [{:private-key "old-pk"}]}}}}
                        (sut/set-config {:work-dir "/tmp/test-dir"
                                         :git {:clone clone}})
-                       (sut/set-ssh-keys ["fetched-pk"])
+                       (emi/set-ssh-keys ["fetched-pk"])
                        (enter))))
 
         (testing "invokes git clone fn with build git details"

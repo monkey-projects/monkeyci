@@ -12,13 +12,11 @@
             [medley.core :as mc]
             [monkey.ci
              [cuid :as cuid]
-             [protocols :as p]
-             [storage :as s]]
+             [protocols :as p]]
             [monkey.ci.runtime.app :as app]
             [monkey.ci.storage.spec :as ss]
-            [monkey.ci.web
-             [auth :as auth]
-             [common :as wc]]
+            [monkey.ci.test.utils :as tu]
+            [monkey.ci.web.common :as wc]
             [ring.mock.request :as mock])
   (:import (org.apache.commons.io FileUtils)))
 
@@ -26,8 +24,9 @@
   (doto (io/file (System/getProperty "java.io.tmpdir") (str "tmp-" (random-uuid)))
     (.mkdirs)))
 
-(defn with-tmp-dir-fn
-  "Creates a temp dir and passes it to `f`.  Recursively deletes the temp dir afterwards."
+(defn ^:deprecated with-tmp-dir-fn
+  "Creates a temp dir and passes it to `f`.  Recursively deletes the temp dir afterwards.
+   Deprecated, use the one from `babashka.fs` instead."
   [f]
   (let [tmp (create-tmp-dir)]
     (try
@@ -35,7 +34,7 @@
       (finally
         (FileUtils/deleteDirectory tmp)))))
 
-(defmacro with-tmp-dir [dir & body]
+(defmacro ^:deprecated with-tmp-dir [dir & body]
   `(with-tmp-dir-fn
      (fn [d#]
        (let [~dir d#]
@@ -57,8 +56,7 @@
         [v c] (ca/alts!! [ch t])]
     (if (= t c) (or timeout-val :timeout) v)))
 
-(defn with-memory-store-fn [f]
-  (f (s/make-memory-storage)))
+(def with-memory-store-fn tu/with-memory-store-fn)
 
 (defmacro with-memory-store [s & body]
   `(with-memory-store-fn
@@ -172,14 +170,7 @@
 (defn with-identity [r id]
   (assoc r :identity id))
 
-(defn ^:deprecated test-rt
-  "Deprecated, use `runtime/test-runtime`"
-  []
-  {:storage (s/make-memory-storage)
-   :jwk (auth/keypair->rt (auth/generate-keypair))})
-
-(defn generate-private-key []
-  (.getPrivate (auth/generate-keypair)))
+(def generate-private-key tu/generate-private-key)
 
 (defn first-event-by-type [type events]
   (->> events

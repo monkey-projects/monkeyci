@@ -303,4 +303,3 @@
                        use-db
                        load-instance-id
                        (oci/delete-ci-interceptor client)]}]]]))
-

@@ -145,7 +145,7 @@
                                   :ssh-keys-dir (str (ssh-keys-dir wd))
                                   ;; Do not pass the ssh keys we receive in the event, because
                                   ;; they are encrypted.  Instead, fetch keys from api.
-                                  :ssh-keys (->> (get-ssh-keys ctx)
+                                  :ssh-keys (->> (emi/get-ssh-keys ctx)
                                                  (map (partial hash-map :private-key)))))]
               (assoc ctx ::checkout-dir (clone opts))))})
 

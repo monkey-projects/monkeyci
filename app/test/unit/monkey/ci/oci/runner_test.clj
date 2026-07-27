@@ -11,7 +11,7 @@
              [core :as oci]
              [runner :as sut]]
             [monkey.ci.script.config :as sc]
-            [monkey.ci.test.helpers :as h]
+            [monkey.ci.test.utils :as tu]
             [monkey.mailman
              [core :as mmc]
              [sieppari :as mms]]))
@@ -22,7 +22,7 @@
            (filter (comp (partial = fn) :file-name))
            first
            :data
-           (h/base64->)))
+           (tu/base64->)))
 
 (deftest instance-config
   (let [build {:org-id "test-cust"
@@ -33,9 +33,9 @@
         ic (sut/instance-config {:log-config "test-log-config"
                                  :build-image-url "test-clojure-img"
                                  :api
-                                 {:private-key (h/generate-private-key)}
+                                 {:private-key (tu/generate-private-key)}
                                  :jwk
-                                 {:priv (h/generate-private-key)
+                                 {:priv (tu/generate-private-key)
                                   :pub "test-pub-key"}
                                  :containers
                                  {:shape "test-shape"
@@ -219,7 +219,7 @@
 
 (deftest prepare-ci-config
   (let [{:keys [enter] :as i} (sut/prepare-ci-config
-                               {:api {:private-key (h/generate-private-key)}})]
+                               {:api {:private-key (tu/generate-private-key)}})]
     (is (keyword? (:name i)))
     
     (testing "updates ci config with container details"
@@ -233,7 +233,7 @@
     (is (keyword? (:name i)))
     
     (testing "`enter` saves ci results in db"
-      (h/with-memory-store st
+      (tu/with-memory-store st
         (let [sid (repeatedly 3 cuid/random-cuid)
               ctx (-> {:event {:sid sid}}
                       (oci/set-ci-response {:status 200
@@ -250,7 +250,7 @@
     (is (keyword? (:name i)))
     
     (testing "`enter` fetches runner details from db"
-      (h/with-memory-store st
+      (tu/with-memory-store st
         (let [sid (repeatedly 3 cuid/random-cuid)
               ocid (random-uuid)
               details {:runner :oci
@@ -277,7 +277,7 @@
                :source :api
                :git {:url "test-url"}}
         st (st/make-memory-storage)
-        conf {:api {:private-key (h/generate-private-key)}
+        conf {:api {:private-key (tu/generate-private-key)}
               :ssh-keys-fetcher (constantly [])}
         router (-> (sut/make-routes conf st)
                    (mmc/router {:executor mms/execute}))]

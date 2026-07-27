@@ -9,9 +9,7 @@
              [aleph-test :as at]
              [helpers :as h]
              [runtime :as trt]]
-            [monkey.ci.vault
-             [common :as vc]
-             [fixed :as vf]]
+            [monkey.ci.vault.common :as vc]
             [monkey.ci.web
              [auth :as auth]
              [bitbucket :as sut]
