@@ -72,10 +72,12 @@
     
     (testing "restores/saves caches"
       (let [caches (atom {})]
-        (letfn [(save-cache [c]
-                  (swap! caches update :saved conj c))
-                (restore-cache [c]
-                  (swap! caches update :restored conj c))]
+        (letfn [(save-cache [_ c]
+                  (swap! caches update :saved conj c)
+                  c)
+                (restore-cache [_ c]
+                  (swap! caches update :restored conj c)
+                  c)]
           (let [cache {:id :test-cache
                        :path "test-cache"}
                 job (bc/action-job ::job-with-caches
@@ -98,7 +100,9 @@
                                    {:save-artifacts [art]})
                 r (execute-sync job (assoc ctx
                                            :job job
-                                           :artifact {:save (partial swap! saved conj)
+                                           :artifact {:save (fn [_ v]
+                                                              (swap! saved conj v)
+                                                              v)
                                                       :restore (constantly nil)}))]
             (is (bc/success? r))
             (is (= [art] @saved)))))
@@ -113,7 +117,9 @@
                 r (execute-sync job (assoc ctx
                                            :job job
                                            :artifact {:save (constantly nil)
-                                                      :restore (partial swap! restored conj)}))]
+                                                      :restore (fn [_ v]
+                                                                 (swap! restored conj v)
+                                                                 v)}))]
             (is (bc/success? r))
             (is (= [art] @restored)))))
 
