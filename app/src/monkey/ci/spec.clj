@@ -1,8 +1,7 @@
 (ns monkey.ci.spec
   (:require [clojure.spec.alpha :as s]
             [clojure.tools.logging :as log]
-            [monkey.ci.spec.common :as c]
-            [monkey.oci.sign :as oci-sign]))
+            [monkey.ci.spec.common :as c]))
 
 (defn valid?
   "Checks if the object is conform to the spec, and also prints a handy warning
@@ -39,7 +38,7 @@
 (s/def :storage/type #{:memory :file :oci :sql})
 (s/def :storage/dir string?)
 (s/def :oci/bucket-name string?)
-(s/def :oci/credentials (s/merge ::oci-sign/config))
+(s/def :oci/credentials map?)
 (s/def :oci/region string?)
 (s/def :oci/prefix string?)
 (s/def :oci/ns string?)

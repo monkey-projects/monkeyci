@@ -119,3 +119,16 @@
   [db]
   {:name ::use-db
    :enter #(set-db % db)})
+
+;;; Retrieve ssh keys for git clone
+
+(def get-ssh-keys ::ssh-keys)
+
+(defn set-ssh-keys [ctx k]
+  (assoc ctx ::ssh-keys k))
+
+(defn fetch-ssh-keys [fetcher]
+  {:name ::fetch-ssh-keys
+   :enter (fn [ctx]
+            (set-ssh-keys ctx (fetcher (get-in ctx [:event :sid]))))})
+

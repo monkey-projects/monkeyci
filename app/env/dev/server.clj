@@ -13,8 +13,7 @@
              [utils :as u]]
             [monkey.ci.app.events.mailman :as em]
             [monkey.ci.runtime.app :as ra]
-            [monkey.ci.web.auth :as auth]
-            [org.httpkit.server :as http]))
+            [monkey.ci.web.auth :as auth]))
 
 (defonce server (atom nil))
 
@@ -47,13 +46,6 @@
                 (component/start))]
     (reset! server sys))
   nil)
-
-(defn get-server-port []
-  (some-> server
-          deref
-          :http
-          :server
-          http/server-port))
 
 (defn private-key []
   (some-> @server :rt :jwk :priv))

@@ -41,9 +41,6 @@
 (defn set-process-reaper [rt pr]
   (assoc rt :process-reaper pr))
 
-(defn set-vault [rt v]
-  (assoc rt :vault v))
-
 (defn set-dek-generator [rt f]
   (assoc-in rt [:crypto :dek-generator] f))
 
@@ -70,7 +67,6 @@
       (set-jwk (auth/keypair->rt (auth/generate-keypair)))
       (set-runner (constantly (md/success-deferred 0)))
       (set-process-reaper (constantly []))
-      (set-vault (h/fake-vault))
       (set-dek-generator (constantly nil))
       (set-decrypter (constantly nil))
       (set-encrypter (constantly nil))

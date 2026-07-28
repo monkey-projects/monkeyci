@@ -99,17 +99,6 @@
 (defn- random-sid []
   (repeatedly 3 (comp str random-uuid)))
 
-(deftest fetch-ssh-keys
-  (let [{:keys [enter] :as i} (sut/fetch-ssh-keys identity)]
-    (is (keyword? (:name i)))
-
-    (testing "`enter` fetches keys for repo sid"
-      (let [sid (random-sid)]
-        (is (= sid
-               (-> {:event {:sid sid}}
-                   (enter)
-                   (sut/get-ssh-keys))))))))
-
 (deftest git-clone
   (let [{:keys [enter] :as i} sut/git-clone]
     (is (keyword? (:name i)))
@@ -121,7 +110,7 @@
                         {:build {:git {:ssh-keys [{:private-key "old-pk"}]}}}}
                        (sut/set-config {:work-dir "/tmp/test-dir"
                                         :git {:clone clone}})
-                       (sut/set-ssh-keys ["fetched-pk"])
+                       (emi/set-ssh-keys ["fetched-pk"])
                        (enter))))
 
         (testing "invokes git clone fn with build git details"

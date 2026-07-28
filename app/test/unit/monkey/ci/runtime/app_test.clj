@@ -12,7 +12,6 @@
              [vault :as v]]
             [monkey.ci.logging.log-ingest :as li]
             [monkey.ci.metrics.otlp :as mo]
-            [monkey.ci.oci.core :as oci]
             [monkey.ci.runtime.app :as sut]
             [monkey.ci.vault
              [common :as vc]
@@ -59,9 +58,6 @@
           (testing "provides process reaper"
             (is (ifn? (:process-reaper rt))))
 
-          (testing "provides vault"
-            (is (p/vault? (:vault rt))))
-
           (testing "provides data encryption key generator"
             (is (fn? (get-in rt [:crypto :dek-generator]))))
 
@@ -99,29 +95,6 @@
 
       (testing "provides otlp client"
         (is (some? (:otlp sys)))))))
-
-(deftest process-reaper
-  (testing "returns empty list when no oci runner"
-    (let [r (sut/->ProcessReaper {:runner {:type :local}})]
-      (is (empty? (r)))))
-
-  (testing "deletes oci stale instances"
-    (with-redefs [oci/delete-stale-instances (fn [ctx cid]
-                                               {:context ctx
-                                                :compartment-id cid})]
-      (testing "for `:oci` runners"
-        (let [r (sut/->ProcessReaper {:runner
-                                      {:type :oci
-                                       :containers {:user-ocid "test-user"
-                                                    :compartment-id "test-comp"}}})
-              res (r)]
-          (testing "creates context from container config"
-            (is (some? (:context res)))
-            (is (= "test-comp" (:compartment-id res))))))
-
-      (testing "not for other runners"
-        (let [r (sut/->ProcessReaper {:runner {:type :some-other}})]
-          (is (empty? (r))))))))
 
 (deftest queue-options
   (testing "`jms` configures destinations"

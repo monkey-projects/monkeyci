@@ -39,11 +39,6 @@
 
 (def evt->build (comp :build :event))
 
-(def get-ssh-keys ::ssh-keys)
-
-(defn set-ssh-keys [ctx k]
-  (assoc ctx ::ssh-keys k))
-
 (defn build-work-dir [{:keys [work-dir]} sid]
   (str (apply fs/path work-dir sid)))
 
@@ -136,11 +131,6 @@
                         b/sid))
           (empty?)))))
 
-(defn fetch-ssh-keys [fetcher]
-  {:name ::fetch-ssh-keys
-   :enter (fn [ctx]
-            (set-ssh-keys ctx (fetcher (get-in ctx [:event :sid]))))})
-
 (def git-clone
   "Clones the repository configured in the build into the build checkout dir"
   {:name ::git-clone
@@ -155,7 +145,7 @@
                                   :ssh-keys-dir (str (ssh-keys-dir wd))
                                   ;; Do not pass the ssh keys we receive in the event, because
                                   ;; they are encrypted.  Instead, fetch keys from api.
-                                  :ssh-keys (->> (get-ssh-keys ctx)
+                                  :ssh-keys (->> (emi/get-ssh-keys ctx)
                                                  (map (partial hash-map :private-key)))))]
               (assoc ctx ::checkout-dir (clone opts))))})
 
@@ -254,7 +244,7 @@
       :interceptors [emi/handle-build-error
                      (add-config conf)
                      add-token
-                     (fetch-ssh-keys (:ssh-keys-fetcher conf))
+                     (emi/fetch-ssh-keys (:ssh-keys-fetcher conf))
                      git-clone
                      save-workspace
                      result-build-init-evt

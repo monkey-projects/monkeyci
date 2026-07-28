@@ -1,0 +1,13 @@
+{:deps {com.monkeyci/app {:mvn/version "0.27.0-SNAPSHOT"}
+        com.monkeyprojects/oci-container-instance {:mvn/version "0.2.5"}
+        com.monkeyprojects/oci-os {:mvn/version "0.4.1"}
+        com.monkeyprojects/oci-sign {:mvn/version "0.1.5"}
+        com.monkeyprojects/oci-vault {:mvn/version "0.2.1"}}
+
+ :aliases
+ {:test
+  ;; clj -X:test
+  {:extra-deps {com.monkeyprojects/build {:mvn/version "0.3.1"}
+                com.monkeyci/test-utils {:local/root "../test-utils"}}
+   :override-deps {com.monkeyci/app {:local/root "../../app"}}
+   :exec-fn monkey.test/all}}}

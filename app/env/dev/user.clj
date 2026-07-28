@@ -2,7 +2,6 @@
   (:require [babashka.fs :as fs]
             [clojure.tools.namespace.repl :as nr]
             [config :as c]
-            [instances :as i]
             [manifold.deferred :as md]
             [monkey.ci
              [commands :as cmd]
@@ -37,11 +36,6 @@
 (defn refresh []
   (server/stop-server)
   (nr/refresh))
-
-(defn list-staging []
-  (c/load-config! "oci/staging-config.edn")
-  (->> @(i/list-active)
-       (map (juxt :id :display-name :time-created :lifecycle-state))))
 
 (defn run-build-agent
   "Runs build agent with local config, returns a fn that stops the agent

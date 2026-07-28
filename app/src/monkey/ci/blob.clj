@@ -7,8 +7,7 @@
             [monkey.ci.blob
              [common :as bc]
              [disk :as bd]
-             [s3 :as bs3]]
-            [monkey.ci.oci.blob :as oci]))
+             [s3 :as bs3]]))
 
 (defn save
   "Saves blob from src to dest, with optional metadata"
@@ -29,7 +28,7 @@
   (bd/->DiskBlobStore (u/abs-path (:work-dir conf) (get-in conf [k :dir]))))
 
 (defmethod make-blob-store :oci [conf k]
-  (oci/make-blob-store (get conf k)))
+  ((requiring-resolve 'monkey.ci.oci.blob/make-blob-store) (get conf k)))
 
 (defmethod make-blob-store :s3 [conf k]
   (let [s3-config (get conf k)]

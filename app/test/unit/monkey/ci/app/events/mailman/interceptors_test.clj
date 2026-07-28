@@ -164,3 +164,14 @@
 
   (testing "if no kill present, does nothing"
     (is (empty? (sut/cancel-process-kill {})))))
+
+(deftest fetch-ssh-keys
+  (let [{:keys [enter] :as i} (sut/fetch-ssh-keys identity)]
+    (is (keyword? (:name i)))
+
+    (testing "`enter` fetches keys for repo sid"
+      (let [sid ["test" "sid"]]
+        (is (= sid
+               (-> {:event {:sid sid}}
+                   (enter)
+                   (sut/get-ssh-keys))))))))

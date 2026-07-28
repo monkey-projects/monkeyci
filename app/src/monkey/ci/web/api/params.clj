@@ -23,7 +23,7 @@
    (encrypt-one req (req->param-id req))))
 
 (defn- decrypt
-  "Decryps all parameter values using the vault from the request"
+  "Decryps all parameter values using the decrypter from the request"
   [req params]
   (let [decrypter (cr/decrypter req)]
     (letfn [(decrypt-vals [d p]

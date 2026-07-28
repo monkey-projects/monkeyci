@@ -69,3 +69,4 @@
       (let [q (java.util.LinkedList.)]
         (is (nil? (.push q ::test)))
         (is (empty? (:queue (enter {:queue q}))))))))
+

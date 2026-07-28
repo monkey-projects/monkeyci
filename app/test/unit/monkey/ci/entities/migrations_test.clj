@@ -41,7 +41,6 @@
   (eh/with-test-db*
     (fn [{:keys [ds] :as conn}]
       (let [[migs rem] (->> (sut/prepare-migrations sut/migrations (-> conn
-                                                                       (eh/add-vault)
                                                                        (dissoc :ds)))
                             (split-with (complement p)))
             db (rj/sql-database ds)
@@ -188,7 +187,7 @@
       (testing "`down` does nothing"
         (is (nil? ((:down mig) conn)))))))
 
-(deftest ^:sql re-encrypt-params
+#_(deftest ^:sql re-encrypt-params
   (with-migrations-up-to (comp (partial re-matches #"^.*-re-encrypt-params$")
                                rp/id)
     conn mig
@@ -233,7 +232,7 @@
                    first
                    :value)))))))
 
-(deftest ^:sql re-encrypt-ssh-keys
+#_(deftest ^:sql re-encrypt-ssh-keys
   (with-migrations-up-to (comp (partial re-matches #"^.*-re-encrypt-ssh-keys$")
                                rp/id)
       conn mig

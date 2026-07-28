@@ -12,7 +12,9 @@
              [pem :as pem]
              [process :as proc]
              [utils :as u]]
-            [monkey.ci.runners.controller :as rc]
+            [monkey.ci.runners
+             [controller :as rc]
+             [runtime :as rr]]
             [monkey.ci.sidecar
              [config :as cs]
              [core :as sc]
@@ -80,11 +82,14 @@
                                                        (md/success-deferred {:status 200}))]
               (validate-sidecar config job (fn [] @recv)))))))))
 
+(defmethod rr/make-container-routes :test [_]
+  [])
+
 (deftest controller
   (testing "invokes `run-controller` with runtime created from config"
     (with-redefs [rc/run-controller (fn [rt]
-                                       (when (some? rt) ::ok))]
-      (is (= ::ok (sut/controller tc/base-config))))))
+                                      (when (some? rt) ::ok))]
+      (is (= ::ok (sut/controller (assoc tc/base-config :containers {:type :test})))))))
 
 (deftest issue-creds
   (h/with-tmp-dir dir

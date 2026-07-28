@@ -9,9 +9,7 @@
              [aleph-test :as at]
              [helpers :as h]
              [runtime :as trt]]
-            [monkey.ci.vault
-             [common :as vc]
-             [fixed :as vf]]
+            [monkey.ci.vault.common :as vc]
             [monkey.ci.web
              [auth :as auth]
              [bitbucket :as sut]
@@ -219,9 +217,6 @@
                (trt/set-decrypter (constantly "decrypted"))
                (assoc :config {:ssh-keys-dir "/tmp"}))
         s (:storage rt)
-        vault (vf/make-fixed-key-vault {})
-        rt (-> rt
-               (trt/set-vault vault))
         repo (-> (h/gen-repo)
                  (assoc :url "http://test-url"))
         org (-> (h/gen-org)

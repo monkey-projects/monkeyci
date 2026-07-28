@@ -104,8 +104,6 @@
       (let [idx (cs/index-of (:uri req) base)]
         (format "%s://%s%s" (name (:scheme req)) (get-in req [:headers "host"]) (subs (:uri req) 0 idx)))))
 
-(def req->vault #(from-rt % :vault))
-
 (def req->mailman
   "Retrieves mailman component from request"
   #(from-rt % :mailman))

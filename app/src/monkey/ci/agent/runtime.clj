@@ -27,7 +27,6 @@
              [polling :as ep]]
             [monkey.ci.logging.log-ingest :as log-ingest]
             [monkey.ci.metrics.core :as mc]
-            [monkey.ci.oci.containers :as c-oci]
             [monkey.ci.runners.runtime :as rr]
             [monkey.ci.web.auth :as auth]
             [monkey.mailman.core :as mmc]))
@@ -108,7 +107,7 @@
 (defmethod make-container-routes :oci [conf deps]
   (-> deps
       (assoc :oci conf)
-      (c-oci/make-routes)))
+      ((requiring-resolve 'monkey.ci.oci.containers/make-routes))))
 
 (defmethod make-container-routes :podman [conf deps]
   (-> deps
