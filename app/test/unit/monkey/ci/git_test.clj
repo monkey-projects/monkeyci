@@ -1,13 +1,11 @@
 (ns monkey.ci.git-test
-  (:require
-   [babashka.fs :as fs]
-   [buddy.core.codecs :as bcc]
-   [clj-jgit.porcelain :as git]
-   [clojure.test :refer [deftest is testing]]
-   [monkey.ci.git :as sut]
-   [monkey.ci.test.helpers :as h]
-   [monkey.ci.web.auth :as auth]
-   [monkey.oci.common.utils :as ocu]))
+  (:require [babashka.fs :as fs]
+            [buddy.core.codecs :as bcc]
+            [clj-jgit.porcelain :as git]
+            [clojure.test :refer [deftest is testing]]
+            [monkey.ci.git :as sut]
+            [monkey.ci.test.helpers :as h]
+            [monkey.ci.web.auth :as auth]))
 
 (defn fake-clone-cmd [calls]
   (proxy [org.eclipse.jgit.api.CloneCommand] []

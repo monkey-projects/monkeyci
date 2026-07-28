@@ -3,9 +3,7 @@
   (:require [buddy.core.codecs :as bcc]
             [clojure.tools.logging :as log]
             [com.stuartsierra.component :as co]
-            [manifold
-             [bus :as mb]
-             [deferred :as md]]
+            [manifold.bus :as mb]
             [monkey.ci
              [blob :as blob]
              [invoicing :as inv]
@@ -27,21 +25,14 @@
              [core :as m]
              [events :as me]
              [otlp :as mo]]
-            [monkey.ci.reporting.print]
             [monkey.ci.runtime.common :as rc]
             [monkey.ci.storage.sql :as sql]
-            [monkey.ci.oci
-             [core :as oci]
-             [runner :as ro]
-             [storage]
-             [vault :as vo]]
             [monkey.ci.vault
              [common :as vc]
              [scw :as v-scw]]
             [monkey.ci.web
              [handler :as wh]
-             [http :as http]]
-            [monkey.oci.container-instance.core :as ci]))
+             [http :as http]]))
 
 (defn- as-map [deps]
   (zipmap deps deps))
@@ -178,16 +169,10 @@
 (defn- new-server-runtime [conf]
   (->ServerRuntime conf))
 
-(defrecord ProcessReaper [config]
-  clojure.lang.IFn
-  (invoke [this]
-    (let [{:keys [containers] :as rc} (:runner config)]
-      (if (#{:oci} (:type rc))
-        (oci/delete-stale-instances (ci/make-context containers) (:compartment-id containers))
-        []))))
-
 (defn- new-process-reaper [conf]
-  (->ProcessReaper conf))
+  (if (= :oci (get-in conf [:runner :type]))
+    ((requiring-resolve 'monkey.ci.oci.process-reaper/make-process-reaper) conf)
+    {}))
 
 (defmulti make-queue-options :type)
 
@@ -229,10 +214,9 @@
 
 (defmethod make-server-runner :oci [config]
   (letfn [(make-routes [c]
-            (ro/make-routes (:runner config)
-                            (:storage c)
-                            ;; Vault is deprecated and has been removed
-                            nil))]
+            ((requiring-resolve 'monkey.ci.oci.runner/make-routes)
+             (:runner config)
+             (:storage c)))]
     (em/map->RouteComponent {:make-routes make-routes})))
 
 (defmethod make-server-runner :agent [_]

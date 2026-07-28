@@ -15,7 +15,6 @@
              [utils :as u]
              [workspace :as ws]]
             [monkey.ci.build.api-server :as bas]
-            [monkey.ci.oci.containers :as c-oci]
             [monkey.ci.app.events.mailman :as em]
             [monkey.ci.app.events.mailman
              [interceptors :as emi]
@@ -198,15 +197,19 @@
 
 (defmulti make-container-routes (comp :type :containers))
 
+(defn make-oci-container-routes [conf]
+  ((requiring-resolve 'monkey.ci.oci.containers/make-routes) conf))
+
 (defmethod make-container-routes :oci [conf]
   (log/debug "Creating OCI container routes")
   (let [extract-keys [:promtail :sidecar]]
-    (c-oci/make-routes (-> conf
-                           (dissoc :containers)
-                           (assoc :oci (-> (:containers conf)
-                                           (as-> x (apply dissoc x extract-keys)))
-                                  :api (bas/srv->api-config (:api conf)))
-                           (merge (select-keys (:containers conf) extract-keys))))))
+    (make-oci-container-routes
+     (-> conf
+         (dissoc :containers)
+         (assoc :oci (-> (:containers conf)
+                         (as-> x (apply dissoc x extract-keys)))
+                :api (bas/srv->api-config (:api conf)))
+         (merge (select-keys (:containers conf) extract-keys))))))
 
 (defn new-container-routes
   "Creates new event handler routes that handle events raised by the controller and 

@@ -19,9 +19,7 @@
             [monkey.ci.sidecar
              [config :as cs]
              [spec :as ss]]
-            [monkey.ci.test
-             [helpers :as h]
-             [runtime :as trt]]))
+            [monkey.ci.test.utils :as tu]))
 
 (defn- find-volume-entry [vol n]
   (->> vol :configs (filter (comp (partial = n) :file-name)) first))
@@ -37,8 +35,7 @@
 (defn random-build-sid []
   (repeatedly 3 cuid/random-cuid))
 
-(def default-rt (-> (trt/test-runtime)
-                    (assoc :build {:checkout-dir "/tmp"})))
+(def default-rt {:build {:checkout-dir "/tmp"}})
 
 (def default-config
   {:runtime default-rt
@@ -232,7 +229,7 @@
                (:working-directory jc))))))
 
   (testing "sidecar container"
-    (let [pk (h/generate-private-key)
+    (let [pk (tu/generate-private-key)
           ic (->> {:job {:id "test-job"
                          :script ["first" "second"]
                          :save-artifacts [{:id "test-artifact"
@@ -253,22 +250,22 @@
         (is (= "java" (first cmd))))
 
       (testing "passes config file as arg"
-        (is (h/contains-subseq? cmd
+        (is (tu/contains-subseq? cmd
                                 ["-c" "/home/monkeyci/config/config.edn"])))
       
       (testing "starts sidecar"
-        (is (h/contains-subseq? cmd ["sidecar"])))
+        (is (tu/contains-subseq? cmd ["sidecar"])))
 
       (testing "passes events-file as arg"
-        (is (h/contains-subseq? cmd
+        (is (tu/contains-subseq? cmd
                                 ["--events-file" cc/event-file])))
 
       (testing "passes start-file as arg"
-        (is (h/contains-subseq? cmd
+        (is (tu/contains-subseq? cmd
                                 ["--start-file" cc/start-file])))
 
       (testing "passes abort-file as arg"
-        (is (h/contains-subseq? cmd
+        (is (tu/contains-subseq? cmd
                                 ["--abort-file" cc/abort-file])))
 
       (testing "config volume"
@@ -366,7 +363,7 @@
                                 :configs
                                 first
                                 :data
-                                h/base64->
+                                tu/base64->
                                 yaml/parse-string)]
           (is (some? v))
           (is (map? contents))

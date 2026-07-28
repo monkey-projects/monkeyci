@@ -3,7 +3,6 @@
             [clojure.test :refer [deftest is testing]]
             [com.stuartsierra.component :as co]
             [manifold.stream :as ms]
-            [monkey.ci.oci.containers :as c-oci]
             [monkey.ci.app.events.mailman :as em]
             [monkey.ci.metrics.core :as m]
             [monkey.ci.runners.runtime :as sut]
@@ -19,12 +18,16 @@
 (def runner-config
   (assoc tc/base-config
          :checkout-base-dir "/base/dir"
+         :containers {:type :test}
          :build {:org-id "test-cust"
                  :repo-id "test-repo"
                  :build-id "test-build"
                  :sid ["test" "build"]}
          :api {:url "http://test"
                :token "test-token"}))
+
+(defmethod sut/make-container-routes :test [_]
+  {})
 
 (deftest make-runner-system
   (let [sys (sut/make-runner-system runner-config)]
@@ -70,13 +73,6 @@
 
     (testing "provides controller routes"
       (is (some? (:controller-routes sys))))
-
-    (testing "passes api config to oci container routes"
-      (let [sys (-> runner-config
-                    (assoc :containers {:type :oci})
-                    (sut/with-runner-system identity))]
-        (is (= (get-in sys [:api-config :token])
-               (-> sys :container-routes :api :token)))))
 
     (testing "provides global forwarder"
       (is (some? (:global-forwarder sys))))
@@ -212,9 +208,9 @@
   (testing "type `oci`"
     (testing "creates oci routes with config"
       (let [conf (atom nil)]
-        (with-redefs [c-oci/make-routes (fn [c]
-                                          (reset! conf c)
-                                          ::routes)]
+        (with-redefs [sut/make-oci-container-routes (fn [c]
+                                                      (reset! conf c)
+                                                      ::routes)]
           (is (= ::routes (sut/make-container-routes {:containers
                                                       {:type :oci
                                                        :sidecar ::sidecar

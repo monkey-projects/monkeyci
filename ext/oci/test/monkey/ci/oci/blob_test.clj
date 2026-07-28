@@ -1,7 +1,6 @@
 (ns monkey.ci.oci.blob-test
   (:require [babashka.fs :as fs]
             [clj-commons.byte-streams :as bs]
-            [clojure.java.io :as io]
             [clojure.test :refer [deftest is testing]]
             [manifold.deferred :as md]
             [monkey.ci
@@ -11,7 +10,6 @@
             [monkey.ci.oci
              [blob :as sut]
              [core :as bo]]
-            [monkey.ci.test.helpers :as h]
             [monkey.oci.os
              [martian :as om]
              [stream :as oss]]))
@@ -22,12 +20,12 @@
   
   (testing "`save`"
       (with-redefs [oss/input-stream->multipart (constantly (md/success-deferred nil))]
-        (h/with-tmp-dir dir
-          (let [tmp-dir (io/file dir "tmp")
+        (fs/with-temp-dir [dir]
+          (let [tmp-dir (fs/file dir "tmp")
                 blob (sut/make-blob-store {:type :oci
                                            :prefix "prefix"
                                            :tmp-dir (u/abs-path tmp-dir)})
-                f (io/file dir "test.txt")
+                f (fs/file dir "test.txt")
                 _ (spit f "This is a test file")
                 r @(p/save-blob blob f "remote/path" nil)]
             
@@ -49,28 +47,28 @@
                                    (every? valid-md? metadata))
                             (md/success-deferred nil)
                             (md/error-deferred (ex-info "Invalid metadata" metadata))))]
-            (h/with-tmp-dir dir
-              (let [src (io/file dir "test.txt")
+            (fs/with-temp-dir [dir]
+              (let [src (fs/file dir "test.txt")
                     _ (spit src "test file")
                     blob (sut/make-blob-store {:type :oci
                                                :tmp-dir (u/abs-path dir)})]
                 (is (some? @(p/save-blob blob src "test/path" {:key "value"})))))))))
 
   (testing "`restore`"
-    (h/with-tmp-dir dir
+    (fs/with-temp-dir [dir]
       (let [files {"test.txt" "This is a test file"
                    "dir/sub.txt" "This is a child file"}
-            orig (io/file dir "orig")
-            arch (io/file dir "archive.tgz")
-            tmp-dir (io/file dir "tmp")
+            orig (fs/file dir "orig")
+            arch (fs/file dir "archive.tgz")
+            tmp-dir (fs/file dir "tmp")
             blob (sut/make-blob-store {:type :oci
                                        :prefix "prefix"
                                        :tmp-dir (u/abs-path tmp-dir)})
-            r (io/file dir "restored")]
+            r (fs/file dir "restored")]
 
         ;; Create archive first
         (doseq [[f v] files]
-          (let [p (io/file orig f)]
+          (let [p (fs/file orig f)]
             (is (true? (.mkdirs (.getParentFile p))))
             (spit p v)))
 
@@ -92,7 +90,7 @@
               (is (= "remote/path" (:src res)))
               (is (fs/exists? (:dest res)))
               (doseq [[f v] files]
-                (let [p (io/file (:dest res) f)]
+                (let [p (fs/file (:dest res) f)]
                   (is (fs/exists? p))
                   (is (= v (slurp p))))))
 
