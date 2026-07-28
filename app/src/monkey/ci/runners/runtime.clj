@@ -184,7 +184,6 @@
 (defn global-to-local-routes
   "Creates new event handler routes, that handle events received from the global broker."
   [types]
-  ;; TODO Also receive dispatcher events for container jobs
   ;; TODO Filter events by build sid using a selector (when on jms)
   (em/map->RouteComponent
    {:make-routes (fn [{:keys [local-mailman]}]
@@ -198,6 +197,7 @@
 (defmulti make-container-routes (comp :type :containers))
 
 (defn make-oci-container-routes [conf]
+  ;; External module
   ((requiring-resolve 'monkey.ci.oci.containers/make-routes) conf))
 
 (defmethod make-container-routes :oci [conf]

@@ -1,5 +1,7 @@
 # README #
 
+**This repository has migrated to [Codeberg](https://codeberg.org/MonkeyProjects/monkeyci)**
+
 ```clojure
 (ns build
   (:require [monkey.ci.api :as m]))
